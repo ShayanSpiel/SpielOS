@@ -1,0 +1,121 @@
+{
+  "skills": [
+    {
+      "name": "shayanspiel-content",
+      "filePatterns": ["*.md"],
+      "applyTo": "session",
+      "description": "SpielEngine content engine — drafts X/LinkedIn/blog posts",
+      "source": "~/.config/opencode/skill/shayanspiel-content/SKILL.md"
+    }
+  ],
+  "commands": [
+    {
+      "name": "extract",
+      "description": "Ingest raw source → wiki pages",
+      "source": "~/.config/opencode/command/extract.md",
+      "template": "AGENTS.md"
+    },
+    {
+      "name": "post",
+      "description": "Session → queue drafts",
+      "source": "~/.config/opencode/command/post.md",
+      "template": "AGENTS.md"
+    },
+    {
+      "name": "publish",
+      "description": "Queue → production",
+      "source": "~/.config/opencode/command/publish.md",
+      "template": "AGENTS.md"
+    },
+    {
+      "name": "queue",
+      "description": "Show queue status",
+      "source": "~/.config/opencode/command/queue.md",
+      "template": "AGENTS.md"
+    },
+    {
+      "name": "health",
+      "description": "Full validation check",
+      "source": "~/.config/opencode/command/health.md",
+      "template": "AGENTS.md"
+    },
+    {
+      "name": "prune",
+      "description": "Archive stale, merge duplicates",
+      "source": "~/.config/opencode/command/prune.md",
+      "template": "AGENTS.md"
+    },
+    {
+      "name": "state",
+      "description": "Show system state",
+      "source": "~/.config/opencode/command/state.md",
+      "template": "AGENTS.md"
+    },
+    {
+      "name": "reconcile",
+      "description": "Update page from source",
+      "source": "~/.config/opencode/command/reconcile.md",
+      "template": "AGENTS.md"
+    },
+    {
+      "name": "relink",
+      "description": "Rebuild cross-links",
+      "source": "~/.config/opencode/command/relink.md",
+      "template": "AGENTS.md"
+    },
+    {
+      "name": "index",
+      "description": "Rebuild page catalog",
+      "source": "~/.config/opencode/command/index.md",
+      "template": "AGENTS.md"
+    },
+    {
+      "name": "compact",
+      "description": "Consolidate related concepts",
+      "source": "~/.config/opencode/command/compact.md",
+      "template": "AGENTS.md"
+    },
+    {
+      "name": "config",
+      "description": "View/modify system config",
+      "source": "~/.config/opencode/command/config.md",
+      "template": "AGENTS.md"
+    },
+    {
+      "name": "log",
+      "description": "Show last N log entries",
+      "source": "~/.config/opencode/command/log.md",
+      "template": "AGENTS.md"
+    },
+    {
+      "name": "help",
+      "description": "Show command synopsis",
+      "source": "~/.config/opencode/command/help.md",
+      "template": "AGENTS.md"
+    },
+    {
+      "name": "schedule",
+      "description": "Schedule draft for later",
+      "source": "~/.config/opencode/command/schedule.md",
+      "template": "AGENTS.md"
+    },
+    {
+      "name": "optimize",
+      "description": "Re-run gates, improve draft",
+      "source": "~/.config/opencode/command/optimize.md",
+      "template": "AGENTS.md"
+    },
+    {
+      "name": "analyze",
+      "description": "Analyze posted content performance",
+      "source": "~/.config/opencode/command/analyze.md",
+      "template": "AGENTS.md"
+    },
+    {
+      "name": "reject",
+      "description": "Reject draft + append to anti-pattern library",
+      "source": "~/.config/opencode/command/reject.md",
+      "template": "AGENTS.md"
+    }
+  ]
+}

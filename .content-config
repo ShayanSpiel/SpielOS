@@ -1,0 +1,7 @@
+posting:
+  mode: manual
+  quality_threshold: 0.85
+  require_confirm:
+    - blog
+    - linkedin
+  max_auto_day: 3

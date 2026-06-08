@@ -1,0 +1,10 @@
+current_state: IDLE
+last_state_change: 2026-01-01T00:00:00
+pending_action: null
+last_validation: passed
+validation_results:
+  orphans: 0
+  broken_links: 0
+  stale: []
+  warnings: []
+last_ingest: null
