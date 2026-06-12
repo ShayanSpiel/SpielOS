@@ -1,0 +1,31 @@
+# Obsidian vault metadata (regeneratable)
+.obsidian/
+.trash/
+
+# Opencode runtime
+.opencode/
+.logs/
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Editor
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Build/cache
+*.log
+__pycache__/
+*.pyc
+
+# PII / source-of-truth files that should never be in the repo
+# (the user's resume, env, credentials)
+.env
+.env.local
+*.pdf
+!templates/*.pdf
+!raw/*.pdf

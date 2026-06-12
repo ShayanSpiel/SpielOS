@@ -1,0 +1,21 @@
+{
+  "name": "shayanwiki",
+  "version": "1.0.0",
+  "description": "A dual-agent system built on opencode: an LLM-operated wiki for compounding knowledge, connected to a content engine that turns every work session into publishable posts.",
+  "main": "index.js",
+  "scripts": {
+    "test": "python3 -m pytest tests/ -v",
+    "test:health": "python3 scripts/wiki-health.py",
+    "test:redundancy": "python3 scripts/detect-redundancy.py",
+    "engine": "python3 scripts/engine.py"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "playwright": "^1.60.0",
+    "puppeteer": "^25.1.0",
+    "puppeteer-core": "^25.1.0"
+  }
+}

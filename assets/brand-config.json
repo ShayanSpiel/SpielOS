@@ -1,0 +1,134 @@
+{
+  "brand": {
+    "name": "ShayanSpiel",
+    "handle": "@ShayanSpiel",
+    "primary_bg": "#e8e8e8",
+    "accent": "#ff6a00",
+    "text_dark": "#202020",
+    "text_mid": "#5a5959",
+    "background": {
+      "type": "solid",
+      "value": "#e8e8e8"
+    }
+  },
+  "fonts": {
+    "heading": "Inter",
+    "heading_weights": [600, 700, 900],
+    "subtitle": "Merriweather",
+    "subtitle_weights": [300, 400, 700],
+    "google_fonts": "https://fonts.googleapis.com/css2?family=Inter:wght@600;700;900&family=Merriweather:wght@300;400;700&display=swap",
+    "use_google_fonts": true
+  },
+  "banners": {
+    "default": {
+      "name": "OG Banner",
+      "description": "1200x630 OG card for blog previews. Left-aligned content, icon watermark right-center.",
+      "dimensions": { "width": 1200, "height": 630 },
+      "title": {
+        "max_words": 6,
+        "font_size_px": 140,
+        "color": "#ff6a00",
+        "weight": 900,
+        "letter_spacing": "-0.03em",
+        "line_height": 0.9
+      },
+      "subtitle": {
+        "font_size_px": 40,
+        "color": "#202020",
+        "weight": 400,
+        "letter_spacing": "0.02em",
+        "line_height": 1.4,
+        "highlight": "rgba(255, 228, 77, 0.3)"
+      },
+      "handle": {
+        "font_size_px": 28,
+        "color": "#5a5959",
+        "weight": 400,
+        "letter_spacing": "0.04em",
+        "alignment": "center",
+        "position_bottom_px": 28
+      },
+      "layout": {
+        "content_alignment": "left",
+        "content_padding": "60px 70px 80px",
+        "icon_position_x": "right",
+        "icon_position_y": "center",
+        "icon_offset_x": "-40%",
+        "icon_offset_y": "-50%"
+      }
+    },
+    "social": {
+      "name": "Social Banner",
+      "description": "1200x675 for X/LinkedIn feed. Left-aligned content, icon watermark right-center.",
+      "dimensions": { "width": 1200, "height": 675 },
+      "title": {
+        "max_words": 6,
+        "font_size_px": 124,
+        "color": "#ff6a00",
+        "weight": 900,
+        "letter_spacing": "-0.03em",
+        "line_height": 0.9
+      },
+      "subtitle": {
+        "font_size_px": 36,
+        "color": "#202020",
+        "weight": 400,
+        "letter_spacing": "0.02em",
+        "line_height": 1.4,
+        "highlight": "rgba(255, 228, 77, 0.3)"
+      },
+      "handle": {
+        "font_size_px": 26,
+        "color": "#5a5959",
+        "weight": 400,
+        "letter_spacing": "0.04em",
+        "alignment": "center",
+        "position_bottom_px": 28
+      },
+      "layout": {
+        "content_alignment": "left",
+        "content_padding": "60px 70px 80px",
+        "icon_position_x": "right",
+        "icon_position_y": "center",
+        "icon_offset_x": "-40%",
+        "icon_offset_y": "-50%"
+      }
+    }
+  },
+  "icons": {
+    "default": "arrow-up-right-square",
+    "source": "inline",
+    "registry": {
+      "arrow-up-right-square": {
+        "svg_path": "assets/icons/arrow-up-right-square.svg",
+        "web_url": "https://www.svgrepo.com/svg/507931/arrow-up-right-square",
+        "fallback_svg": ""
+      }
+    },
+    "web_search": {
+      "base_url": "https://www.svgrepo.com/collections/",
+      "default_collection": "arrows",
+      "instructions": "Search SVG Repo (https://www.svgrepo.com) for best SVG aligned with content context. Filter by: monocolor, stroke-based, 24x24 viewBox ideal. Prefer simple geometric icons."
+    },
+    "mapping": [
+      { "patterns": ["ai", "agent", "automation", "engine", "machine", "llm", "gpt", "model", "pipeline"], "icon": "arrow-up-right-square" },
+      { "patterns": ["system", "process", "engine", "workflow", "architecture", "infrastructure", "stack", "framework"], "icon": "arrow-up-right-square" },
+      { "patterns": ["growth", "scale", "business", "revenue", "metrics", "kpi", "analytics", "data", "trend"], "icon": "arrow-up-right-square" },
+      { "patterns": ["code", "build", "develop", "ship", "deploy", "api", "script", "dev"], "icon": "arrow-up-right-square" },
+      { "patterns": ["terminal", "cli", "command", "console"], "icon": "arrow-up-right-square" },
+      { "patterns": ["strategy", "plan", "positioning", "offer", "framework", "method", "pillar"], "icon": "arrow-up-right-square" },
+      { "patterns": ["idea", "learn", "knowledge", "note", "insight", "lesson", "concept", "think"], "icon": "arrow-up-right-square" },
+      { "patterns": ["goal", "target", "focus", "priority", "mission", "objective", "outcome"], "icon": "arrow-up-right-square" },
+      { "patterns": ["launch", "ship", "start", "mvp", "product", "release", "growth"], "icon": "arrow-up-right-square" },
+      { "patterns": ["layer", "stack", "level", "tier", "architecture", "depth"], "icon": "arrow-up-right-square" },
+      { "patterns": ["publish", "content", "post", "draft", "blog", "tweet", "schedule", "queue"], "icon": "arrow-up-right-square" },
+      { "patterns": ["write", "story", "copy", "headline", "hook"], "icon": "arrow-up-right-square" }
+    ],
+    "style": {
+      "opacity": 0.30,
+      "color": "#444444",
+      "size_percent": 120,
+      "rotate_deg": 30
+    }
+  }
+}

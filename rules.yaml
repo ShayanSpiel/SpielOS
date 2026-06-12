@@ -1,0 +1,248 @@
+# Spiel Engine — Single source of truth for all mechanical rules.
+# ===============================================================
+# Edit this file to change behavior. Scripts read this at startup
+# and NEVER have hardcoded values. The scripts/ directory is framework.
+#
+# A new user should be able to:
+#   1. Edit rules.yaml (15 min)
+#   2. Edit concepts/*.md (30 min)
+#   3. Edit templates/*.md (15 min)
+#   → Engine ready for their voice and strategy
+
+# ─── Posting Behavior ────────────────────────────────────────────────
+posting:
+  mode: manual              # manual | auto-threshold | auto-always
+  quality_threshold: 0.85   # 0.0–1.0; auto-pass above this
+  require_confirm: [blog, linkedin]
+  max_auto_day: 3
+
+# ─── Strategy Defaults ──────────────────────────────────────────────
+strategy:
+  primary_offer: your-offer-name
+  icp_profile: your-ideal-customer
+  funnel_default: TOFU
+  conversion_log: content/conversions.md
+  content_verticals:
+    - your-first-vertical
+    - your-second-vertical
+  session_classifier: active
+
+  pages:
+    - icp-offer
+    - funnel-and-matrix
+    - voice-and-gates
+    - session-as-content
+
+  archetypes:
+    S1_system_build:    ["system build", "built the", "architect", "pipeline", "workflow", "framework", "architecture"]
+    S2_ship:            ["ship", "shipped", "released", "deployed", "launched"]
+    S3_decision:        ["chose", "picked", "decided", "trade-off", "over ", "vs ", "versus"]
+    S4_lesson:          ["learned", "lesson", "realised", "realized", "taught me", "discovered"]
+    S5_failure:         ["broke", "crash", "failed", "failure", "bug", "went wrong"]
+    S6_client_work:     ["client", "customer", "for a ", "installed for"]
+    S7_research:        ["research", "analyzed", "analysed", "reading", "study"]
+    S8_tooling:         ["tool", "script", "automation", "capture", "wrote the"]
+    S9_strategy:        ["strategy", "position", "planning", "decided to", "approach"]
+    S10_meta:           ["wiki", "vault", "restructur", "consolidat", "archive", "refactor"]
+  verticals:
+    your-vertical: ["keyword1", "keyword2", "keyword3"]
+  funnel_stages:
+    TOFU:  ["tofu", "awareness", "new", "never", "discover", "first time", "what is"]
+    MOFU:  ["mofu", "consideration", "how it", "the system", "mechanism", "framework", "method"]
+    BOFU:  ["bofu", "conversion", "buy", "purchase", "price", "offer", "close"]
+  icp_layers:
+    L1_surface:  ["time", "busy", "too many", "mess", "unorganized", "overlap"]
+    L2_mid:      ["system", "method", "approach", "process", "workflow", "how to"]
+    L3_deep:     ["identity", "feels like", "status", "threat", "competence", "shame"]
+    L4_root:     ["core", "tension", "trade-off", "fundamental", "root"]
+
+# ─── Character Limits (per surface) ─────────────────────────────────
+char_limits:
+  linkedin_casual: 1500
+  linkedin_polished: 3000
+  x_single: 280
+  x_thread_max_tweets: 12
+  blog_pillar_words: 2500
+
+# ─── Safe Openers (pass AP-13 "project as subject" check) ──────────
+safe_openers:
+  - "the" - "this" - "that" - "these" - "those" - "it" - "its"
+  - "every" - "each" - "some" - "many" - "most" - "few" - "all"
+  - "before" - "after" - "here" - "there" - "now" - "then"
+  - "you" - "your" - "today" - "yesterday" - "tomorrow"
+  - "recently" - "currently" - "you're" - "you've" - "i" - "we"
+  - "i've" - "we've" - "my" - "our" - "their" - "his" - "her"
+  - "no" - "not" - "never" - "none" - "what" - "why" - "how"
+  - "when" - "where" - "stop" - "if" - "anyone" - "everyone"
+  - "actually" - "basically" - "honestly" - "frankly"
+  - "typically" - "usually" - "often" - "always" - "never"
+  - "already" - "still" - "just" - "even" - "only" - "also"
+  - "really" - "simply" - "two" - "three" - "four" - "five"
+  - "first" - "second" - "third" - "another" - "such"
+  - "when" - "while" - "since" - "until" - "although" - "though"
+  - "everyone" - "nobody" - "somebody" - "anyone"
+  - "in" - "on" - "at" - "for" - "with" - "from" - "same"
+  - "here's" - "there's" - "that's" - "it's" - "they're"
+  - "we're" - "you'll" - "we'll" - "i'll" - "i'd" - "we'd" - "you'd"
+  - "don't" - "can't" - "won't" - "isn't" - "aren't" - "hasn't"
+  - "doesn't" - "didn't" - "so" - "well" - "but" - "and" - "yet"
+  - "because" - "like" - "sure" - "okay" - "right" - "literally"
+  - "a" - "an" - "one" - "hey"
+
+# ─── Banned Opener Patterns ────────────────────────────────────────
+banned_openers:
+  - "^today\\s+i\\s+(want\\s+to\\s+)?talk\\s+about"
+  - "^let\\s+me\\s+tell\\s+you\\s+about"
+  - "^i\\s+wanted\\s+to\\s+share"
+  - "^have\\s+you\\s+ever"
+  - "^everyone\\s+talks\\s+about"
+  - "^we\\s+all\\s+know"
+  - "^in\\s+the\\s+(world|realm|era|age)\\s+of"
+  - "^as\\s+a\\s+(founder|builder|creator|developer)"
+  - "^if\\s+you"
+  - "^the\\s+truth\\s+is"
+  - "^i'm\\s+(excited|thrilled)"
+  - "^hey\\s+friends"
+  - "^there's\\s+a\\s+(reason|secret|thing|pattern)"
+
+# ─── Lesson Triggers ───────────────────────────────────────────────
+lesson_triggers:
+  - "i learned" - "i realised" - "i realized" - "i noticed"
+  - "lesson" - "what i learned" - "what i realised"
+  - "what i realized" - "here is what" - "here's what"
+  - "taught me" - "the takeaway" - "the insight"
+  - "here's the thing" - "key takeaway"
+
+# ─── Audience Triggers ─────────────────────────────────────────────
+audience_triggers:
+  - "for " - "to " - "any " - "every "
+  - "builders" - "founders" - "creators"
+  - "developers" - "makers" - "operators"
+  - "engineers" - "designers" - "leaders"
+  - "managers" - "teams" - "people who"
+  - "anyone who" - "if you're" - "your "
+
+# ─── Engagement Ask Bank ───────────────────────────────────────────
+engagement_bank:
+  - "i be happy" - "what's your take?" - "agreed?"
+  - "what are you building?" - "who else"
+  - "curious what you think?" - "i'd love to hear"
+  - "let me know" - "what do YOU think?"
+  - "share your" - "your experience"
+  - "question for you" - "drop a comment"
+  - "reply with" - "dm me"
+
+# ─── Architecture Leaks ────────────────────────────────────────────
+architecture_leaks:
+  - "\\bS[1-9]\\b" - "\\bTOFU\\b" - "\\bMOFU\\b" - "\\bBOFU\\b"
+  - "\\bL[1-4]\\b" - "\\bICP\\b" - "\\bfunnel.stage\\b"
+  - "\\bcontent.vertical\\b" - "\\bsession.classifier\\b"
+  - "\\bgate.check\\b"
+
+# ─── Generic Statement Patterns ────────────────────────────────────
+generic_statements:
+  - "consistency\\s+is\\s+important"
+  - "consistency\\s+matters"
+  - "content\\s+is\\s+king"
+  - "quality\\s+over\\s+quantity"
+  - "hard\\s+work\\s+pays?\\s+off"
+  - "trust\\s+the\\s+process"
+  - "it'?s?\\s+not\\s+about\\s+the\\s+tools?"
+  - "done\\s+is\\s+better\\s+than\\s+perfect"
+  - "fail\\s+(fast|often)"
+
+# ─── Common Words ──────────────────────────────────────────────────
+common_words:
+  - "the" - "and" - "for" - "that" - "this" - "with" - "you"
+  - "your" - "not" - "was" - "are" - "but" - "its" - "all"
+  - "can" - "has" - "had" - "been" - "just" - "like" - "more"
+  - "some" - "than" - "very" - "what" - "when" - "where"
+  - "which" - "who" - "will" - "would" - "could" - "should"
+  - "about" - "into" - "over" - "after" - "also" - "each"
+  - "from" - "have" - "how" - "much" - "most" - "only"
+  - "other" - "our" - "such" - "their" - "them" - "then"
+  - "there" - "these" - "they" - "were" - "because" - "got"
+  - "get" - "did" - "done" - "say" - "said" - "way" - "make"
+  - "made" - "use" - "used" - "using" - "take" - "took"
+  - "know" - "need" - "want" - "thing" - "things" - "does"
+  - "doing" - "work" - "worked" - "working" - "look" - "looking"
+  - "let" - "even" - "still" - "also" - "back" - "here" - "now"
+  - "see" - "think" - "going"
+
+# ─── Known Names (proper noun grounding check) ─────────────────────
+known_names:
+  - "Andrej Karpathy" - "Bret Victor" - "Charlie Munger"
+  - "Chris Dixon" - "David Deutsch" - "Douglas Engelbart"
+  - "Douglas Hofstadter" - "Douglas Rushkoff" - "Edsger Dijkstra"
+  - "Elon Musk" - "Eric Ries" - "Francesco Cirillo"
+  - "Francis Bacon" - "Frank Herbert" - "Frederick Brooks"
+  - "George Orwell" - "Gerald Weinberg" - "Gregory Bateson"
+  - "Hiroshi Ishii" - "Isaac Asimov" - "Ivan Sutherland"
+  - "Jaron Lanier" - "Jeff Bezos" - "John Boyd" - "John Carmack"
+  - "John Dewey" - "John McCarthy" - "John Muir" - "Kevin Kelly"
+  - "Kurt Vonnegut" - "Larry Page" - "Linus Pauling"
+  - "Linus Torvalds" - "Marc Andreessen" - "Marvin Minsky"
+  - "Marshall McLuhan" - "Norbert Wiener" - "Paul Graham"
+  - "Peter Drucker" - "Peter Thiel" - "Ray Kurzweil"
+  - "Richard Feynman" - "Robert Pirsig" - "Sam Altman"
+  - "Satya Nadella" - "Sebastian Thrun" - "Simon Sinek"
+  - "Steve Jobs" - "Stewart Brand" - "Tim Berners-Lee"
+  - "Tim Urban" - "Vannevar Bush" - "William Gibson"
+  - "Yuval Noah Harari" - "Karpathy" - "Huxley" - "Munger"
+  - "Dijkstra" - "Feynman" - "Vonnegut" - "McLuhan"
+  - "Weinberg" - "Pirsig" - "Brand" - "Deming"
+  - "Ward Cunningham" - "Admiral John Boyd" - "Van Jones"
+
+# ─── Gate Selection ────────────────────────────────────────────────
+gates:
+  char_count: true
+  hook_check: true
+  em_dash: true
+  word_repeat: true
+  architecture_leak: true
+  audience_named: true
+  lesson_surfaced: true
+  generic_statement: true
+  project_as_subject: true
+  closing: true
+  frontmatter: true
+  dollar_in_note: true
+  strategy_void: true
+  icp_present: true
+  grounded_reference: true
+
+# ─── Posting Cadence ────────────────────────────────────────────────
+cadence:
+  x:
+    per_day: 3
+    per_week: 10
+  linkedin:
+    per_day: 1
+    per_week: 3
+  blog:
+    per_day: 1
+    per_week: 2
+
+# ─── Compiler Config ────────────────────────────────────────────────
+compiler:
+  meaning_axes:
+    - systemic
+    - behavioral
+    - philosophical
+    - contrarian
+    - leverage
+    - human
+
+# ─── Gate Parameters ────────────────────────────────────────────────
+gate_params:
+  close_detect_window: 200
+  close_fallback_phrases: ["note:", "?"]
+  word_repeat_scale_small: 500
+  word_repeat_scale_medium: 1500
+  word_repeat_scale_large_min: 6
+  word_repeat_scale_large_max: 12
+  required_frontmatter_fields: ["title", "created", "tags", "platform"]
+
+# ─── Voice Markers ──────────────────────────────────────────────────
+voice_markers:
+  note: "LLM guidance only. See concepts/voice-and-gates.md for details."

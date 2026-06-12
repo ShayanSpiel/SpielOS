@@ -1,0 +1,79 @@
+name: Wiki Health
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 6 * * 0"  # every Sunday at 6am
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install pyyaml pytest
+
+      - name: Run automated tests
+        run: python3 -m pytest tests/ -v
+
+      - name: Run wiki health check
+        run: python3 scripts/wiki-health.py
+        continue-on-error: true
+
+      - name: Run redundancy scan
+        run: python3 scripts/detect-redundancy.py
+        continue-on-error: true
+
+      - name: Validate .wiki-state
+        run: |
+          python3 -c "
+          import yaml
+          with open('.wiki-state') as f:
+              data = yaml.safe_load(f)
+          assert data.get('current_state') == 'IDLE', 'System is not in IDLE state'
+          assert data.get('loop') in ('WIKI', 'CONTENT'), 'Invalid loop'
+          print('.wiki-state is valid: state=%s, loop=%s' % (data['current_state'], data['loop']))
+          "
+
+      - name: Check frontmatter completeness
+        run: |
+          echo "Checking frontmatter on all concept/entity pages..."
+          python3 -c "
+          import os, re, yaml
+          vault = '.'
+          for dir in ['concepts', 'entities', 'comparisons', 'summaries']:
+              for f in sorted(os.listdir(os.path.join(vault, dir))):
+                  if not f.endswith('.md'):
+                      continue
+                  path = os.path.join(vault, dir, f)
+                  with open(path) as fh:
+                      content = fh.read()
+                  if not content.startswith('---'):
+                      print(f'  WARN: {path} has no frontmatter')
+                      continue
+                  parts = content.split('---', 2)
+                  if len(parts) < 3:
+                      print(f'  WARN: {path} has broken frontmatter')
+                      continue
+                  fm = yaml.safe_load(parts[1])
+                  for field in ['title', 'created', 'updated', 'tags', 'sources']:
+                      if field not in fm or fm[field] is None:
+                          print(f'  WARN: {path} missing frontmatter field: {field}')
+          "
+
+      - name: Summary
+        run: |
+          echo "=== Wiki Health Summary ==="
+          echo "Tests: passed"
+          echo "State: $(python3 -c "import yaml; d=yaml.safe_load(open('.wiki-state')); print(f\"{d['current_state']} ({d['loop']})\")")"
+          echo "Pages: $(find concepts entities comparisons summaries -name '*.md' | wc -l | tr -d ' ') wiki pages"

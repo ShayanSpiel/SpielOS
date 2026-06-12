@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  @import url('__GOOGLE_FONTS__');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    width: __WIDTH__px;
+    height: __HEIGHT__px;
+    overflow: hidden;
+    font-family: '__FONT_FAMILY__', sans-serif;
+    __BG_STYLE__
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+  }
+
+  .bg-icon {
+    position: absolute;
+    __ICON_POSITION_STYLE__
+    transform: __ICON_TRANSFORM__ rotate(__ICON_ROTATE__deg);
+    width: __ICON_SIZE__%;
+    height: __ICON_SIZE__%;
+    z-index: 1;
+    opacity: __ICON_OPACITY__;
+    color: __ICON_COLOR__;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    pointer-events: none;
+  }
+
+  .bg-icon svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  .content {
+    position: relative;
+    z-index: 2;
+    padding: __CONTENT_PADDING__;
+    width: 85%;
+    text-align: __TEXT_ALIGN__;
+  }
+
+  .title-line {
+    font-size: __TITLE_SIZE__px;
+    font-weight: __TITLE_WEIGHT__;
+    color: __TITLE_COLOR__;
+    letter-spacing: __TITLE_LETTER_SPACING__;
+    line-height: __TITLE_LINE_HEIGHT__;
+    font-family: '__FONT_FAMILY__', sans-serif;
+    text-wrap: nowrap;
+  }
+
+  .subtitle-wrapper {
+    margin-top: 32px;
+    display: inline-block;
+  }
+
+  .subtitle-highlight {
+    display: inline;
+    background: __SUBTITLE_HIGHLIGHT__;
+    padding: 4px 14px 6px;
+    font-family: '__SUBTITLE_FONT__', serif;
+    font-size: __SUBTITLE_SIZE__px;
+    font-weight: __SUBTITLE_WEIGHT__;
+    color: __SUBTITLE_COLOR__;
+    letter-spacing: __SUBTITLE_LETTER_SPACING__;
+    line-height: __SUBTITLE_LINE_HEIGHT__;
+    text-wrap: nowrap;
+  }
+
+  .handle {
+    position: absolute;
+    bottom: __HANDLE_BOTTOM__px;
+    left: 0;
+    right: 0;
+    text-align: __HANDLE_ALIGN__;
+    padding: 0 __HANDLE_PADDING__;
+    z-index: 2;
+    font-size: __HANDLE_SIZE__px;
+    font-weight: __HANDLE_WEIGHT__;
+    color: __HANDLE_COLOR__;
+    letter-spacing: __HANDLE_LETTER_SPACING__;
+    font-family: '__FONT_FAMILY__', sans-serif;
+  }
+
+  .handle-inner {
+    display: inline-block;
+  }
+</style>
+</head>
+<body>
+  <div class="bg-icon">
+    __ICON_SVG__
+  </div>
+
+  <div class="content">
+    __TITLE_LINES_HTML__
+    __SUBTITLE_HTML__
+  </div>
+
+  <div class="handle"><span class="handle-inner">__HANDLE_TEXT__</span></div>
+</body>
+</html>
