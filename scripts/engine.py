@@ -229,7 +229,7 @@ def run_script(script_path: str, *args: str) -> tuple[int, str]:
 @logged()
 def print_state(state: dict) -> None:
     """Pretty-print the current state."""
-    print("═══ ShayanWiki State ═══")
+    print("═══ Spiel Engine State ═══")
     print(f"State:    {state.get('current_state', 'UNKNOWN')}")
     print(f"Loop:     {state.get('loop', 'WIKI')}")
     print(f"Changed:  {state.get('last_state_change', 'never')}")

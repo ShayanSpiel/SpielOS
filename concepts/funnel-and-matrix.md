@@ -1,7 +1,7 @@
 # Funnel & Matrix
 
-> Define your content funnel archetypes, verticals, and CTA matrix here.
-> Edit this file to change how the engine classifies sessions and routes content.
+Define your content funnel archetypes, verticals, and CTA matrix here.
+The /setup command fills this from your answers. Or edit directly.
 
 ## Archetypes (S1-S10)
 
@@ -20,7 +20,7 @@
 
 ## Content Verticals
 
-- 
+-
 
 ## Funnel Stages
 

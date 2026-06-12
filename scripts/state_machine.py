@@ -142,7 +142,7 @@ def read_wiki_state() -> dict:
     try:
         with WIKI_STATE_FILE.open() as f:
             data = yaml.safe_load(f)
-        if data is None:
+        if not isinstance(data, dict):
             return default
         return data
     except Exception:

@@ -1,7 +1,6 @@
 # Session as Content
 
-> Methodology: turning work sessions into platform-native posts.
-> Edit this file to change the session schema and methodology.
+Methodology: turning work sessions into platform-native posts.
 
 ## Core Principle
 

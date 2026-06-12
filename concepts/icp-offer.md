@@ -1,9 +1,9 @@
 # ICP & Offer
 
-> Define your Ideal Customer Profile and offer here.
-> Edit this file to change who the engine writes for and what it sells.
+Define your Ideal Customer Profile and offer here.
+The /setup command fills this from your answers. Or edit directly.
 
-## ICP: [Your ICP Name]
+## ICP
 
 ### Demographics
 
@@ -14,11 +14,11 @@
 
 ### Psychographics
 
-- **Identity:**
-- **Core drive:**
-- **Deep fear:**
-- **Hidden desire:**
-- **Self-image:**
+- Identity:
+- Core drive:
+- Deep fear:
+- Hidden desire:
+- Self-image:
 
 ### Problem Hierarchy
 
@@ -29,7 +29,7 @@
 | L3 (Deep) | |
 | L4 (Root) | |
 
-### Internal Monologue
+### Internal Monologue (7 Questions the ICP Asks)
 
 1.
 2.
@@ -41,27 +41,27 @@
 
 ### Content That Resonates
 
-- 
+-
 
-### Critical Sensitivity
+### Critical Sensitivity (What NOT to say)
 
-- 
+-
 
 ## Offer
 
-### What you sell
+### What you sell (in the customer's words)
 
-- 
+-
 
 ### How ICP describes the problem before your solution
 
-- 
+-
 
 ### How ICP describes the value after
 
-- 
+-
 
-### Funnel stages
+### Funnel Stages
 
 | Stage | ICP state | Content job |
 |-------|-----------|-------------|

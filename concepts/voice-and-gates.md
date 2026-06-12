@@ -1,9 +1,9 @@
 # Voice & Gates
 
-> Engine: LLM voice markers + 4-check baseline + 10-gate extended + 8-step Compiler.
-> Edit this file to change the LLM's writing voice and gate criteria.
+Engine: LLM voice markers + 4-check baseline + 10-gate extended + 8-step Compiler.
+Edit this file to change the LLM's writing voice and gate criteria.
 
-## Voice Markers (9)
+## Voice Markers (Universal)
 
 1. **Lowercase i** — intentional, not a typo
 2. **Absolutely** — emphatic agreement
@@ -17,23 +17,23 @@
 
 ## 4-Check Baseline
 
-1. **Is the reader's world the subject?** — Not the writer's project.
-2. **Is the tension in the first 2 lines?** — No preamble.
-3. **Is there a named reader?** — "founders", "builders", "you".
-4. **Is the last line a landing, not a summary?** — Thought or ask, not recap.
+1. Is the reader's world the subject? — Not the writer's project.
+2. Is the tension in the first 2 lines? — No preamble.
+3. Is there a named reader? — "founders", "builders", "you".
+4. Is the last line a landing, not a summary? — Thought or ask, not recap.
 
 ## 10-Gate Extended
 
-1. **Gate 1: One ICP** — Every post targets exactly one ICP segment.
-2. **Gate 2: Problem before solution** — Pain is named before the fix.
-3. **Gate 3: Specificity** — No vague claims; numbers or named examples.
-4. **Gate 4: No architecture leaks** — Internal labels stay internal.
-5. **Gate 5: Reader is the hero** — Not the writer, not the tool.
-6. **Gate 6: Lesson surfaced** — Practical takeaway exists.
-7. **Gate 7: Engagement ask** — Ends with a question or specific call.
-8. **Gate 8: One meaning axis** — Drawn from the Compiler's 6 axes.
-9. **Gate 9: No generic statements** — Platitudes fail.
-10. **Gate 10: Grounded references** — Named entities have context.
+1. **One ICP** — Every post targets exactly one ICP segment.
+2. **Problem before solution** — Pain is named before the fix.
+3. **Specificity** — No vague claims; numbers or named examples.
+4. **No architecture leaks** — Internal labels stay internal.
+5. **Reader is the hero** — Not the writer, not the tool.
+6. **Lesson surfaced** — Practical takeaway exists.
+7. **Engagement ask** — Ends with a question or specific call.
+8. **One meaning axis** — Drawn from the Compiler's 6 axes.
+9. **No generic statements** — Platitudes fail.
+10. **Grounded references** — Named entities have context.
 
 ## 8-Step Compiler
 

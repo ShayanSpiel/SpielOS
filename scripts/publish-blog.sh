@@ -43,8 +43,8 @@
 set -euo pipefail
 
 # ─── Config ────────────────────────────────────────────────────────────────
-VAULT="${VAULT:-$HOME/ShayanWiki}"
-GH_PAGES="${GH_PAGES:-$HOME/ShayanSpiel.github.io}"
+VAULT="${VAULT:-$(cd "$(dirname "$0")/.." && pwd)}"
+GH_PAGES="${GH_PAGES:-}"  # Set to your GitHub Pages repo path, e.g. $HOME/yourusername.github.io
 QUEUE_DIR="$VAULT/content/queue"
 POSTS_DIR="$GH_PAGES/_posts"
 UPLOADS_DIR="$GH_PAGES/assets/uploads"

@@ -12,7 +12,26 @@ from pathlib import Path
 
 import yaml
 
-VAULT = Path(os.environ.get("VAULT_DIR", Path(__file__).resolve().parent.parent))
+
+def _load_dotenv() -> None:
+    """Load .env from vault root if present. Never overrides existing env vars."""
+    env_path = Path(__file__).resolve().parent.parent / ".env"
+    if env_path.exists():
+        for line in env_path.read_text().splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+
+
+_load_dotenv()
+VAULT = Path(
+    os.environ.get(
+        "VAULT_DIR",
+        Path(__file__).resolve().parent.parent,
+    )
+)
 
 RULES_FILE = VAULT / "rules.yaml"
 WIKI_STATE_FILE = VAULT / ".wiki-state"

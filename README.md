@@ -1,51 +1,46 @@
-# Spiel Engine
+# The Spiel Engine
 
-An agentic content engine that turns work sessions into platform-native posts.
-Portable — runs from anywhere via `VAULT_DIR` or auto-detects its root.
+A portable content engine that turns work sessions into platform-native content.
 
-## Quick Start (5 min)
+## Quick Start
 
-### 1. Edit your rules
-**`rules.yaml`** — All mechanical gates, character limits, banned openers, safe openers, audience triggers, lesson triggers, strategy classifier keywords, and posting behavior.
-
-### 2. Edit your voice
-- **`concepts/voice-and-gates.md`** — Voice markers + 4-check + 10-gate + 8-step Compiler
-- **`concepts/voice-corpus.md`** — Fill in your best posts as canonical examples
-- **`concepts/icp-offer.md`** — Who you're writing for, what you're selling
-- **`concepts/funnel-and-matrix.md`** — Funnel stages, archetypes, CTA matrix
-
-### 3. Edit your templates
-- **`templates/x-post.md`** — X/Twitter post structure
-- **`templates/linkedin-post.md`** — LinkedIn post structure
-- **`templates/blog-post.md`** — Blog pillar structure
-- **`templates/session-log.md`** — Session log format
-
-### 4. Run the pipeline
 ```bash
-./scripts/engine.py status        # See current state
-./scripts/post.sh                  # Start a post from your latest session
-./scripts/gates.py --all           # Check all queue drafts against your rules
-./scripts/pipeline.sh wiki-health  # Run wiki health check
+bash scripts/install.sh
 ```
+
+Then run `/setup` in opencode (or any agent) to set up your ICP, offer, and voice.
+
+## Commands
+
+| Command | Action |
+|---------|--------|
+| `/post` | Start content pipeline |
+| `/extract` | Ingest raw notes → wiki pages |
+| `/publish` | Queue → production |
+| `/health` | Wiki health check |
+| `/queue` | Show content queue |
+| `/setup` | Configure ICP, offer, voice |
+
+See `SETUP.md` for the full manual, `concepts/` for methodology.
 
 ## Architecture
 
 ```
-rules.yaml          ← THE config. Mechanical rules, keywords, limits, toggles.
-concepts/*.md       ← LLM guidance. Voice markers, ICP, funnel, corpus.
-templates/*.md      ← Post structural templates.
-scripts/            ← Framework code. No hardcoded config values.
+TheSpielEngine/
+├── agents/              # Agent specs (generated)
+├── assets/              # Brand, banners, screenshots
+├── concepts/            # Strategy + voice configuration
+├── content/             # Sessions, queue, posted archive
+├── logs/                # JSONL activity logs
+├── notes/               # Raw exports / .md journals
+├── pages/               # Wiki pages (semantic memory)
+├── raw/                 # Ingest source files
+├── scripts/             # Engine scripts (Python + Shell)
+├── templates/           # Post templates
+└── rules.yaml           # Engine config (local, gitignored)
 ```
 
 ## Portability
 
-Set `VAULT_DIR` to run from any directory. All scripts use it with a dynamic fallback to the vault root.
-
-## What to configure
-
-1. `rules.yaml` — your keywords, limits, openers, posting mode
-2. `concepts/icp-offer.md` — your ICP and offer
-3. `concepts/funnel-and-matrix.md` — your verticals and funnel
-4. `concepts/voice-and-gates.md` — your voice markers
-5. `templates/*.md` — your post structures
-6. `assets/brand-config.json` — your brand identity
+The engine auto-resolves its root path. Set `VAULT_DIR` in `.env` (gitignored)
+or as an environment variable. No hardcoded paths.
