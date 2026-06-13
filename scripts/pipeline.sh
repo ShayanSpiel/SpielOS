@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/pipeline.sh — Single-state pipeline wrappers for ShayanWiki.
+# scripts/pipeline.sh — Single-state pipeline wrappers for the Spiel Engine.
 #
 # Every subcommand maps 1:1 to one engine.py call. Run them as SEPARATE
 # bash tool calls so each state transition is visible in the CLI.

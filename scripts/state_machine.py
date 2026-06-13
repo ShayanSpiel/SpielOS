@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""state_machine.py — State definitions + transition table for ShayanWiki.
+"""state_machine.py — State definitions + transition table for the Spiel Engine.
 
 Both wiki management and content posting state machines are defined here.
 The engine.py controller reads .wiki-state and validates transitions against

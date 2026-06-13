@@ -33,7 +33,7 @@ set -e
 
 # ---- Config ----
 VAULT="${VAULT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
-GH_PAGES="${GH_PAGES:-$HOME/ShayanSpiel.github.io}"
+GH_PAGES="${GH_PAGES:-}"
 OUTPUT_DIR="$VAULT/assets/screenshots"
 TIMESTAMP=$(date +%Y-%m-%d)
 mkdir -p "$OUTPUT_DIR"
@@ -215,7 +215,7 @@ cap_08_post_command() {
 
 cap_09_skill_file() {
   echo "[9] terminal: skill file → 09-skill-file.png"
-  capture_terminal "clear && echo 'SHAYANSPIEL-CONTENT SKILL' && echo '' && cat ~/.config/opencode/skill/shayanspiel-content/SKILL.md | head -40 && echo '' && echo '... central rulebook for all post drafts ...' && echo '' && echo '[hard rule: NEVER accept credentials in chat]'" "09-skill-file.png"
+  capture_terminal "clear && echo 'SPIEL-CONTENT SKILL' && echo '' && cat ~/.config/opencode/skill/spiel-content/SKILL.md | head -40 && echo '' && echo '... central rulebook for all post drafts ...' && echo '' && echo '[hard rule: NEVER accept credentials in chat]'" "09-skill-file.png"
 }
 
 cap_10_lint_output() {
@@ -294,7 +294,7 @@ cap_16_blog_home() {
     return
   fi
   # Open the live blog (or local file:// if Jekyll not yet pushed)
-  open "https://shayanspiel.github.io/" 2>/dev/null
+  open "https://<your-blog>.github.io/" 2>/dev/null
   if [[ "$SLEEP_BETWEEN" == "1" ]]; then sleep 4; fi
   capture_window "Safari" "16-blog-home.png"
   capture_window "Google Chrome" "16-blog-home.png" 2>/dev/null || true
@@ -306,19 +306,19 @@ cap_17_blog_about() {
     echo "  (skipping browser capture)"
     return
   fi
-  open "https://shayanspiel.github.io/about/" 2>/dev/null
+  open "https://<your-blog>.github.io/about/" 2>/dev/null
   if [[ "$SLEEP_BETWEEN" == "1" ]]; then sleep 4; fi
   capture_window "Safari" "17-blog-about.png"
   capture_window "Google Chrome" "17-blog-about.png" 2>/dev/null || true
 }
 
-cap_18_wiki_shayanspiel() {
-  echo "[18] obsidian: wiki shayanspiel page → 18-wiki-shayanspiel.png"
+cap_18_wiki_brand() {
+  echo "[18] obsidian: wiki brand page → 18-wiki-brand.png"
   if [[ "$OPEN_OBSIDIAN" == "1" ]]; then
-    open_in_obsidian "$VAULT/entities/shayanspiel.md"
+    open_in_obsidian "$VAULT/entities/<brand>.md"
     if [[ "$SLEEP_BETWEEN" == "1" ]]; then sleep 2; fi
   fi
-  capture_window "$OBSIDIAN" "18-wiki-shayanspiel.png"
+  capture_window "$OBSIDIAN" "18-wiki-brand.png"
 }
 
 cap_19_wiki_credibility() {
@@ -332,12 +332,12 @@ cap_19_wiki_credibility() {
 
 cap_20_publish_blog_script() {
   echo "[20] terminal: publish-blog.sh running → 20-publish-blog-script.png"
-  capture_terminal "clear && echo 'PUBLISH-BLOG.SH' && echo '' && echo '\$ bash scripts/publish-blog.sh content/queue/2026-06-06-pillar-blog.md --dry-run' && echo '' && echo '→ Source: /Users/shayan/ShayanWiki/content/queue/2026-06-06-pillar-blog.md' && echo '→ Vault: /Users/shayan/ShayanWiki' && echo '→ GH Pages: /Users/shayan/ShayanSpiel.github.io' && echo '' && echo '✓ Gates passed: status=ready-to-publish, standalone_test=skipped' && echo '→ Target: _posts/2026-06-06-how-i-automated-my-content.md' && echo '' && echo 'WROTE: /Users/shayan/ShayanSpiel.github.io/_posts/2026-06-06-how-i-automated.md' && echo 'COPIED: 7 image(s) to assets/uploads/2026-06-06-how-i-automated' && echo '' && echo '✓ Post published locally' && echo '' && echo '⚠ DRY RUN: nothing committed, nothing pushed.'" "20-publish-blog-script.png"
+  capture_terminal "clear && echo 'PUBLISH-BLOG.SH' && echo '' && echo '\$ bash scripts/publish-blog.sh content/queue/2026-06-06-pillar-blog.md --dry-run' && echo '' && echo '→ Source: \$VAULT/content/queue/2026-06-06-pillar-blog.md' && echo '→ Vault: \$VAULT' && echo '→ GH Pages: \$GH_PAGES' && echo '' && echo '✓ Gates passed: status=ready-to-publish, standalone_test=skipped' && echo '→ Target: _posts/2026-06-06-how-i-automated-my-content.md' && echo '' && echo 'WROTE: \$GH_PAGES/_posts/2026-06-06-how-i-automated.md' && echo 'COPIED: 7 image(s) to assets/uploads/2026-06-06-how-i-automated' && echo '' && echo '✓ Post published locally' && echo '' && echo '⚠ DRY RUN: nothing committed, nothing pushed.'" "20-publish-blog-script.png"
 }
 
 cap_21_publish_blog_list() {
   echo "[21] terminal: publish-blog.sh --list → 21-publish-blog-list.png"
-  capture_terminal "clear && echo '\$ bash scripts/publish-blog.sh --list' && echo '' && echo 'Pillar blog posts in /Users/shayan/ShayanWiki/content/queue with status: ready-to-publish' && echo '────────────────────────────────────────────────────────────' && echo '✓ 2026-06-06-pillar-blog.md  |  How I automated my content…' && echo '  status=ready-to-publish standalone=skipped' && echo '' && echo '1 ready to publish'" "21-publish-blog-list.png"
+  capture_terminal "clear && echo '\$ bash scripts/publish-blog.sh --list' && echo '' && echo 'Pillar blog posts in \$VAULT/content/queue with status: ready-to-publish' && echo '────────────────────────────────────────────────────────────' && echo '✓ 2026-06-06-pillar-blog.md  |  How I automated my content…' && echo '  status=ready-to-publish standalone=skipped' && echo '' && echo '1 ready to publish'" "21-publish-blog-list.png"
 }
 
 cap_22_posts_folder() {
@@ -356,7 +356,7 @@ cap_23_published_post() {
     return
   fi
   # The actual post URL once it's been pushed (slug-based, no date in URL since permalink is /:year/:month/:title/)
-  open "https://shayanspiel.github.io/2026/06/how-i-automated-my-content-with-a-second-brain-and-you-can-too-for-5-month/" 2>/dev/null
+  open "https://<your-blog>.github.io/2026/06/<post-slug>/" 2>/dev/null
   if [[ "$SLEEP_BETWEEN" == "1" ]]; then sleep 4; fi
   capture_window "Safari" "23-published-post.png"
   capture_window "Google Chrome" "23-published-post.png" 2>/dev/null || true
@@ -365,7 +365,7 @@ cap_23_published_post() {
 # ---- Run ----
 
 DEFAULT_CAPS=(cap_01_vault_tree cap_02_wiki_page cap_03_graph_view cap_04_session_log cap_05_templates_folder cap_06_draft_in_queue cap_07_content_types cap_08_post_command cap_09_skill_file cap_10_lint_output cap_11_queue_folder cap_12_tone_of_voice)
-EXTRA_CAPS=(cap_13_post_running cap_14_offers_stack cap_15_stack_brag cap_16_blog_home cap_17_blog_about cap_18_wiki_shayanspiel cap_19_wiki_credibility cap_20_publish_blog_script cap_21_publish_blog_list cap_22_posts_folder cap_23_published_post)
+EXTRA_CAPS=(cap_13_post_running cap_14_offers_stack cap_15_stack_brag cap_16_blog_home cap_17_blog_about cap_18_wiki_brand cap_19_wiki_credibility cap_20_publish_blog_script cap_21_publish_blog_list cap_22_posts_folder cap_23_published_post)
 
 if [[ "$LIST_ONLY" == "1" ]]; then
   echo "Default captures (12):"

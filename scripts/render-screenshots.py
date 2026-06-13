@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-render-screenshots.py — Real screenshot renderer for ShayanSpiel pillar posts.
+render-screenshots.py — Real screenshot renderer for the brand's pillar posts.
 
 Uses Chrome headless to render real content (live URLs, vault markdown files,
 terminal output, folder listings) with custom CSS that mimics Obsidian / macOS
@@ -353,7 +353,7 @@ def render_wiki(file_path, title=None, side_tree=None):
   <div class="sidebar">{sidebar_html}</div>
   <div class="main">
     <h1>{title}</h1>
-    <div class="page-title-row">~/ShayanWiki/{file_path}</div>
+    <div class="page-title-row">~/{file_path}</div>
     <div class="content">{html_body}</div>
   </div>
 </body></html>"""
@@ -366,7 +366,7 @@ def render_terminal(title, lines, cmd="cat file.md"):
     body.append(f'<div class="dot red"></div><div class="dot yellow"></div><div class="dot green"></div>')
     body.append(f'<div class="window-name">{title} — zsh — {WIDTH}×{HEIGHT}</div>')
     body.append('</div>')
-    body.append(f'<div><span class="prompt-user">shayan@spiel</span>:<span class="prompt-path">~/ShayanWiki</span><span class="prompt-sign">$ </span>{cmd}</div>')
+    body.append(f'<div><span class="prompt-user">user@local</span>:<span class="prompt-path">~</span><span class="prompt-sign">$ </span>{cmd}</div>')
     body.append('<br>')
     for line in lines:
         body.append(f'<div>{line}</div>')
@@ -378,7 +378,7 @@ def render_terminal(title, lines, cmd="cat file.md"):
 def render_finder(title, breadcrumb, files, side_items=None, view="list"):
     """Render Finder window with macOS Finder-like CSS."""
     side = '<div class="sidebar-section">FAVORITES</div>'
-    for item in (side_items or ['AirDrop', 'Applications', 'Desktop', 'Documents', 'Downloads', 'shayanspiel', 'ShayanSpiel.github.io', 'ShayanWiki']):
+    for item in (side_items or ['AirDrop', 'Applications', 'Desktop', 'Documents', 'Downloads']):
         side += f'<div class="sidebar-item">{item}</div>'
     body = []
     body.append(f'<div class="title-bar">')
@@ -417,8 +417,8 @@ def render_live(url):
 SPECS = [
     {
         "id": "01", "slug": "vault-tree", "type": "finder",
-        "title": "ShayanWiki",
-        "breadcrumb": ["ShayanWiki"],
+        "title": "Vault",
+        "breadcrumb": ["Vault"],
         "view": "list",
         "files": [
             {"name": "AI-RULES.md", "size": "1.5 KB"},
@@ -459,7 +459,7 @@ SPECS = [
         "id": "08", "slug": "post-command", "type": "terminal",
         "title": "post.md",
         "cmd": "cat ~/.config/opencode/command/post.md",
-        "file": "/Users/shayan/.config/opencode/command/post.md",
+        "file": "/Users/<you>/.config/opencode/command/post.md",
         "max_lines": 60,
         "caption": "the `/post` slash command — 9 steps from session log to queue",
         "caption_lower": "the `/post` slash command. 9 steps from session log to queue — read session, read strategy pages, run decision tree, draft per archetype, run standalone test, write to queue, list what was written, ask about offers, publish to blog. one slash. one queue. one edit.",
@@ -467,16 +467,16 @@ SPECS = [
     {
         "id": "09", "slug": "skill-file", "type": "terminal",
         "title": "SKILL.md",
-        "cmd": "cat ~/.config/opencode/skill/shayanspiel-content/SKILL.md | head -80",
-        "file": "/Users/shayan/.config/opencode/skill/shayanspiel-content/SKILL.md",
+        "cmd": "cat ~/.config/opencode/skill/spiel-content/SKILL.md | head -80",
+        "file": "/Users/<you>/.config/opencode/skill/spiel-content/SKILL.md",
         "max_lines": 80,
         "caption": "the SKILL.md — auto-injected into every opencode session",
-        "caption_lower": "the SKILL.md. auto-injected into every opencode session. the system spec the LLM never forgets. read this once and the LLM has the full ShayanSpiel content engine in working memory for the rest of the session.",
+        "caption_lower": "the SKILL.md. auto-injected into every opencode session. the system spec the LLM never forgets. read this once and the LLM has the full content engine in working memory for the rest of the session.",
     },
     {
         "id": "11", "slug": "queue-folder", "type": "finder",
         "title": "queue",
-        "breadcrumb": ["ShayanWiki", "content", "queue"],
+        "breadcrumb": ["Vault", "content", "queue"],
         "view": "list",
         "files": [
             {"name": "2026-06-06-corpus-LI-01-optimized.md", "size": "5.6 KB"},
@@ -504,7 +504,7 @@ SPECS = [
     {
         "id": "15", "slug": "stack-brag", "type": "terminal",
         "title": "stack.txt",
-        "cmd": "cat ~/ShayanWiki/notes/stack.txt",
+        "cmd": "cat ~/Vault/notes/stack.txt",
         "inline_lines": [
             '<span class="comment"># the $5 stack. obsidian + opencode + filesystem + cloudflare + LLM. no SaaS dependency.</span>',
             '',
@@ -522,23 +522,23 @@ SPECS = [
     },
     {
         "id": "16", "slug": "blog-home", "type": "live",
-        "url": "https://shayanspiel.github.io/",
+        "url": "https://<your-blog>.github.io/",
         "caption": "the new blog home — hero, latest, currently shipping",
         "caption_lower": "the new blog home. hero at the top, latest 5 posts in the middle, \"currently shipping\" at the bottom, what-this-site-is at the very bottom. no demo content. no \"this is a Jekyll theme demo.\" the home page is the brand.",
     },
     {
         "id": "17", "slug": "blog-about", "type": "live",
-        "url": "https://shayanspiel.github.io/about/",
+        "url": "https://<your-blog>.github.io/about/",
         "caption": "the about page — personal brand, credibility-first",
         "caption_lower": "the about page. personal brand, credibility-first. the 8-year story arc. 5 offers with detail. contact at the bottom. no \"this is a Jekyll theme demo.\" the about page is the proof layer.",
     },
     {
-        "id": "18", "slug": "wiki-shayanspiel", "type": "wiki",
-        "file": "entities/shayanspiel.md",
-        "title": "shayanspiel",
-        "side_tree": ["entities/", "  shayanspiel.md", "  geogent.md", "  linkedin.md", "  x.md", "  blog.md", "  digikala.md", "  takhfifan.md", "concepts/", "  background-and-credibility.md", "comparisons/", "summaries/"],
+        "id": "18", "slug": "wiki-brand", "type": "wiki",
+        "file": "entities/<brand>.md",
+        "title": "<brand>",
+        "side_tree": ["entities/", "  <brand>.md", "concepts/", "  background-and-credibility.md", "comparisons/", "summaries/"],
         "caption": "the wiki page that became the brand source-of-truth",
-        "caption_lower": "the wiki page that became the brand source-of-truth. entities/shayanspiel.md. handles, projects, voice, 3-voice blend. the page the LLM reads before writing any post. the page the blog about-page mirrors.",
+        "caption_lower": "the wiki page that became the brand source-of-truth. entities/<brand>.md. handles, projects, voice. the page the LLM reads before writing any post. the page the blog about-page mirrors.",
     },
     {
         "id": "19", "slug": "wiki-credibility", "type": "wiki",
@@ -623,7 +623,7 @@ SPECS = [
     {
         "id": "22", "slug": "posts-folder", "type": "finder",
         "title": "_posts",
-        "breadcrumb": ["ShayanSpiel.github.io", "_posts"],
+        "breadcrumb": ["<your-blog>.github.io", "_posts"],
         "view": "list",
         "files": [
             {"name": "2026-06-06-how-i-automated-my-content-with-a-second-brain-and-you-can-too-for-5-month.md", "size": "16 KB", "date": "Jun 6, 2026 7:32 PM"},
@@ -634,7 +634,7 @@ SPECS = [
     },
     {
         "id": "23", "slug": "published-post", "type": "live",
-        "url": "https://shayanspiel.github.io/how-i-rebuilt-my-blog-in-4-hours-and-shipped-2-posts-the-same-night/",
+        "url": "https://<your-blog>.github.io/<post-slug>/",
         "caption": "the post landing in `_posts/` — proof the pipeline works",
         "caption_lower": "the post landing in `_posts/`. the title slug is right. the frontmatter is transformed. the screenshots are in `assets/uploads/`. the git diff is clean. the post is one `git push` away from being live. proof the pipeline works end-to-end.",
     },

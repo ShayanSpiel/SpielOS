@@ -142,3 +142,22 @@ Write every file below with the answers filled in. Overwrite existing content.
 
 **Do not ask "does this look right?" Do not ask "shall I continue?"**
 **The goal is achieved when all 6 phases are complete and verified.**
+
+---
+
+## Note for Forked or Copied Copies
+
+If you received this engine by forking, copying, or zipping it from another
+user, the `.git/` history may still carry that user's commit author metadata.
+To start with a clean history under your own name, run once after cloning:
+
+```bash
+rm -rf .git
+git init
+git add -A
+git commit -m "init: portable Spiel Engine"
+git remote add origin <your-repo-url>
+```
+
+If you are setting the `origin` remote, replace `<your-repo-url>` with your
+fork (e.g. `https://github.com/<your-username>/TheSpielEngine.git`).

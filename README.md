@@ -11,7 +11,7 @@ WORK SESSION → [Wiki Loop] → Knowledge Base → [Content Loop] → X / Linke
 ## Quick Start
 
 ```bash
-git clone https://github.com/ShayanSpiel/TheSpielEngine.git
+git clone https://github.com/<owner>/TheSpielEngine.git
 cd TheSpielEngine
 ```
 

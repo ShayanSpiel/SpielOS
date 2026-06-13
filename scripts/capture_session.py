@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""capture_session.py — Dual-mode session input for ShayanWiki.
+"""capture_session.py — Dual-mode session input for the Spiel Engine.
 
 Parses session transcripts (structured or free-form) into a schema,
 and writes session log files with YAML frontmatter.

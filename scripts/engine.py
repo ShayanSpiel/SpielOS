@@ -205,7 +205,7 @@ def run_script(script_path: str, *args: str) -> tuple[int, str]:
         env = os.environ.copy()
         rid = get_request_id()
         if rid:
-            env["SHAYANWIKI_REQUEST_ID"] = rid
+            env["SPIEL_ENGINE_REQUEST_ID"] = rid
         result = subprocess.run(
             [full_path, *args],
             capture_output=True,
@@ -1282,7 +1282,7 @@ def confirm(prompt: str) -> bool:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="ShayanWiki State Machine Engine",
+        description="Spiel Engine State Machine",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )

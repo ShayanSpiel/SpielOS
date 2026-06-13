@@ -2,7 +2,7 @@
 """generate-arch-canvas.py — Generate Obsidian Canvas architecture diagram.
 
 Reads AGENTS.md, .wiki-state, and rules.yaml to produce a visual map
-of the ShayanWiki engine at assets/architecture.canvas.
+of the Spiel Engine at assets/architecture.canvas.
 
 Usage:
     python3 scripts/generate-arch-canvas.py

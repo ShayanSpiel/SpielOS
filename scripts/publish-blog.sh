@@ -2,7 +2,8 @@
 # scripts/publish-blog.sh — vault pillar blog → GitHub Pages
 #
 # Publishes a pillar blog post from the vault (content/queue/*.md) to the
-# GitHub Pages Jekyll site (~ShayanSpiel.github.io/_posts/*.md), with
+# GitHub Pages Jekyll site (set $GH_PAGES to your repo, e.g. ~/yourname.github.io),
+# with
 # referenced screenshots copied to assets/uploads/ and frontmatter
 # transformed to Jekyll format. Then git add + commit + (optional) push.
 #
@@ -23,8 +24,8 @@
 #
 # Requirements:
 #   - bash 4+, python3, git
-#   - The vault is at $VAULT (default: $HOME/ShayanWiki)
-#   - The GH Pages repo is at $GH_PAGES (default: $HOME/ShayanSpiel.github.io)
+#   - The vault is at $VAULT (default: $VAULT_DIR from .env, or the engine's own dir)
+#   - The GH Pages repo is at $GH_PAGES (no default — set this to your GitHub Pages repo)
 #   - The GH Pages repo is initialized as a git repo with a remote
 #
 # Behavior:

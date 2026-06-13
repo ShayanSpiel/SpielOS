@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Pre-commit hook for ShayanWiki
+# Pre-commit hook for the Spiel Engine
 set -euo pipefail
 
 VAULT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-echo "═══ Pre-commit: ShayanWiki ═══"
+echo "═══ Pre-commit: Spiel Engine ═══"
 
 # 1. Check .wiki-state is valid
 if [[ -f "$VAULT_DIR/.wiki-state" ]]; then
