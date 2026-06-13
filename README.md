@@ -2,8 +2,8 @@
 
 **Agentic wiki — a vault operated by state machines, not prompts.**
 
-> [!NOTE]
-> This repository is the markdown structural version of the engine. The scripted version is under development. You can message me on X if you want to implement it at [@ShayanSpiel](https://x.com/ShayanSpiel).
+> [!IMPORTANT]
+> **This is the initial experimental prototype version.** The system has evolved SIGNIFICANTLY — for v2 you can message me on X if you want to implement it - [@ShayanSpiel](https://x.com/ShayanSpiel).
 
 SpielEngine is an open-source template for building an LLM-operated second brain. It replaces static rule files ("always check, never overwrite") with two executable state machines:
 
