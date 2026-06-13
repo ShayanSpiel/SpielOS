@@ -60,12 +60,24 @@ typing `/command` in the chat.
 
 | Command | Action |
 |---------|--------|
-| `/post [topic]` | Start content pipeline (session or topic) |
+| `/analyze` | Run analysis step on pending items |
+| `/compact` | Merge redundant or overlapping pages |
+| `/config` | Show current engine configuration |
 | `/extract [file]` | Ingest raw notes → wiki pages |
-| `/publish [id\|all]` | Queue → production (X / LinkedIn) |
 | `/health` | Wiki health check (orphans, links, frontmatter) |
-| `/queue` | Show content queue grouped by platform |
+| `/help` | Show all available commands |
+| `/index` | Display the wiki index |
 | `/log` | Recent log entries |
+| `/optimize` | Suggest tagging, linking, and pruning opportunities |
+| `/post [topic]` | Start content pipeline (session or topic) |
+| `/prune` | Identify and remove stale or low-confidence pages |
+| `/publish [id\|all]` | Queue → production (X / LinkedIn) |
+| `/queue` | Show content queue grouped by platform |
+| `/reconcile` | Reconcile extracted content into wiki pages |
+| `/reject` | Remove a draft from the queue |
+| `/relink` | Scan and repair broken wikilinks |
+| `/schedule` | Set publish timestamps for queued content |
+| `/state` | Show current state of wiki and content loops |
 
 ### Pipeline Subcommands
 
