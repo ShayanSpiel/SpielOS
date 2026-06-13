@@ -1,8 +1,5 @@
 # The Spiel Engine
 
-> [!NOTE]
-> If you are a technical founder who wants inbound without becoming a creator, this is the setup. Read the full methodology on the [homepage](/), or DM me on [X @ShayanSpiel](https://x.com/ShayanSpiel) for a done-for-you install.
-
 A portable content engine that turns work sessions into platform-native posts.
 Two agentic loops — one for compounding knowledge (wiki), one for publishing
 content — governed by state machines, quality gates, and your ICP strategy.
@@ -10,6 +7,9 @@ content — governed by state machines, quality gates, and your ICP strategy.
 ```
 WORK SESSION → [Wiki Loop] → Knowledge Base → [Content Loop] → X / LinkedIn / Blog
 ```
+
+> [!NOTE]
+> If you are a technical founder who wants inbound without becoming a creator, this is the setup. Read the full methodology on the [homepage](/), or DM me on [X @ShayanSpiel](https://x.com/ShayanSpiel) for a done-for-you install.
 
 ## Quick Start
 
