@@ -15,3 +15,4 @@ content/posted/*
 !content/posted/.gitkeep
 logs/*
 !logs/.gitkeep
+.cursor/

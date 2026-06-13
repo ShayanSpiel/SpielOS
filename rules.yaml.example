@@ -1,5 +1,5 @@
 # rules.yaml — Engine Configuration
-# Copy this to rules.yaml and edit. Or run /setup to auto-fill.
+# Copy this to rules.yaml and edit. Or run the setup prompt in SETUP.md.
 # This file is gitignored once copied; the .example stays versioned.
 
 state:

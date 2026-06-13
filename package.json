@@ -1,7 +1,7 @@
 {
-  "name": "shayanwiki",
+  "name": "spiel-engine",
   "version": "1.0.0",
-  "description": "A dual-agent system built on opencode: an LLM-operated wiki for compounding knowledge, connected to a content engine that turns every work session into publishable posts.",
+  "description": "A portable content engine that turns work sessions into platform-native posts. Wiki loop + content loop with LLM-driven drafting and gating.",
   "main": "index.js",
   "scripts": {
     "test": "python3 -m pytest tests/ -v",

@@ -45,6 +45,7 @@ set -euo pipefail
 # ─── Config ────────────────────────────────────────────────────────────────
 VAULT="${VAULT:-$(cd "$(dirname "$0")/.." && pwd)}"
 GH_PAGES="${GH_PAGES:-}"  # Set to your GitHub Pages repo path, e.g. $HOME/yourusername.github.io
+GH_URL="${GH_URL:-}"       # Your published URL, e.g. https://yourusername.github.io
 QUEUE_DIR="$VAULT/content/queue"
 POSTS_DIR="$GH_PAGES/_posts"
 UPLOADS_DIR="$GH_PAGES/assets/uploads"
@@ -452,7 +453,7 @@ ok "Committed."
 if $YES_FLAG; then
   info "Pushing to remote..."
   git push
-  ok "Pushed. GitHub Pages will rebuild in ~30s. Post will be live at https://shayanspiel.github.io/${SLUG}/"
+  ok "Pushed. GitHub Pages will rebuild in ~30s. Post will be live at ${GH_URL}/${SLUG}/"
 else
   warn "Not pushing (no --yes). Run: cd $GH_PAGES && git push"
 fi

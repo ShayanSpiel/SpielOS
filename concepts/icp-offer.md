@@ -1,7 +1,7 @@
 # ICP & Offer
 
 Define your Ideal Customer Profile and offer here.
-The /setup command fills this from your answers. Or edit directly.
+Edit directly, or run the setup prompt in SETUP.md.
 
 ## ICP
 

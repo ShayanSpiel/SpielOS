@@ -1,7 +1,7 @@
 # Voice Corpus
 
 Canonical examples of your best posts. The LLM reads these before drafting to match register.
-The /setup command prompts you to paste 3 of your best posts here.
+The setup prompt (SETUP.md) will ask you to paste 3 of your best posts here.
 
 ## Example 1: Hook with tension
 

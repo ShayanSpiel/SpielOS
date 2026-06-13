@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""shayanwiki-engine — State machine controller for ShayanWiki.
+"""spiel-engine — State machine controller for TheSpielEngine.
 
 Validates state transitions, runs automated actions, and reports status.
 The LLM performs creative steps (analyzing, reconciling, drafting); this

@@ -47,4 +47,4 @@ CONTENT LOOP:  IDLE → SESSION → STRATEGY → COMPILE → DRAFT → GATE → 
 | `/health` | Wiki health check |
 | `/queue` | Show content queue |
 | `/log` | Recent log entries |
-| `/setup` | Configure ICP, offer, voice |
+
