@@ -1,4 +1,4 @@
-# The Spiel Engine 🤖✍️
+# The Spiel Engine
 
 Turn real build sessions into publishable content automatically.
 
@@ -9,37 +9,37 @@ posts for **X, LinkedIn, and blog** without requiring a separate content workflo
 > You do not create content. You extract it from work.
 
 ```
-WORK SESSION → [Wiki Loop] → Knowledge Base → [Content Loop] → X / LinkedIn / Blog
+WORK SESSION -> [Wiki Loop] -> Knowledge Base -> [Content Loop] -> X / LinkedIn / Blog
 ```
 
-👉 Want a white-glove install? DM [X @ShayanSpiel](https://x.com/ShayanSpiel) to get a custom setup,
-ICP build, and voice model configured for your company.
+> [!NOTE]
+> Want a white-glove install? DM [X @ShayanSpiel](https://x.com/ShayanSpiel) to get a custom setup,
+> ICP build, and voice model configured for your company.
 
-> [!WARNING] 
+> [!WARNING]
 > This repo is not a ready-made content strategy.
 > It is an engine, not a finished brand voice, and it needs your ICP definition,
 > positioning, and offer to produce differentiated output.
 
-> [!NOTE] 
+> [!NOTE]
 > The engine ships with skeleton strategy templates in `concepts/`.
 > `SETUP.md` uses a 14-question session to fill those with your real ICP, voice,
 > and offer. Your full strategy stays in your local vault, not in this repo.
 
 ## What this repo is for
 
-- **Engine only:** session-based content workflow, quality gates, publishing
-  automation.
+- **Engine only:** session-based content workflow, quality gates, publishing automation.
 - **Not a SaaS wrapper:** runs locally with Python + bash.
 - **Not pre-trained on your voice:** it learns your language from your setup.
 - **Not a finished audience:** you must define your ICP and positioning first.
 
 ## What this repo does not include
 
-❌ Your ICP definition
-❌ Your positioning strategy
-❌ Your offer design
-❌ Your brand voice
-❌ A distribution plan
+- Your ICP definition
+- Your positioning strategy
+- Your offer design
+- Your brand voice
+- A distribution plan
 
 Without those, output will read as functional but generic.
 
@@ -65,8 +65,8 @@ The agent will:
 
 ## Choose your path
 
-- 🛠️ **Self-Serve:** clone the repo, run `SETUP.md`, and launch your engine in minutes.
-- 🚀 **Done-For-You:** skip the setup and get a custom install, ICP build, and voice model configured for your company.
+- **Self-Serve:** clone the repo, run `SETUP.md`, and launch your engine in minutes.
+- **Done-For-You:** skip the setup and get a custom install, ICP build, and voice model configured for your company.
 
 DM me on [X @ShayanSpiel](https://x.com/ShayanSpiel) if you want the full white-glove install.
 
@@ -85,12 +85,9 @@ content identity switch.
 
 ## See it in action
 
-| 📄 Your raw input | 🚀 Generated post output |
+| Your raw input | Generated post output |
 | :--- | :--- |
-| *“Spent 4 hours debugging LangGraph state drift. The issue was hidden state
-  transitions and a bad `n_parallel` default.”* | *“Most AI agents don’t fail because of prompts.
-  They fail because hidden state transitions create another place for context to drift.
-  If you are building local agent workflows, fix your state model first.”* |
+| *"Spent 4 hours debugging LangGraph state drift. The issue was hidden state transitions and a bad `n_parallel` default."* | *"Most AI agents don't fail because of prompts. They fail because hidden state transitions create another place for context to drift. If you are building local agent workflows, fix your state model first."* |
 
 ---
 
@@ -101,10 +98,10 @@ Two state machines run independently. Each step is a `pipeline.sh` call.
 ### Wiki Loop
 
 Ingests raw notes, extracts entities, reconciles into wiki pages, and links
-them — a compounding knowledge base that grows with every session.
+them -- a compounding knowledge base that grows with every session.
 
 ```
-IDLE → INGEST → ANALYZE → RECONCILE → INDEX → VALIDATE → COMPLETE → IDLE
+IDLE -> INGEST -> ANALYZE -> RECONCILE -> INDEX -> VALIDATE -> COMPLETE -> IDLE
 ```
 
 ### Content Loop
@@ -114,7 +111,7 @@ classification, the 8-step Content Engine Compiler, drafting, gating,
 queuing, and publishing.
 
 ```
-IDLE → SESSION → STRATEGY → COMPILE → DRAFT → GATE → QUEUE → PUBLISH → ARCHIVE → IDLE
+IDLE -> SESSION -> STRATEGY -> COMPILE -> DRAFT -> GATE -> QUEUE -> PUBLISH -> ARCHIVE -> IDLE
 ```
 
 Both loops are driven by the LLM for creative work (analyzing, drafting,
@@ -130,9 +127,9 @@ typing `/command` in the chat.
 
 | Command | Action |
 |---------|--------|
-| **`/post [topic]`** | 🔥 **Start content pipeline - convert a session into drafts** |
-| **`/publish [id\|all]`** | 🚀 **Push approved queue to X / LinkedIn** |
-| **`/extract [file]`** | Ingest raw notes → wiki pages |
+| **`/post [topic]`** | **Start content pipeline -- convert a session into drafts** |
+| **`/publish [id\|all]`** | **Push approved queue to X / LinkedIn** |
+| **`/extract [file]`** | Ingest raw notes -> wiki pages |
 | `/state` | Show current state of wiki and content loops |
 | `/health` | Wiki health check (orphans, links, frontmatter) |
 | `/queue` | View drafts waiting for review or publish |
@@ -194,7 +191,7 @@ TheSpielEngine/
 │   ├── voice-corpus.md    # Canonical post examples
 │   ├── voice-and-gates.md # Voice markers + 4-check + 10-gate system
 │   ├── funnel-and-matrix.md # Archetypes, verticals, CTA matrix
-│   └── session-as-content.md # Methodology: session → post
+│   └── session-as-content.md # Methodology: session -> post
 │
 ├── templates/             # Post frontmatter + structure templates
 │   ├── x-post.md
@@ -240,13 +237,15 @@ TheSpielEngine/
 
 Every draft passes through a multi-layer gate system before publishing:
 
-### Mechanical (16 checks — `gates.py`)
+### Mechanical (16 checks -- `gates.py`)
+
 - Character count, hook presence, em-dash rules
 - No architecture leaks, audience named, lesson surfaced
 - No generic statements, reader as subject, closing presence
 - Frontmatter complete, ICP present, banner file exists
 
-### Creative (4-check baseline + 10-gate extended — LLM judges)
+### Creative (4-check baseline + 10-gate extended -- LLM judges)
+
 - Reader's world is the subject, not the writer's project
 - Tension in first 2 lines
 - Named reader present (founders, builders, operators)
@@ -254,6 +253,7 @@ Every draft passes through a multi-layer gate system before publishing:
 - No platitudes, grounded references, engagement ask
 
 ### Composite score
+
 `(passes / total gates)`. Minimum threshold: 0.85. Configured in `rules.yaml`.
 
 ---
@@ -267,18 +267,15 @@ Every draft passes through a multi-layer gate system before publishing:
 | `concepts/icp-offer.md` | ICP demographics, psychographics, problem hierarchy |
 | `concepts/voice-corpus.md` | Canonical examples for voice matching |
 | `concepts/funnel-and-matrix.md` | Archetypes, verticals, CTA matrix |
-| `.env` | `VAULT_DIR` — vault root path |
+| `.env` | `VAULT_DIR` -- vault root path |
 
 ---
 
 ## Portability
 
-- **Auto-resolving root:** scripts detect their own location, no hardcoded
-  paths. Set `VAULT_DIR` in `.env` or as an environment variable to override.
-- **Agent-agnostic:** the setup prompt works in any LLM agent — Cursor, Claude
-  Code, opencode, Continue, ChatGPT, etc.
-- **Gitignored:** `rules.yaml`, `.env`, `content/*`, `logs/*`, `assets/banners/*`,
-  `assets/screenshots/*` — local data stays local.
+- **Auto-resolving root:** scripts detect their own location, no hardcoded paths. Set `VAULT_DIR` in `.env` or as an environment variable to override.
+- **Agent-agnostic:** the setup prompt works in any LLM agent -- Cursor, Claude Code, opencode, Continue, ChatGPT, etc.
+- **Gitignored:** `rules.yaml`, `.env`, `content/*`, `logs/*`, `assets/banners/*`, `assets/screenshots/*` -- local data stays local.
 - **Standalone:** Python 3 + bash is all you need. No npm, no Docker.
 
 ---
