@@ -92,6 +92,12 @@ def load_icon_svg(config: dict, name: str) -> str:
     import re
     svg = re.sub(r"<\?xml.*?\?>", "", svg).strip()
     svg = re.sub(r'\s+(width|height)="[^"]*"', "", svg)
+    def _fix_fill(m):
+        v = m.group(1)
+        if v in ("none", "transparent", "currentColor"):
+            return f' fill="{v}"'
+        return ' fill="currentColor"'
+    svg = re.sub(r'\s+fill="([^"]*)"', _fix_fill, svg)
     return svg
 
 
@@ -113,6 +119,9 @@ def _best_split(words: list[str], parts: int) -> list[str]:
             lines = splits + [" ".join(words[start:])]
             counts = [len(l) for l in lines]
             score = max(counts) - min(counts)
+            word_counts = [len(l.split()) for l in lines]
+            if any(wc <= 1 for wc in word_counts):
+                score += 5
             if score < best_score:
                 best_score, best = score, lines
             return
@@ -123,7 +132,41 @@ def _best_split(words: list[str], parts: int) -> list[str]:
     return best or [" ".join(words)]
 
 
-def render_html(template: str, config: dict, banner_type: str, title: str, subtitle: str) -> str:
+def auto_scale_font(title_lines: list[str], subtitle: str, bt: dict, width: int, height: int) -> int:
+    title_cfg = bt["title"]
+    base_size = title_cfg["font_size_px"]
+    min_size = title_cfg.get("font_size_min_px", 36)
+
+    padding = bt.get("layout", {}).get("content_padding", "60px 70px 80px")
+    parts = padding.split()
+    h_pad = int(parts[1].replace("px", "")) if len(parts) >= 2 else int(parts[0].replace("px", ""))
+    avail_w = int(width * 0.85) - h_pad * 2
+
+    longest = max((len(l) for l in title_lines), default=1)
+    size_by_w = avail_w / (longest * 0.48) if longest else base_size
+
+    t_pad = int(parts[0].replace("px", ""))
+    b_pad = int(parts[-1].replace("px", ""))
+    handle = bt.get("handle", {})
+    content_max_h = height - t_pad - b_pad - handle.get("position_bottom_px", 28) - handle.get("font_size_px", 18) - 10
+    text_area_h = content_max_h - t_pad - b_pad
+
+    lh = float(title_cfg.get("line_height", 0.9))
+    sub_h = bt["subtitle"]["font_size_px"] * float(bt["subtitle"].get("line_height", 1.4)) + (32 if subtitle else 0)
+    n = len(title_lines)
+    size_by_h = (text_area_h - sub_h) / (n * lh) if n else base_size
+
+    final = min(base_size, size_by_w, size_by_h)
+    return max(int(final), min_size)
+
+
+def truncate_to_fit(text: str, max_chars: int) -> str:
+    if len(text) <= max_chars:
+        return text
+    return text[:max_chars - 1] + "…"
+
+
+def render_html(template: str, config: dict, banner_type: str, title: str, subtitle: str, headline: str = "") -> str:
     bt = config["banners"].get(banner_type, config["banners"].get("default"))
     brand = config["brand"]
     fonts = config["fonts"]
@@ -132,7 +175,12 @@ def render_html(template: str, config: dict, banner_type: str, title: str, subti
 
     icon_name = pick_icon(config, title, subtitle)
     icon_svg = load_icon_svg(config, icon_name)
-    title_lines = split_title(title)
+
+    MAX_SUBTITLE_CHARS = 50
+    subtitle = subtitle[:MAX_SUBTITLE_CHARS - 1] + "…" if len(subtitle) > MAX_SUBTITLE_CHARS else subtitle
+
+    display_title = headline if headline else title
+    title_lines = split_title(display_title)
     title_lines_html = "\n".join(f'<div class="title-line">{line}</div>' for line in title_lines)
 
     bg = brand.get("background", {})
