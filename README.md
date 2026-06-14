@@ -1,31 +1,97 @@
-# The Spiel Engine
+# The Spiel Engine 🤖✍️
 
-A portable content engine that turns work sessions into platform-native posts.
-Two agentic loops — one for compounding knowledge (wiki), one for publishing
-content — governed by state machines, quality gates, and your ICP strategy.
+Turn real build sessions into publishable content automatically.
+
+The Spiel Engine is a Session-as-Content system for technical founders.
+It converts what you already build, debug, decide, and ship into platform-native
+posts for **X, LinkedIn, and blog** without requiring a separate content workflow.
+
+> You do not create content. You extract it from work.
 
 ```
 WORK SESSION → [Wiki Loop] → Knowledge Base → [Content Loop] → X / LinkedIn / Blog
 ```
-The engine ships with skeleton strategy templates in `concepts/`. After running the
-setup prompt in SETUP.md, the 14-question session fills these with your real content strategy.
 
-> [!NOTE] 
-> **If you are a technical founder who wants inbound without becoming a creator, this is the setup. Read the full methodology on the [homepage](/), or DM me on [X @ShayanSpiel](https://x.com/ShayanSpiel) for a done-for-you install.**
+👉 Want a white-glove install? DM [X @ShayanSpiel](https://x.com/ShayanSpiel) to get a custom setup,
+ICP build, and voice model configured for your company.
+
+> ⚠️ WARNING
+> This repo is not a ready-made content strategy.
+> It is an engine, not a finished brand voice, and it needs your ICP definition,
+> positioning, and offer to produce differentiated output.
+
+> 💡 NOTE
+> The engine ships with skeleton strategy templates in `concepts/`.
+> `SETUP.md` uses a 14-question session to fill those with your real ICP, voice,
+> and offer. Your full strategy stays in your local vault, not in this repo.
+
+## What this repo is for
+
+- **Engine only:** session-based content workflow, quality gates, publishing
+  automation.
+- **Not a SaaS wrapper:** runs locally with Python + bash.
+- **Not pre-trained on your voice:** it learns your language from your setup.
+- **Not a finished audience:** you must define your ICP and positioning first.
+
+## What this repo does not include
+
+❌ Your ICP definition
+❌ Your positioning strategy
+❌ Your offer design
+❌ Your brand voice
+❌ A distribution plan
+
+Without those, output will read as functional but generic.
+>>>>>>> 00883f6 (Update README clone URL to github.com/ShayanSpiel/SpielEngine)
 
 ## Quick Start
 
 ```bash
-git clone https://github.com/<owner>/TheSpielEngine.git
-cd TheSpielEngine
+git clone https://github.com/ShayanSpiel/SpielEngine.git
+cd SpielEngine
 ```
 
-Open `SETUP.md` and paste the prompt into **any** LLM-powered agent
-(Cursor, Claude Code, opencode, Continue, ChatGPT, etc.).
-The agent will self-detect, install commands, and walk through the
-14-question ICP/voice/brand setup automatically.
+Open `SETUP.md` and paste the prompt into **any** LLM-powered agent:
+Cursor, Claude Code, opencode, Continue, ChatGPT, etc.
+The agent will:
+
+- detect the repo structure
+- configure your ICP and voice
+- initialize your content strategy
+- generate the templates and commands
 
 **Requirements:** Python 3, bash, git.
+
+---
+
+## Choose your path
+
+- 🛠️ **Self-Serve:** clone the repo, run `SETUP.md`, and launch your engine in minutes.
+- 🚀 **Done-For-You:** skip the setup and get a custom install, ICP build, and voice model configured for your company.
+
+DM me on [X @ShayanSpiel](https://x.com/ShayanSpiel) if you want the full white-glove install.
+
+---
+
+## Why this exists
+
+Technical founders do not need to become influencers to get inbound.
+They need a system that turns their actual work into distribution without a
+content identity switch.
+
+> Your work already contains content.
+> This system extracts it, structures it, and turns it into platform-ready posts.
+
+---
+
+## See it in action
+
+| 📄 Your raw input | 🚀 Generated post output |
+| :--- | :--- |
+| *“Spent 4 hours debugging LangGraph state drift. The issue was hidden state
+  transitions and a bad `n_parallel` default.”* | *“Most AI agents don’t fail because of prompts.
+  They fail because hidden state transitions create another place for context to drift.
+  If you are building local agent workflows, fix your state model first.”* |
 
 ---
 
@@ -65,24 +131,24 @@ typing `/command` in the chat.
 
 | Command | Action |
 |---------|--------|
+| **`/post [topic]`** | 🔥 **Start content pipeline - convert a session into drafts** |
+| **`/publish [id\|all]`** | 🚀 **Push approved queue to X / LinkedIn** |
+| **`/extract [file]`** | Ingest raw notes → wiki pages |
+| `/state` | Show current state of wiki and content loops |
+| `/health` | Wiki health check (orphans, links, frontmatter) |
+| `/queue` | View drafts waiting for review or publish |
+| `/optimize` | Suggest tagging, linking, and pruning opportunities |
+| `/reconcile` | Reconcile extracted content into wiki pages |
 | `/analyze` | Run analysis step on pending items |
 | `/compact` | Merge redundant or overlapping pages |
 | `/config` | Show current engine configuration |
-| `/extract [file]` | Ingest raw notes → wiki pages |
-| `/health` | Wiki health check (orphans, links, frontmatter) |
-| `/help` | Show all available commands |
 | `/index` | Display the wiki index |
 | `/log` | Recent log entries |
-| `/optimize` | Suggest tagging, linking, and pruning opportunities |
-| `/post [topic]` | Start content pipeline (session or topic) |
 | `/prune` | Identify and remove stale or low-confidence pages |
-| `/publish [id\|all]` | Queue → production (X / LinkedIn) |
-| `/queue` | Show content queue grouped by platform |
-| `/reconcile` | Reconcile extracted content into wiki pages |
 | `/reject` | Remove a draft from the queue |
 | `/relink` | Scan and repair broken wikilinks |
 | `/schedule` | Set publish timestamps for queued content |
-| `/state` | Show current state of wiki and content loops |
+| `/help` | Show all available commands |
 
 ### Pipeline Subcommands
 
