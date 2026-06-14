@@ -15,12 +15,12 @@ WORK SESSION → [Wiki Loop] → Knowledge Base → [Content Loop] → X / Linke
 👉 Want a white-glove install? DM [X @ShayanSpiel](https://x.com/ShayanSpiel) to get a custom setup,
 ICP build, and voice model configured for your company.
 
-> ⚠️ WARNING
+> [!WARNING] 
 > This repo is not a ready-made content strategy.
 > It is an engine, not a finished brand voice, and it needs your ICP definition,
 > positioning, and offer to produce differentiated output.
 
-> 💡 NOTE
+> [!NOTE] 
 > The engine ships with skeleton strategy templates in `concepts/`.
 > `SETUP.md` uses a 14-question session to fill those with your real ICP, voice,
 > and offer. Your full strategy stays in your local vault, not in this repo.
@@ -42,7 +42,7 @@ ICP build, and voice model configured for your company.
 ❌ A distribution plan
 
 Without those, output will read as functional but generic.
->>>>>>> 00883f6 (Update README clone URL to github.com/ShayanSpiel/SpielEngine)
+>00883f6 (Update README clone URL to github.com/ShayanSpiel/SpielEngine)
 
 ## Quick Start
 
