@@ -42,7 +42,6 @@ ICP build, and voice model configured for your company.
 ❌ A distribution plan
 
 Without those, output will read as functional but generic.
->00883f6 (Update README clone URL to github.com/ShayanSpiel/SpielEngine)
 
 ## Quick Start
 
