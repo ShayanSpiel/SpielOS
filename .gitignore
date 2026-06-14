@@ -16,3 +16,4 @@ content/posted/*
 logs/*
 !logs/.gitkeep
 .cursor/
+content/strategy/

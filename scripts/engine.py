@@ -135,7 +135,7 @@ def load_strategy_pages() -> list[dict]:
     """
     rules = _load_rules()
     strategy_pages = rules.get("strategy", {}).get("pages", [
-        "icp-offer", "funnel-and-matrix", "voice-and-gates", "session-as-content",
+        "icp-offer", "funnel-and-matrix", "voice-and-gates", "session-as-content", "voice-corpus",
     ])
     results = []
     for name in strategy_pages:

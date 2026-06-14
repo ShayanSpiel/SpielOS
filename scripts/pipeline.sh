@@ -113,8 +113,26 @@ cmd_wiki_reset() {     warn "WIKI: RESET";         run_engine wiki reset; }
 
 cmd_post_start() {     info "CONTENT: SESSION_CAPTURE";  run_engine content post "$@"; }
 cmd_post_strategy() {  info "CONTENT: STRATEGY_LOAD";    run_engine content strategy; }
-cmd_post_compile() {   info "CONTENT: ICP_WORLD_BUILD";  run_engine content compile; }
-cmd_post_draft() {     info "CONTENT: DRAFTING";         run_engine content draft; }
+# 🔒 Pre-flight: validate .content-brief.json exists before compiling/drafting
+guard_brief_exists() {
+  local brief="$VAULT_DIR/.content-brief.json"
+  if [[ ! -f "$brief" ]]; then
+    die "No .content-brief.json found. Run 'bash scripts/pipeline.sh post-start [topic]' first."
+  fi
+}
+
+cmd_post_compile() {
+  guard_brief_exists
+  info "CONTENT: ICP_WORLD_BUILD"
+  run_engine content compile
+}
+
+cmd_post_draft() {
+  guard_brief_exists
+  # engine.py does its own deeper validation (core_insight, meanings, selection)
+  info "CONTENT: DRAFTING"
+  run_engine content draft
+}
 cmd_post_banner() {    info "CONTENT: BANNER";           run_engine content banner; }
 cmd_post_gate() {      info "CONTENT: GATE_CHECK";       run_engine content gate; }
 cmd_post_revise() {    info "CONTENT: REVISING";         run_engine content revise; }

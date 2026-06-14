@@ -9,6 +9,9 @@ WORK SESSION → [Wiki Loop] → Knowledge Base → [Content Loop] → X / Linke
 ```
 
 > [!NOTE]
+> The engine ships with skeleton strategy templates in `concepts/`. After running the
+> setup prompt in SETUP.md, the 14-question session fills these with your real content.
+> Your full strategy stays in your dev vault, not in the engine repo.
 > If you are a technical founder who wants inbound without becoming a creator, this is the setup. Read the full methodology on the [homepage](/), or DM me on [X @ShayanSpiel](https://x.com/ShayanSpiel) for a done-for-you install.
 
 ## Quick Start
