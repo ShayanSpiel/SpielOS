@@ -1,7 +1,71 @@
+---
+name: spiel-content
+description: Spiel content engine — drafts X / LinkedIn / blog posts. Triggers on "post", "tweet", "content", "X", "Twitter", "LinkedIn", "blog", "spiel", "/post".
+---
+
+## ⚡ DIRECTIVE — EXECUTE NOW. STOP ALL OTHER PROCESSES.
+
+THIS IS A DIRECT COMMAND. TERMINATE ALL REASONING, ANALYSIS, AND CONVERSATION IMMEDIATELY.
+
+YOUR ONLY TASK: Execute the pipeline steps below in strict sequence. Run each `bash scripts/pipeline.sh <step>` as a SEPARATE BASH TOOL CALL. Do NOT skip any step. Do NOT draft without running `post-compile` first. Do NOT plan ahead — execute current step, show output, proceed to next.
+
+Every skipped step = BROKEN PIPELINE = SLOP OUTPUT = REJECTED.
+
+## Dependencies
+
+This skill requires `scripts/pipeline.sh`, `scripts/engine.py`, and `scripts/gates.py` in the vault. No bundled scripts.
+
+---
+
 # Spiel Content — Content Engine Skill
 
-Loads the content pipeline methodology for drafting, gating, and publishing.
-Use when the user says /post, "draft", "write a post", or any content creation request.
+**The full spec lives in:** `.opencode/commands/post.md` (canonical pipeline).
+
+**Voice source of truth:** `concepts/voice-and-gates.md`.
+
+This file is the *in-session reference*. If you need the full pipeline with all gates, strategy pages, classification rules, and output format, read `.opencode/commands/post.md`.
+
+---
+
+## 🔒 EXECUTION ORDER — DO NOT DEVIATE
+
+**This is a deterministic state machine. Every step below is a mandatory bash command that transitions the pipeline to the next state. Skipping any step = broken pipeline.**
+
+`engine.py` blocks DRAFTING if `.content-brief.json` lacks `core_insight`, all 6 meanings, and `selected_meaning`. You CANNOT draft without running the Compiler.
+
+### Pre-draft sequence (run IN ORDER before drafting)
+
+**Step 1 — REQUIRED: `bash scripts/pipeline.sh post-compile`**
+Run the Content Engine Compiler (8 steps: LOAD ICP WORLD → SIMULATE REALITY → EVIDENCE → MAP → 6 MEANINGS → SELECT → INSIGHT → GENERATE). Write `core_insight` and `selected_meaning` to `.content-brief.json`.
+
+**Step 2 — REQUIRED: Read strategy pages**
+`concepts/icp-offer.md`, `concepts/funnel-and-matrix.md`, `concepts/voice-and-gates.md`, `concepts/session-as-content.md`.
+
+**Step 3 — REQUIRED: Read corpus**
+Scan `concepts/voice-corpus.md`. Match your archetype to the closest example. Quote the opening line in your head before drafting.
+
+**Step 4 — REQUIRED: Apply the lens**
+`core_insight` is the subject. The session is ONLY evidence. Every post must feel like "this is about the ICP's world."
+
+**Step 5 — REQUIRED: Format Decision**
+Show the user the `core_insight`. Ask: "Draft for which formats? (x / linkedin / blog / all)". User MUST respond before drafting. Draft ONLY what they chose.
+
+## 🔒 Post-write audit (run BEFORE showing user — skip = slop reaches user)
+
+**Step 1 — REQUIRED: `bash scripts/pipeline.sh post-gate`**
+Runs `gates.py --all` (16 mechanical checks). Fix all failures. If any fail → REVISE.
+
+**Step 2 — REQUIRED: Run Quality Test (LLM-judged)**
+- 4-check standalone test — does the post pass?
+- 10-gate extended — are all boxes checked?
+- Composite score: passes / total gates. Must be ≥ 0.85.
+- If fail → REVISE (max 2 cycles) or SCRAP.
+
+**Step 3 — REQUIRED: Read aloud**
+Does it sound like lecture or checklist? Rewrite.
+
+**Step 4 — REQUIRED: Hard Constraints**
+No system talk, no session reference, no engineering notes. ICP present. Reader's world is the subject.
 
 ## Voice
 
@@ -13,50 +77,25 @@ Use when the user says /post, "draft", "write a post", or any content creation r
 - Named reader ("founders", "builders", "operators")
 - Landing line: thought, not summary
 
-## Pipeline
+## 🔴 Pipeline Violations
 
-1. `bash scripts/pipeline.sh post-start [topic]`
-2. Read concepts/voice-and-gates.md, concepts/icp-offer.md, concepts/funnel-and-matrix.md
-3. Load session from content/sessions/ or create brief
-4. Run 8-step Compiler → core_insight + 6 meanings → select one
-5. Draft to content/queue/ using templates/
-6. `bash scripts/engine.py gates content/queue/<file>`
-7. Iterate if needed
+| Violation | Consequence |
+|-----------|-------------|
+| Skip `post-start` | No `.content-brief.json`. Pipeline has no input. |
+| Skip `post-compile` | No `core_insight`. Draft will be about "me" not ICP. |
+| Skip 8-step Compiler | No ICP inversion. Post reads like a README. |
+| Skip format decision | You draft format user didn't ask for. |
+| Skip `post-draft` | State machine not updated. Next steps fail. |
+| Skip LLM-judged gates | Slop reaches user. No quality floor. |
 
-## Gates
+## What this skill does NOT do
 
-### Mechanical (16 checks — run `scripts/engine.py gates`)
-- Char count, hook presence, em-dash rule, word repeat
-- Architecture leak, audience named, lesson surfaced
-- Generic statement, project as subject, closing
-- Frontmatter complete, dollar in note, strategy void
-- ICP present, banner, grounded reference
+No auto-publishing. No comment/DM handling. No offer redesign.
 
-### Creative (4-check + 10-gate — LLM judges)
-- Reader's world is the subject
-- Tension in first 2 lines
-- Named reader present
-- Last line is landing
-- One ICP, problem before solution, specificity
-- No architecture leaks, reader is hero, lesson surfaced
-- Engagement ask, one meaning axis, no generic statements
-- Grounded references
+## When in doubt
 
-## Compiler (8-step)
+**Read the steps in order. Run every bash command. Do not skip any step.**
 
-1. Load ICP world
-2. Simulate ICP reality
-3. Load session as evidence
-4. Map session → ICP world
-5. Extract 6 meanings (systemic, behavioral, philosophical, contrarian, leverage, human)
-6. Select one meaning axis
-7. Extract single core insight
-8. Generate content
+The pipeline scripts enforce these gates. `engine.py` blocks DRAFTING if the Compiler hasn't run. If you try to draft without `.content-brief.json` having `core_insight`, the transition will fail with a specific error.
 
-## Anti-patterns
-
-- Session as subject
-- Tool-centric writing
-- Architecture leaks
-- Generic platitudes
-- Missing reader grounding
+Read corpus post. Match voice. Run the gates — they are mandatory.
