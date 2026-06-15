@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """banner.py — Generate banner images for queue drafts (Puppeteer-based).
 
-Replaces `scripts/generate-banner.js` (419 LOC of Node.js) with ~200 LOC of Python.
-Honors brand-config.json. Auto-writes banner path into the queue draft's frontmatter.
+All mechanical parameters live in brand-config.json under "banners.*".
+No script-level hardcoded values (except CHROME_PATH and template location).
 
 Usage:
     python3 scripts/banner.py --queue-id 2026-06-12-tweet-01 --type social
@@ -12,6 +12,7 @@ Usage:
 import argparse
 import json
 import os
+import re
 import subprocess
 import tempfile
 from pathlib import Path
@@ -56,7 +57,16 @@ def read_draft(queue_id: str) -> Path:
 
 
 def title_case(text: str) -> str:
-    return " ".join(w if (len(w) <= 2 and w.isupper()) else w.capitalize() for w in text.split())
+    words = text.split()
+    result = []
+    for w in words:
+        if len(w) <= 2 and w.isupper():
+            result.append(w)
+        elif any(c.isupper() for c in w[1:]):
+            result.append(w)
+        else:
+            result.append(w.capitalize())
+    return " ".join(result)
 
 
 def pick_icon(config: dict, title: str, subtitle: str) -> str:
@@ -89,7 +99,6 @@ def load_icon_svg(config: dict, name: str) -> str:
     if not abs_path.exists():
         return entry.get("fallback_svg", "")
     svg = abs_path.read_text()
-    import re
     svg = re.sub(r"<\?xml.*?\?>", "", svg).strip()
     svg = re.sub(r'\s+(width|height)="[^"]*"', "", svg)
     def _fix_fill(m):
@@ -133,6 +142,10 @@ def _best_split(words: list[str], parts: int) -> list[str]:
 
 
 def auto_scale_font(title_lines: list[str], subtitle: str, bt: dict, width: int, height: int) -> int:
+    """Compute the largest font size that fits title + subtitle in the available area.
+
+    Reads all parameters from the banner-type config (bt). Never hardcodes.
+    """
     title_cfg = bt["title"]
     base_size = title_cfg["font_size_px"]
     min_size = title_cfg.get("font_size_min_px", 36)
@@ -148,8 +161,8 @@ def auto_scale_font(title_lines: list[str], subtitle: str, bt: dict, width: int,
     t_pad = int(parts[0].replace("px", ""))
     b_pad = int(parts[-1].replace("px", ""))
     handle = bt.get("handle", {})
-    content_max_h = height - t_pad - b_pad - handle.get("position_bottom_px", 28) - handle.get("font_size_px", 18) - 10
-    text_area_h = content_max_h - t_pad - b_pad
+    space_for_handle = handle.get("position_bottom_px", 28) + handle.get("font_size_px", 18) + 10
+    text_area_h = height - t_pad - b_pad - space_for_handle
 
     lh = float(title_cfg.get("line_height", 0.9))
     sub_h = bt["subtitle"]["font_size_px"] * float(bt["subtitle"].get("line_height", 1.4)) + (32 if subtitle else 0)
@@ -163,7 +176,7 @@ def auto_scale_font(title_lines: list[str], subtitle: str, bt: dict, width: int,
 def truncate_to_fit(text: str, max_chars: int) -> str:
     if len(text) <= max_chars:
         return text
-    return text[:max_chars - 1] + "…"
+    return text[:max_chars - 1] + "\u2026"
 
 
 def render_html(template: str, config: dict, banner_type: str, title: str, subtitle: str, headline: str = "") -> str:
@@ -175,12 +188,14 @@ def render_html(template: str, config: dict, banner_type: str, title: str, subti
 
     icon_name = pick_icon(config, title, subtitle)
     icon_svg = load_icon_svg(config, icon_name)
+    icon_registry = config.get("icons", {}).get("registry", {})
 
-    MAX_SUBTITLE_CHARS = 50
-    subtitle = subtitle[:MAX_SUBTITLE_CHARS - 1] + "…" if len(subtitle) > MAX_SUBTITLE_CHARS else subtitle
+    max_subtitle_chars = bt.get("subtitle", {}).get("max_chars", 50)
+    subtitle = subtitle[:max_subtitle_chars - 1] + "\u2026" if len(subtitle) > max_subtitle_chars else subtitle
 
     display_title = headline if headline else title
     title_lines = split_title(display_title)
+    title_size = auto_scale_font(title_lines, subtitle, bt, bt["dimensions"]["width"], bt["dimensions"]["height"])
     title_lines_html = "\n".join(f'<div class="title-line">{line}</div>' for line in title_lines)
 
     bg = brand.get("background", {})
@@ -189,14 +204,19 @@ def render_html(template: str, config: dict, banner_type: str, title: str, subti
 
     pos_x = layout.get("icon_position_x", "right")
     pos_y = layout.get("icon_position_y", "center")
+    offset_x = layout.get("icon_offset_x", "0%")
+    offset_y = layout.get("icon_offset_y", "0%")
     if pos_x == "right":
-        icon_position_style = f'right: {layout.get("icon_offset_x", "0%")}; top: 50%;'
+        icon_position_style = f'right: {offset_x}; top: 50%;'
     elif pos_x == "left":
-        icon_position_style = f'left: {layout.get("icon_offset_x", "0%")}; top: 50%;'
+        icon_position_style = f'left: {offset_x}; top: 50%;'
     else:
         x_map = {"left": "0%", "center": "50%", "right": "100%"}
         y_map = {"top": "0%", "center": "50%", "bottom": "100%"}
         icon_position_style = f'left: {x_map.get(pos_x, "50%")}; top: {y_map.get(pos_y, "50%")};'
+    icon_transform = f"translateY({offset_y})"
+
+    icon_overrides = icon_registry.get(icon_name, {})
 
     handle_align = bt.get("handle", {}).get("alignment", "center")
     handle_padding = "70px" if handle_align in ("left", "right") else "0px"
@@ -208,9 +228,7 @@ def render_html(template: str, config: dict, banner_type: str, title: str, subti
     html = html.replace("__BG_STYLE__", bg_style)
     html = html.replace("__FONT_FAMILY__", fonts.get("heading", "Inter"))
     html = html.replace("__SUBTITLE_FONT__", fonts.get("subtitle", "Merriweather"))
-    for field in ["size_px", "weight", "color", "letter_spacing", "line_height"]:
-        pass
-    html = html.replace("__TITLE_SIZE__", str(bt["title"]["font_size_px"]))
+    html = html.replace("__TITLE_SIZE__", str(title_size))
     html = html.replace("__TITLE_WEIGHT__", str(bt["title"]["weight"]))
     html = html.replace("__TITLE_COLOR__", bt["title"]["color"])
     html = html.replace("__TITLE_LETTER_SPACING__", str(bt["title"]["letter_spacing"]))
@@ -230,12 +248,12 @@ def render_html(template: str, config: dict, banner_type: str, title: str, subti
     html = html.replace("__HANDLE_ALIGN__", handle_align)
     html = html.replace("__HANDLE_PADDING__", handle_padding)
     html = html.replace("__ICON_SVG__", icon_svg)
-    html = html.replace("__ICON_OPACITY__", str(icon_style.get("opacity", 0.30)))
-    html = html.replace("__ICON_COLOR__", icon_style.get("color", "#444444"))
-    html = html.replace("__ICON_SIZE__", str(icon_style.get("size_percent", 120)))
-    html = html.replace("__ICON_ROTATE__", str(icon_style.get("rotate_deg", 30)))
+    html = html.replace("__ICON_OPACITY__", str(icon_overrides.get("opacity", icon_style.get("opacity", 0.30))))
+    html = html.replace("__ICON_COLOR__", icon_overrides.get("color", icon_style.get("color", "#444444")))
+    html = html.replace("__ICON_SIZE__", str(icon_overrides.get("size_percent", icon_style.get("size_percent", 120))))
+    html = html.replace("__ICON_ROTATE__", str(icon_overrides.get("rotate_deg", icon_style.get("rotate_deg", 30))))
     html = html.replace("__ICON_POSITION_STYLE__", icon_position_style)
-    html = html.replace("__ICON_TRANSFORM__", "")
+    html = html.replace("__ICON_TRANSFORM__", icon_transform)
     html = html.replace("__TITLE_LINES_HTML__", title_lines_html)
     html = html.replace("__SUBTITLE_HTML__",
                         f'<div class="subtitle-wrapper"><span class="subtitle-highlight">{subtitle}</span></div>' if subtitle else "")
@@ -244,8 +262,11 @@ def render_html(template: str, config: dict, banner_type: str, title: str, subti
     return html
 
 
-def render_png(html: str, out_path: Path, width: int, height: int) -> bool:
-    """Render HTML to PNG via Puppeteer (Node)."""
+def render_png(html: str, out_path: Path, width: int, height: int, scale_factor: int = 2) -> bool:
+    """Render HTML to PNG via Puppeteer (Node).
+    
+    scale_factor comes from brand-config.json render.device_scale_factor (default 2 for Retina).
+    """
     with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as f:
         f.write(html)
         html_path = f.name
@@ -257,7 +278,7 @@ const puppeteer = require('puppeteer');
     args: ['--no-sandbox', '--disable-setuid-sandbox']
   }});
   const page = await browser.newPage();
-  await page.setViewport({{ width: {width}, height: {height}, deviceScaleFactor: 1 }});
+  await page.setViewport({{ width: {width}, height: {height}, deviceScaleFactor: {scale_factor} }});
   await page.goto('file://{html_path}', {{ waitUntil: 'networkidle0' }});
   await page.screenshot({{ path: '{out_path}', type: 'png', clip: {{x:0, y:0, width:{width}, height:{height}}}}});
   await browser.close();
@@ -269,7 +290,7 @@ const puppeteer = require('puppeteer');
     try:
         result = subprocess.run(["node", str(js_path)], capture_output=True, text=True, timeout=60)
         if result.returncode != 0:
-            print(f"  ✗ puppeteer: {result.stderr[:200]}")
+            print(f"  \u2717 puppeteer: {result.stderr[:200]}")
             return False
         return out_path.exists()
     finally:
@@ -305,6 +326,7 @@ def main():
     bt = config["banners"].get(args.type, config["banners"].get("default"))
     width = bt["dimensions"]["width"]
     height = bt["dimensions"]["height"]
+    scale_factor = config.get("render", {}).get("device_scale_factor", 2)
 
     draft_path = read_draft(args.queue_id)
     fm, _ = parse_frontmatter(draft_path.read_text(encoding="utf-8"))
@@ -317,12 +339,12 @@ def main():
 
     template = load_template()
     html = render_html(template, config, args.type, title_case(title), subtitle)
-    if not render_png(html, out_path, width, height):
+    if not render_png(html, out_path, width, height, scale_factor):
         return 1
 
     update_draft_banner(draft_path, banner_rel)
-    print(f"  ✓ {out_path.relative_to(VAULT)}")
-    print(f"  ✓ wrote banner: {banner_rel} → {draft_path.name}")
+    print(f"  \u2713 {out_path.relative_to(VAULT)}")
+    print(f"  \u2713 wrote banner: {banner_rel} \u2192 {draft_path.name}")
     return 0
 
 

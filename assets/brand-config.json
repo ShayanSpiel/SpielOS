@@ -1,10 +1,156 @@
 {
-  "brand_name": "",
-  "tagline": "",
-  "colors": { "primary": "", "secondary": "", "accent": "" },
-  "fonts": { "heading": "", "body": "" },
-  "logo_path": "",
-  "voice_keywords": [],
-  "target_platforms": ["x", "linkedin", "blog"],
-  "content_focus": ""
+  "brand": {
+    "name": "Your Brand",
+    "handle": "@yourhandle",
+    "primary_bg": "#e8e8e8",
+    "accent": "#ff6a00",
+    "text_dark": "#202020",
+    "text_mid": "#5a5959",
+    "background": {
+      "type": "solid",
+      "value": "#e8e8e8"
+    }
+  },
+  "fonts": {
+    "heading": "Inter",
+    "heading_weights": [600, 700, 900],
+    "subtitle": "Merriweather",
+    "subtitle_weights": [300, 400, 700],
+    "google_fonts": "https://fonts.googleapis.com/css2?family=Inter:wght@600;700;900&family=Merriweather:wght@300;400;700&display=swap",
+    "use_google_fonts": true
+  },
+  "render": {
+    "device_scale_factor": 2
+  },
+  "banners": {
+    "default": {
+      "name": "OG Banner",
+      "description": "1200x630 OG card for blog previews.",
+      "dimensions": { "width": 1200, "height": 630 },
+      "title": {
+        "max_words": 6,
+        "font_size_px": 120,
+        "font_size_min_px": 64,
+        "color": "#ff6a00",
+        "weight": 900,
+        "letter_spacing": "-0.03em",
+        "line_height": 1.05
+      },
+      "subtitle": {
+        "font_size_px": 36,
+        "color": "#202020",
+        "weight": 400,
+        "letter_spacing": "0.02em",
+        "line_height": 1.4,
+        "highlight": "rgba(255, 228, 77, 0.3)",
+        "max_chars": 50
+      },
+      "handle": {
+        "font_size_px": 22,
+        "color": "#5a5959",
+        "weight": 400,
+        "letter_spacing": "0.04em",
+        "alignment": "center",
+        "position_bottom_px": 28
+      },
+      "layout": {
+        "content_alignment": "left",
+        "content_padding": "50px 70px 70px",
+        "icon_position_x": "right",
+        "icon_position_y": "center",
+        "icon_offset_x": "-15%",
+        "icon_offset_y": "-50%"
+      }
+    },
+    "social": {
+      "name": "Social Banner",
+      "description": "1200x675 for X/LinkedIn feed.",
+      "dimensions": { "width": 1200, "height": 675 },
+      "title": {
+        "max_words": 6,
+        "font_size_px": 110,
+        "font_size_min_px": 56,
+        "color": "#ff6a00",
+        "weight": 900,
+        "letter_spacing": "-0.03em",
+        "line_height": 1.05
+      },
+      "subtitle": {
+        "font_size_px": 32,
+        "color": "#202020",
+        "weight": 400,
+        "letter_spacing": "0.02em",
+        "line_height": 1.4,
+        "highlight": "rgba(255, 228, 77, 0.3)",
+        "max_chars": 50
+      },
+      "handle": {
+        "font_size_px": 20,
+        "color": "#5a5959",
+        "weight": 400,
+        "letter_spacing": "0.04em",
+        "alignment": "center",
+        "position_bottom_px": 28
+      },
+      "layout": {
+        "content_alignment": "left",
+        "content_padding": "50px 70px 70px",
+        "icon_position_x": "right",
+        "icon_position_y": "center",
+        "icon_offset_x": "-15%",
+        "icon_offset_y": "-50%"
+      }
+    }
+  },
+  "icons": {
+    "default": "arrow-up-right-square",
+    "source": "inline",
+    "registry": {
+      "arrow-up-right-square": { "svg_path": "icons/arrow-up-right-square.svg", "fallback_svg": "" },
+      "gears": { "svg_path": "icons/gears.svg", "fallback_svg": "" },
+      "code": { "svg_path": "icons/code.svg", "fallback_svg": "" },
+      "compass": { "svg_path": "icons/compass.svg", "fallback_svg": "" },
+      "feather": { "svg_path": "icons/feather.svg", "fallback_svg": "" },
+      "layers": { "svg_path": "icons/layers.svg", "fallback_svg": "" },
+      "lightbulb": { "svg_path": "icons/lightbulb.svg", "fallback_svg": "" },
+      "publish": { "svg_path": "icons/publish.svg", "fallback_svg": "" },
+      "rocket": { "svg_path": "icons/rocket.svg", "fallback_svg": "" },
+      "sparkles": { "svg_path": "icons/sparkles.svg", "fallback_svg": "" },
+      "target": { "svg_path": "icons/target.svg", "fallback_svg": "" },
+      "terminal": { "svg_path": "icons/terminal.svg", "fallback_svg": "" },
+      "trending-up": { "svg_path": "icons/trending-up.svg", "fallback_svg": "" },
+      "stop-circle": { "svg_path": "icons/stop-circle.svg", "fallback_svg": "" },
+      "alert-circle": { "svg_path": "icons/alert-circle.svg", "fallback_svg": "" },
+      "alert-square": { "svg_path": "icons/alert-square.svg", "fallback_svg": "" },
+      "github": { "svg_path": "icons/github.svg", "fallback_svg": "", "opacity": 0.20, "color": "#444444", "size_percent": 100, "rotate_deg": 30 }
+    },
+    "web_search": {
+      "base_url": "https://www.svgrepo.com/collections/",
+      "default_collection": "arrows",
+      "instructions": "Search SVG Repo for best monocolor stroke-based SVG aligned with content context."
+    },
+    "mapping": [
+      { "patterns": ["ai", "agent", "automation", "machine", "llm", "gpt", "model"], "icon": "sparkles" },
+      { "patterns": ["open source", "github", "repo"], "icon": "github" },
+      { "patterns": ["system", "process", "engine", "workflow", "architecture", "infrastructure", "stack", "framework", "pipeline"], "icon": "gears" },
+      { "patterns": ["growth", "scale", "business", "revenue", "metrics", "kpi", "analytics", "data", "trend"], "icon": "trending-up" },
+      { "patterns": ["code", "build", "develop", "ship", "deploy", "api", "script", "dev"], "icon": "code" },
+      { "patterns": ["terminal", "cli", "command", "console"], "icon": "terminal" },
+      { "patterns": ["strategy", "plan", "positioning", "offer", "method", "pillar"], "icon": "compass" },
+      { "patterns": ["idea", "learn", "knowledge", "note", "insight", "lesson", "concept", "think"], "icon": "lightbulb" },
+      { "patterns": ["goal", "target", "focus", "priority", "mission", "objective", "outcome"], "icon": "target" },
+      { "patterns": ["launch", "start", "mvp", "product", "release"], "icon": "rocket" },
+      { "patterns": ["layer", "level", "tier", "depth"], "icon": "layers" },
+      { "patterns": ["publish", "content", "post", "draft", "blog", "tweet", "schedule", "queue"], "icon": "publish" },
+      { "patterns": ["write", "story", "copy", "headline", "hook"], "icon": "feather" },
+      { "patterns": ["identity", "creator", "builder", "founder", "technical", "engineer"], "icon": "compass" },
+      { "patterns": ["stop", "pause", "limit", "bottleneck", "barrier", "block", "bounce", "ceiling", "trap", "enough", "alert", "warning", "critical", "urgent"], "icon": "alert-square" }
+    ],
+    "style": {
+      "opacity": 0.25,
+      "color": "#444444",
+      "size_percent": 105,
+      "rotate_deg": 20
+    }
+  }
 }

@@ -1,8 +1,12 @@
 # The Spiel Engine
 
-A portable content engine that turns work sessions into platform-native posts.
-Two agentic loops -- one for compounding knowledge (wiki), one for publishing
-content -- governed by state machines, quality gates, and your ICP strategy.
+Turn real build sessions into publishable content automatically.
+
+The Spiel Engine is a **Session-as-Content** system for technical founders.
+It converts what you already build, debug, decide, and ship into platform-native
+posts for **X, LinkedIn, and blog** without requiring a separate content workflow.
+
+You do not create content. You extract it from work.
 
 ```
 WORK SESSION → [Wiki Loop] → Knowledge Base → [Content Loop] → X / LinkedIn / Blog
@@ -13,9 +17,25 @@ the setup prompt in `SETUP.md`, the 14-question session fills these with your
 real content strategy.
 
 > [!NOTE]
-> If you are a technical founder who wants inbound without becoming a full-time
-> content strategist, and want me to set this up for you and your team, DM me on
-> [X @ShayanSpiel](https://x.com/ShayanSpiel) for a done-for-you install.
+> Want a white-glove install? DM [@ShayanSpiel](https://x.com/ShayanSpiel) to get a custom setup,
+> ICP build, content strategy, and voice model configured for your company.
+
+## What this repo is for
+
+- **Engine only:** session-based content workflow, quality gates, publishing automation.
+- **Not a SaaS wrapper:** runs locally with Python + bash.
+- **Not pre-trained on your voice:** it learns your language from your setup.
+- **Not a finished audience:** you must define your ICP and positioning first.
+
+## What this repo does NOT include
+
+- Your ICP definition
+- Your positioning strategy
+- Your offer design
+- Your brand voice
+- A distribution plan
+
+---
 
 ## Quick Start
 
