@@ -1,3 +1,7 @@
+---
+description: Show recent activity log entries
+---
+
 # /log — Recent Log Entries
 
 Shows recent activity log entries.

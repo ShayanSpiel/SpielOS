@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""gates.py — Unified mechanical gate for the Spiel Engine.
+"""gates.py — Unified mechanical gate for Spiel Engine drafts.
 
 Replaces both preflight_post.py and validate_post.py.
 All rule parameters come from rules.yaml — edit that file to tune behavior.
@@ -388,7 +388,7 @@ def main():
     import argparse
     from datetime import datetime
 
-    parser = argparse.ArgumentParser(description="Gates: unified mechanical gate for the Spiel Engine")
+    parser = argparse.ArgumentParser(description="Gates: unified mechanical gate for Spiel Engine")
     parser.add_argument("file", nargs="?", help="Draft file to validate")
     parser.add_argument("--all", action="store_true", help="Validate all queue drafts")
     parser.add_argument("--list", action="store_true", help="List available checks")

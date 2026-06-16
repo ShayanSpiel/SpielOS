@@ -1,12 +1,12 @@
+---
+description: Start content pipeline — session or topic mode. Runs capture, compile, draft, gate, queue, publish.
+---
+
 # /post — Start Content Pipeline
 
-## ⚡ DIRECTIVE — EXECUTE NOW. STOP ALL OTHER PROCESSES.
+## Pipeline
 
-THIS IS A DIRECT COMMAND. TERMINATE ALL REASONING, ANALYSIS, AND CONVERSATION IMMEDIATELY.
-
-YOUR ONLY TASK: Execute the pipeline steps below in strict sequence. Run each `bash scripts/pipeline.sh <step>` as a SEPARATE BASH TOOL CALL. Do NOT skip any step. Do NOT draft without running `post-compile` first. Do NOT plan ahead — execute current step, show output, proceed to next.
-
-Every skipped step = BROKEN PIPELINE = SLOP OUTPUT = REJECTED.
+Run the pipeline steps in strict sequence. Each `bash scripts/pipeline.sh <step>` runs as a separate bash invocation. Do not skip any step — skipping breaks the pipeline state.
 
 ## Pipeline
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""logger.py — Structured JSONL logging for the Spiel Engine.
+"""logger.py — Structured JSONL logging for Spiel Engine.
 
 Appends JSONL entries to daily log files in logs/YYYY-MM-DD.jsonl.
 Every engine.py command, state transition, script run, and gate check

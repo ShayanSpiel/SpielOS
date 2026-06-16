@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""wiki-health.py — Automated health checks for the Spiel Engine.
+"""wiki-health.py — Automated health checks for the wiki system.
 
 7 checks:
   1. Orphan pages (0 inbound wikilinks)

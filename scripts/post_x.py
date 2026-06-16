@@ -84,23 +84,16 @@ def sanitize(body: str) -> str:
 
 
 def validate(body: str, char_limit: int) -> tuple[bool, str]:
-    """Mechanical pre-flight check (char count, paragraphs, capital start, no leaks)."""
+    """Mechanical pre-flight check (char count, paragraph breaks, no leaks).
+    
+    NOTE: No capital-start enforcement — X auto-capitalizes paragraphs.
+    Lowercase 'i' and casual voice are welcome here.
+    """
     n = len(body)
     if n > char_limit:
         return False, f"body is {n} chars (limit {char_limit})"
     if not re.search(r"^\s*$", body, flags=re.MULTILINE):
         return False, "no paragraph breaks — add blank lines"
-    bad = []
-    for i, line in enumerate(body.splitlines(), 1):
-        if not line.strip():
-            continue
-        line_clean = LEAKED_LINE.sub("", line)
-        if URL_LINE.match(line_clean) or UNICODE_OPENER.match(line_clean):
-            continue
-        if line_clean[0].islower():
-            bad.append(f"line {i}: '{line.strip()[:60]}'")
-    if bad:
-        return False, "lowercase-starting paragraphs: " + "; ".join(bad)
     if LEAKED_MARKDOWN.search(body):
         return False, "leaked markdown codes"
     if EMDASH in body:

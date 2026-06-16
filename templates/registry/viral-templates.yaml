@@ -1,0 +1,1114 @@
+# templates/registry/viral-templates.yaml
+# Master Content Strategy: 150 Viral Hooks and Templates for 2026
+# 50 X (Twitter) + 50 LinkedIn + 50 Blog
+# Source: /Users/shayan/Desktop/Master Content Strategy Document_ 150 Viral Hooks and Templates for 2026.md
+#
+# Each hook/cta uses {slots} for LLM substitution at draft time.
+# best_for maps to strategy_classifier outputs (archetype, meaning_axis, funnel_stage, icp_layer).
+version: 1
+platforms:
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # X (Twitter) — 50 Templates (5 categories × 10)
+  # ═══════════════════════════════════════════════════════════════════════════
+  x:
+    categories:
+
+      # ─── Listicles: Resource Curation & Tools ──────────────────────────
+      - id: listicle
+        name: Listyles — Resource Curation
+        defaults:
+          psych_triggers: [greed, curiosity]
+          anti_patterns: [generic_advice]
+          body: list
+          best_for:
+            archetypes: [S4, S8, S7]
+            meaning_axes: [leverage, behavioral]
+            funnel_stages: [TOFU]
+            icp_layers: [L1, L2]
+        templates:
+          - id: x-listicle-01
+            name: 7 Free tools for X to achieve Y
+            hook: "{number} free tools for {persona} to achieve {result}: 1) {tool_1} — {function_1}, 2) {tool_2} — {function_2}"
+            cta: "Bookmark this for your {year} stack"
+
+          - id: x-listicle-02
+            name: Steal these N assets that result Y
+            hook: "Steal these {number} {asset_type} that {result}: {list}"
+            cta: "RT for your network"
+
+          - id: x-listicle-03
+            name: Number lessons I wish I knew timeframe ago
+            hook: "{number} {lesson_type} I wish I knew {timeframe} ago about {topic}: {list}"
+            cta: "Follow @{handle} for daily {niche} tips"
+
+          - id: x-listicle-04
+            name: The subject stack for goal without pain
+            hook: "My personal {category} stack for {goal} without {pain}: {tool_1}, {tool_2}"
+            cta: "Click the link for the full breakdown"
+
+          - id: x-listicle-05
+            name: N topic tactics I wish I knew N years ago
+            hook: "{number} {topic} tactics I wish I knew {timeframe} ago: 🧵"
+            cta: "Follow for more {niche} threads"
+
+          - id: x-listicle-06
+            name: Number resources for audience
+            hook: "{number} resources for {audience} to {solve}: {list}"
+            cta: "Save this thread for later"
+
+          - id: x-listicle-07
+            name: Number things I learned from experience
+            hook: "{number} lessons I learned from {experience}: {lesson_1}, {lesson_2}"
+            cta: "RT if this helped you"
+
+          - id: x-listicle-08
+            name: My personal stack for task in year
+            hook: "My personal stack for {task} in {year}: {tool_1}, {tool_2}"
+            cta: "Follow for more curation"
+
+          - id: x-listicle-09
+            name: Number subjects that result in N days
+            hook: "{number} {asset_type} that {result} in {timeframe}: {list}"
+            cta: "RT to help a founder"
+
+          - id: x-listicle-10
+            name: Number lessons I wish I learned at age/phase
+            hook: "{number} lessons I wish I learned in my {career_phase}: {lesson_1}, {lesson_2}"
+            cta: "Follow for more insights"
+
+      # ─── Contrarian: Paradigm Shifts ───────────────────────────────────
+      - id: contrarian
+        name: Contrarian — Paradigm Shifts
+        defaults:
+          psych_triggers: [fear, anger, curiosity, pride]
+          anti_patterns: [no_emotion, generic_advice]
+          body: take
+          best_for:
+            archetypes: [S3, S9, S5]
+            meaning_axes: [contrarian, philosophical, behavioral]
+            funnel_stages: [MOFU]
+            icp_layers: [L3, L4]
+        templates:
+          - id: x-contrarian-01
+            name: Unpopular opinion — belief is overrated
+            hook: "Unpopular opinion: {common_belief} is overrated. {pragmatic_alternative}"
+            cta: "What's your take?"
+
+          - id: x-contrarian-02
+            name: You don't need X. You need Y.
+            hook: "You don't need {popular_item}. You need {better_alternative}"
+            cta: "RT to save a peer"
+
+          - id: x-contrarian-03
+            name: Common practice is dead. Here's what replaces it.
+            hook: "{standard_practice} is dead. Here is what is replacing it for {goal}: {new_trend}"
+            cta: "Follow for the update"
+
+          - id: x-contrarian-04
+            name: Stop optimizing for vanity metric
+            hook: "Stop optimizing for {metric_a}. Do this instead to build {metric_b}: {action}"
+            cta: "RT for awareness"
+
+          - id: x-contrarian-05
+            name: Everyone is doing task wrong
+            hook: "Everyone is doing {task} wrong. Here is why {problem} is happening: {evidence}"
+            cta: "Follow for the fix"
+
+          - id: x-contrarian-06
+            name: The industry doesn't want you to know this
+            hook: "The {industry} does not want you to know this: {revelation}"
+            cta: "Bookmark before this is deleted"
+
+          - id: x-contrarian-07
+            name: Subject is not about belief. It's about truth.
+            hook: "{topic} is not about {common_belief}. It's about {actual_truth}"
+            cta: "Follow for the truth"
+
+          - id: x-contrarian-08
+            name: Hot take with evidence
+            hook: "Hot take: {opinion}. I have the {evidence_type} to prove it"
+            cta: "Reply with your take"
+
+          - id: x-contrarian-09
+            name: Why conventional advice is a scam
+            hook: "Why {conventional_advice} is a scam — and what actually builds {result}: {strategy}"
+            cta: "RT to expose the truth"
+
+          - id: x-contrarian-10
+            name: Popular belief is failing you
+            hook: "{common_advice} is failing you. Here is the alternative: {action}"
+            cta: "Follow for results"
+
+      # ─── Story: Transformation & Failure ─────────────────────────────
+      - id: story
+        name: Story — Transformation & Failure
+        defaults:
+          psych_triggers: [hope, fear, guilt, belonging]
+          anti_patterns: [no_emotion, buried_value]
+          body: narrative
+          best_for:
+            archetypes: [S4, S5, S2]
+            meaning_axes: [human, behavioral, philosophical]
+            funnel_stages: [TOFU, MOFU]
+            icp_layers: [L3, L4]
+        templates:
+          - id: x-story-01
+            name: I went from low point to high point in N time
+            hook: "I went from {low_point} to {high_point} in {timeframe}. Here is exactly how: 🧵"
+            cta: "Follow for the blueprint"
+
+          - id: x-story-02
+            name: I achieved X doing simple thing
+            hook: "I achieved {milestone} doing {simple_habit}. Here's how"
+            cta: "RT to share the simple path"
+
+          - id: x-story-03
+            name: Time ago I was situation — today transformation
+            hook: "{time} ago, I was {scenario}. Today, {success}. Here is what happened"
+            cta: "Follow my journey"
+
+          - id: x-story-04
+            name: I almost failed — then insight changed everything
+            hook: "I almost failed at {task}. Then {pivotal_event} changed everything"
+            cta: "RT for the lesson"
+
+          - id: x-story-05
+            name: True story — shocking setup with rest
+            hook: "True story: {shocking_setup}. Here is the rest of the story"
+            cta: "Follow for more"
+
+          - id: x-story-06
+            name: Last year I made a massive mistake
+            hook: "Last year, I made a {error_type}. It cost me {loss}. Don't let it happen to you"
+            cta: "RT to help others avoid this"
+
+          - id: x-story-07
+            name: I tested strategy for N time — results shocked me
+            hook: "I tested {strategy} for {timeframe}. Here is what happened to my {metric}"
+            cta: "Follow for more experiments"
+
+          - id: x-story-08
+            name: I wasted $Amount on mistake before realizing this
+            hook: "I wasted ${amount} on {mistake} before realizing this single {topic} rule"
+            cta: "RT to save your money"
+
+          - id: x-story-09
+            name: Nobody believed my claim — now here's proof
+            hook: "Nobody believed me when I said {claim}. {time} later, here is the proof"
+            cta: "Follow for more proof"
+
+          - id: x-story-10
+            name: I stopped action — this happened to my metric
+            hook: "I stopped {action} for {timeframe}. The results shocked my {metric}"
+            cta: "RT if you're trying this"
+
+      # ─── Data: Original Analysis & Proof ─────────────────────────────
+      - id: data
+        name: Data — Original Analysis & Proof
+        defaults:
+          psych_triggers: [curiosity, fear, trust, fomo]
+          anti_patterns: [generic_advice, no_emotion]
+          body: analysis
+          best_for:
+            archetypes: [S7, S1, S10]
+            meaning_axes: [systemic, philosophical]
+            funnel_stages: [MOFU, TOFU]
+            icp_layers: [L2]
+        templates:
+          - id: x-data-01
+            name: I analyzed N items and found pattern
+            hook: "I analyzed {number} {assets} and found {pattern}: {findings}"
+            cta: "Bookmark for your data bank"
+
+          - id: x-data-02
+            name: N items analyzed — X% used this opening
+            hook: "{number} {assets} analyzed. {percentage} used this exact {element}: {result}"
+            cta: "RT for the strategy"
+
+          - id: x-data-03
+            name: I reviewed 1,000 items — here are the patterns
+            hook: "I reviewed 1,000 {niche_assets}. Here are the {number} patterns that {result}"
+            cta: "Follow for more analysis"
+
+          - id: x-data-04
+            name: Tested across N accounts with X% success rate
+            hook: "Tested across {number} {accounts_type} with an {percentage} success rate: {framework}"
+            cta: "RT to help a creator"
+
+          - id: x-data-05
+            name: The numbers don't lie — stat vs average
+            hook: "The numbers don't lie: {metric} jumped {percentage} with this single change"
+            cta: "Follow for data-driven tips"
+
+          - id: x-data-06
+            name: I analyzed 5,000 platform posts
+            hook: "I analyzed 5,000 {platform} posts and found the sweet spot: {metric_detail}"
+            cta: "RT to share the data"
+
+          - id: x-data-07
+            name: Data shows high-arousal emotions drive X% more shares
+            hook: "Data shows {emotion_type} drives {percentage} more {metric}. Proof:"
+            cta: "Follow for more {platform} science"
+
+          - id: x-data-08
+            name: Analyzed 10,000 viral posts — here are 5 patterns
+            hook: "I analyzed 10,000 viral posts. {number} patterns appeared in {percentage}%. Here they are:"
+            cta: "Bookmark this thread"
+
+          - id: x-data-09
+            name: Platform algorithm prioritized signal in 2026
+            hook: "{platform}'s algorithm prioritized {signal} in {year}. Here is the evidence:"
+            cta: "RT to stay updated"
+
+          - id: x-data-10
+            name: Metric jumped X% with this single change
+            hook: "{metric} jumped {percentage} after I replaced {step_a} with {step_b}"
+            cta: "Follow for more tests"
+
+      # ─── Interactive: Engagement Loops ──────────────────────────────
+      - id: interactive
+        name: Interactive — Engagement Loops
+        defaults:
+          psych_triggers: [belonging, pride, greed, curiosity]
+          anti_patterns: [no_payoff]
+          body: question
+          best_for:
+            archetypes: [S6, S3, S9]
+            meaning_axes: [behavioral, human]
+            funnel_stages: [BOFU, TOFU]
+            icp_layers: [L1, L3]
+        templates:
+          - id: x-interactive-01
+            name: In one word describe topic
+            hook: "In one word, describe your biggest {challenge}:"
+            cta: "Reply below"
+
+          - id: x-interactive-02
+            name: Drop your asset — I'll send feedback
+            hook: "Drop your {asset} below. I'll send you 1 {tweak} to {benefit}"
+            cta: "RT and reply"
+
+          - id: x-interactive-03
+            name: Which is better — A or B?
+            hook: "Which is better for {goal}: A) {option_1} or B) {option_2}?"
+            cta: "Vote in replies"
+
+          - id: x-interactive-04
+            name: Question + hint + promise to reveal
+            hook: "{question} + {hint} + Promise to reveal in thread: 🧵"
+            cta: "RT to unlock the answer"
+
+          - id: x-interactive-05
+            name: Struggling with pain point? I'll help N people
+            hook: "Struggling with {pain_point}? I'll help {number} people for free today"
+            cta: "Reply with your {asset_or_problem}"
+
+          - id: x-interactive-06
+            name: What's the biggest niche mistake?
+            hook: "What's the biggest {niche} mistake you've seen this {timeframe}?"
+            cta: "Share in the replies"
+
+          - id: x-interactive-07
+            name: Binary choice — concept A vs concept B
+            hook: "Binary choice: {concept_a} vs {concept_b}. Which wins in {year}?"
+            cta: "Quote tweet with your winner"
+
+          - id: x-interactive-08
+            name: Reciprocity — share template with everyone who RTs
+            hook: "I'll share my {valuable_asset} with everyone who RTs this"
+            cta: "RT and DM \"{keyword}\""
+
+          - id: x-interactive-09
+            name: If you could achieve goal by tomorrow
+            hook: "If you could achieve {goal} by tomorrow, what would you do first?"
+            cta: "Reply with your plan"
+
+          - id: x-interactive-10
+            name: Trending topic lessons for niche
+            hook: "Everyone's talking about {trend}. Here are {number} lessons for {audience}"
+            cta: "RT to join the conversation"
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # LinkedIn — 50 Templates (5 categories × 10)
+  # ═══════════════════════════════════════════════════════════════════════════
+  linkedin:
+    categories:
+
+      # ─── Authority: Case Studies & Results (STAR/PAS) ────────────────
+      - id: authority
+        name: Authority — Case Studies & Results
+        defaults:
+          psych_triggers: [trust, greed, pride]
+          anti_patterns: [generic_advice, no_emotion]
+          body: narrative
+          best_for:
+            archetypes: [S1, S7, S10]
+            meaning_axes: [systemic, leverage, human]
+            funnel_stages: [MOFU, BOFU]
+            icp_layers: [L2, L3]
+        templates:
+          - id: li-authority-01
+            name: 47 inbound leads from one LinkedIn post
+            hook: "{number} inbound leads. From one LinkedIn post. Here is the STAR breakdown: Situation → {situation}. Task → {task}. Action → {action}. Result → {result}"
+            cta: "Check my profile score for similar growth fixes"
+
+          - id: li-authority-02
+            name: We cut our sales cycle in half with one change
+            hook: "We cut our {metric} in half with one change. Problem: {old_frustration}. Agitation: {cost}. Solution: {single_tweak}"
+            cta: "Comment \"Case Study\" for the full PDF"
+
+          - id: li-authority-03
+            name: Client lost a $50K account — best thing to happen
+            hook: "Client lost a ${amount} {asset}. It was the best thing to happen. Problem: {loss}. Agitation: {fear}. Solution: {restructure} → {result}"
+            cta: "Save this for your next strategy session"
+
+          - id: li-authority-04
+            name: This asset has a 68% response rate — steal it
+            hook: "This {asset} has a {percentage} response rate. Steal it: Situation → {situation}. Task → {task}. Action → {exact_template}. Result → {response_rate}"
+            cta: "Share with your sales team"
+
+          - id: li-authority-05
+            name: X years of field lessons in one post
+            hook: "{years} years of {field} lessons in one post. Situation → {starting_point}. Task → {goal}. Action → {framework}. Result → {outcome}"
+            cta: "Follow for weekly executive deep-dives"
+
+          - id: li-authority-06
+            name: Meet the role who achieved result in timeframe
+            hook: "Meet the {role} who achieved {result} in {timeframe}. Situation → {humble_start}. Task → {ambitious_goal}. Action → {strategy}. Result → {milestone}"
+            cta: "Check my newsletter for the full story"
+
+          - id: li-authority-07
+            name: I reviewed 100 profiles — here is the pattern
+            hook: "I reviewed {number} {asset}. Here is the pattern. Problem: {common_failure}. Agitation: {cost_of_being_ignored}. Solution: {optimization_patterns}"
+            cta: "Fix your profile using these steps"
+
+          - id: li-authority-08
+            name: Company achieved milestone valuation — here's how
+            hook: "{company} just achieved {milestone} valuation. Here's how: Situation → {origin}. Task → {scaling_goal}. Action → {core_pivot}. Result → {valuation}"
+            cta: "Comment your thoughts on this strategy below"
+
+          - id: li-authority-09
+            name: As someone who helped 50 founders achieve result
+            hook: "As someone who helped {number} {persona} achieve {result}: Problem → {common_struggle}. Agitation → {bottleneck}. Solution → {high_leverage_move}"
+            cta: "Save for later when you scale"
+
+          - id: li-authority-10
+            name: I doubled our metric with a single visual tweak
+            hook: "I doubled our {metric} with a single {tweak_type}. Situation → {flat_performance}. Task → {increase_goal}. Action → {pattern_interrupt}. Result → {multiple}x {metric}"
+            cta: "Check my profile for more growth hacks"
+
+      # ─── Vulnerability: Lessons Learned ──────────────────────────────
+      - id: vulnerability
+        name: Vulnerability — Lessons Learned
+        defaults:
+          psych_triggers: [guilt, hope, belonging]
+          anti_patterns: [no_emotion, buried_value]
+          body: narrative
+          best_for:
+            archetypes: [S4, S5, S2]
+            meaning_axes: [human, behavioral, philosophical]
+            funnel_stages: [TOFU, MOFU]
+            icp_layers: [L3, L4]
+        templates:
+          - id: li-vulnerability-01
+            name: This is the post I've been avoiding writing
+            hook: "This is the post I've been avoiding writing. Problem: {internal_fear}. Agitation: {cost_of_silence}. Solution: {admitting_failure} + {lesson}"
+            cta: "Comment if you've felt this too"
+
+          - id: li-vulnerability-02
+            name: I almost gave up on agency three months ago
+            hook: "I almost gave up on {venture} {timeframe} ago. Situation → {crisis}. Task → {save_goal}. Action → {drastic_restructure}. Result → {recovery} + {growth}"
+            cta: "Follow for more honest building"
+
+          - id: li-vulnerability-03
+            name: I don't have this figured out — but here's what I'm learning
+            hook: "I don't have this figured out. But here's what I'm learning: Problem → {scaling_challenge}. Agitation → {confusion}. Solution → {raw_lessons} from the messy middle"
+            cta: "Share your experience with this below"
+
+          - id: li-vulnerability-04
+            name: I spent years optimizing for the wrong metric
+            hook: "I spent years optimizing for the wrong metric. Problem → {vanity_metric}. Agitation → {zero_business_result}. Solution → pivot to {real_strategy} → {outcome}"
+            cta: "Save this to avoid the vanity trap"
+
+          - id: li-vulnerability-05
+            name: I almost quit after 10 posts flopped
+            hook: "I almost quit after {number} posts flopped. Situation → {zero_engagement}. Task → {establish_presence}. Action → {formula_switch}. Result → {viral_growth}"
+            cta: "Follow for the real journey"
+
+          - id: li-vulnerability-06
+            name: I thought I found the perfect position — I was wrong
+            hook: "I thought I found the perfect {position}. I was wrong. Problem → {dream_illusion}. Agitation → {mental_toll}. Solution → {departure_decision} + {new_path}"
+            cta: "Comment your biggest career shift"
+
+          - id: li-vulnerability-07
+            name: Three years ago I walked out of my cubicle
+            hook: "{timeframe} ago, I walked out of my {starting_point}. Situation → {routine}. Task → {independence_goal}. Action → {risk_taken}. Result → {current_freedom} + {revenue}"
+            cta: "Save for your escape plan"
+
+          - id: li-vulnerability-08
+            name: Last year was the most challenging year we faced
+            hook: "{year} was the most challenging year our {organization} faced. Problem → {industry_crash}. Agitation → {revenue_loss}. Solution → {survival_moves} that became growth moves"
+            cta: "Share your biggest operational lesson"
+
+          - id: li-vulnerability-09
+            name: I used to think bad advice was a badge of honor
+            hook: "I used to think {bad_advice} was a badge of honor. Problem → {overwork_culture}. Agitation → {burnout}. Solution → realization that {depth_beats_volume}"
+            cta: "Follow for more professional growth"
+
+          - id: li-vulnerability-10
+            name: I'm taking back the advice I gave for 5 years
+            hook: "I'm taking back the advice I gave for {years} years. Problem → {old_advice}. Agitation → {algorithm_fatigue}. Solution → new strategy: {new_approach}"
+            cta: "Comment \"Agree\" or \"Disagree\""
+
+      # ─── De-risking: Cautionary & Preventive ─────────────────────────
+      - id: de-risking
+        name: De-risking — Cautionary & Preventive
+        defaults:
+          psych_triggers: [fear, fomo, trust]
+          anti_patterns: [generic_advice, no_emotion]
+          body: list
+          best_for:
+            archetypes: [S3, S9, S5]
+            meaning_axes: [behavioral, philosophical]
+            funnel_stages: [MOFU, TOFU]
+            icp_layers: [L1, L2]
+        templates:
+          - id: li-de-risking-01
+            name: Before you post that carousel read this
+            hook: "Before you post that {format}, read this. Problem → {low_reach}. Agitation → {wasted_effort}. Solution → {rules_count} visual rules for {metric}"
+            cta: "Save for your next post"
+
+          - id: li-de-risking-02
+            name: Stop ignoring metric if you want to scale
+            hook: "Stop ignoring {metric} if you want to scale. Problem → {stagnant_growth}. Agitation → {invisible_leak}. Solution → the one number that predicts {outcome}"
+            cta: "Comment for the audit sheet"
+
+          - id: li-de-risking-03
+            name: Don't start phase without knowing this first
+            hook: "Don't start {phase} without knowing this first. Problem → {rushing_in}. Agitation → {risk_type}. Solution → {steps}-step de-risking checklist"
+            cta: "Share with a fellow founder"
+
+          - id: li-de-risking-04
+            name: Before you hire a type agency ask these questions
+            hook: "Before you hire a {agency_type} agency, ask these questions. Problem → {wasted_spend}. Agitation → {frustration}. Solution → {count} screening questions that reveal the truth"
+            cta: "Save for your next RFP"
+
+          - id: li-de-risking-05
+            name: Avoid this if you want to land corporate deals
+            hook: "Avoid this if you want to land {deal_type}: Problem → {bad_pitch_type}. Agitation → {immediate_rejection}. Solution → {reframe_strategy}"
+            cta: "Follow for more de-risking tips"
+
+          - id: li-de-risking-06
+            name: If you're in role and not doing action you're losing money
+            hook: "If you're in {role} and not doing {action}, you're losing money. Problem → {traditional_workflows}. Agitation → {lost_revenue}. Solution → {new_standard}"
+            cta: "Check my latest guide"
+
+          - id: li-de-risking-07
+            name: The harsh reality of being a role in 2026
+            hook: "The harsh reality of being a {role} in {year}: Problem → {market_shift}. Agitation → {role_shrinkage}. Solution → {count} skills required to stay relevant"
+            cta: "Comment your plan for the shift"
+
+          - id: li-de-risking-08
+            name: Before you accept that counteroffer consider this
+            hook: "Before you accept that counteroffer, consider this. Problem → {easy_stay}. Agitation → {regret_timeframe}. Solution → {count} psychological reasons counteroffers fail"
+            cta: "Share with your network"
+
+          - id: li-de-risking-09
+            name: Stop overcomplicating task — use this simple way
+            hook: "Stop overcomplicating {task}. Use this simple way: Problem → {complex_workflows}. Agitation → {inaction}. Solution → the {time}-minute version"
+            cta: "Save for later"
+
+          - id: li-de-risking-10
+            name: Before you send that cold DM check these 3 things
+            hook: "Before you send that cold DM, check these {count} things. Problem → {low_response_rate}. Agitation → {burned_leads}. Solution → profile elements that build instant trust"
+            cta: "Follow for better sales"
+
+      # ─── Paradigm: Professional Theories ─────────────────────────────
+      - id: paradigm
+        name: Paradigm — Professional Theories
+        defaults:
+          psych_triggers: [curiosity, anger, pride]
+          anti_patterns: [no_emotion, generic_advice]
+          body: take
+          best_for:
+            archetypes: [S3, S9, S6]
+            meaning_axes: [contrarian, philosophical, systemic]
+            funnel_stages: [MOFU, TOFU]
+            icp_layers: [L3, L4]
+        templates:
+          - id: li-paradigm-01
+            name: Stop trying to go viral
+            hook: "Stop trying to go viral. Seriously. Problem → {chasing_views}. Agitation → {wrong_audience}. Solution → focusing on {strategy_type} for {outcome}"
+            cta: "Follow for more strategy"
+
+          - id: li-paradigm-02
+            name: Consistency is overrated — depth drives leads
+            hook: "Consistency is overrated. {quality_metric} drives {outcome}. Problem → {shallow_posting}. Agitation → {audience_fatigue}. Solution → {ratio}: 1 high-depth post > {number} generic posts"
+            cta: "Save for your plan"
+
+          - id: li-paradigm-03
+            name: The best networking strategy is not having one
+            hook: "The best networking strategy? Not having one. Problem → {transactional_networking}. Agitation → {low_trust}. Solution → focusing on {alternative} over {vanity_metric}"
+            cta: "Share your take"
+
+          - id: li-paradigm-04
+            name: Networking events are a waste of time
+            hook: "Networking events are a waste of time. Here is why: Problem → {time_waste}. Agitation → {low_roi}. Solution → building {trust_mechanism} through content instead"
+            cta: "Follow for higher ROI"
+
+          - id: li-paradigm-05
+            name: Your content engagement isn't the problem — your offer is
+            hook: "Your content engagement isn't the problem. Your offer is. Problem → {optimizing_hooks}. Agitation → {no_sales}. Solution → diagnosing the structural gap in your {offer_type}"
+            cta: "Comment for the offer guide"
+
+          - id: li-paradigm-06
+            name: Format is the most underrated sales channel in 2026
+            hook: "{format_type} is the most underrated sales channel in {year}. Problem → {missing_growth_channels}. Agitation → {rising_cac}. Solution → {strategy} for {engagement_rate} ER"
+            cta: "Check my latest carousel"
+
+          - id: li-paradigm-07
+            name: Content without distribution is just a public diary
+            hook: "Content without distribution is just a public diary. Problem → {writing_into_void}. Agitation → {zero_reach}. Solution → the {strategy_tactic}"
+            cta: "Save to fix your budget"
+
+          - id: li-paradigm-08
+            name: The best marketers I know barely use social media
+            hook: "The best marketers I know barely use social media. Problem → {following_herd}. Agitation → {time_drain}. Solution → shift to {content_type} and {growth_strategy}"
+            cta: "Comment your thoughts"
+
+          - id: li-paradigm-09
+            name: I never worked at a VC-backed company — I still built this
+            hook: "I never worked at a {company_type}. I still built this. Situation → {no_pedigree}. Task → {build_goal}. Action → {non_traditional_pathway}. Result → {success}"
+            cta: "Follow my journey"
+
+          - id: li-paradigm-10
+            name: Always be closing is terrible sales advice
+            hook: "\"Always be closing\" is terrible sales advice. Problem → {aggressive_sales}. Agitation → {prospect_friction}. Solution → {methodology} for {year}"
+            cta: "Share with your team"
+
+      # ─── Scale: Metrics & Tenure ─────────────────────────────────────
+      - id: scale
+        name: Scale — Metrics & Tenure
+        defaults:
+          psych_triggers: [greed, pride, trust, fomo]
+          anti_patterns: [no_emotion, generic_advice]
+          body: list
+          best_for:
+            archetypes: [S7, S1, S10]
+            meaning_axes: [systemic, leverage]
+            funnel_stages: [BOFU, MOFU]
+            icp_layers: [L1, L2]
+        templates:
+          - id: li-scale-01
+            name: 6 months ago I had 400 followers — today 12,000
+            hook: "{timeframe} ago, I had {start_count} followers. Today, {end_count}. Situation → {low_visibility}. Task → {build_authority}. Action → {strategy}. Result → {end_count} engaged readers"
+            cta: "Follow for the growth map"
+
+          - id: li-scale-02
+            name: 3 years of consulting lessons condensed into 2 minutes
+            hook: "{years} years of {field} lessons condensed into {timeframe}. Problem → {struggling_to_do}. Agitation → {slow_learning}. Solution → {pillars} pillars of {skill}"
+            cta: "Save for your next meeting"
+
+          - id: li-scale-03
+            name: What I learned after facilitating 100 workshops in 90 days
+            hook: "What I learned after facilitating {number} workshops in {timeframe}. Situation → {high_volume_demand}. Task → {quality_delivery}. Action → {automation_of_prep}. Result → {feedback_level}"
+            cta: "Follow for more audits"
+
+          - id: li-scale-04
+            name: It took me 10 years to learn this — save yourself the decade
+            hook: "It took me {years} years to learn this. Save yourself the decade. Problem → {trial_and_error}. Agitation → {lost_time}. Solution → the single most important {domain} rule"
+            cta: "Share to help a junior"
+
+          - id: li-scale-05
+            name: 5 operational mistakes I'd avoid if I started today
+            hook: "{count} operational mistakes I'd avoid if I started today. Problem → {common_startup_errors}. Agitation → {risk_type}. Solution → the {steps}-step corrective roadmap"
+            cta: "Save to protect your startup"
+
+          - id: li-scale-06
+            name: 3 profile mistakes I see founders make every single week
+            hook: "{count} profile mistakes I see {persona} make every single week. Problem → {weak_profiles}. Agitation → {lost_leads}. Solution → {fix_1} and {fix_2}"
+            cta: "Check my profile score"
+
+          - id: li-scale-07
+            name: 7 hard-earned lessons from 3 years of building in public
+            hook: "{count} hard-earned lessons from {years} years of building in public. Situation → {starting_at_zero}. Task → {build_transparency}. Action → {documenting_every_failure}. Result → {built_trust}"
+            cta: "Follow for more logs"
+
+          - id: li-scale-08
+            name: 4 questions to ask before accepting that executive offer
+            hook: "{count} questions to ask before you accept that {position}. Problem → {misaligned_roles}. Agitation → {burnout_risk}. Solution → {count} diagnostics for {context}"
+            cta: "Save for your career move"
+
+          - id: li-scale-09
+            name: I analyzed 847 posts that got 10K+ views — here is the data
+            hook: "I analyzed {number} posts that got {threshold}+ views. Here is the data. Situation → {guessing_content}. Task → {systematize_virality}. Action → {quantitative_audit}. Result → {predictive_framework}"
+            cta: "Follow for more data"
+
+          - id: li-scale-10
+            name: 7 things I learned from reviewing 500 outreach templates
+            hook: "{count} things I learned from reviewing {number} outreach templates. Problem → {bad_outreach}. Agitation → {blocked_by_prospects}. Solution → {rules} rules for {scaling_type}"
+            cta: "Save to fix your sales"
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Blog — 50 Templates (5 categories × 10)
+  # ═══════════════════════════════════════════════════════════════════════════
+  blog:
+    categories:
+
+      # ─── How-To: Step-by-Step Guides ──────────────────────────────────
+      - id: howto
+        name: How-To — Step-by-Step Guides
+        defaults:
+          psych_triggers: [greed, trust, curiosity]
+          anti_patterns: [generic_advice, too_complex]
+          body: list
+          best_for:
+            archetypes: [S8, S4, S7]
+            meaning_axes: [leverage, behavioral]
+            funnel_stages: [TOFU, MOFU]
+            icp_layers: [L1, L2]
+        templates:
+          - id: blog-howto-01
+            name: How to action and get results
+            hook: "How to {action} (And Get {outcome}): Intro → The {framework} → Step-by-Step Execution → {payoff}"
+            cta: "Download the implementation checklist"
+
+          - id: blog-howto-02
+            name: How to avoid problem the easy way
+            hook: "How to Avoid {problem} (The Easy Way): The Pain → Why Standard Fixes Fail → The Simple Way → {maintenance}"
+            cta: "Sign up for more efficiency tips"
+
+          - id: blog-howto-03
+            name: How to skill — 7 secrets from authority
+            hook: "How to {skill}: {count} Secrets From {authority}: Elite Result → Expert Logic → {count} Secrets → {payoff}"
+            cta: "Get the full guide"
+
+          - id: blog-howto-04
+            name: How to earn $Amount in less than 30 days
+            hook: "How to Earn ${amount} in Less Than {days} Days: The Financial Goal → The Math → Daily Roadmap → {conclusion}"
+            cta: "Start your trial"
+
+          - id: blog-howto-05
+            name: Step-by-step guide to complex process
+            hook: "Step-by-Step Guide to {process}: The Complexity → Tools Needed → Step-by-Step → Final Review"
+            cta: "Download the PDF"
+
+          - id: blog-howto-06
+            name: How to task like a high performer
+            hook: "How to {task} Like A High Performer: {prestige} → Mindset → Workflow → {payoff}"
+            cta: "Join the community"
+
+          - id: blog-howto-07
+            name: How to set up software in 5 simple steps
+            hook: "How to Set Up {software} in {count} Simple Steps: Account Creation → Config → Integration → Testing"
+            cta: "Get a free audit"
+
+          - id: blog-howto-08
+            name: How to build an asset in 20 minutes
+            hook: "How to Build a {asset} in {time} Minutes: The Speed Hook → Preparation → Rapid Build → Optimization"
+            cta: "See the template"
+
+          - id: blog-howto-09
+            name: How to use tool — the complete tutorial
+            hook: "How to Use {tool}: The Complete Tutorial: Basics → Advanced Features → Troubleshooting → Final Tips"
+            cta: "Sign up for the course"
+
+          - id: blog-howto-10
+            name: How to achieve goal without common obstacle
+            hook: "How to {goal} Without {obstacle}: The Strategy → The Workaround → Proof → Summary"
+            cta: "Subscribe for more guides"
+
+      # ─── Numbered Lists: Structural Categorization ──────────────────
+      - id: numbered
+        name: Numbered Lists — Structural Categorization
+        defaults:
+          psych_triggers: [curiosity, greed, fomo]
+          anti_patterns: [generic_advice, no_payoff]
+          body: list
+          best_for:
+            archetypes: [S6, S4, S8]
+            meaning_axes: [leverage, behavioral]
+            funnel_stages: [TOFU]
+            icp_layers: [L1, L2]
+        templates:
+          - id: blog-numbered-01
+            name: 9 topic formulas that get clicks with examples
+            hook: "{number} {topic} Formulas That Get {outcome} (With Examples): Category Breakdown → The Formula → Real-World Evidence"
+            cta: "Download the formula sheet"
+
+          - id: blog-numbered-02
+            name: 27 easy task ideas to finally result
+            hook: "{number} Easy {task} Ideas to Finally {result}: Selection Guide → The List of {number} → Action Plan"
+            cta: "Save this list for later"
+
+          - id: blog-numbered-03
+            name: 11 adjective items that will give you emotion
+            hook: "{number} {adjective} {items} That Will Give You {emotion}: Emotional Hook → The Selection → Why They Work"
+            cta: "Share your favorite"
+
+          - id: blog-numbered-04
+            name: 10 simple tips to solving problem
+            hook: "{number} Simple Tips to Solving {problem}: Problem Agitation → {number} Tips → Conclusion"
+            cta: "Sign up for daily tips"
+
+          - id: blog-numbered-05
+            name: 15 greatest topic hacks for audience
+            hook: "{number} Greatest {topic} Hacks For {audience}: Audience Filtering → The Hacks → Efficiency Results"
+            cta: "Get the toolkit"
+
+          - id: blog-numbered-06
+            name: 7 easy fixes to common frustration
+            hook: "{number} Easy Fixes to {frustration}: The Pain → {number} Simple Solutions → Payoff"
+            cta: "Start your free trial"
+
+          - id: blog-numbered-07
+            name: 10 strange niche you need to see
+            hook: "{number} Strange {niche} You Need to See: The Novelty Hook → The Explanation → The Impact"
+            cta: "Join our newsletter"
+
+          - id: blog-numbered-08
+            name: 5 weird ways to increase metric by 40%
+            hook: "{number} Weird Ways to Increase {metric} by {percentage}%: Pattern Interrupt → The {number} Methods → The Data Proof"
+            cta: "Request a demo"
+
+          - id: blog-numbered-09
+            name: Introduction to topic — the 5 basic steps
+            hook: "Introduction to {topic}: The {count} Basic Steps: Beginner Roadmap → Steps 1-{count} → Conclusion"
+            cta: "Start for free"
+
+          - id: blog-numbered-10
+            name: Industry research — back to the basics in 2026
+            hook: "{industry} Research: Back to the Basics in {year}: Industry Confusion → The Simplified Process → Summary"
+            cta: "Download the checklist"
+
+      # ─── Question-Based: Direct Answer ──────────────────────────────
+      - id: question
+        name: Question-Based — Direct Answer
+        defaults:
+          psych_triggers: [curiosity, trust, fear]
+          anti_patterns: [no_emotion, too_complex]
+          body: analysis
+          best_for:
+            archetypes: [S7, S1, S10]
+            meaning_axes: [systemic, philosophical]
+            funnel_stages: [TOFU, MOFU]
+            icp_layers: [L1, L2, L3]
+        templates:
+          - id: blog-question-01
+            name: What is concept — the answer might surprise you
+            hook: "What Is {concept}? (The Answer Might Surprise You): Definition → Common Myths → The Reality"
+            cta: "Learn more here"
+
+          - id: blog-question-02
+            name: Why does my subject action?
+            hook: "Why Does My {subject} {action}?: The Query → Technical Answer → Prevention"
+            cta: "Get the expert view"
+
+          - id: blog-question-03
+            name: How long is asset/process?
+            hook: "How Long Is {asset}?: Direct Answer → Factors Involved → Optimization"
+            cta: "Request a quote"
+
+          - id: blog-question-04
+            name: What is topic — infographic
+            hook: "What Is {topic}? Infographic: Visual Breakdown → Definitions → Summary"
+            cta: "Share this graphic"
+
+          - id: blog-question-05
+            name: How are items made — hint they're not
+            hook: "How Are {items} Made? (Hint: They're Not): Subversion Hook → The Real Process → Summary"
+            cta: "Subscribe for more truths"
+
+          - id: blog-question-06
+            name: Statistic — here's what that means for you
+            hook: "{statistic}. Here's What That Means For You: The Data Point → Practical Impact → Next Steps"
+            cta: "Contact us for a strategy"
+
+          - id: blog-question-07
+            name: Persona is now 60 — but did you know?
+            hook: "{persona} Is Now {age} — But Did You Know...?: Bio Hook → Historical Context → Modern Lesson"
+            cta: "Follow for more stories"
+
+          - id: blog-question-08
+            name: Fact — here's what we know
+            hook: "{fact_type}: Here's What We Know: The Evidence → Current Consensus → Conclusion"
+            cta: "Join the discussion"
+
+          - id: blog-question-09
+            name: It takes 2-6 months to result but there's more
+            hook: "It Takes {min_time}-{max_time} {unit} to {result} (But There's More): The Timeline → The Narrative Twist → The Roadmap"
+            cta: "Start today"
+
+          - id: blog-question-10
+            name: Structure is size — but how was it made?
+            hook: "{structure} Is {size} — But How Was It Made?: The Stats → The Engineering Story → Lessons"
+            cta: "See our case studies"
+
+      # ─── Curiosity-Gap: The "One Thing" ─────────────────────────────
+      - id: curiosity
+        name: Curiosity-Gap — The \"One Thing\"
+        defaults:
+          psych_triggers: [curiosity, greed, fomo, fear]
+          anti_patterns: [no_payoff, generic_advice]
+          body: narrative
+          best_for:
+            archetypes: [S3, S5, S9]
+            meaning_axes: [contrarian, human, philosophical]
+            funnel_stages: [TOFU, MOFU]
+            icp_layers: [L2, L3, L4]
+        templates:
+          - id: blog-curiosity-01
+            name: Who else wants desirable outcome?
+            hook: "Who Else Wants {outcome}?: Audience Filtering → The Solution → Proof"
+            cta: "Sign up now"
+
+          - id: blog-curiosity-02
+            name: The secret of scaling metric
+            hook: "The Secret Of Scaling {metric}: Mystery Hook → The Single Lever → Application"
+            cta: "Get the blueprint"
+
+          - id: blog-curiosity-03
+            name: What every audience needs to know about topic
+            hook: "What Every {audience} Needs To Know About {topic}: FOMO Trigger → The Knowledge Gap → Summary"
+            cta: "Sign up for updates"
+
+          - id: blog-curiosity-04
+            name: Why your competitors are beating your metric
+            hook: "Why Your Competitors Are Beating Your {metric}: Loss Aversion → The Gap Breakdown → The Fix"
+            cta: "Get a free audit"
+
+          - id: blog-curiosity-05
+            name: New study shows unexpected cause triggers result
+            hook: "New Study Shows {cause} Triggers {result}: Scientific Hook → The Evidence → Implications"
+            cta: "Read the full report"
+
+          - id: blog-curiosity-06
+            name: Disaster is failing — why it's a good thing
+            hook: "{disaster} Is Failing: Why It's A Good Thing: Industry Chaos → The Positive Reframe → Opportunity"
+            cta: "Pivot with us"
+
+          - id: blog-curiosity-07
+            name: Before pain — after result — here's the blueprint
+            hook: "Before: {pain}. After: {result}. Here's the Blueprint: Case Study Hook → The Transformation Move → Proof"
+            cta: "Talk to an expert"
+
+          - id: blog-curiosity-08
+            name: Problem — why your asset fails plus 5 fixes
+            hook: "{problem}? Why Your {asset} Fails, Plus {count} Fixes: Pain → Agitation of Failure → {count} Quick Solutions"
+            cta: "Fix your {asset} now"
+
+          - id: blog-curiosity-09
+            name: The secret of action to double your outcome
+            hook: "The Secret of {action} to Double Your {outcome}: Specific Micro-Action → The Math → Summary"
+            cta: "See our results"
+
+          - id: blog-curiosity-10
+            name: Are you making these common topic mistakes?
+            hook: "Are You Making These Common {topic} Mistakes?: Self-Diagnosis Hook → The Mistake List → Corrective Action"
+            cta: "Get the checklist"
+
+      # ─── Contrarian: Myth Busting ────────────────────────────────────
+      - id: contrarian
+        name: Contrarian — Myth Busting
+        defaults:
+          psych_triggers: [anger, curiosity, pride, fear]
+          anti_patterns: [no_emotion, generic_advice]
+          body: take
+          best_for:
+            archetypes: [S3, S9, S5]
+            meaning_axes: [contrarian, philosophical, systemic]
+            funnel_stages: [MOFU, BOFU]
+            icp_layers: [L3, L4]
+        templates:
+          - id: blog-contrarian-01
+            name: Why popular concept is horrible advice
+            hook: "Why {popular_concept} Is Horrible Advice: The Cliché → The Breakdown of Failure → The Alternative"
+            cta: "Try the better way"
+
+          - id: blog-contrarian-02
+            name: Why action is actually horrible for goal
+            hook: "Why {action} Is Actually Horrible for {goal}: Standard Best Practice → The Negative Impact → Action Plan"
+            cta: "See the data"
+
+          - id: blog-contrarian-03
+            name: This unpopular choice is actually healthy for metric
+            hook: "This Unpopular Choice Is Actually Healthy & Great for {metric}: The Subversion → The Evidence → Implementation"
+            cta: "Learn the truth"
+
+          - id: blog-contrarian-04
+            name: How common practice is hurting your metric
+            hook: "How {common_practice} Is Hurting Your {metric}: The Warning → Mechanism of Failure → The Fix"
+            cta: "Protect your business"
+
+          - id: blog-contrarian-05
+            name: Topic is good for you — or is it the science
+            hook: "{topic} Is Good for You... or Is It? The Science: The Common Belief → The Scientific Verdict → Analysis"
+            cta: "Read the full analysis"
+
+          - id: blog-contrarian-06
+            name: Tool 1 vs tool 2 vs tool 3 — industry verdict
+            hook: "{tool_1} vs {tool_2} vs {tool_3}: Industry Verdict: Comparison Context → Pros/Cons → The Winner"
+            cta: "Start for free"
+
+          - id: blog-contrarian-07
+            name: Option 1 vs option 2 — is one better?
+            hook: "{option_1} vs {option_2}: Is One Better?: The Conflict → Direct Comparison → Recommendation"
+            cta: "Choose your plan"
+
+          - id: blog-contrarian-08
+            name: Choosing your asset — type A vs type B
+            hook: "Choosing Your {asset}: Type A vs. Type B: The Choice → Contextual Fit → Summary"
+            cta: "Request a demo"
+
+          - id: blog-contrarian-09
+            name: Niche discipline — the ultimate tried and tested guide
+            hook: "{niche} Discipline: The Ultimate Tried & Tested Guide: The Authority Hook → The Exhaustive Guide → Proof"
+            cta: "Download the PDF"
+
+          - id: blog-contrarian-10
+            name: The ultimate guide to goal in 2026
+            hook: "The Ultimate Guide to {goal} in {year}: The Big Vision → Deep Roadmap → Final Checklist"
+            cta: "Subscribe for more"
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Pillar — 20 Templates (4 categories × 5)
+  # ═══════════════════════════════════════════════════════════════════════════
+  pillar:
+    categories:
+
+      # ─── System Breakdown: How Things Work ────────────────────────────
+      - id: system
+        name: System Breakdown — How Things Really Work
+        defaults:
+          psych_triggers: [curiosity, trust, pride]
+          anti_patterns: [generic_advice, no_emotion]
+          body: narrative
+          best_for:
+            archetypes: [S1, S7, S9]
+            meaning_axes: [systemic, philosophical]
+            funnel_stages: [MOFU, BOFU]
+            icp_layers: [L3, L4]
+        templates:
+          - id: pillar-system-01
+            name: The hidden architecture behind common outcome
+            hook: "The Hidden Architecture Behind {outcome}: Why most people miss the real mechanism → The {layers} layers that actually drive it → How to build your own"
+            cta: "Map your own system"
+          - id: pillar-system-02
+            name: Why common practice fights reality — and what works instead
+            hook: "Why {common_practice} Fights Reality: The fundamental tension → Why conventional wisdom is wrong → The {alternative} that aligns with how it actually works"
+            cta: "Rebuild your approach"
+          - id: pillar-system-03
+            name: The N tensions that define domain
+            hook: "The {number} Tensions That Define {domain}: The trade-off most people ignore → How each tension creates a constraint → The system that resolves all {number} at once"
+            cta: "Download the tension map"
+          - id: pillar-system-04
+            name: From first principles to production system
+            hook: "From First Principles to Production {system}: The {number} irreducible components → How each maps to a real implementation → The complete architecture"
+            cta: "Study the blueprint"
+          - id: pillar-system-05
+            name: The feedback loop nobody talks about
+            hook: "The Feedback Loop Nobody Talks About: The invisible cycle that determines {outcome} → Why {common_fix} makes it worse → The intervention that breaks the loop"
+            cta: "Trace your own loops"
+
+      # ─── Methodology: Frameworks & Systems ────────────────────────────
+      - id: methodology
+        name: Methodology — Frameworks You Can Apply
+        defaults:
+          psych_triggers: [greed, trust, curiosity]
+          anti_patterns: [generic_advice, no_payoff]
+          body: list
+          best_for:
+            archetypes: [S4, S9, S8]
+            meaning_axes: [behavioral, leverage]
+            funnel_stages: [MOFU, BOFU]
+            icp_layers: [L2, L3]
+        templates:
+          - id: pillar-method-01
+            name: The methodology framework for achieving goal
+            hook: "The {name} Methodology: A {number}-step framework for {goal} that I refined over {timeframe} — Step {number} is the one most people skip"
+            cta: "Apply the framework"
+          - id: pillar-method-02
+            name: Stop doing X — start doing Y instead
+            hook: "Stop Doing {bad_practice}. Start Doing {good_practice} Instead: Why {bad_practice} feels productive → The hidden cost → The {steps}-step replacement system"
+            cta: "Switch today"
+          - id: pillar-method-03
+            name: The N-question diagnostic for diagnosing domain problem
+            hook: "The {number}-Question Diagnostic for {domain}: Most people treat the symptom — these {number} questions find the root in {timeframe} minutes"
+            cta: "Run your diagnostic"
+          - id: pillar-method-04
+            name: How to decide between option and option
+            hook: "How to Decide Between {option_1} and {option_2}: The decision framework that eliminates regret → When to pick each → The one question that makes it obvious"
+            cta: "Save for your next decision"
+          - id: pillar-method-05
+            name: The N-phase system for building durable skill
+            hook: "The {number}-Phase System for Building {skill}: Phase {phase} is where most people quit → Why each phase exists → How to know you are ready for the next"
+            cta: "Start phase one"
+
+      # ─── Teardown: Deconstructing Examples ────────────────────────────
+      - id: teardown
+        name: Teardown — Deconstructing What Works
+        defaults:
+          psych_triggers: [curiosity, anger, pride]
+          anti_patterns: [no_emotion, too_complex]
+          body: narrative
+          best_for:
+            archetypes: [S3, S5, S6]
+            meaning_axes: [contrarian, human]
+            funnel_stages: [MOFU, TOFU]
+            icp_layers: [L3, L4]
+        templates:
+          - id: pillar-teardown-01
+            name: A deep dive into example — what they got right
+            hook: "A Deep Dive Into {example}: What most people missed → The {number} strategic moves that made it work → Why copying them fails and what to do instead"
+            cta: "Study the full analysis"
+          - id: pillar-teardown-02
+            name: Why popular product/success actually failed
+            hook: "Why {popular_success} Actually Failed: The surface narrative → The hidden contradiction → The {number} lessons nobody extracted"
+            cta: "Read the post-mortem"
+          - id: pillar-teardown-03
+            name: Dissecting the approach that everyone recommends
+            hook: "Dissecting the {approach} Everyone Recommends: Where it works → Where it silently fails → The context switch that determines outcome"
+            cta: "Get the decision matrix"
+          - id: pillar-teardown-04
+            name: My N biggest mistakes building project
+            hook: "My {number} Biggest Mistakes Building {project}: The embarrassing failures → What I thought was right at each step → The pattern that connects them all"
+            cta: "Avoid these mistakes"
+          - id: pillar-teardown-05
+            name: I spent timeframe doing X — here is exactly what happened
+            hook: "I Spent {timeframe} Doing {experiment}: The raw data → What surprised me → The {number} actionable lessons that changed my approach permanently"
+            cta: "Run your own experiment"
+
+      # ─── Educational: Teaching Deep Concepts ──────────────────────────
+      - id: educational
+        name: Educational — Teaching Concepts That Stick
+        defaults:
+          psych_triggers: [curiosity, trust, fomo]
+          anti_patterns: [generic_advice, no_payoff]
+          body: analysis
+          best_for:
+            archetypes: [S7, S1, S10]
+            meaning_axes: [philosophical, systemic]
+            funnel_stages: [TOFU, MOFU]
+            icp_layers: [L1, L2]
+        templates:
+          - id: pillar-edu-01
+            name: The concept explained — from confusion to clarity
+            hook: "{concept}, Explained: Why it feels confusing → The {number} core ideas that unlock everything → How to think about it, not just memorize it"
+            cta: "Master the concept"
+          - id: pillar-edu-02
+            name: The mental model that changed how I think about domain
+            hook: "The Mental Model That Changed How I Think About {domain}: The framing that reframed everything → How to apply it in {timeframe} minutes → Why most people get it backwards"
+            cta: "Adopt the model"
+          - id: pillar-edu-03
+            name: Rethinking common assumption — a new framework
+            hook: "Rethinking {common_assumption}: The evidence that contradicts it → The new framework that explains the data better → What changes when you adopt it"
+            cta: "Challenge your assumptions"
+          - id: pillar-edu-04
+            name: Understanding principle through concrete example
+            hook: "Understanding {principle} Through {concrete_example}: The abstract idea → The real-world case → How to generalize it to your context"
+            cta: "Read with a notebook"
+          - id: pillar-edu-05
+            name: The spectrum from novice to master in discipline
+            hook: "The Spectrum From Novice to Master in {discipline}: What changes at each stage → The bottleneck preventing progress → The deliberate practice that accelerates growth"
+            cta: "Find your stage"

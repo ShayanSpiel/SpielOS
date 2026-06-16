@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/pipeline.sh — Single-state pipeline wrappers for the Spiel Engine.
+# scripts/pipeline.sh — Single-state pipeline wrappers for TheSpielEngine.
 #
 # Every subcommand maps 1:1 to one engine.py call. Run them as SEPARATE
 # bash tool calls so each state transition is visible in the CLI.
@@ -59,10 +59,13 @@ Content:
   post-start [about]     SESSION_CAPTURE — load strategy pages + session
   post-strategy           STRATEGY_LOAD — classify session
   post-compile            ICP_WORLD_BUILD — run Content Engine Compiler (6 steps)
-  post-draft              DRAFTING — draft posts from core insight
+  post-select-template    TEMPLATE_SELECT — choose viral hooks from registry
+  post-wizard             FORMAT_WIZARD — interactive format selection questionnaire
+  post-draft              DRAFTING — draft posts from core insight + selected template
   post-banner             BANNER — auto-generate banners for all queue drafts
   post-gate               GATE_CHECK — auto-runs gates.py (rules from rules.yaml)
   post-revise             REVISING — fix failing gates
+  post-verify             VERIFY — check brief + drafts + gates before queue
   post-queue              QUEUE — show queued drafts
   post-queue-hold         HOLD — keep drafts in queue, reset state to IDLE
   post-publish [id]       PUBLISHING — post to X / LinkedIn
@@ -127,6 +130,17 @@ cmd_post_compile() {
   run_engine content compile
 }
 
+cmd_post_select_template() {
+  guard_brief_exists
+  info "CONTENT: TEMPLATE_SELECT"
+  run_engine content select
+}
+
+cmd_post_wizard() {
+  guard_brief_exists
+  info "CONTENT: FORMAT_WIZARD"
+  run_engine content wizard
+}
 cmd_post_draft() {
   guard_brief_exists
   # engine.py does its own deeper validation (core_insight, meanings, selection)
@@ -135,6 +149,85 @@ cmd_post_draft() {
 }
 cmd_post_banner() {    info "CONTENT: BANNER";           run_engine content banner; }
 cmd_post_gate() {      info "CONTENT: GATE_CHECK";       run_engine content gate; }
+
+cmd_post_verify() {
+  info "CONTENT: VERIFY"
+  local brief="$VAULT_DIR/.content-brief.json"
+  local errors=0
+  local queue_dir="$VAULT_DIR/content/queue"
+  local has_drafts=false
+
+  # ── Pre-checks ──
+  if [[ ! -f "$brief" ]]; then
+    warn "Missing .content-brief.json — pipeline not started"
+    errors=$((errors + 1))
+  else
+    local pycheck
+    pycheck=$(python3 -c "
+import json, sys
+d = json.load(open('$brief'))
+ok = []
+err = []
+if d.get('core_insight'): ok.append('core_insight present')
+else: err.append('core_insight missing')
+if d.get('meanings') and isinstance(d['meanings'], dict) and len(d['meanings']) == 6:
+  ok.append('6 meanings present')
+else:
+  err.append('6 meanings missing or incomplete')
+if d.get('selected_meaning'): ok.append('selected_meaning present')
+else: err.append('selected_meaning missing')
+for l in ok: print(f'OK|{l}')
+for l in err: print(f'ERR|{l}')
+" 2>&1) || true
+    while IFS='|' read -r status msg; do
+      case "$status" in
+        OK)  ok "$msg" ;;
+        ERR) warn "$msg"; errors=$((errors + 1)) ;;
+      esac
+    done <<< "$pycheck"
+  fi
+
+  # ── Queue drafts ──
+  if ls "$queue_dir"/*.md &>/dev/null 2>&1; then
+    has_drafts=true
+    local draft_count; draft_count=$(ls -1 "$queue_dir"/*.md 2>/dev/null | wc -l | tr -d ' ')
+    ok "$draft_count draft(s) in content/queue/"
+    for f in "$queue_dir"/*.md; do
+      [[ -f "$f" ]] || continue
+      local name; name=$(basename "$f")
+      if grep -q '^banner:' "$f" 2>/dev/null; then
+        ok "  $name — banner present"
+      else
+        warn "  $name — missing banner field"
+        errors=$((errors + 1))
+      fi
+      if grep -q '^title:' "$f" 2>/dev/null; then
+        ok "  $name — title present"
+      else
+        warn "  $name — missing title"
+        errors=$((errors + 1))
+      fi
+    done
+    # Run gates.py for mechanical checks
+    info "Running gates.py --all on queue drafts..."
+    python3 "$VAULT_DIR/scripts/gates.py" --all 2>&1 || { warn "gates.py reported failures"; }
+  else
+    warn "No drafts in content/queue/ — pipeline has not reached DRAFTING"
+  fi
+
+  # ── Summary ──
+  echo ""
+  if [[ $errors -eq 0 && "$has_drafts" == true ]]; then
+    ok "VERIFY PASSED — all checks green"
+    return 0
+  elif [[ $errors -eq 0 && "$has_drafts" == false ]]; then
+    warn "VERIFY PARTIAL — brief OK but no drafts yet (pipeline is early)"
+    return 0
+  else
+    warn "VERIFY FAILED — $errors issue(s) found. Fix before proceeding to QUEUE."
+    return 1
+  fi
+}
 cmd_post_revise() {    info "CONTENT: REVISING";         run_engine content revise; }
 cmd_post_queue() {     info "CONTENT: QUEUE";           run_engine content queue; }
 cmd_post_hold() {      info "CONTENT: HOLD";             run_engine content hold; }
@@ -207,11 +300,14 @@ case "$CMD" in
 
   post-start)        cmd_post_start "$@" ;;
   post-strategy)     cmd_post_strategy ;;
-  post-compile)      cmd_post_compile ;;
-  post-draft)        cmd_post_draft ;;
+  post-compile)           cmd_post_compile ;;
+  post-select-template)   cmd_post_select_template ;;
+  post-wizard)            cmd_post_wizard ;;
+  post-draft)             cmd_post_draft ;;
   post-banner)       cmd_post_banner ;;
   post-gate)         cmd_post_gate ;;
   post-revise)       cmd_post_revise ;;
+  post-verify)       cmd_post_verify ;;
   post-queue)        cmd_post_queue ;;
   post-queue-hold)   cmd_post_hold ;;
   post-publish)      cmd_post_publish "$@" ;;

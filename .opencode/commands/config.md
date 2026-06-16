@@ -1,3 +1,7 @@
+---
+description: Show current engine configuration
+---
+
 # /config — Show Engine Configuration
 
 Displays current engine configuration.

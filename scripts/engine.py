@@ -19,6 +19,8 @@ Usage:
     ./scripts/engine.py content post [about]    # Start SESSION_CAPTURE
     ./scripts/engine.py content banner          # Auto-generate banners for queue drafts
     ./scripts/engine.py content compile         # Start ICP_WORLD_BUILD (Content Engine Compiler)
+    ./scripts/engine.py content select          # Select templates from registry
+    ./scripts/engine.py content wizard          # Interactive format selection
     ./scripts/engine.py content queue           # Show queue
     ./scripts/engine.py content hold            # QUEUE → IDLE, keep drafts for later
     ./scripts/engine.py content publish <id>    # Publish draft
@@ -205,7 +207,7 @@ def run_script(script_path: str, *args: str) -> tuple[int, str]:
         env = os.environ.copy()
         rid = get_request_id()
         if rid:
-            env["SPIEL_ENGINE_REQUEST_ID"] = rid
+            env["SPIEL_REQUEST_ID"] = rid
         result = subprocess.run(
             [full_path, *args],
             capture_output=True,
@@ -283,7 +285,10 @@ WIKI_NEXT = {
 CONTENT_NEXT = {
     "SESSION_CAPTURE": [("post-strategy",   "STRATEGY_LOAD — classify session (S1-S10, vertical, funnel)")],
     "STRATEGY_LOAD":   [("post-compile",    "ICP_WORLD_BUILD — run Content Engine Compiler (6 steps)")],
-    "ICP_WORLD_BUILD": [("post-draft",      "DRAFTING — draft posts from core insight")],
+    "ICP_WORLD_BUILD": [
+        ("post-select-template", "TEMPLATE_SELECT — choose viral hooks from registry"),
+        ("post-draft",           "DRAFTING — draft posts from core insight + selected template"),
+    ],
     "DRAFTING":        [
         ("post-banner", "BANNER — auto-generate banners for all queue drafts"),
         ("post-gate",   "GATE_CHECK — auto-runs gates.py (rules from rules.yaml)"),
@@ -681,6 +686,10 @@ def cmd_content_post(state: dict, args: list) -> int:
             "axis": "",
             "rationale": "",
         },
+        "template_selection": {
+            "recommendations": {},
+            "selected": {},
+        },
     }
     CONTENT_BRIEF_FILE.write_text(json.dumps(brief, indent=2))
     print(f"── Brief saved to .content-brief.json ──")
@@ -728,6 +737,56 @@ def cmd_content_compile(state: dict) -> int:
         print(f"WARN: content_compiler.py exited with code {rc}")
     print()
     print_next(state)
+    return 0
+
+
+@logged()
+def cmd_content_wizard(state: dict) -> int:
+    """Interactive format selection wizard (no state change, pre-draft tool)."""
+    if not CONTENT_BRIEF_FILE.exists():
+        print("ERROR: No .content-brief.json found.", file=sys.stderr)
+        print("  Run 'bash scripts/pipeline.sh post-start [topic]' first.", file=sys.stderr)
+        return 1
+    rc, output = run_script("format_wizard.py")
+    print(output)
+    return 0 if rc == 0 else 1
+
+
+# ─── Template Selector ──────────────────────────────────────────────
+
+REGISTRY_FILE = VAULT / "templates" / "registry" / "viral-templates.yaml"
+
+
+@logged()
+def cmd_content_select_template(state: dict) -> int:
+    """Run template selector. Does NOT change state (pre-draft utility, like BANNER).
+    Validates brief exists and Compiler fields are populated, then runs
+    template_selector.py and prints recommendations.
+    """
+    if not CONTENT_BRIEF_FILE.exists():
+        print("ERROR: No content brief. Run 'engine.py content post' first.", file=sys.stderr)
+        return 1
+
+    brief = json.loads(CONTENT_BRIEF_FILE.read_text())
+    core_insight = brief.get("core_insight", "").strip()
+    selected = brief.get("selected_meaning", {})
+    if not core_insight or not selected.get("axis"):
+        print("ERROR: Compiler fields not populated. Run 'engine.py content compile' first.", file=sys.stderr)
+        print("  Pipeline halted: cannot select templates without core insight + selected meaning.", file=sys.stderr)
+        return 1
+
+    rc, output = run_script("template_selector.py")
+    print(output)
+    if rc != 0:
+        print(f"WARN: template_selector.py exited with code {rc}", file=sys.stderr)
+        return 1
+
+    print()
+    print("── How to use ──")
+    print("  The LLM reads these recommendations, presents them to the user,")
+    print("  and writes selected template IDs to .content-brief.json under")
+    print("  template_selection.selected before drafting.")
+    print()
     return 0
 
 
@@ -841,22 +900,12 @@ def cmd_content_banner(state: dict) -> int:
                 except yaml.YAMLError:
                     pass
 
-        platform = (fm.get("platform") or "").lower()
-        draft_title = fm.get("title", draft.stem)
-
-        # Determine banner type: social for linkedin/x, default for blog
-        if platform in ("linkedin", "x", "twitter"):
-            banner_type = "social"
-        else:
-            banner_type = "default"
-
         queue_id = draft.stem
-        print(f"  {queue_id} → {banner_type} ({platform})")
+        print(f"  {queue_id}")
 
         rc, output = run_script(
             "banner.py",
             "--queue-id", queue_id,
-            "--type", banner_type,
         )
         if rc == 0:
             generated += 1
@@ -1061,7 +1110,9 @@ def cmd_content_queue_list(state: dict) -> int:
                 platform = "x"
             elif "linkedin" in name:
                 platform = "linkedin"
-            elif "blog" in name or "pillar" in name:
+            elif "pillar" in name:
+                platform = "pillar"
+            elif "blog" in name:
                 platform = "blog"
             elif "offer" in name:
                 platform = "offer"
@@ -1312,6 +1363,8 @@ def main():
     post.add_argument("about", nargs="*", help="Topic or 'about <topic>'")
     content_sub.add_parser("strategy", help="Mark STRATEGY_LOAD complete")
     content_sub.add_parser("compile", help="Mark ICP_WORLD_BUILD complete (Content Engine Compiler)")
+    content_sub.add_parser("select", help="Select templates from registry — runs template_selector.py")
+    content_sub.add_parser("wizard", help="Interactive format selection wizard")
     content_sub.add_parser("draft", help="Mark DRAFTING complete")
     content_sub.add_parser("banner", help="Auto-generate banners for queue drafts")
     content_sub.add_parser("gate", help="Mark GATE_CHECK complete")
@@ -1390,7 +1443,7 @@ def main():
 
         elif args.command == "content":
             if not args.content_cmd:
-                print("Usage: engine.py content {post|strategy|compile|draft|gate|revise|queue|publish|archive|analyze|complete}")
+                print("Usage: engine.py content {post|strategy|compile|select|wizard|draft|banner|gate|revise|queue|publish|archive|analyze|complete}")
                 return 1
             if not acquire_lock():
                 print("ERROR: Another pipeline is running (lock file present).", file=sys.stderr)
@@ -1404,6 +1457,10 @@ def main():
                     return cmd_content_strategy(state)
                 elif args.content_cmd == "compile":
                     return cmd_content_compile(state)
+                elif args.content_cmd == "select":
+                    return cmd_content_select_template(state)
+                elif args.content_cmd == "wizard":
+                    return cmd_content_wizard(state)
                 elif args.content_cmd == "draft":
                     return cmd_content_draft(state)
                 elif args.content_cmd == "banner":

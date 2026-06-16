@@ -1,3 +1,7 @@
+---
+description: Ingest raw notes and create wiki pages
+---
+
 # /extract — Ingest Raw → Wiki Pages
 
 Extracts content from raw notes and creates wiki pages.

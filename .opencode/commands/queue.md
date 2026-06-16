@@ -1,3 +1,7 @@
+---
+description: Show content queue grouped by platform
+---
+
 # /queue — Show Content Queue
 
 Shows the content queue grouped by platform.

@@ -5,7 +5,7 @@ All mechanical parameters live in brand-config.json under "banners.*".
 No script-level hardcoded values (except CHROME_PATH and template location).
 
 Usage:
-    python3 scripts/banner.py --queue-id 2026-06-12-tweet-01 --type social
+    python3 scripts/banner.py --queue-id 2026-06-12-blog-01
     python3 scripts/banner.py --list
 """
 
@@ -308,7 +308,6 @@ def update_draft_banner(draft_path: Path, banner_rel: str) -> None:
 def main():
     parser = argparse.ArgumentParser(description="Generate banner for a queue draft.")
     parser.add_argument("--queue-id", help="Generate banner for the given queue file")
-    parser.add_argument("--type", default="default", help="Banner type: default (1200x630) or social (1200x675)")
     parser.add_argument("--title", help="Override title")
     parser.add_argument("--subtitle", help="Override subtitle")
     parser.add_argument("--list", action="store_true", help="List queue items")
@@ -323,7 +322,8 @@ def main():
         return 1
 
     config = load_brand()
-    bt = config["banners"].get(args.type, config["banners"].get("default"))
+    banner_type = "default"
+    bt = config["banners"][banner_type]
     width = bt["dimensions"]["width"]
     height = bt["dimensions"]["height"]
     scale_factor = config.get("render", {}).get("device_scale_factor", 2)
@@ -338,7 +338,7 @@ def main():
     banner_rel = f"assets/banners/{draft_path.stem}.png"
 
     template = load_template()
-    html = render_html(template, config, args.type, title_case(title), subtitle)
+    html = render_html(template, config, banner_type, title_case(title), subtitle)
     if not render_png(html, out_path, width, height, scale_factor):
         return 1
 

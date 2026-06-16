@@ -1,3 +1,7 @@
+---
+description: Run wiki health checks (orphans, links, frontmatter)
+---
+
 # /health — Wiki Health Check
 
 Runs health checks on the wiki.

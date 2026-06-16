@@ -17,8 +17,7 @@ the setup prompt in `SETUP.md`, the 14-question session fills these with your
 real content strategy.
 
 > [!NOTE]
-> Want a white-glove install? DM [@ShayanSpiel](https://x.com/ShayanSpiel) to get a custom setup,
-> ICP build, content strategy, and voice model configured for your company.
+> Want help with setup, ICP, and content strategy? Open an issue or check the docs in `SETUP.md`.
 
 ## What this repo is for
 

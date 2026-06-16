@@ -1,3 +1,7 @@
+---
+description: Publish queued content to production (X / LinkedIn)
+---
+
 # /publish — Queue → Production
 
 Publishes queued content to production endpoints.

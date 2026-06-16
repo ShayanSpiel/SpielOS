@@ -60,3 +60,80 @@ CONTENT LOOP:  IDLE → SESSION → STRATEGY → COMPILE → DRAFT → GATE → 
 | `/schedule` | Set publish timestamps for queued content |
 | `/state` | Show current state of wiki and content loops |
 
+---
+
+## Human-Review Toggle
+
+`rules.yaml §posting`:
+
+```yaml
+posting:
+  mode: manual              # manual | auto-threshold | auto-always
+  quality_threshold: 0.85
+  require_confirm: [blog, linkedin]
+  max_auto_day: 3
+```
+
+- **manual**: `/publish` shows draft, waits for "yes" before API call.
+- **auto-threshold**: if composite score ≥ 0.85, auto-publish; else pause.
+- **auto-always**: zero human review (opt-in only).
+
+Composite score = (passes / total gates). With current `gates.py` (16 mechanical)
++ LLM gates (4-check standalone + 10-gate extended = 14), total ≈ 30.
+
+---
+
+## Quality Gates
+
+### Pre-Creation (ANALYZING)
+- **Threshold**: 2+ sources or core to one source → create. Passing mention → skip.
+- **Redundancy**: >60% overlap → update, don't create.
+- **Domain**: must be within identity, strategy, psychology, systems, execution, business, tech, philosophy, narrative, leadership.
+
+### Pre-Write (RECONCILING)
+- **Frontmatter**: title, created, updated, type, tags, sources.
+- **Provenance**: claims link back to `raw/`.
+- **Contradiction**: preserve both with date stamps.
+
+### Post-Write (VALIDATING)
+- **Link health**: all `[[wikilinks]]` resolve.
+- **Index**: new page listed in `index.md`.
+- **Log**: action recorded in `log.md`.
+
+### Content (GATE_CHECK)
+- **Banner**: `banner:` frontmatter field pointing to existing file in `assets/banners/`.
+- **Mechanical**: 16 checks in `gates.py` (char count, hook, em-dash, word repeat, architecture leak, audience named, lesson surfaced, generic statement, project as subject, closing, frontmatter, dollar in note, strategy void, icp present, banner, grounded reference). All parameters from `rules.yaml`.
+- **Creative**: 4-check standalone test + 10-gate extended. See `concepts/voice-and-gates.md`.
+
+---
+
+## Logging
+
+JSONL to `logs/YYYY-MM-DD.jsonl`. View with:
+
+```bash
+bash scripts/engine.py log --days 7 --tail 20
+bash scripts/engine.py log --level ERROR
+```
+
+---
+
+## Portability
+
+Set `VAULT_DIR` to run from any directory. All scripts use it with a dynamic fallback to the vault root (parent of `scripts/`). Configure in `~/.config/opencode/opencode.jsonc` under `env:` for automatic availability.
+
+---
+
+## Pipeline Determinism Contract
+
+The LLM may request execution, draft text, and run bash invocations. The LLM may
+NOT call `Write` for `content/queue/` or `pages/` files. Only `pipeline.sh` (via
+`post-draft`) may write to those paths. `post-verify` is the receipt — its output
+is the only valid assertion of pipeline state.
+
+---
+
+## Extract Dedup
+
+`/extract` uses `.raw-manifest.json` (SHA256) to skip unchanged files. To force re-extract, delete the entry from `.raw-manifest.json` or modify the source.
+
