@@ -4,8 +4,14 @@ description: Show current engine configuration
 
 # /config — Show Engine Configuration
 
-Displays current engine configuration.
+Displays active settings from `rules.yaml` and resolved paths from the engine.
 
-Usage: /config
+Usage: `/config`
 
-Shows active settings from rules.yaml and resolved paths.
+## Run
+
+```
+spiel status --verbose    # if available
+```
+
+Otherwise read `rules.yaml` directly, or run `spiel --where` to confirm the resolved vault path.

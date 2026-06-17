@@ -2,7 +2,12 @@
   "brand_name": "Your Brand",
   "tagline": "Your tagline here",
   "colors": { "primary": "#000000", "secondary": "#666666", "accent": "#ff6a00" },
-  "fonts": { "heading": "Inter", "body": "Inter" },
+  "fonts": {
+    "heading": "Inter",
+    "body": "Inter",
+    "google_fonts": "https://fonts.googleapis.com/css2?family=Inter:wght@600;700;900&family=Merriweather:wght@300;400;700&display=swap",
+    "use_google_fonts": true
+  },
   "logo_path": "",
   "voice_keywords": [],
   "target_platforms": ["x", "linkedin", "blog"],
@@ -19,104 +24,104 @@
       "value": "#f5f5f5"
     }
   },
-  "banners": {
-    "default": {
-      "name": "OG Banner",
-      "description": "1200x630 OG card. Left-aligned content, icon watermark right-center.",
-      "dimensions": { "width": 1200, "height": 630 },
-      "title": {
-        "max_words": 8,
-        "font_size_px": 96,
-        "font_size_min_px": 56,
-        "color": "#ff6a00",
-        "weight": 900,
-        "letter_spacing": "-0.03em",
-        "line_height": 1.1
-      },
-      "subtitle": {
-        "font_size_px": 32,
-        "color": "#202020",
-        "weight": 400,
-        "letter_spacing": "0.02em",
-        "line_height": 1.4,
-        "highlight": "transparent",
-        "max_chars": 80
-      },
-      "handle": {
-        "font_size_px": 22,
-        "color": "#5a5959",
-        "weight": 400,
-        "letter_spacing": "0.04em",
-        "alignment": "center",
-        "position_bottom_px": 32
-      },
-      "layout": {
-        "content_alignment": "left",
-        "content_padding": "60px 80px 80px",
-        "icon_position_x": "right",
-        "icon_position_y": "center",
-        "icon_offset_x": "-10%",
-        "icon_offset_y": "-50%"
-      }
+  "banner": {
+    "template": "default",
+    "icon_collection": {
+      "url": "https://github.com/la-moore/scarlab-icons",
+      "source": "github"
+    },
+    "render": {
+      "device_scale_factor": 2,
+      "chrome_path": null
+    },
+    "dimensions": {
+      "width": 1200,
+      "height": 630
+    },
+    "tokens": {
+      "bg": "#f5f5f5",
+      "font_heading": "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+      "font_subtitle": "'Merriweather', Georgia, 'Times New Roman', serif",
+      "text_title_color": "#ff6a00",
+      "text_title_size": "96px",
+      "text_title_size_min": 56,
+      "text_title_weight": 900,
+      "text_title_shadow": "2px 2px 0 #ffffff",
+      "text_title_lh": 1.1,
+      "text_title_letterspacing": "-0.03em",
+      "text_subtitle_color": "#202020",
+      "text_subtitle_size": "32px",
+      "text_subtitle_weight": 400,
+      "text_subtitle_lh": 1.4,
+      "text_subtitle_letterspacing": "0.02em",
+      "text_subtitle_highlight": "rgba(255, 228, 77, 0.3)",
+      "text_subtitle_max_chars": 80,
+      "text_handle": "#5a5959",
+      "text_handle_size": "22px",
+      "text_handle_weight": 400,
+      "text_handle_letterspacing": "0.04em",
+      "text_handle_align": "center",
+      "text_handle_bottom": "32px",
+      "icon_color": "#444444",
+      "icon_opacity": 0.15,
+      "icon_size": "780px",
+      "icon_rotate": "30deg",
+      "icon_position_x": "right",
+      "icon_position_y": "center",
+      "icon_offset_x": "40px",
+      "icon_offset_y": "-50%",
+      "content_padding": "60px 80px 80px",
+      "content_width": "85%",
+      "text_align": "left"
+    },
+    "icon_mapping": {
+      "default": "arrow-up-right",
+      "rules": [
+        { "patterns": ["ai", "agent", "automation", "machine", "llm", "gpt", "model"], "icon": "sparkles" },
+        { "patterns": ["open source", "github", "repo"], "icon": "git-pull-request" },
+        { "patterns": ["system", "process", "engine", "workflow", "architecture", "infrastructure", "stack", "framework", "pipeline"], "icon": "cog" },
+        { "patterns": ["growth", "scale", "business", "revenue", "metrics", "kpi", "analytics", "data", "trend"], "icon": "trending-up" },
+        { "patterns": ["code", "build", "develop", "ship", "deploy", "api", "script", "dev"], "icon": "code" },
+        { "patterns": ["terminal", "cli", "command", "console"], "icon": "terminal" },
+        { "patterns": ["strategy", "plan", "positioning", "offer", "method", "pillar"], "icon": "crosshair" },
+        { "patterns": ["idea", "learn", "knowledge", "note", "insight", "lesson", "concept", "think"], "icon": "bulb" },
+        { "patterns": ["goal", "target", "focus", "priority", "mission", "objective", "outcome"], "icon": "crosshair" },
+        { "patterns": ["launch", "start", "mvp", "product", "release"], "icon": "award" },
+        { "patterns": ["layer", "level", "tier", "depth"], "icon": "layers" },
+        { "patterns": ["publish", "content", "post", "draft", "blog", "tweet", "schedule", "queue"], "icon": "mail" },
+        { "patterns": ["write", "story", "copy", "headline", "hook"], "icon": "feather" },
+        { "patterns": ["identity", "creator", "builder", "founder", "technical", "engineer"], "icon": "location" },
+        { "patterns": ["stop", "pause", "limit", "bottleneck", "barrier", "block", "bounce", "ceiling", "trap", "enough", "alert", "warning", "critical", "urgent"], "icon": "ban" },
+        { "patterns": ["scan", "scanning", "qrcode", "qr code", "decode", "extract", "extracting"], "icon": "qrcode" }
+      ]
     }
   },
-  "render": {
-    "device_scale_factor": 2
-  },
   "icons": {
-    "default": "arrow-up-right-square",
+    "default": "arrow-up-right",
     "source": "inline",
     "registry": {
-      "arrow-up-right-square": {
-        "svg_path": "icons/arrow-up-right-square.svg",
-        "web_url": "https://www.svgrepo.com/svg/507931/arrow-up-right-square",
-        "fallback_svg": ""
-      },
-      "gears": { "svg_path": "icons/gears.svg", "fallback_svg": "" },
+      "arrow-up-right": { "svg_path": "icons/arrow-up-right.svg", "fallback_svg": "" },
+      "award": { "svg_path": "icons/award.svg", "fallback_svg": "" },
+      "ban": { "svg_path": "icons/ban.svg", "fallback_svg": "" },
+      "bulb": { "svg_path": "icons/bulb.svg", "fallback_svg": "" },
       "code": { "svg_path": "icons/code.svg", "fallback_svg": "" },
-      "compass": { "svg_path": "icons/compass.svg", "fallback_svg": "" },
-      "archery-target": { "svg_path": "icons/archery-target.svg", "fallback_svg": "" },
+      "cog": { "svg_path": "icons/cog.svg", "fallback_svg": "" },
+      "crosshair": { "svg_path": "icons/crosshair.svg", "fallback_svg": "" },
       "feather": { "svg_path": "icons/feather.svg", "fallback_svg": "" },
+      "git-pull-request": { "svg_path": "icons/git-pull-request.svg", "fallback_svg": "" },
       "layers": { "svg_path": "icons/layers.svg", "fallback_svg": "" },
-      "lightbulb": { "svg_path": "icons/lightbulb.svg", "fallback_svg": "" },
-      "publish": { "svg_path": "icons/publish.svg", "fallback_svg": "" },
-      "rocket": { "svg_path": "icons/rocket.svg", "fallback_svg": "" },
+      "location": { "svg_path": "icons/location.svg", "fallback_svg": "" },
+      "mail": { "svg_path": "icons/mail.svg", "fallback_svg": "" },
+      "qrcode": { "svg_path": "icons/qrcode.svg", "fallback_svg": "" },
       "sparkles": { "svg_path": "icons/sparkles.svg", "fallback_svg": "" },
-      "target": { "svg_path": "icons/target.svg", "fallback_svg": "" },
       "terminal": { "svg_path": "icons/terminal.svg", "fallback_svg": "" },
-      "trending-up": { "svg_path": "icons/trending-up.svg", "fallback_svg": "" },
-      "stop-circle": { "svg_path": "icons/stop-circle.svg", "fallback_svg": "" },
-      "alert-circle": { "svg_path": "icons/alert-circle.svg", "fallback_svg": "" },
-      "alert-square": { "svg_path": "icons/alert-square.svg", "fallback_svg": "" },
-      "github": { "svg_path": "icons/github.svg", "fallback_svg": "", "opacity": 0.20, "color": "#444444", "size_percent": 100, "rotate_deg": 30 }
+      "trending-up": { "svg_path": "icons/trending-up.svg", "fallback_svg": "" }
     },
-    "web_search": {
-      "base_url": "https://www.svgrepo.com/collections/",
-      "default_collection": "arrows",
-      "instructions": "Search SVG Repo (https://www.svgrepo.com) for best SVG aligned with content context. Filter by: monocolor, stroke-based, 24x24 viewBox ideal. Prefer simple geometric icons."
-    },
-    "mapping": [
-      { "patterns": ["ai", "agent", "automation", "machine", "llm", "gpt", "model"], "icon": "sparkles" },
-      { "patterns": ["open source", "github", "repo"], "icon": "github" },
-      { "patterns": ["system", "process", "engine", "workflow", "architecture", "infrastructure", "stack", "framework", "pipeline"], "icon": "gears" },
-      { "patterns": ["growth", "scale", "business", "revenue", "metrics", "kpi", "analytics", "data", "trend"], "icon": "trending-up" },
-      { "patterns": ["code", "build", "develop", "ship", "deploy", "api", "script", "dev"], "icon": "code" },
-      { "patterns": ["terminal", "cli", "command", "console"], "icon": "terminal" },
-      { "patterns": ["strategy", "plan", "positioning", "offer", "method", "pillar"], "icon": "target" },
-      { "patterns": ["idea", "learn", "knowledge", "note", "insight", "lesson", "concept", "think"], "icon": "lightbulb" },
-      { "patterns": ["goal", "target", "focus", "priority", "mission", "objective", "outcome"], "icon": "target" },
-      { "patterns": ["launch", "start", "mvp", "product", "release"], "icon": "rocket" },
-      { "patterns": ["layer", "level", "tier", "depth"], "icon": "layers" },
-      { "patterns": ["publish", "content", "post", "draft", "blog", "tweet", "schedule", "queue"], "icon": "publish" },
-      { "patterns": ["write", "story", "copy", "headline", "hook"], "icon": "feather" },
-      { "patterns": ["identity", "creator", "builder", "founder", "technical", "engineer"], "icon": "compass" },
-      { "patterns": ["stop", "pause", "limit", "bottleneck", "barrier", "block", "bounce", "ceiling", "trap", "enough", "alert", "warning", "critical", "urgent"], "icon": "alert-square" }
-    ],
     "style": {
-      "opacity": 0.25,
+      "opacity": 0.15,
       "color": "#444444",
-      "size_percent": 105,
-      "rotate_deg": 20
+      "size_percent": 100,
+      "rotate_deg": 30
     }
   }
 }

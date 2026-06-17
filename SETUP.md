@@ -8,8 +8,8 @@ opencode, Continue, etc.). Copy from the line below to the end and paste.
 ## SETUP PROMPT — copy from here ↓
 
 **GOAL:** Wire this engine natively into the current environment. Install all
-commands, all skills, all configs, and all files. Then run the 14-question
-setup and write every config file.
+commands, all skills, all configs, the `spiel` shim, and all files. Then run
+the 14-question setup and write every config file.
 
 **RULES — obey these without exception:**
 1. Do NOT stop before the goal is reached.
@@ -64,6 +64,52 @@ Detect which platform you are running on right now. Then install.
 - Write a complete setup summary at `SETUP_NATIVE.md` listing every command,
   every skill, and where they should be placed for the user to install manually
 - Set `VAULT_DIR` as an environment variable
+
+### Phase 2.5 — Install the `spiel` shim
+
+The shim is the single entrypoint. It resolves the vault from
+`~/.config/opencode/.env` and execs `scripts/engine.py` inside it — from any
+project cwd, in any IDE. Every command in Phase 2 ultimately invokes `spiel`.
+
+1. Confirm `scripts/bin/spiel` exists in this vault. (It does — bundled.)
+2. Copy it to `~/.local/bin/spiel`:
+   ```bash
+   install -d -m 0755 "$HOME/.local/bin"
+   install -m 0755 scripts/bin/spiel "$HOME/.local/bin/spiel"
+   ```
+3. Verify `~/.local/bin` is on PATH:
+   ```bash
+   echo "$PATH" | tr ':' '\n' | grep -qx "$HOME/.local/bin" && echo "PATH OK" || echo "PATH MISSING"
+   ```
+4. If PATH is missing, append this idempotent guard to the user's shell rc
+   (use `~/.zshrc` for zsh, `~/.bashrc` for bash, `~/.config/fish/config.fish`
+   for fish). The `# spiel-engine-shim-path` comment marks the block; the
+   `[[ ... ]]` guard makes re-runs safe.
+   ```bash
+   # spiel-engine-shim-path
+   [[ ":$PATH:" != *":$HOME/.local/bin:"* ]] && export PATH="$HOME/.local/bin:$PATH"
+   ```
+5. Verify the shim works from outside the vault:
+   ```bash
+   cd /tmp && "$HOME/.local/bin/spiel" --version
+   # expected: spiel 1.0.0 / vault: <abs path to this vault>
+   ```
+6. Write `VAULT_DIR` into the global env file so the shim works without
+   inline overrides (the shim reads this as a fallback):
+   ```bash
+   ENV_FILE="$HOME/.config/opencode/.env"
+   mkdir -p "$(dirname "$ENV_FILE")"
+   chmod 600 "$ENV_FILE" 2>/dev/null || true
+   if ! grep -q '^VAULT_DIR=' "$ENV_FILE" 2>/dev/null; then
+     echo "VAULT_DIR=$(pwd)" >> "$ENV_FILE"
+   fi
+   ```
+7. Re-verify from a different cwd:
+   ```bash
+   cd /tmp && "$HOME/.local/bin/spiel" --where
+   # expected: <abs path to this vault>
+   ```
+8. Report: shim installed at `~/.local/bin/spiel`, vault resolved to `<abs path>`.
 
 ### Phase 3 — Filesystem prep
 
@@ -133,12 +179,15 @@ Write every file below with the answers filled in. Overwrite existing content.
 
 ### Phase 6 — Verify and report
 
-1. Confirm `VAULT_DIR` resolves to the correct absolute path
+1. Confirm `VAULT_DIR` resolves to the correct absolute path:
+   `spiel --where` from any cwd should print the vault root.
 2. Confirm every command from `.opencode/commands/` is wired into this
    platform and visible in the command menu
 3. Confirm every skill from `.opencode/skill/` is installed fully
-4. List what was installed and where (exact file paths)
-5. Show: `bash scripts/pipeline.sh post "my first post"`
+4. Confirm `spiel` is on PATH and works from `/tmp`:
+   `cd /tmp && spiel --version` should print `spiel 1.0.0` and the vault path
+5. List what was installed and where (exact file paths)
+6. Show: `spiel content post "my first post"`
 
 **Do not ask "does this look right?" Do not ask "shall I continue?"**
 **The goal is achieved when all 6 phases are complete and verified.**

@@ -3,17 +3,56 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Banner Template — default</title>
 <style>
-  @import url('__GOOGLE_FONTS__');
+  :root {
+    --width: 1200px;
+    --height: 630px;
+
+    --bg: #e8e8e8;
+    --font-heading: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --font-subtitle: 'Merriweather', Georgia, 'Times New Roman', serif;
+
+    --text-title-color: #ff6a00;
+    --text-title-size: 96px;
+    --text-title-weight: 900;
+    --text-title-lh: 1.1;
+    --text-title-letterspacing: -0.03em;
+
+    --text-subtitle-color: #202020;
+    --text-subtitle-size: 32px;
+    --text-subtitle-weight: 400;
+    --text-subtitle-lh: 1.4;
+    --text-subtitle-highlight: rgba(255, 228, 77, 0.3);
+
+    --text-handle: #5a5959;
+    --text-handle-size: 22px;
+    --text-handle-weight: 400;
+    --text-handle-letterspacing: 0.04em;
+    --text-handle-align: center;
+    --text-handle-bottom: 32px;
+
+    --icon-color: #444444;
+    --icon-opacity: 0.30;
+    --icon-size: 780px;
+    --icon-rotate: 30deg;
+    --icon-position-x: right;
+    --icon-position-y: center;
+    --icon-offset-x: 40px;
+    --icon-offset-y: -50%;
+
+    --content-padding: 60px 80px 80px;
+    --content-width: 85%;
+    --text-align: left;
+  }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
+  html, body { width: var(--width); height: var(--height); overflow: hidden; }
+
   body {
-    width: __WIDTH__px;
-    height: __HEIGHT__px;
-    overflow: hidden;
-    font-family: '__FONT_FAMILY__', sans-serif;
-    __BG_STYLE__
+    font-family: var(--font-heading);
+    background: var(--bg);
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -22,89 +61,89 @@
 
   .bg-icon {
     position: absolute;
-    __ICON_POSITION_STYLE__
-    transform: __ICON_TRANSFORM__ rotate(__ICON_ROTATE__deg);
-    width: __ICON_SIZE__%;
-    height: __ICON_SIZE__%;
+    width: var(--icon-size);
+    height: var(--icon-size);
     z-index: 1;
-    opacity: __ICON_OPACITY__;
-    color: __ICON_COLOR__;
+    opacity: var(--icon-opacity);
+    color: var(--icon-color);
     display: flex;
     align-items: center;
-    justify-content: flex-end;
+    justify-content: center;
     pointer-events: none;
+    transform: translateY(var(--icon-offset-y)) rotate(var(--icon-rotate));
   }
 
-  .bg-icon svg {
-    width: 100%;
-    height: 100%;
-  }
+  .bg-icon.position-right { right: var(--icon-offset-x); top: 50%; }
+  .bg-icon.position-left  { left: var(--icon-offset-x);  top: 50%; }
+  .bg-icon.position-center { left: 50%; top: 50%; transform: translate(-50%, var(--icon-offset-y)) rotate(var(--icon-rotate)); }
+  .bg-icon.position-top    { left: 50%; top: 0; transform: translate(-50%, 0) rotate(var(--icon-rotate)); }
+  .bg-icon.position-bottom { left: 50%; top: 100%; transform: translate(-50%, -100%) rotate(var(--icon-rotate)); }
+
+  .bg-icon svg { width: 100%; height: 100%; }
 
   .content {
     position: relative;
     z-index: 2;
-    padding: __CONTENT_PADDING__;
-    width: 85%;
-    text-align: __TEXT_ALIGN__;
+    padding: var(--content-padding);
+    width: var(--content-width);
+    text-align: var(--text-align);
   }
 
   .title-line {
-    font-size: __TITLE_SIZE__px;
-    font-weight: __TITLE_WEIGHT__;
-    color: __TITLE_COLOR__;
-    letter-spacing: __TITLE_LETTER_SPACING__;
-    line-height: __TITLE_LINE_HEIGHT__;
-    font-family: '__FONT_FAMILY__', sans-serif;
+    font-size: var(--text-title-size);
+    font-weight: var(--text-title-weight);
+    color: var(--text-title-color);
+    letter-spacing: var(--text-title-letterspacing);
+    line-height: var(--text-title-lh);
+    font-family: var(--font-heading);
+    text-wrap: nowrap;
+    text-shadow: var(--text-title-shadow);
   }
 
-  .subtitle-wrapper {
-    margin-top: 32px;
-    display: inline-block;
-  }
+  .subtitle-wrapper { margin-top: 32px; display: inline-block; }
 
   .subtitle-highlight {
     display: inline;
-    background: __SUBTITLE_HIGHLIGHT__;
+    background: var(--text-subtitle-highlight);
     padding: 4px 14px 6px;
-    font-family: '__SUBTITLE_FONT__', serif;
-    font-size: __SUBTITLE_SIZE__px;
-    font-weight: __SUBTITLE_WEIGHT__;
-    color: __SUBTITLE_COLOR__;
-    letter-spacing: __SUBTITLE_LETTER_SPACING__;
-    line-height: __SUBTITLE_LINE_HEIGHT__;
+    font-family: var(--font-subtitle);
+    font-size: var(--text-subtitle-size);
+    font-weight: var(--text-subtitle-weight);
+    color: var(--text-subtitle-color);
+    letter-spacing: 0.02em;
+    line-height: var(--text-subtitle-lh);
     text-wrap: nowrap;
   }
 
   .handle {
     position: absolute;
-    bottom: __HANDLE_BOTTOM__px;
+    bottom: var(--text-handle-bottom);
     left: 0;
     right: 0;
-    text-align: __HANDLE_ALIGN__;
-    padding: 0 __HANDLE_PADDING__;
+    text-align: var(--text-handle-align);
+    padding: 0 70px;
     z-index: 2;
-    font-size: __HANDLE_SIZE__px;
-    font-weight: __HANDLE_WEIGHT__;
-    color: __HANDLE_COLOR__;
-    letter-spacing: __HANDLE_LETTER_SPACING__;
-    font-family: '__FONT_FAMILY__', sans-serif;
+    font-size: var(--text-handle-size);
+    font-weight: var(--text-handle-weight);
+    color: var(--text-handle);
+    letter-spacing: var(--text-handle-letterspacing);
+    font-family: var(--font-heading);
   }
+  .handle.align-left   { padding: 0 70px; text-align: left; }
+  .handle.align-right  { padding: 0 70px; text-align: right; }
+  .handle.align-center { padding: 0; text-align: center; }
 
-  .handle-inner {
-    display: inline-block;
-  }
+  .handle-inner { display: inline-block; }
 </style>
 </head>
 <body>
-  <div class="bg-icon">
-    __ICON_SVG__
-  </div>
+  <div class="bg-icon position-right">__ICON_SVG__</div>
 
   <div class="content">
     __TITLE_LINES_HTML__
     __SUBTITLE_HTML__
   </div>
 
-  <div class="handle"><span class="handle-inner">__HANDLE_TEXT__</span></div>
+  <div class="handle align-center"><span class="handle-inner">__HANDLE_TEXT__</span></div>
 </body>
 </html>

@@ -4,9 +4,14 @@ description: Show content queue grouped by platform
 
 # /queue — Show Content Queue
 
-Shows the content queue grouped by platform.
+Lists drafts in `content/queue/` grouped by platform (x, linkedin, blog, ...).
 
-Usage: /queue
+Usage: `/queue`
 
-1. Lists content/queue/ files grouped by platform
-2. Shows status, archetype, funnel stage for each
+## Run
+
+```
+spiel queue
+```
+
+Shows each draft's name, status (draft / scheduled / published), and platform.

@@ -1,15 +1,24 @@
 ---
-description: Run wiki health checks (orphans, links, frontmatter)
+description: Run wiki health checks (orphans, links, frontmatter, redundancy)
 ---
 
 # /health — Wiki Health Check
 
-Runs health checks on the wiki.
+Read-only health check. Safe to run any time.
 
-Usage: /health
+Usage: `/health`
 
-1. Checks for orphan pages
-2. Checks broken wikilinks
-3. Validates frontmatter
-4. Finds stale pages
-5. Detects redundancy
+## Run
+
+```
+spiel wiki health
+```
+
+## What it checks
+
+1. Orphans (pages with no inbound links)
+2. Broken wikilinks
+3. Frontmatter completeness
+4. Stale pages (low confidence, no recent update)
+5. Redundancy candidates (overlap >60%)
+6. Missing-from-index pages

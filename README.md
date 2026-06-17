@@ -16,9 +16,6 @@ The engine ships with skeleton strategy templates in `concepts/`. After running
 the setup prompt in `SETUP.md`, the 14-question session fills these with your
 real content strategy.
 
-> [!NOTE]
-> Want help with setup, ICP, and content strategy? Open an issue or check the docs in `SETUP.md`.
-
 ## What this repo is for
 
 - **Engine only:** session-based content workflow, quality gates, publishing automation.
@@ -39,14 +36,14 @@ real content strategy.
 ## Quick Start
 
 ```bash
-git clone https://github.com/ShayanSpiel/SpielEngine.git
-cd SpielEngine
+git clone https://github.com/<your-org>/TheSpielEngine.git
+cd TheSpielEngine
 ```
 
 Open `SETUP.md` and paste the prompt into **any** LLM-powered agent
 (Cursor, Claude Code, opencode, Continue, ChatGPT, etc.).
-The agent will self-detect, install commands, and walk through the
-14-question ICP/voice/brand setup automatically.
+The agent will self-detect, install commands, install the `spiel` shim,
+and walk through the 14-question ICP/voice/brand setup automatically.
 
 **Requirements:** Python 3, bash, git.
 
@@ -54,7 +51,7 @@ The agent will self-detect, install commands, and walk through the
 
 ## How It Works
 
-Two state machines run independently. Each step is a `pipeline.sh` call.
+Two state machines run independently. Each step is a `spiel` call.
 
 ### Wiki Loop
 
@@ -84,7 +81,9 @@ API calls). See `AGENTS.md` for the full state machine.
 ## Commands
 
 After setup, your agent will have these commands available. Run them by
-typing `/command` in the chat.
+typing `/command` in the chat. Every command ultimately invokes `spiel`
+(§[The spiel shim](#the-spiel-shim)), so they work from any project cwd,
+in any IDE.
 
 | Command | Action |
 |---------|--------|
@@ -107,33 +106,65 @@ typing `/command` in the chat.
 | `/schedule` | Set publish timestamps for queued content |
 | `/help` | Show all available commands |
 
+### The spiel shim
+
+`spiel` is a thin shell wrapper (at `~/.local/bin/spiel`, also bundled at
+`scripts/bin/spiel`) that resolves the vault from `~/.config/opencode/.env`
+and execs `scripts/engine.py` inside it. It is path-independent — invoke it
+from any project, any IDE, any shell.
+
+```bash
+spiel --version           # print version + resolved vault path
+spiel --where             # print the resolved vault path
+spiel status              # engine: current state
+spiel queue               # engine: queue contents
+spiel wiki extract        # engine: start ingest
+spiel content run         # engine: full content pipeline (orchestrator)
+spiel content publish     # engine: publish queued drafts
+spiel log --tail 20       # engine: recent log entries
+```
+
+The shim resolves `VAULT_DIR` (first match wins):
+1. `$VAULT_DIR` env var (inline override)
+2. `<cwd>/.spiel-vault` (project-local override file)
+3. `~/.config/opencode/.env` (the global source of truth)
+4. The shim's own location, if it lives at `<vault>/scripts/bin/spiel`
+
 ### Pipeline Subcommands
 
-The `pipeline.sh` script drives every state transition. Run individual steps
-to inspect, debug, or resume:
+You can also drive the engine directly via the subcommand namespace. `spiel`
+and the older `pipeline.sh` are interchangeable — both resolve the same
+vault and exec the same engine.
 
 ```bash
 # Wiki pipeline
-bash scripts/pipeline.sh wiki-extract notes/my-session.md
-bash scripts/pipeline.sh wiki-analyze
-bash scripts/pipeline.sh wiki-reconcile
-bash scripts/pipeline.sh wiki-index
-bash scripts/pipeline.sh wiki-validate
-bash scripts/pipeline.sh wiki-complete
+spiel wiki extract notes/my-session.md
+spiel wiki analyze
+spiel wiki reconcile
+spiel wiki index
+spiel wiki validate
+spiel wiki complete
 
 # Content pipeline
-bash scripts/pipeline.sh post-start "topic"
-bash scripts/pipeline.sh post-strategy
-bash scripts/pipeline.sh post-compile
-bash scripts/pipeline.sh post-draft
-bash scripts/pipeline.sh post-banner
-bash scripts/pipeline.sh post-gate
-bash scripts/pipeline.sh post-publish
+spiel content post "topic"
+spiel content run
+spiel content compile-write ...
+spiel content draft-write --file content/queue/<name>.md
+spiel content draft-done
+spiel content banner
+spiel content gate
+spiel content publish
 
 # Utilities
+spiel status
+spiel queue
+spiel recover
+spiel log --tail 20
+
+# Or the bash wrappers (back-compat):
+bash scripts/pipeline.sh wiki-extract notes/my-session.md
+bash scripts/pipeline.sh post-start "topic"
 bash scripts/pipeline.sh status
-bash scripts/pipeline.sh queue
-bash scripts/pipeline.sh recover
 ```
 
 ---
@@ -165,11 +196,12 @@ Every draft passes through a multi-layer gate system before publishing:
 | File | Purpose |
 |------|---------|
 | `rules.yaml` | Posting mode, platform limits, gate thresholds, strategy |
-| `assets/brand-config.json` | Brand name, colors, voice keywords, platforms |
+| `assets/brand-config.json` | Brand name, colors, voice keywords, platforms, banner tokens |
 | `concepts/icp-offer.md` | ICP demographics, psychographics, problem hierarchy |
 | `concepts/voice-corpus.md` | Canonical examples for voice matching |
 | `concepts/funnel-and-matrix.md` | Archetypes, verticals, CTA matrix |
-| `.env` | `VAULT_DIR` -- vault root path |
+| `concepts/voice-and-gates.md` | Voice spec, 4-check, 10-gate, 8-step compiler |
+| `~/.config/opencode/.env` | `VAULT_DIR` -- vault root path |
 
 ---
 
@@ -180,9 +212,10 @@ TheSpielEngine/
 ├── AGENTS.md                # State machines + governance rules
 ├── SETUP.md                 # Universal setup prompt (start here)
 ├── SCHEMA.md                # Page and post frontmatter schemas
+├── PORTING.md               # How this portable engine relates to a root vault
 ├── rules.yaml               # Engine config (local, gitignored)
 ├── rules.yaml.example       # Example config with defaults
-├── .env                     # VAULT_DIR (local, gitignored)
+├── pyproject.toml           # Build-system + project deps
 │
 ├── concepts/                # Strategy + voice configuration
 │   ├── icp-offer.md
@@ -192,21 +225,23 @@ TheSpielEngine/
 │   └── session-as-content.md
 │
 ├── scripts/                 # Engine scripts (Python + Shell)
-│   ├── engine.py             # State machine controller
-│   ├── pipeline.sh           # CLI wrapper for all states
+│   ├── engine.py             # State machine controller (v2 with orchestrator)
+│   ├── engine_state.py       # State machine + paths + brief validation
+│   ├── engine_config.py      # rules.yaml reader
+│   ├── engine_serial.py      # JSONL logger
+│   ├── engine_frontmatter.py # Frontmatter parser
+│   ├── engine_health.py      # Wiki health checks
+│   ├── pipeline.sh           # CLI wrapper (back-compat with old docs)
 │   ├── content_compiler.py   # 8-step Content Engine Compiler
 │   ├── gates.py              # 16 mechanical gate checks
 │   ├── strategy_classifier.py
 │   ├── icp_world.py
-│   ├── post_x.py / post_linkedin.py / post_topic.py
+│   ├── publishers/           # Buffer + direct X/LinkedIn dispatch
+│   ├── bin/spiel             # Path-independent entrypoint shim
+│   ├── banner_tool.py        # Playwright banner generator
+│   ├── publish_dispatcher.py
 │   ├── post.sh / publish-blog.sh
-│   ├── banner.py
-│   ├── wiki-health.py
-│   ├── state_machine.py / state.py
-│   ├── logger.py
-│   ├── capture_session.py / capture-*.sh
-│   ├── detect-redundancy.py
-│   └── generate-arch-canvas.py
+│   └── ... (capture, analyze, archive, wizard, etc.)
 │
 ├── templates/               # Post frontmatter + structure templates
 │   ├── x-post.md
@@ -214,7 +249,7 @@ TheSpielEngine/
 │   ├── blog-post.md
 │   └── session-log.md
 │
-├── assets/                  # Brand, banners, screenshots, icons
+├── assets/                  # Brand, banners, icons
 │   ├── brand-config.json
 │   ├── banners/
 │   └── icons/
@@ -226,7 +261,7 @@ TheSpielEngine/
 │   └── rejected/
 │
 ├── .opencode/               # Command + skill definitions for agent
-├── tests/                   # Test suite
+├── tests/                   # Test suite (197+ tests)
 ├── comparisons/             # Wiki comparison pages
 ├── entities/                # Extracted wiki entities
 ├── summaries/               # Wiki summary pages
@@ -239,8 +274,9 @@ TheSpielEngine/
 
 ## Portability
 
-- **Auto-resolving root:** scripts detect their own location, no hardcoded
-  paths. Set `VAULT_DIR` in `.env` or as an environment variable to override.
+- **Auto-resolving root:** the `spiel` shim detects its own location and
+  the `VAULT_DIR` env var, with fallbacks to `<cwd>/.spiel-vault` and
+  `~/.config/opencode/.env`. Commands work from any project, any IDE.
 - **Agent-agnostic:** the setup prompt works in any LLM agent -- Cursor, Claude
   Code, opencode, Continue, ChatGPT, etc.
 - **Gitignored:** `rules.yaml`, `.env`, `content/*`, `logs/*`, `assets/banners/*`,
@@ -255,8 +291,8 @@ All state transitions are logged to `logs/YYYY-MM-DD.jsonl` (JSONL format).
 View with:
 
 ```bash
-python3 scripts/engine.py log --days 7 --tail 20
-python3 scripts/engine.py log --level ERROR
+spiel log --days 7 --tail 20
+spiel log --level ERROR
 ```
 
 ---

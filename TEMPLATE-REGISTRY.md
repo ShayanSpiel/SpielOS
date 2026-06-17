@@ -179,7 +179,8 @@ And update `template_selector.py` `flatten_templates()` to iterate `registry['pl
 | `scripts/template_selector.py` | Selection engine |
 | `rules.yaml` §`template_selector` | Config |
 | `scripts/engine.py` — `cmd_content_select_template` | Pipeline command |
-| `scripts/pipeline.sh` — `post-select-template` | CLI wrapper |
+| `scripts/pipeline.sh` — `post-select-template` | CLI wrapper (back-compat) |
+| `scripts/bin/spiel` — `spiel content select` | Path-independent CLI wrapper (preferred) |
 | `.content-brief.json` — `template_selection` | Brief schema |
 | `commands/post.md` | Pipeline protocol |
 | `.config/opencode/skill/spiel-content/SKILL.md` | Skill definition |
@@ -190,7 +191,8 @@ And update `template_selector.py` `flatten_templates()` to iterate `registry['pl
 
 ```bash
 # Run template selector (after post-compile, before post-draft)
-bash scripts/pipeline.sh post-select-template
+spiel content select                 # preferred: works from any cwd
+bash scripts/pipeline.sh post-select-template   # back-compat: needs cwd = vault
 
 # Filter to specific platform
 python3 scripts/template_selector.py --platform x --top-n 5

@@ -12,6 +12,11 @@
 # Flags:
 #   --yes     Skip confirmation prompts
 #   --dry-run Show command without running
+#
+# The shim `spiel` is the recommended entrypoint. `spiel` and `pipeline.sh`
+# are interchangeable — both resolve the vault from ~/.config/opencode/.env
+# and exec the same engine.py. This file is retained for back-compat with
+# old docs, log references, and any LLM trained on the pipeline.sh namespace.
 
 set -euo pipefail
 
@@ -68,7 +73,7 @@ Content:
   post-verify             VERIFY — check brief + drafts + gates before queue
   post-queue              QUEUE — show queued drafts
   post-queue-hold         HOLD — keep drafts in queue, reset state to IDLE
-  post-publish [id]       PUBLISHING — post to X / LinkedIn
+  post-publish [id]       PUBLISHING — engine dispatches via Buffer/direct API
   post-archive             ARCHIVING — move posted drafts
   post-analyze             ANALYZE_POST — review engagement data
   post-complete            COMPLETE_POST — finish content pipeline
@@ -103,24 +108,19 @@ cmd_wiki_link() {      info "WIKI: LINKING";       run_engine wiki link; }
 cmd_wiki_index() {     info "WIKI: INDEXING";      run_engine wiki index; }
 cmd_wiki_validate() {  info "WIKI: VALIDATING";    run_engine wiki validate; }
 cmd_wiki_complete() {  info "WIKI: COMPLETE";      run_engine wiki complete; }
-cmd_wiki_health() {
-    info "WIKI: HEALTH CHECK"
-    run_engine wiki health
-    echo ""
-    info "Refreshing architecture canvas..."
-    python3 "$VAULT_DIR/scripts/generate-arch-canvas.py"
-}
+cmd_wiki_health() {    info "WIKI: HEALTH CHECK";  run_engine wiki health; }
 cmd_wiki_reset() {     warn "WIKI: RESET";         run_engine wiki reset; }
 
 # ─── Content wrappers ───────────────────────────────────────────────────────
 
 cmd_post_start() {     info "CONTENT: SESSION_CAPTURE";  run_engine content post "$@"; }
 cmd_post_strategy() {  info "CONTENT: STRATEGY_LOAD";    run_engine content strategy; }
+
 # 🔒 Pre-flight: validate .content-brief.json exists before compiling/drafting
 guard_brief_exists() {
   local brief="$VAULT_DIR/.content-brief.json"
   if [[ ! -f "$brief" ]]; then
-    die "No .content-brief.json found. Run 'bash scripts/pipeline.sh post-start [topic]' first."
+    die "No .content-brief.json found. Run 'bash scripts/pipeline.sh post-start [topic]' (or: spiel content post [topic]) first."
   fi
 }
 
@@ -141,12 +141,14 @@ cmd_post_wizard() {
   info "CONTENT: FORMAT_WIZARD"
   run_engine content wizard
 }
+
 cmd_post_draft() {
   guard_brief_exists
   # engine.py does its own deeper validation (core_insight, meanings, selection)
   info "CONTENT: DRAFTING"
   run_engine content draft
 }
+
 cmd_post_banner() {    info "CONTENT: BANNER";           run_engine content banner; }
 cmd_post_gate() {      info "CONTENT: GATE_CHECK";       run_engine content gate; }
 
@@ -228,35 +230,19 @@ for l in err: print(f'ERR|{l}')
     return 1
   fi
 }
+
 cmd_post_revise() {    info "CONTENT: REVISING";         run_engine content revise; }
 cmd_post_queue() {     info "CONTENT: QUEUE";           run_engine content queue; }
 cmd_post_hold() {      info "CONTENT: HOLD";             run_engine content hold; }
+
+# The engine dispatches via the engine itself (cmd_content_publish routes to
+# publishers/buffer.py or the direct X/LinkedIn publishers), so this wrapper
+# just delegates. No post_x.py / post_linkedin.py calls here.
 cmd_post_publish() {
-  info "CONTENT: PUBLISHING"
-  # engine.py validates + transitions; then dispatches to the platform publisher.
+  info "CONTENT: PUBLISHING (engine dispatches to Buffer or direct publisher)"
   run_engine content publish "$@"
-  local target="${1:-}"
-  if [[ -z "$target" || "$target" == "all" ]]; then
-    for f in "$VAULT_DIR/content/queue"/*.md; do
-      [[ -f "$f" ]] || continue
-      local plat; plat=$(grep -m1 '^platform:' "$f" | awk '{print $2}')
-      case "$plat" in
-        x|twitter)       python3 "$VAULT_DIR/scripts/post_x.py" "$f" --yes ;;
-        linkedin)        python3 "$VAULT_DIR/scripts/post_linkedin.py" "$f" --yes ;;
-      esac
-    done
-  else
-    local f="$VAULT_DIR/content/queue/$target"
-    [[ -f "$f" ]] || f="$(find "$VAULT_DIR/content/queue" -name "${target}*" -print -quit)"
-    [[ -f "$f" ]] || die "draft not found: $target"
-    local plat; plat=$(grep -m1 '^platform:' "$f" | awk '{print $2}')
-    case "$plat" in
-      x|twitter)       python3 "$VAULT_DIR/scripts/post_x.py" "$f" --yes ;;
-      linkedin)        python3 "$VAULT_DIR/scripts/post_linkedin.py" "$f" --yes ;;
-      *)               die "no publisher for platform: $plat" ;;
-    esac
-  fi
 }
+
 cmd_post_archive() {   info "CONTENT: ARCHIVING";        run_engine content archive; }
 cmd_post_analyze() {   info "CONTENT: ANALYZING_POST";   run_engine content analyze; }
 cmd_post_complete() {  info "CONTENT: COMPLETE_POST";    run_engine content complete; }

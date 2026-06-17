@@ -26,6 +26,10 @@ jobs:
       - name: Run automated tests
         run: python3 -m pytest tests/ -v
 
+      - name: Run wiki health check
+        run: python3 scripts/engine_health.py
+        continue-on-error: true
+
       - name: Validate .wiki-state
         run: |
           python3 -c "
@@ -37,20 +41,17 @@ jobs:
           print('.wiki-state is valid: state=%s, loop=%s' % (data['current_state'], data['loop']))
           "
 
-      - name: Check frontmatter on concept pages
+      - name: Check frontmatter completeness
         run: |
-          echo "Checking frontmatter on concept pages..."
+          echo "Checking frontmatter on all concept/entity pages..."
           python3 -c "
-          import os, yaml
+          import os, re, yaml
           vault = '.'
-          for dir in ['concepts', 'templates']:
-              dirpath = os.path.join(vault, dir)
-              if not os.path.isdir(dirpath):
-                  continue
-              for f in sorted(os.listdir(dirpath)):
+          for dir in ['concepts', 'entities', 'comparisons', 'summaries']:
+              for f in sorted(os.listdir(os.path.join(vault, dir))):
                   if not f.endswith('.md'):
                       continue
-                  path = os.path.join(dirpath, f)
+                  path = os.path.join(vault, dir, f)
                   with open(path) as fh:
                       content = fh.read()
                   if not content.startswith('---'):
@@ -68,7 +69,7 @@ jobs:
 
       - name: Summary
         run: |
-          echo "=== Repo Health Summary ==="
+          echo "=== Wiki Health Summary ==="
           echo "Tests: passed"
           echo "State: $(python3 -c "import yaml; d=yaml.safe_load(open('.wiki-state')); print(f\"{d['current_state']} ({d['loop']})\")")"
-          echo "Concept files: $(find concepts -name '*.md' | wc -l | tr -d ' ')"
+          echo "Pages: $(find concepts entities comparisons summaries -name '*.md' | wc -l | tr -d ' ') wiki pages"

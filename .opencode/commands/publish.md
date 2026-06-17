@@ -1,16 +1,25 @@
 ---
-description: Publish queued content to production (X / LinkedIn)
+description: Publish queued content to production (X / LinkedIn / Buffer)
 ---
 
 # /publish — Queue → Production
 
-Publishes queued content to production endpoints.
+Publishes queued drafts to the configured platforms.
 
-Usage: /publish [id|all]
+Usage: `/publish [id|all]`
 
-1. Shows draft and waits for confirmation (manual mode)
-2. Posts to platform API
-3. Archives to content/posted/
-4. Updates frontmatter with published_at and platform-specific IDs
+## Run
 
-Configure posting mode in rules.yaml: manual | auto-threshold | auto-always.
+```
+spiel content publish                # publish all (manual mode asks for confirm)
+spiel content publish <id>           # publish one draft (filename, stem, or short ref)
+```
+
+## What happens
+
+1. In `manual` mode (default), `spiel` shows the draft and waits for "yes" before the API call.
+2. Posts to the platform API (Buffer fan-out → X + LinkedIn + Threads in one call; or direct X/LinkedIn as fallbacks).
+3. Archives the draft to `content/posted/`.
+4. Updates frontmatter with `posted_at` and platform-specific IDs.
+
+Configure posting mode in `rules.yaml` → `posting.mode` (manual | auto-threshold | auto-always).
