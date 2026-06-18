@@ -1,6 +1,3 @@
-Want a white-glove install? DM [@ShayanSpiel](https://x.com/ShayanSpiel) to get
-a custom setup, voice-trained, and deployed within 10 days.
-
 # The Spiel Engine
 
 Turn real build sessions into publishable content automatically.
@@ -18,6 +15,11 @@ WORK SESSION → [Wiki Loop] → Knowledge Base → [Content Loop] → X / Linke
 The engine ships with skeleton strategy templates in `concepts/`. After running
 the setup prompt in `SETUP.md`, the 14-question session fills these with your
 real content strategy.
+
+> [!IMPORTANT]
+> Want a white-glove install? DM [@ShayanSpiel](https://x.com/ShayanSpiel) to get
+a custom setup, voice-trained, and deployed within 10 days.
+
 
 ## What this repo is for
 
