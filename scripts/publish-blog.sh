@@ -516,7 +516,7 @@ ok "Committed."
 if $YES_FLAG; then
   info "Pushing to remote..."
   git push
-  ok "Pushed. GitHub Pages will rebuild in ~30s. Post will be live at https://shayanspiel.github.io/${SLUG}/"
+  ok "Pushed. GitHub Pages will rebuild in ~30s. Post will be live at https://$(git remote get-url origin 2>/dev/null | sed 's|.*/||; s|\.git$||' | tr 'A-Z' 'a-z').github.io/${SLUG}/"
 else
   warn "Not pushing (no --yes). Run: cd $GH_PAGES && git push"
 fi
