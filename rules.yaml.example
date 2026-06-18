@@ -35,6 +35,12 @@ gates:
   char_max: 3000
 
 strategy:
+  pages:
+    - icp-offer
+    - funnel-and-matrix
+    - voice-and-gates
+    - session-as-content
+    - voice-corpus
   verticals: []
   archetypes: {}
   icp: {}

@@ -110,7 +110,7 @@ _resolve_vault() {
     echo "" >&2
     echo "  Fix (pick one):" >&2
     echo "    a) Set VAULT_DIR in ~/.config/opencode/.env:" >&2
-    echo "         echo 'VAULT_DIR=/absolute/path/to/your/vault' >> ~/.config/opencode/.env" >&2
+    echo "         echo 'VAULT_DIR=/abs/path/to/vault' >> ~/.config/opencode/.env" >&2
     echo "    b) Run the engine's SETUP.md (installs the shim + writes .env automatically)." >&2
     echo "    c) Drop a .spiel-vault file in your project root with: VAULT_DIR=/abs/path" >&2
     echo "" >&2

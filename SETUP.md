@@ -71,7 +71,7 @@ The shim is the single entrypoint. It resolves the vault from
 `~/.config/opencode/.env` and execs `scripts/engine.py` inside it — from any
 project cwd, in any IDE. Every command in Phase 2 ultimately invokes `spiel`.
 
-1. Confirm `scripts/bin/spiel` exists in this vault. (It does — bundled.)
+1. Confirm `scripts/bin/spiel` exists in this vault.
 2. Copy it to `~/.local/bin/spiel`:
    ```bash
    install -d -m 0755 "$HOME/.local/bin"
@@ -81,9 +81,8 @@ project cwd, in any IDE. Every command in Phase 2 ultimately invokes `spiel`.
    ```bash
    echo "$PATH" | tr ':' '\n' | grep -qx "$HOME/.local/bin" && echo "PATH OK" || echo "PATH MISSING"
    ```
-4. If PATH is missing, append this idempotent guard to the user's shell rc
-   (use `~/.zshrc` for zsh, `~/.bashrc` for bash, `~/.config/fish/config.fish`
-   for fish). The `# spiel-engine-shim-path` comment marks the block; the
+4. If PATH is missing, append this idempotent guard to the user's shell rc.
+   The `# spiel-engine-shim-path` comment marks the block; the
    `[[ ... ]]` guard makes re-runs safe.
    ```bash
    # spiel-engine-shim-path
@@ -92,14 +91,11 @@ project cwd, in any IDE. Every command in Phase 2 ultimately invokes `spiel`.
 5. Verify the shim works from outside the vault:
    ```bash
    cd /tmp && "$HOME/.local/bin/spiel" --version
-   # expected: spiel 1.0.0 / vault: <abs path to this vault>
    ```
-6. Write `VAULT_DIR` into the global env file so the shim works without
-   inline overrides (the shim reads this as a fallback):
+6. Write `VAULT_DIR` into the global env file:
    ```bash
    ENV_FILE="$HOME/.config/opencode/.env"
    mkdir -p "$(dirname "$ENV_FILE")"
-   chmod 600 "$ENV_FILE" 2>/dev/null || true
    if ! grep -q '^VAULT_DIR=' "$ENV_FILE" 2>/dev/null; then
      echo "VAULT_DIR=$(pwd)" >> "$ENV_FILE"
    fi
@@ -107,7 +103,6 @@ project cwd, in any IDE. Every command in Phase 2 ultimately invokes `spiel`.
 7. Re-verify from a different cwd:
    ```bash
    cd /tmp && "$HOME/.local/bin/spiel" --where
-   # expected: <abs path to this vault>
    ```
 8. Report: shim installed at `~/.local/bin/spiel`, vault resolved to `<abs path>`.
 
@@ -151,9 +146,7 @@ between blocks. When all 14 are answered, immediately move to Phase 5.
 
 **Block 4 — Verticals and CTAs**
 10. What main content verticals or topics do you cover?
-    (e.g. "startup growth, technical architecture, team dynamics")
 11. What action do you want readers to take after each post?
-    (e.g. subscribe, comment, share, book a call, buy a product)
 
 **Block 5 — Voice**
 12. Describe your writing voice in 3 words.

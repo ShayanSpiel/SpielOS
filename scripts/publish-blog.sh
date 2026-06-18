@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # scripts/publish-blog.sh — vault pillar blog → GitHub Pages
 #
-# Publishes a pillar blog post from the vault (content/queue/*.md) to the
-# GitHub Pages Jekyll site (set $GH_PAGES to your repo, e.g. ~/yourname.github.io),
-# with
-# referenced screenshots copied to assets/uploads/ and frontmatter
-# transformed to Jekyll format. Then git add + commit + (optional) push.
+# Publishes a pillar blog post from the vault (content/queue/*.md) to a
+# GitHub Pages Jekyll site (default: $GH_PAGES/_posts/*.md, set the env var
+# to override), with referenced screenshots copied to assets/uploads/ and
+# frontmatter transformed to Jekyll format. Then git add + commit + (optional)
+# push.
 #
 # Usage:
 #   bash scripts/publish-blog.sh <pillar-blog-file>
@@ -24,8 +24,8 @@
 #
 # Requirements:
 #   - bash 4+, python3, git
-#   - The vault is at $VAULT (default: $VAULT_DIR from .env, or the engine's own dir)
-#   - The GH Pages repo is at $GH_PAGES (no default — set this to your GitHub Pages repo)
+#   - The vault is at $VAULT (default: $HOME/SpielEngine)
+#   - The GH Pages repo is at $GH_PAGES (default: $HOME/yourblog.github.io)
 #   - The GH Pages repo is initialized as a git repo with a remote
 #
 # Behavior:
@@ -44,9 +44,8 @@
 set -euo pipefail
 
 # ─── Config ────────────────────────────────────────────────────────────────
-VAULT="${VAULT:-$(cd "$(dirname "$0")/.." && pwd)}"
-GH_PAGES="${GH_PAGES:-}"  # Set to your GitHub Pages repo path, e.g. $HOME/yourusername.github.io
-GH_URL="${GH_URL:-}"       # Your published URL, e.g. https://yourusername.github.io
+VAULT="${VAULT:-$HOME/SpielEngine}"
+GH_PAGES="${GH_PAGES:-$HOME/yourblog.github.io}"
 QUEUE_DIR="$VAULT/content/queue"
 POSTS_DIR="$GH_PAGES/_posts"
 UPLOADS_DIR="$GH_PAGES/assets/uploads"
@@ -222,10 +221,12 @@ UPLOAD_TARGET="$GH_PAGES/$UPLOAD_SUBDIR"
 mkdir -p "$UPLOAD_TARGET"
 
 # Use Python to do the full transform — frontmatter + image rewrites — atomically
-python3 - "$SOURCE" "$TARGET" "$UPLOAD_SUBDIR" "$SCREENSHOTS_DIR" "$DATE_PREFIX" "$SLUG" <<'PYEOF'
+MANIFEST_FILE="$(mktemp -t publish-blog-manifest.XXXXXX)"
+trap 'rm -f "$FM_FILE" "$MANIFEST_FILE"' EXIT
+python3 - "$SOURCE" "$TARGET" "$UPLOAD_SUBDIR" "$SCREENSHOTS_DIR" "$DATE_PREFIX" "$SLUG" "$MANIFEST_FILE" "$VAULT" <<'PYEOF'
 import re, sys, os, shutil, pathlib
 
-source, target, upload_subdir, screenshots_dir, date_prefix, slug = sys.argv[1:7]
+source, target, upload_subdir, screenshots_dir, date_prefix, slug, manifest_file, vault_root = sys.argv[1:9]
 # upload_subdir is relative to GH Pages root (e.g. assets/uploads/2026-06-06-foo).
 # Resolve it against GH_PAGES_ROOT (one level up from the _posts/ target).
 gh_pages_root = os.path.dirname(os.path.dirname(target))
@@ -263,6 +264,11 @@ def parse_fm(text):
 
 fm = parse_fm(fm_text)
 
+# Track files we copy to GH Pages (uploaded screenshots, banners, icons).
+# These are written to manifest_file at the end so the bash side can git-add them.
+copied_files = []
+flagged_paths = set()
+
 # Build Jekyll frontmatter (keep only Jekyll-relevant fields)
 title = fm.get('title', 'Untitled')
 # Tags: from frontmatter tags list, or empty
@@ -284,6 +290,30 @@ if tags:
 if description:
     jekyll_fm_lines.append(f'description: "{description}"')
 
+# Banner/image: map vault "banner:" field to Jekyll "image: path:" frontmatter
+# If the banner is a vault asset, copy it to GH Pages (preserving path).
+banner = fm.get('banner', '')
+if banner:
+    banner_norm = banner.lstrip('/')
+    if banner_norm.startswith(('assets/banners/', 'assets/icons/')):
+        banner_src = os.path.join(vault_root, banner_norm)
+        if os.path.isfile(banner_src):
+            banner_dst = os.path.join(gh_pages_root, banner_norm)
+            os.makedirs(os.path.dirname(banner_dst), exist_ok=True)
+            shutil.copy2(banner_src, banner_dst)
+            copied_files.append((banner_src, banner_dst, '/' + banner_norm))
+    # Make banner path absolute for Jekyll
+    if banner.startswith('assets/'):
+        banner_path = '/' + banner
+    else:
+        banner_path = banner if banner.startswith('/') else '/' + banner
+    jekyll_fm_lines.extend([
+        'image:',
+        f'  path: {banner_path}',
+        '  width: 1200',
+        '  height: 630',
+    ])
+
 # Find image references in body
 # Patterns: ![alt](path), <img src="path">, src="path"
 img_patterns = [
@@ -292,17 +322,29 @@ img_patterns = [
     re.compile(r'src="([^"]+)"'),
 ]
 
-copied_files = []
-flagged_paths = set()
-
 def process_path(path):
-    # Skip http(s) and absolute paths and data: URIs
-    if path.startswith(('http://', 'https://', 'data:', '/')):
+    # Skip external URLs and data URIs
+    if path.startswith(('http://', 'https://', 'data:')):
         return path
-    # Skip if it's already a Jekyll-relative path
-    if path.startswith('assets/'):
+
+    # Vault asset paths (banners, icons): if the file exists in the vault, copy
+    # it to GH Pages at the same relative path. Otherwise fall through.
+    norm = path.lstrip('/')
+    if norm.startswith(('assets/banners/', 'assets/icons/')):
+        src_abs = os.path.join(vault_root, norm)
+        if os.path.isfile(src_abs):
+            dst = os.path.join(gh_pages_root, norm)
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            shutil.copy2(src_abs, dst)
+            copied_files.append((src_abs, dst, '/' + norm))
+            return path  # Keep original form (absolute or relative)
+
+    # Other absolute paths and Jekyll-relative paths — assume already on GH Pages
+    # (e.g. /logo.png, /og-default.png, or assets/... committed in a prior publish)
+    if path.startswith(('/', 'assets/')):
         return path
-    # Try to resolve from vault screenshots dir
+
+    # Try to resolve relative to source, vault root, or fall back to absolute
     if os.path.isabs(path):
         src_abs = path
     else:
@@ -310,7 +352,6 @@ def process_path(path):
         src_abs = os.path.join(os.path.dirname(source), path)
         if not os.path.isfile(src_abs):
             # Try relative to vault root
-            vault_root = os.path.dirname(os.path.dirname(source))  # queue is 2 levels deep
             src_abs = os.path.normpath(os.path.join(vault_root, path))
             if not os.path.isfile(src_abs):
                 # Try absolute interpretation from vault
@@ -318,7 +359,7 @@ def process_path(path):
                 src_abs = os.path.normpath(src_abs)
 
     if os.path.isfile(src_abs):
-        # Copy to upload subdir
+        # Copy to upload subdir (per-post screenshots)
         fname = os.path.basename(src_abs)
         dst = os.path.join(upload_subdir_abs, fname)
         shutil.copy2(src_abs, dst)
@@ -368,9 +409,21 @@ def strip_leading_h1(body_text, fm_title):
     lines = body_text.split('\n')
     if not lines:
         return body_text
-    if not lines[0].lstrip().startswith('# '):
+    # Skip leading blank lines (empty lines or whitespace-only)
+    idx = 0
+    while idx < len(lines) and lines[idx].strip() == '':
+        idx += 1
+    if idx == len(lines):
         return body_text
-    h1_text = lines[0].lstrip()[2:].strip()
+    if not lines[idx].lstrip().startswith('# '):
+        return body_text
+    h1_text = lines[idx].lstrip()[2:].strip()
+    def norm(s):
+        return re.sub(r'[^a-z0-9]+', '', s.lower())
+    if norm(h1_text) == norm(fm_title):
+        del lines[idx]
+        if idx < len(lines) and lines[idx].strip() == '':
+            del lines[idx]
     def norm(s):
         return re.sub(r'[^a-z0-9]+', '', s.lower())
     if norm(h1_text) == norm(fm_title):
@@ -396,6 +449,13 @@ if flagged_paths:
     print(f"FLAGGED: {len(flagged_paths)} image(s) not found in vault (left as-is, will be broken on live site unless fixed manually):")
     for p in flagged_paths:
         print(f"  - {p}")
+
+# Write manifest of files copied to GH Pages (relative to repo root).
+# The bash side reads this and `git add`s each one.
+with open(manifest_file, 'w') as mf:
+    for src, dst, rel in copied_files:
+        repo_rel = os.path.relpath(dst, gh_pages_root)
+        mf.write(repo_rel + '\n')
 PYEOF
 
 hr
@@ -420,9 +480,11 @@ info "Staging files in $GH_PAGES..."
 
 cd "$GH_PAGES"
 git add "$TARGET_REL"
-# Stage uploads dir if anything was copied
-if compgen -G "$UPLOAD_SUBDIR/*" > /dev/null; then
-  git add "$UPLOAD_SUBDIR/"
+# Stage any files the Python script copied (uploads, banners, icons, etc.)
+if [[ -s "$MANIFEST_FILE" ]]; then
+  while IFS= read -r staged_file; do
+    [[ -n "$staged_file" ]] && git add "$staged_file"
+  done < "$MANIFEST_FILE"
 fi
 
 # Show diff
@@ -454,7 +516,7 @@ ok "Committed."
 if $YES_FLAG; then
   info "Pushing to remote..."
   git push
-  ok "Pushed. GitHub Pages will rebuild in ~30s. Post will be live at ${GH_URL}/${SLUG}/"
+  ok "Pushed. GitHub Pages will rebuild in ~30s. Post will be live at https://shayanspiel.github.io/${SLUG}/"
 else
   warn "Not pushing (no --yes). Run: cd $GH_PAGES && git push"
 fi

@@ -36,14 +36,14 @@ real content strategy.
 ## Quick Start
 
 ```bash
-git clone https://github.com/<your-org>/TheSpielEngine.git
+git clone https://github.com/ShayanSpiel/SpielEngine.git
 cd TheSpielEngine
 ```
 
 Open `SETUP.md` and paste the prompt into **any** LLM-powered agent
 (Cursor, Claude Code, opencode, Continue, ChatGPT, etc.).
-The agent will self-detect, install commands, install the `spiel` shim,
-and walk through the 14-question ICP/voice/brand setup automatically.
+The agent will self-detect, install commands, and walk through the
+14-question ICP/voice/brand setup automatically.
 
 **Requirements:** Python 3, bash, git.
 
@@ -51,25 +51,25 @@ and walk through the 14-question ICP/voice/brand setup automatically.
 
 ## How It Works
 
-Two state machines run independently. Each step is a `spiel` call.
+Two state machines run independently. The `spiel` shim drives every transition.
 
 ### Wiki Loop
 
 Ingests raw notes, extracts entities, reconciles into wiki pages, and links
-them -- a compounding knowledge base that grows with every session.
+them — a compounding knowledge base that grows with every session.
 
 ```
-IDLE → INGEST → ANALYZE → RECONCILE → INDEX → VALIDATE → COMPLETE → IDLE
+IDLE → INGEST → ANALYZE → RECONCILE → LINK → INDEX → VALIDATE → COMPLETE → IDLE
 ```
 
 ### Content Loop
 
 Turns a session (or topic) into platform-native drafts through strategy
-classification, the 8-step Content Engine Compiler, drafting, gating,
-queuing, and publishing.
+classification, the 8-step Content Engine Compiler, drafting, banner generation,
+gating, queuing, and publishing.
 
 ```
-IDLE → SESSION → STRATEGY → COMPILE → DRAFT → GATE → QUEUE → PUBLISH → ARCHIVE → IDLE
+IDLE → SESSION_CAPTURE → COMPILE → SELECT → FORMAT_WIZARD → DRAFTING → BANNER → GATE_CHECK → QUEUE → PUBLISHING → ARCHIVING → ANALYZE_POST → COMPLETE_POST → IDLE
 ```
 
 Both loops are driven by the LLM for creative work (analyzing, drafting,
@@ -82,8 +82,7 @@ API calls). See `AGENTS.md` for the full state machine.
 
 After setup, your agent will have these commands available. Run them by
 typing `/command` in the chat. Every command ultimately invokes `spiel`
-(§[The spiel shim](#the-spiel-shim)), so they work from any project cwd,
-in any IDE.
+(the path-independent entrypoint), so they work from any project cwd.
 
 | Command | Action |
 |---------|--------|
@@ -132,9 +131,7 @@ The shim resolves `VAULT_DIR` (first match wins):
 
 ### Pipeline Subcommands
 
-You can also drive the engine directly via the subcommand namespace. `spiel`
-and the older `pipeline.sh` are interchangeable — both resolve the same
-vault and exec the same engine.
+You can also drive the engine directly:
 
 ```bash
 # Wiki pipeline
@@ -155,16 +152,9 @@ spiel content banner
 spiel content gate
 spiel content publish
 
-# Utilities
-spiel status
-spiel queue
-spiel recover
-spiel log --tail 20
-
 # Or the bash wrappers (back-compat):
 bash scripts/pipeline.sh wiki-extract notes/my-session.md
 bash scripts/pipeline.sh post-start "topic"
-bash scripts/pipeline.sh status
 ```
 
 ---
@@ -173,13 +163,13 @@ bash scripts/pipeline.sh status
 
 Every draft passes through a multi-layer gate system before publishing:
 
-### Mechanical (16 checks -- `gates.py`)
+### Mechanical (16 checks — `gates.py`)
 - Character count, hook presence, em-dash rules
 - No architecture leaks, audience named, lesson surfaced
 - No generic statements, reader as subject, closing presence
 - Frontmatter complete, ICP present, banner file exists
 
-### Creative (4-check baseline + 10-gate extended -- LLM judges)
+### Creative (4-check baseline + 10-gate extended — LLM judges)
 - Reader's world is the subject, not the writer's project
 - Tension in first 2 lines
 - Named reader present (founders, builders, operators)
@@ -196,12 +186,11 @@ Every draft passes through a multi-layer gate system before publishing:
 | File | Purpose |
 |------|---------|
 | `rules.yaml` | Posting mode, platform limits, gate thresholds, strategy |
-| `assets/brand-config.json` | Brand name, colors, voice keywords, platforms, banner tokens |
+| `assets/brand-config.json` | Brand name, colors, voice keywords, platforms |
 | `concepts/icp-offer.md` | ICP demographics, psychographics, problem hierarchy |
 | `concepts/voice-corpus.md` | Canonical examples for voice matching |
 | `concepts/funnel-and-matrix.md` | Archetypes, verticals, CTA matrix |
-| `concepts/voice-and-gates.md` | Voice spec, 4-check, 10-gate, 8-step compiler |
-| `~/.config/opencode/.env` | `VAULT_DIR` -- vault root path |
+| `.env` | `VAULT_DIR` — vault root path |
 
 ---
 
@@ -212,10 +201,9 @@ TheSpielEngine/
 ├── AGENTS.md                # State machines + governance rules
 ├── SETUP.md                 # Universal setup prompt (start here)
 ├── SCHEMA.md                # Page and post frontmatter schemas
-├── PORTING.md               # How this portable engine relates to a root vault
 ├── rules.yaml               # Engine config (local, gitignored)
 ├── rules.yaml.example       # Example config with defaults
-├── pyproject.toml           # Build-system + project deps
+├── .env                     # VAULT_DIR (local, gitignored)
 │
 ├── concepts/                # Strategy + voice configuration
 │   ├── icp-offer.md
@@ -225,62 +213,63 @@ TheSpielEngine/
 │   └── session-as-content.md
 │
 ├── scripts/                 # Engine scripts (Python + Shell)
-│   ├── engine.py             # State machine controller (v2 with orchestrator)
-│   ├── engine_state.py       # State machine + paths + brief validation
+│   ├── engine.py             # State machine controller + orchestrator
+│   ├── pipeline.sh           # CLI wrapper for all states
+│   ├── engine_state.py       # State machine + paths + validation
 │   ├── engine_config.py      # rules.yaml reader
-│   ├── engine_serial.py      # JSONL logger
-│   ├── engine_frontmatter.py # Frontmatter parser
 │   ├── engine_health.py      # Wiki health checks
-│   ├── pipeline.sh           # CLI wrapper (back-compat with old docs)
-│   ├── content_compiler.py   # 8-step Content Engine Compiler
-│   ├── gates.py              # 16 mechanical gate checks
-│   ├── strategy_classifier.py
-│   ├── icp_world.py
-│   ├── publishers/           # Buffer + direct X/LinkedIn dispatch
-│   ├── bin/spiel             # Path-independent entrypoint shim
-│   ├── banner_tool.py        # Playwright banner generator
-│   ├── publish_dispatcher.py
-│   ├── post.sh / publish-blog.sh
-│   └── ... (capture, analyze, archive, wizard, etc.)
+│   ├── engine_serial.py      # State serialization
+│   ├── state_handlers.py     # Wiki loop state handlers
+│   ├── wizard.py             # Format + publish wizards
+│   ├── compiler.py           # Compiler write
+│   ├── publish_dispatcher.py # Publishing dispatcher
+│   ├── template_ranker.py    # Template scoring + curation
+│   ├── ui.py                 # Terminal UI
+│   ├── archive.py            # Archive files
+│   ├── analyze.py            # Post-analyze (Buffer engagement)
+│   ├── banner_tool.py        # Banner image generator
+│   ├── gates.py              # Mechanical gate checks
+│   ├── buffer_client.py      # Buffer API client
+│   ├── capture.py / classifier.py
+│   ├── icp.py / selector.py / setup_buffer_channels.py
+│   ├── publishers/           # Publishing backends
+│   │   ├── buffer.py         # Buffer (multi-platform)
+│   │   ├── twitter.py        # X direct API
+│   │   └── linkedin.py       # LinkedIn direct API
+│   └── bin/spiel             # Path-independent entrypoint
 │
-├── templates/               # Post frontmatter + structure templates
+
+├── templates/                # Post frontmatter + structure templates
 │   ├── x-post.md
 │   ├── linkedin-post.md
 │   ├── blog-post.md
 │   └── session-log.md
 │
-├── assets/                  # Brand, banners, icons
+├── assets/                   # Brand, banners, screenshots, icons
 │   ├── brand-config.json
 │   ├── banners/
 │   └── icons/
 │
-├── content/                 # All generated content
+├── content/                  # All generated content
 │   ├── sessions/
 │   ├── queue/
 │   ├── posted/
 │   └── rejected/
 │
-├── .opencode/               # Command + skill definitions for agent
-├── tests/                   # Test suite (197+ tests)
-├── comparisons/             # Wiki comparison pages
-├── entities/                # Extracted wiki entities
-├── summaries/               # Wiki summary pages
-├── logs/                    # JSONL activity logs
-├── raw/                     # Ingest source files
-└── notes/                   # Raw exports / .md journals
+├── tests/                    # Test suite
+└── logs/                     # JSONL activity logs (local, gitignored)
 ```
 
 ---
 
 ## Portability
 
-- **Auto-resolving root:** the `spiel` shim detects its own location and
-  the `VAULT_DIR` env var, with fallbacks to `<cwd>/.spiel-vault` and
-  `~/.config/opencode/.env`. Commands work from any project, any IDE.
-- **Agent-agnostic:** the setup prompt works in any LLM agent -- Cursor, Claude
+- **Auto-resolving root:** scripts detect their own location, no hardcoded
+  paths. Set `VAULT_DIR` in `.env` or as an environment variable to override.
+- **Agent-agnostic:** the setup prompt works in any LLM agent — Cursor, Claude
   Code, opencode, Continue, ChatGPT, etc.
 - **Gitignored:** `rules.yaml`, `.env`, `content/*`, `logs/*`, `assets/banners/*`,
-  `assets/screenshots/*` -- local data stays local.
+  `assets/screenshots/*` — local data stays local.
 - **Standalone:** Python 3 + bash is all you need. No npm, no Docker.
 
 ---

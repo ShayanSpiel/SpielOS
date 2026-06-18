@@ -1,4 +1,5 @@
-<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M17 15L19.6462 12.3538C19.8416 12.1584 19.8416 11.8416 19.6462 11.6462L17 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M7 9L4.35151 11.6485C4.15738 11.8426 4.15738 12.1574 4.35151 12.3515L7 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+  <polyline points="55 50 10 100 55 150"/>
+  <polyline points="145 50 190 100 145 150"/>
+  <line x1="120" y1="30" x2="80" y2="170"/>
 </svg>

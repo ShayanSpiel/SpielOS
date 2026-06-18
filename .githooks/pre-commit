@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Pre-commit hook for the Spiel Engine
+# Pre-commit hook for Spiel Engine
 set -euo pipefail
 
 VAULT_DIR="$(cd "$(dirname "$0")/.." && pwd)"

@@ -14,3 +14,8 @@ dependencies = [
 
 [project.optional-dependencies]
 test = ["pytest>=8.0", "pillow>=10.0", "numpy>=1.26"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --tb=short"

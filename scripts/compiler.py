@@ -16,9 +16,52 @@ from engine_state import (
 )
 
 
+TOPIC_TYPES = ["announcement", "explainer", "opinion", "teardown", "case-study", "how-to"]
+
+ANNOUNCEMENT_KEYWORDS = [
+    "ship", "shipped", "release", "released", "launch", "launched", "v1", "v2", "v3",
+    "feature", "added", "merged", "rolled out", "public beta", "open source",
+    "now available", "just shipped", "announce", "announcing",
+]
+
+
+def _infer_topic_kind(topic_text: str) -> str:
+    """Heuristic: is this an announcement, explainer, opinion, etc.?"""
+    if not topic_text:
+        return "announcement"
+    lower = topic_text.lower()
+    score = sum(1 for kw in ANNOUNCEMENT_KEYWORDS if kw in lower)
+    if score >= 1:
+        return "announcement"
+    if any(w in lower for w in ["how to", "how do", "tutorial", "guide", "step by step"]):
+        return "how-to"
+    if any(w in lower for w in ["why", "vs", "versus", "comparison", "compare"]):
+        return "opinion"
+    if any(w in lower for w in ["breakdown", "teardown", "anatomy of", "under the hood"]):
+        return "teardown"
+    if any(w in lower for w in ["case study", "client", "customer story", "before/after"]):
+        return "case-study"
+    if any(w in lower for w in ["explain", "what is", "primer", "intro to"]):
+        return "explainer"
+    return "announcement"
+
+
 def format_compiler_sequence(brief: dict, icp_world_text: str, session_evidence: str, meaning_axes: list[str]) -> str:
+    """Render the Compiler handoff display. Two modes:
+      - session: the build-to-public 8-step sequence (session IS evidence, ICP world IS subject)
+      - topic:   the announcement/explainer 6-question sequence (topic IS the subject)
+    Branch is read from brief["source"]["kind"] (set by cmd_content_post).
+    """
+    source = brief.get("source", {})
+    kind = (source.get("kind") or "session").lower()
+    if kind == "topic":
+        return _format_topic_compiler(brief, source, icp_world_text, meaning_axes)
+    return _format_session_compiler(brief, source, icp_world_text, session_evidence, meaning_axes)
+
+
+def _format_session_compiler(brief, source, icp_world_text, session_evidence, meaning_axes):
     lines = []
-    lines.append("═══ Content Engine Compiler ═══")
+    lines.append("═══ Content Engine Compiler — SESSION MODE ═══")
     lines.append("")
     lines.append("Follow this pipeline exactly. The session is NOT the subject.")
     lines.append("The ICP world is the subject. Session is evidence.")
@@ -28,7 +71,6 @@ def format_compiler_sequence(brief: dict, icp_world_text: str, session_evidence:
     if session_path:
         lines.append(f"  Session evidence: {session_path}")
     else:
-        source = brief.get("source", {})
         label = source.get("label", "topic mode")
         lines.append(f"  Topic evidence: {label}")
     lines.append("")
@@ -145,6 +187,177 @@ def format_compiler_sequence(brief: dict, icp_world_text: str, session_evidence:
     empty_label = "empty \u2014 must be filled"
     lines.append(f"  selected_meaning.axis: {axis_sel or '(' + empty_label + ')'}")
     lines.append(f"  selected_meaning.rationale: {(rationale[:60] + '...') if rationale else '(' + empty_label + ')'}")
+
+    return "\n".join(lines)
+
+
+def _format_topic_compiler(brief, source, icp_world_text, meaning_axes):
+    """Topic-mode compiler: the topic IS the subject. Used for announcements,
+    explainers, opinions, teardowns, case-studies, how-tos.
+
+    Different from session mode in three ways:
+      1. Topic is the SUBJECT, not evidence. Announce the thing.
+      2. core_insight = "the one thing the reader walks away knowing" (not
+         "ICP world shift"). For announcements, this is the value proposition.
+      3. Hard constraints are relaxed: "we shipped" / "we added" / "now
+         available" / partner mentions (e.g. @buffer) are ENCOURAGED.
+    """
+    lines = []
+    topic_label = source.get("label") or "(no topic)"
+    topic_text = source.get("text") or ""
+    topic_kind = source.get("topic_kind") or _infer_topic_kind(topic_text)
+    strategy = brief.get("strategy") or {}
+
+    arch = strategy.get("archetype") or "?"
+    arch_label = strategy.get("archetype_label") or ""
+    vertical = strategy.get("vertical") or "?"
+    funnel = strategy.get("funnel_stage") or "?"
+    layer = strategy.get("icp_layer") or "?"
+
+    lines.append("═══ Content Engine Compiler — TOPIC MODE ═══")
+    lines.append("")
+    lines.append("The topic IS the subject. Announce it, explain it, defend it.")
+    lines.append("Reader outcome, not ICP world shift.")
+    lines.append("")
+    lines.append(f"  Topic:        {topic_label}")
+    lines.append(f"  Topic kind:   {topic_kind}")
+    lines.append(f"  Archetype:    {arch} ({arch_label})")
+    lines.append(f"  Vertical:     {vertical}")
+    lines.append(f"  Funnel:       {funnel}")
+    lines.append(f"  ICP layer:    {layer}")
+    lines.append("")
+    lines.append("  (ICP profile for TONE: see concepts/icp-offer.md — use it for")
+    lines.append("   language register, not to suppress the announcement itself.)")
+    lines.append("")
+    try:
+        from engine_config import Config
+        mode_routing = (Config()._load().get("compiler") or {}).get("mode_routing") or {}
+        topic_routing = mode_routing.get("topic") or {}
+        if topic_routing:
+            default_axis = topic_routing.get("default_axis", "leverage")
+            default_funnel = topic_routing.get("default_funnel", "MOFU")
+            cta = topic_routing.get("cta", "try-it")
+            lines.append(f"  Topic-mode routing hint: default axis={default_axis}, funnel={default_funnel}, cta={cta}")
+            override = topic_routing.get("archetype_funnel_override") or {}
+            if arch in override:
+                lines.append(f"  Override for {arch}: funnel={override[arch]} (announcements drive installs/usage, not passive authority).")
+            lines.append("")
+    except Exception:
+        pass
+    lines.append("═══ TOPIC (THE SUBJECT) ═══")
+    lines.append(topic_text or "(empty topic)")
+    lines.append("")
+    lines.append("═══ END TOPIC ═══")
+    lines.append("")
+
+    lines.append("─" * 60)
+    lines.append("COMPILER SEQUENCE — Run these 6 questions in order:")
+    lines.append("─" * 60)
+    lines.append("")
+    lines.append("Q1: POST TYPE")
+    lines.append("  What kind of post is this? Pick one:")
+    lines.append("    - announcement  → we shipped / launched / released X")
+    lines.append("    - explainer     → teach the reader how/why something works")
+    lines.append("    - opinion       → take a side on a debate")
+    lines.append("    - teardown      → dissect a real artifact in public")
+    lines.append("    - case-study    → show a result with permission")
+    lines.append("    - how-to        → step-by-step instructions")
+    lines.append("")
+    lines.append("Q2: READER OUTCOME")
+    lines.append("  In one sentence, what does the reader walk away knowing?")
+    lines.append("  This is the takeaway, not the agenda. Concrete, not abstract.")
+    lines.append("")
+    lines.append("Q3: 6 ANGLES (one sentence per axis, reframed for the topic)")
+    for axis in meaning_axes:
+        lines.append(f"")
+        lines.append(f"  {axis.capitalize()} angle:")
+        if axis == "systemic":
+            lines.append("    What system/invariant does this topic reveal?")
+        elif axis == "behavioral":
+            lines.append("    What does the reader's behavior change to after this?")
+        elif axis == "philosophical":
+            lines.append("    What principle about building/knowing/creating does this touch?")
+        elif axis == "contrarian":
+            lines.append("    What industry assumption does this topic contradict?")
+        elif axis == "leverage":
+            lines.append("    What is the highest-leverage thing the reader can do AFTER reading?")
+        elif axis == "human":
+            lines.append("    What identity shift or emotional beat does this topic carry?")
+    lines.append("")
+    lines.append("─" * 60)
+    lines.append("Q4: PICK ONE AXIS")
+    lines.append("  For announcements: usually 'leverage' (what it unlocks) or")
+    lines.append("  'contrarian' (what's surprising). Default-funnel hint below.")
+    lines.append("  For explainers: usually 'systemic' or 'behavioral'.")
+    lines.append("  For opinions: usually 'contrarian' or 'philosophical'.")
+    lines.append("")
+    lines.append("─" * 60)
+    lines.append("Q5: CORE_INSIGHT (the one sentence the post must deliver)")
+    lines.append("  - For announcements: the value prop. What shipped, why it matters,")
+    lines.append("    what the reader gets. Concrete, not abstract.")
+    lines.append("  - For explainers: the mechanism. The one thing the reader 'gets'")
+    lines.append("    that they didn't get before.")
+    lines.append("  - For opinions: the take. The position, stated in one sentence.")
+    lines.append("  This is NOT an 'ICP world shift' — it's the post's payload.")
+    lines.append("")
+    lines.append("Q6: HOOK + NEXT-STEP")
+    lines.append("  - First 2 lines: name the topic. Reader knows in 5 sec what's new.")
+    lines.append("  - Last 1-2 lines: a verb-driven next step (clone, install, try,")
+    lines.append("    read, reply, sign up, comment).")
+    lines.append("")
+    lines.append("─" * 60)
+    lines.append("HARD CONSTRAINTS (TOPIC MODE — CRITICAL)")
+    lines.append("─" * 60)
+    lines.append("")
+    lines.append("ENCOURAGED in topic mode (this is the whole point):")
+    lines.append("  - 'we shipped', 'we added', 'we released', 'now available'")
+    lines.append("  - 'just shipped', 'just released', 'this week'")
+    lines.append("  - Naming partners/credits: '@buffer', 'thanks to X', 'built with Y'")
+    lines.append("  - Verb-driven CTAs: 'clone it', 'try the templates', 'reply with'")
+    lines.append("  - Specific numbers: '3 channels', '3000 calls/month', 'v2.1'")
+    lines.append("  - Naming what shipped: feature names, file paths, version numbers")
+    lines.append("")
+    lines.append("STILL BANNED in topic mode (same as session):")
+    lines.append("  - 'i'm excited to share', 'hey friends', 'i'm thrilled'")
+    lines.append("  - Engagement bait ('Like if you agree', 'Share if this resonates')")
+    lines.append("  - Corporate buzzwords (utilize, leverage, optimize, facilitate)")
+    lines.append("  - Em dashes (use →, colons, or commas)")
+    lines.append("  - Internal labels (S1-S10, TOFU/MOFU/BOFU, L1-L4, 'the engine',")
+    lines.append("    'the pipeline', 'session-as-content' as surface labels)")
+    lines.append("  - Same noun 3+ times in a post")
+    lines.append("")
+    lines.append("─" * 60)
+    lines.append("AFTER RUNNING ALL 6 QUESTIONS")
+    lines.append("─" * 60)
+    lines.append("")
+    lines.append("Write to .content-brief.json (same shape as session mode):")
+    lines.append("  1. core_insight (string) — the takeaway from Q5")
+    lines.append("  2. meanings (object) — all 6 axes from Q3")
+    lines.append("  3. selected_meaning (object) — axis + rationale from Q4")
+    lines.append("")
+
+    lines.append("─" * 60)
+    lines.append("CURRENT BRIEF STATE")
+    lines.append("─" * 60)
+    core_insight = brief.get("core_insight", "")
+    meanings = brief.get("meanings", {})
+    selected = brief.get("selected_meaning", {})
+    if core_insight:
+        lines.append(f"  core_insight: {core_insight}")
+    else:
+        lines.append("  core_insight: (empty — must be filled)")
+    for axis in meaning_axes:
+        val = meanings.get(axis, "")
+        if val:
+            lines.append(f"  meanings.{axis}: {val[:60]}...")
+        else:
+            lines.append(f"  meanings.{axis}: (empty — must be filled)")
+    axis_sel = selected.get("axis", "")
+    rationale = selected.get("rationale", "")
+    empty_label = "empty — must be filled"
+    lines.append(f"  selected_meaning.axis: {axis_sel or '(' + empty_label + ')'}")
+    lines.append(f"  selected_meaning.rationale: {(rationale[:60] + '...') if rationale else '(' + empty_label + ')'}")
+    lines.append(f"  topic_kind: {topic_kind}")
 
     return "\n".join(lines)
 

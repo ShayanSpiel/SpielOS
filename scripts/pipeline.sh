@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/pipeline.sh — Single-state pipeline wrappers for TheSpielEngine.
+# scripts/pipeline.sh — Single-state pipeline wrappers for Spiel Engine.
 #
 # Every subcommand maps 1:1 to one engine.py call. Run them as SEPARATE
 # bash tool calls so each state transition is visible in the CLI.
@@ -13,10 +13,10 @@
 #   --yes     Skip confirmation prompts
 #   --dry-run Show command without running
 #
-# The shim `spiel` is the recommended entrypoint. `spiel` and `pipeline.sh`
-# are interchangeable — both resolve the vault from ~/.config/opencode/.env
-# and exec the same engine.py. This file is retained for back-compat with
-# old docs, log references, and any LLM trained on the pipeline.sh namespace.
+# The shim `spiel` is the recommended entrypoint; this file is retained for
+# back-compat with old docs, log references, and any LLM trained on them.
+# `spiel` and `pipeline.sh` can be used interchangeably; both resolve the
+# vault from ~/.config/opencode/.env and exec the same engine.py underneath.
 
 set -euo pipefail
 
@@ -235,7 +235,7 @@ cmd_post_revise() {    info "CONTENT: REVISING";         run_engine content revi
 cmd_post_queue() {     info "CONTENT: QUEUE";           run_engine content queue; }
 cmd_post_hold() {      info "CONTENT: HOLD";             run_engine content hold; }
 
-# The engine dispatches via the engine itself (cmd_content_publish routes to
+# Engine dispatches via the engine itself (cmd_content_publish routes to
 # publishers/buffer.py or the direct X/LinkedIn publishers), so this wrapper
 # just delegates. No post_x.py / post_linkedin.py calls here.
 cmd_post_publish() {

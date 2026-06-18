@@ -229,7 +229,15 @@ def print_next(state: dict) -> None:
         print(ui.copyable(cmd, label=f"NEXT  →  {t}"))
         print()
     if current in ("COMPILE",):
-        print(ui.ego("Eight steps. One sentence. That is the work."))
+        try:
+            brief = read_brief()
+            kind = (brief.get("source") or {}).get("kind") or "session"
+        except Exception:
+            kind = "session"
+        if kind == "topic":
+            print(ui.ego("Topic is the subject. Announce it. Name what shipped. End with a verb."))
+        else:
+            print(ui.ego("Eight steps. One sentence. That is the work."))
     elif current in ("DRAFTING",):
         print(ui.ego("Three platforms. One insight. Ship it."))
     elif current in ("FORMAT_WIZARD",):
@@ -596,7 +604,13 @@ def cmd_content_post(state: dict, args: list) -> int:
         print(f"  Source: {source_label}")
         from classifier import classify
         classification = classify(source_text, config._load())
-        print(f"  Archetype: {classification.get('archetype', '?')} \u2014 {classification.get('archetype_label', '')}")
+        try:
+            from compiler import _infer_topic_kind
+            topic_kind = _infer_topic_kind(source_text)
+        except Exception:
+            topic_kind = "announcement"
+        print(f"  Topic kind: {topic_kind}    (compiler will use TOPIC MODE)")
+        print(f"  Archetype: {classification.get('archetype', '?')} — {classification.get('archetype_label', '')}")
         print(f"  Vertical:  {classification.get('vertical', '?')}")
         print(f"  Funnel:    {classification.get('funnel_stage', '?')}")
         print(f"  ICP layer: {classification.get('icp_layer', '?')}")
@@ -616,7 +630,7 @@ def cmd_content_post(state: dict, args: list) -> int:
     brief = {
         "session": session["filepath"] if session else None,
         "strategy_pages": [s["name"] for s in strategy_pages if s["filepath"]],
-        "source": {"kind": source_kind, "text": source_text, "label": source_label},
+        "source": {"kind": source_kind, "text": source_text, "label": source_label, "topic_kind": None},
         "pre_write_gate_required": True,
         "core_insight": "",
         "meanings": {ax: "" for ax in config.compiler_meaning_axes},
@@ -627,13 +641,19 @@ def cmd_content_post(state: dict, args: list) -> int:
         "drafting": {"done": False, "files": []},
         "handoff": None,
     }
-    if session and session.get("content"):
-        from classifier import classify
-        classification = classify(session["content"], config._load())
-        brief["strategy"] = classification
-    elif source_kind == "topic" and source_text:
+    if source_kind == "topic" and source_text:
+        try:
+            from compiler import _infer_topic_kind
+            brief["source"]["topic_kind"] = _infer_topic_kind(source_text)
+        except Exception:
+            brief["source"]["topic_kind"] = "announcement"
+    if source_kind == "topic" and source_text:
         from classifier import classify
         classification = classify(source_text, config._load())
+        brief["strategy"] = classification
+    elif session and session.get("content"):
+        from classifier import classify
+        classification = classify(session["content"], config._load())
         brief["strategy"] = classification
     write_brief(brief)
     print(f"── Brief saved to {CONTENT_BRIEF_FILE.relative_to(VAULT)} ──")
@@ -1092,11 +1112,19 @@ def _step_compile(state: dict) -> int:
 
 def _print_compile_handoff(state: dict, brief: dict) -> None:
     """Print the 8-step Compiler sequence + handoff instructions."""
+    source_kind = (brief.get("source") or {}).get("kind") or "session"
+    topic_kind = (brief.get("source") or {}).get("topic_kind") or ""
+    is_topic = source_kind == "topic"
+
     print()
     print(ui.header("HANDOFF 1/2  ·  COMPILE  ·  LLM creative work", accent="magenta", width=80))
     print()
-    print(ui.status("info", "The kernel is in COMPILE state. The LLM runs the 8-step Compiler."))
-    print(ui.status("arrow", "LOAD ICP → SIMULATE → EVIDENCE → MAP → 6 MEANINGS → SELECT → INSIGHT → WRITE"))
+    if is_topic:
+        print(ui.status("info", f"The kernel is in COMPILE state. Compiler mode: TOPIC ({topic_kind})."))
+        print(ui.status("arrow", "Q1 POST TYPE → Q2 READER OUTCOME → Q3 6 ANGLES → Q4 PICK → Q5 INSIGHT → Q6 HOOK+CTA"))
+    else:
+        print(ui.status("info", "The kernel is in COMPILE state. The LLM runs the 8-step Compiler."))
+        print(ui.status("arrow", "LOAD ICP → SIMULATE → EVIDENCE → MAP → 6 MEANINGS → SELECT → INSIGHT → WRITE"))
     print()
     compile_cmd = (
         "python3 scripts/engine.py content compile-write \\\n"
@@ -1118,7 +1146,10 @@ def _print_compile_handoff(state: dict, brief: dict) -> None:
         return
     _print_compiler_display(state)
     print()
-    print(ui.ego("Eight steps. One sentence. That is the work."))
+    if is_topic:
+        print(ui.ego("Topic is the subject. Announce it. Name what shipped. End with a verb."))
+    else:
+        print(ui.ego("Eight steps. One sentence. That is the work."))
     print()
     print(ui.copyable("python3 scripts/engine.py content run", label="WHEN DONE"))
     brief["_compiler_displayed"] = True
@@ -1143,16 +1174,29 @@ def _step_format_wizard(state: dict) -> int:
     brief = read_brief()
     valid, _ = validate_brief_for_transition("DRAFTING", brief)
     if not valid:
-        # Run the wizard (interactive or LLM-mediated)
-        from wizard import format_wizard
-        ok, msg = format_wizard()
-        if not ok:
-            print(f"ERROR: {msg}", file=sys.stderr)
-            return 1
-        # Reload brief — wizard wrote formats
-        brief = read_brief()
-        if (brief.get("wizard") or {}).get("hold"):
-            return _reset_to_idle(state, "user held at format wizard")
+        # Topic-mode default: prefill x + linkedin + blog for an announcement campaign.
+        # User can still override.
+        source_kind = (brief.get("source") or {}).get("kind") or "session"
+        if source_kind == "topic":
+            wizard = brief.get("wizard") or {}
+            if not wizard.get("formats"):
+                wizard["formats"] = ["x", "linkedin", "blog"]
+                wizard["answered_at"] = datetime.now().isoformat(timespec="seconds")
+                wizard["topic_mode_default"] = True
+                brief["wizard"] = wizard
+                write_brief(brief)
+                print()
+                print(ui.status("info", "Topic mode detected — defaulting formats to [x, linkedin, blog] (announcement campaign)."))
+                print(ui.status("arrow", "Override: `spiel content wizard` if you want a different set."))
+        else:
+            from wizard import format_wizard
+            ok, msg = format_wizard()
+            if not ok:
+                print(f"ERROR: {msg}", file=sys.stderr)
+                return 1
+            brief = read_brief()
+            if (brief.get("wizard") or {}).get("hold"):
+                return _reset_to_idle(state, "user held at format wizard")
 
     # Transition FORMAT_WIZARD → DRAFTING.
     if not transition(state, "DRAFTING"):
@@ -1206,16 +1250,36 @@ def _step_drafting(state: dict) -> int:
 def _print_draft_handoff(state: dict, brief: dict) -> None:
     formats = (brief.get("wizard") or {}).get("formats") or ["x", "linkedin", "blog"]
     core = (core_insight if (core_insight := (brief.get("core_insight") or "").strip()) else "(empty)")
+    source_kind = (brief.get("source") or {}).get("kind") or "session"
+    topic_kind = (brief.get("source") or {}).get("topic_kind") or ""
     print()
     print(ui.header("HANDOFF 2/2  ·  DRAFT  ·  LLM creative work", accent="magenta", width=80))
     print()
+    mode_label = "TOPIC" if source_kind == "topic" else "SESSION"
     body = [
+        f"Compiler mode: {mode_label}" + (f" ({topic_kind})" if topic_kind else ""),
         f"Core insight:  {core[:160]}{'...' if len(core) > 160 else ''}",
         f"Formats:       {', '.join(formats)}",
         f"Handoff TTL:   {HANDOFF_TTL_MINUTES} minutes",
     ]
     print(ui.panel("BRIEF", body, accent="bright_blue", width=80))
     print()
+    # Surface top-3 ranked templates per platform so the LLM uses the right shape.
+    recs = ((brief.get("template_selection") or {}).get("recommendations") or {})
+    if recs:
+        print(ui.status("info", "Top ranked templates per format (use these as your structural shape):"))
+        print()
+        for plat in formats:
+            plat_recs = recs.get(plat) or []
+            if not plat_recs:
+                continue
+            print(f"  {plat.upper()}:")
+            for r in plat_recs[:3]:
+                hook_line = (r.get("hook") or "").split("\n")[0][:90]
+                print(f"    • {r.get('id'):24s}  {r.get('name','')}")
+                if hook_line:
+                    print(f"      hook: {hook_line}")
+            print()
     print(ui.status("arrow", "For each draft, write the file then register it:"))
     print()
     print(ui.copyable(
@@ -1232,6 +1296,8 @@ def _print_draft_handoff(state: dict, brief: dict) -> None:
     print()
     print(ui.status("info", "Drafts must include full frontmatter (title, platform, etc.)"))
     print(ui.status("info", "See templates/ for structure."))
+    if source_kind == "topic":
+        print(ui.status("info", "Topic mode: name what shipped, mention partners, end with a verb."))
     print()
     print(ui.ego("Three platforms. One insight. Ship it."))
 

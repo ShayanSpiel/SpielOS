@@ -376,7 +376,7 @@ scripts/
   banner_tool.py                      ← the tool
   banner-tool.README.md               ← this file
   banner-templates/
-    default.html                      ← default template (OG card, 1200×630)
+    default.html                      ← default template
     {name}.html                       ← your custom templates
 
 assets/
