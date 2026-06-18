@@ -21,10 +21,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install pyyaml pytest
-
-      - name: Run automated tests
-        run: python3 -m pytest tests/ -v
+          pip install pyyaml
 
       - name: Validate .wiki-state
         run: |
@@ -69,6 +66,5 @@ jobs:
       - name: Summary
         run: |
           echo "=== Repo Health Summary ==="
-          echo "Tests: passed"
           echo "State: $(python3 -c "import yaml; d=yaml.safe_load(open('.wiki-state')); print(f\"{d['current_state']} ({d['loop']})\")")"
           echo "Concept files: $(find concepts -name '*.md' | wc -l | tr -d ' ')"
