@@ -1,3 +1,6 @@
+Want a white-glove install? DM [@ShayanSpiel](https://x.com/ShayanSpiel) to get
+a custom setup, voice-trained, and deployed within 10 days.
+
 # The Spiel Engine
 
 Turn real build sessions into publishable content automatically.
@@ -287,11 +290,6 @@ spiel log --level ERROR
 ---
 
 ## License
-
----
-
-Want a white-glove install? DM [@ShayanSpiel](https://x.com/ShayanSpiel) to get a custom setup,
-voice-trained, and deployed within 48 hours.
 
 ---
 
