@@ -138,7 +138,6 @@ INSTALL_DIR=$(resolve_path "$DEFAULT_INSTALL_DIR")
 if [[ -d "$INSTALL_DIR" ]]; then
   if [[ -f "$INSTALL_DIR/team/md.md" ]]; then
     note "Existing SpielOS install detected at $INSTALL_DIR"
-    ok "Re-running the wizard on the existing install..."
   else
     err "Directory $INSTALL_DIR is not a SpielOS install."
     err "Pick a different path (set \$SPIELOS_INSTALL_DIR) or remove it first."
@@ -152,6 +151,7 @@ fi
 # ── Download ────────────────────────────────────────────────────
 
 cd "$INSTALL_DIR"
+IS_REINSTALL=0
 if [[ ! -f "team/md.md" ]]; then
   if [[ $HAS_GIT -eq 1 ]]; then
     note "Cloning $GITHUB_REPO ..."
@@ -175,78 +175,130 @@ if [[ ! -f "team/md.md" ]]; then
       wget -qO- "$TARBALL_URL" | tar -xz --strip-components=1 -C "$INSTALL_DIR"
     fi
   fi
-fi
-ok "SpielOS downloaded to $INSTALL_DIR"
-
-# ── Run wizard ──────────────────────────────────────────────────
-
-note "Opening the setup wizard"
-echo "  → URL:  http://localhost:$WIZARD_PORT/"
-echo "  → Fill the 10 steps (about 5 minutes)"
-echo "  → Click 'Finish & install' to write the files"
-echo "  → Then:  spiel /post empty  (from any IDE)"
-echo ""
-
-# The wizard needs a real browser to fill the form. The user opens the
-# URL in their browser, fills the form, clicks Finish, and the wizard
-# writes the files. The install script then continues.
-#
-# If the user is in an interactive terminal, try to open the browser.
-# If piped, just print the URL.
-
-WIZARD_PID=""
-if [[ $HAS_CURL -eq 1 ]]; then
-  ok "Starting wizard at http://localhost:$WIZARD_PORT/ ..."
-  cd "$INSTALL_DIR"
-  python3 "$INSTALL_DIR/install/wizard/serve.py" \
-    --port "$WIZARD_PORT" \
-    --target "$INSTALL_DIR" </dev/null &
-  WIZARD_PID=$!
 else
-  err "curl is required to run the wizard."
-  exit 1
-fi
+  # Re-install: vault already has team/md.md. Just refresh the source files
+  # (team/, tools/, system/ source files) without touching user data
+  # (strategy/, content/, .env, system/brand.*).
+  IS_REINSTALL=1
+  note "Existing install detected at $INSTALL_DIR"
+  note "Re-install mode: refreshing tool sources only."
+  note "  → team/, tools/, system/ source files: refreshed (your edits to these are preserved)"
+  note "  → strategy/, content/, .env, system/brand.*: NOT touched (run \`spiel init\` to redo the wizard)"
+  note "  → IDE adapters: re-synced"
 
-# Try to open the browser (only if we have a display tool)
-if [[ $HAS_TTY -eq 1 ]]; then
-  if command -v open >/dev/null 2>&1; then
-    (sleep 0.5; open "http://localhost:$WIZARD_PORT/") 2>/dev/null || true
-  elif command -v xdg-open >/dev/null 2>&1; then
-    (sleep 0.5; xdg-open "http://localhost:$WIZARD_PORT/") 2>/dev/null || true
+  if [[ $HAS_GIT -eq 1 ]]; then
+    # Stage 1: git pull to get the latest tool source
+    if git pull origin "$VERSION" --ff-only 2>/dev/null; then
+      ok "git pull: tool sources updated"
+    else
+      # git pull failed (not a git repo, or no network). Fall back to tarball.
+      err "git pull failed; falling back to tarball overlay..."
+      if [[ $HAS_CURL -eq 1 ]]; then
+        TMPDIR_OVERLAY=$(mktemp -d)
+        curl -fsSL "$TARBALL_URL" | tar -xz -C "$TMPDIR_OVERLAY" --strip-components=1
+        # Copy only files that don't exist in the target (preserve user edits)
+        python3 - <<PYEOF
+import os, shutil
+src = "$TMPDIR_OVERLAY"
+dst = "$INSTALL_DIR"
+copied = 0
+for root, dirs, files in os.walk(src):
+    for f in files:
+        sp = os.path.join(root, f)
+        dp = os.path.join(dst, os.path.relpath(sp, src))
+        if os.path.exists(dp):
+            continue  # preserve user edits
+        os.makedirs(os.path.dirname(dp), exist_ok=True)
+        shutil.copy2(sp, dp)
+        copied += 1
+print(f'  overlaid {copied} new files (existing files preserved)')
+PYEOF
+        rm -rf "$TMPDIR_OVERLAY"
+      fi
+    fi
   fi
 fi
+ok "SpielOS source at $INSTALL_DIR (re-install=$IS_REINSTALL)"
 
-# Wait for the wizard to write its marker file (which it does on Finish)
-# or for the user to Ctrl+C.
-note "Waiting for the wizard to finish (max ${WIZARD_TIMEOUT}s)..."
-INSTALL_STATE="$INSTALL_DIR/.install-state.json"
+# ── Run wizard (fresh install) or skip (re-install) ───────────
 
-ELAPSED=0
-while [[ ! -f "$INSTALL_STATE" ]] && kill -0 "$WIZARD_PID" 2>/dev/null; do
-  sleep 1
-  ELAPSED=$((ELAPSED + 1))
-  if [[ $ELAPSED -ge $WIZARD_TIMEOUT ]]; then
-    err "Wizard timed out after ${WIZARD_TIMEOUT}s"
-    break
+if [[ $IS_REINSTALL -eq 1 ]]; then
+  note "Re-install: skipping the wizard."
+  note "  Your strategy files, content, and .env are preserved."
+  note "  Tool source files in team/, tools/, system/ have been refreshed."
+  note "  To re-run the wizard (and re-write your config), use:"
+  note "    spiel init"
+  WIZARD_EXIT=0
+else
+  note "Opening the setup wizard"
+  echo "  → URL:  http://localhost:$WIZARD_PORT/"
+  echo "  → Fill the 10 steps (about 5 minutes)"
+  echo "  → Click 'Finish & install' to write the files"
+  echo "  → Then:  spiel /post empty  (from any IDE)"
+  echo ""
+
+  # The wizard needs a real browser to fill the form. The user opens the
+  # URL in their browser, fills the form, clicks Finish, and the wizard
+  # writes the files. The install script then continues.
+  #
+  # If the user is in an interactive terminal, try to open the browser.
+  # If piped, just print the URL.
+
+  WIZARD_PID=""
+  if [[ $HAS_CURL -eq 1 ]]; then
+    ok "Starting wizard at http://localhost:$WIZARD_PORT/ ..."
+    cd "$INSTALL_DIR"
+    python3 "$INSTALL_DIR/install/wizard/serve.py" \
+      --port "$WIZARD_PORT" \
+      --target "$INSTALL_DIR" </dev/null &
+    WIZARD_PID=$!
+  else
+    err "curl is required to run the wizard."
+    exit 1
   fi
-done
 
-# Stop the wizard (it may have already exited)
-if kill -0 "$WIZARD_PID" 2>/dev/null; then
-  kill "$WIZARD_PID" 2>/dev/null || true
-  for _ in 1 2 3 4; do
-    kill -0 "$WIZARD_PID" 2>/dev/null || break
-    sleep 0.3
+  # Try to open the browser (only if we have a display tool)
+  if [[ $HAS_TTY -eq 1 ]]; then
+    if command -v open >/dev/null 2>&1; then
+      (sleep 0.5; open "http://localhost:$WIZARD_PORT/") 2>/dev/null || true
+    elif command -v xdg-open >/dev/null 2>&1; then
+      (sleep 0.5; xdg-open "http://localhost:$WIZARD_PORT/") 2>/dev/null || true
+    fi
+  fi
+
+  # Wait for the wizard to write its marker file (which it does on Finish)
+  # or for the user to Ctrl+C.
+  note "Waiting for the wizard to finish (max ${WIZARD_TIMEOUT}s)..."
+  INSTALL_STATE="$INSTALL_DIR/.install-state.json"
+
+  ELAPSED=0
+  while [[ ! -f "$INSTALL_STATE" ]] && kill -0 "$WIZARD_PID" 2>/dev/null; do
+    sleep 1
+    ELAPSED=$((ELAPSED + 1))
+    if [[ $ELAPSED -ge $WIZARD_TIMEOUT ]]; then
+      err "Wizard timed out after ${WIZARD_TIMEOUT}s"
+      break
+    fi
   done
-  kill -9 "$WIZARD_PID" 2>/dev/null || true
+
+  # Stop the wizard (it may have already exited)
+  if kill -0 "$WIZARD_PID" 2>/dev/null; then
+    kill "$WIZARD_PID" 2>/dev/null || true
+    for _ in 1 2 3 4; do
+      kill -0 "$WIZARD_PID" 2>/dev/null || break
+      sleep 0.3
+    done
+    kill -9 "$WIZARD_PID" 2>/dev/null || true
+  fi
+  wait "$WIZARD_PID" 2>/dev/null || true
+  WIZARD_PID=""
+  WIZARD_EXIT=0
 fi
-wait "$WIZARD_PID" 2>/dev/null || true
-WIZARD_PID=""
 
 # ── Post-wizard steps (if user finished) ────────────────────────
 
-if [[ -f "$INSTALL_STATE" && -f "$INSTALL_DIR/.env" ]]; then
-  ok "Wizard completed."
+if [[ $WIZARD_EXIT -eq 0 && -f "$INSTALL_DIR/.env" ]]; then
+  ok "Setup confirmed (.env present)."
 
   # Install the shim
   mkdir -p "$(dirname "$SHIM_PATH")"
@@ -283,8 +335,9 @@ if [[ -f "$INSTALL_STATE" && -f "$INSTALL_DIR/.env" ]]; then
   esac
 
   note "DONE. Run 'spiel /post empty' from any IDE to ship a post."
+  note "To re-run the wizard and update your config:"
+  note "  spiel init"
 else
-  err "Wizard did not complete (no .install-state.json found)."
-  note "Re-run any time:"
-  note "  python3 $INSTALL_DIR/install/wizard/serve.py --port $WIZARD_PORT --target $INSTALL_DIR"
+  err "Setup incomplete (.env not found)."
+  note "Re-run any time: $SHIM_PATH init"
 fi
