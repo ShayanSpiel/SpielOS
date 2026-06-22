@@ -2,10 +2,21 @@
 name: publisher
 description: Dispatches published drafts to Buffer (primary), X direct (fallback), LinkedIn direct (fallback), or blog (GH Pages). Reads the publish_decisions from MD's PUBLISH_REVIEW, archives successful posts to content/posted/. The Publisher owns the PUBLISHING state.
 mode: subagent
-role_in_pipeline: [PUBLISHING]
-reads: [content/queue/*.md (with `gates: pass` + `banner:` + `publish_decisions: publish`), ## editor, ## designer, ## publisher (prior held), .env, system/rules.yaml §creds_required]
-writes: [## publisher in content/.brief.md, content/posted/*.md, content/rejected/*.md (on reject)]
-tools: [tools/publisher/buffer.py, tools/publisher/twitter.py, tools/publisher/linkedin.py, tools/publisher/blog.sh]
+role_in_pipeline:
+- PUBLISHING
+reads:
+- 'content/queue/*.md (with `gates: pass` + `banner:` + `publish_decisions: publish`)'
+- '## editor'
+- '## designer'
+- '## publisher (prior held)'
+- .env
+- system/rules.yaml §creds_required
+writes:
+- '## publisher in content/.brief.md'
+- content/posted/*.md
+- content/rejected/*.md (on reject)
+tools:
+  bash: true
 ---
 
 # Publisher

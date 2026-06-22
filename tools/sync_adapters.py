@@ -33,7 +33,7 @@ OPENCODE_CONFIG = Path.home() / ".config" / "opencode"
 
 
 def parse_frontmatter(text: str) -> tuple[dict, str]:
-    """Parse YAML frontmatter (simple key: value)."""
+    """Parse YAML frontmatter. Returns (frontmatter_dict, body)."""
     m = re.match(r"^---\n(.*?)\n---\n(.*)$", text, re.DOTALL)
     if not m:
         return {}, text
@@ -52,15 +52,22 @@ def parse_frontmatter(text: str) -> tuple[dict, str]:
 
 
 def make_frontmatter(d: dict) -> str:
-    lines = ["---"]
-    for k, v in d.items():
-        if isinstance(v, list):
-            lines.append(f"{k}: [{', '.join(str(x) for x in v)}]")
-        else:
-            lines.append(f"{k}: {v}")
-    lines.append("---")
-    lines.append("")
-    return "\n".join(lines)
+    """Render a dict as YAML frontmatter.
+
+    Special handling for `tools:` (opencode requires an object or absence,
+    not an array). Empty arrays become absent. Arrays of CLI tool paths
+    become `{ bash: true }` (the subagent invokes them via the bash tool).
+    """
+    import yaml
+    # Normalize tools: empty array -> omit; array of strings -> { bash: true }
+    if "tools" in d:
+        v = d["tools"]
+        if isinstance(v, list) and len(v) == 0:
+            del d["tools"]
+        elif isinstance(v, list):
+            # Treat as "this role can invoke CLI tools via bash"
+            d["tools"] = {"bash": True}
+    return "---\n" + yaml.safe_dump(d, sort_keys=False, allow_unicode=True).rstrip() + "\n---\n\n"
 
 
 def make_skill_stub(role_name: str, description: str) -> str:

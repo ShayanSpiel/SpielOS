@@ -12,7 +12,7 @@
   <nav class="stepper">
     <div class="stepper-inner">
       <template x-for="(s, i) in steps.slice(0, 10)" :key="s.key">
-        <span style="display: flex; align-items: center; flex: 1 1 auto;">
+        <span class="stepper-step-wrap">
           <button class="stepper-step"
                   :class="{ done: i < current, current: i === current, clickable: i <= current }"
                   @click="i <= current && go(i)"
@@ -90,7 +90,7 @@
 
       <div class="field">
         <label class="field-label">Banner colors <span class="field-counter">click swatch → pick</span></label>
-        <div class="field-grid-3">
+        <div class="color-grid-5">
           <div class="color-group">
             <label class="color-label">Background</label>
             <div class="color-picker">
@@ -110,6 +110,24 @@
             </div>
           </div>
           <div class="color-group">
+            <label class="color-label">Subtitle</label>
+            <div class="color-picker">
+              <label class="color-swatch" :style="`background: ${form.subtitle_color}`">
+                <input type="color" x-model="form.subtitle_color">
+              </label>
+              <input class="color-input" x-model="form.subtitle_color" placeholder="#8a8a8a">
+            </div>
+          </div>
+          <div class="color-group">
+            <label class="color-label">Handle</label>
+            <div class="color-picker">
+              <label class="color-swatch" :style="`background: ${form.handle_color}`">
+                <input type="color" x-model="form.handle_color">
+              </label>
+              <input class="color-input" x-model="form.handle_color" placeholder="#505050">
+            </div>
+          </div>
+          <div class="color-group">
             <label class="color-label">Accent</label>
             <div class="color-picker">
               <label class="color-swatch" :style="`background: ${form.accent}`">
@@ -122,6 +140,15 @@
         <span class="field-hint"><span class="field-target">system/brand.md + system/brand.json</span></span>
       </div>
 
+      <div class="field">
+        <label class="field-label">Title style</label>
+        <div class="toggle-group">
+          <span class="toggle" :class="{ selected: !form.title_gradient }" @click="form.title_gradient = false">Solid color</span>
+          <span class="toggle" :class="{ selected: form.title_gradient }" @click="form.title_gradient = true">Silver gradient</span>
+        </div>
+        <span class="field-hint">Solid is the default. The gradient matches the shayanspiel.github.io hero h1 (white → mid-grey).</span>
+      </div>
+
       <!-- Banner preview (mirrors tools/banner-templates/default.html) -->
       <div class="banner-preview">
         <div class="banner-preview-head">
@@ -131,11 +158,14 @@
         <div class="banner-canvas" :style="`background: ${form.primary_bg};`">
           <div class="bg-icon" x-html="iconSvg"></div>
           <div class="content">
-            <div class="title-line" :style="`background: linear-gradient(180deg, ${form.primary_fg} 0%, #888 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; color: ${form.primary_fg};`"
+            <div class="title-line"
+                 :style="form.title_gradient
+                   ? `background: linear-gradient(180deg, ${form.primary_fg} 0%, #888 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; color: ${form.primary_fg};`
+                   : `color: ${form.primary_fg};`"
                  x-text="form.brand_name || 'Your title'"></div>
-            <div class="subtitle-highlight" x-text="form.tagline || 'Your tagline'"></div>
+            <div class="subtitle-highlight" :style="`color: ${form.subtitle_color};`" x-text="form.tagline || 'Your tagline'"></div>
           </div>
-          <div class="handle" x-text="form.handle || '@your_handle'"></div>
+          <div class="handle" :style="`color: ${form.handle_color};`" x-text="form.handle || '@your_handle'"></div>
         </div>
       </div>
     </section>

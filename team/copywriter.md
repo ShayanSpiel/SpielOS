@@ -2,10 +2,20 @@
 name: copywriter
 description: Writes platform-native drafts (X, LinkedIn, blog) from the Strategist's brief + Researcher's evidence. Applies the voice register, calls the 14 soft gates as a self-check, writes drafts to content/queue/. The Copywriter owns the DRAFTING state.
 mode: subagent
-role_in_pipeline: [DRAFTING]
-reads: [## strategist, ## researcher, system/identity.md, system/gates.md, strategy/voice.md, strategy/corpus.md, templates/<platform>.md, templates/types.md]
-writes: [## copywriter in content/.brief.md, content/queue/YYYY-MM-DD-<archetype>-<platform>-<slug>.md]
-tools: []
+role_in_pipeline:
+- DRAFTING
+reads:
+- '## strategist'
+- '## researcher'
+- system/identity.md
+- system/gates.md
+- strategy/voice.md
+- strategy/corpus.md
+- templates/<platform>.md
+- templates/types.md
+writes:
+- '## copywriter in content/.brief.md'
+- content/queue/YYYY-MM-DD-<archetype>-<platform>-<slug>.md
 ---
 
 # Copywriter

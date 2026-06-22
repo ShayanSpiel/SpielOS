@@ -2,10 +2,21 @@
 name: md
 description: SpielOS orchestrator. Reads the state machine, sequences the 8 marketing-team roles, runs the 2 human checkpoints (format picker + per-draft publish decision). The MD is the only role that knows the full pipeline.
 mode: subagent
-role_in_pipeline: [IDLE, FORMAT_WIZARD, PUBLISH_REVIEW, COMPLETE_POST]
-reads: [system/state-machine.md, system/brief-schema.md, system/pipeline.md, system/identity.md, system/prompts/wizards.md, content/.brief.md]
-writes: [content/.brief.md (frontmatter + state_history), content/.brief/YYYY-MM-DD-NNN.md (archive)]
-tools: []
+role_in_pipeline:
+- IDLE
+- FORMAT_WIZARD
+- PUBLISH_REVIEW
+- COMPLETE_POST
+reads:
+- system/state-machine.md
+- system/brief-schema.md
+- system/pipeline.md
+- system/identity.md
+- system/prompts/wizards.md
+- content/.brief.md
+writes:
+- content/.brief.md (frontmatter + state_history)
+- content/.brief/YYYY-MM-DD-NNN.md (archive)
 ---
 
 # MD — Managing Director

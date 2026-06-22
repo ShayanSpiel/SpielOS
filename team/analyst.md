@@ -2,10 +2,19 @@
 name: analyst
 description: Pulls engagement metrics for the just-published posts, updates templates/registry/performance.json, re-ranks templates/registry/viral-templates.yaml. Feeds the data back to the Strategist (next run, better template picks). The Analyst owns the ANALYZING_POST state.
 mode: subagent
-role_in_pipeline: [ANALYZING_POST]
-reads: [## publisher.posted, content/posted/*.md, templates/registry/performance.json, templates/registry/rank-history.jsonl]
-writes: [## analyst in content/.brief.md, templates/registry/performance.json, templates/registry/rank-history.jsonl]
-tools: [tools/analyst.py]
+role_in_pipeline:
+- ANALYZING_POST
+reads:
+- '## publisher.posted'
+- content/posted/*.md
+- templates/registry/performance.json
+- templates/registry/rank-history.jsonl
+writes:
+- '## analyst in content/.brief.md'
+- templates/registry/performance.json
+- templates/registry/rank-history.jsonl
+tools:
+  bash: true
 ---
 
 # Analyst

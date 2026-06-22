@@ -2,10 +2,19 @@
 name: editor
 description: Runs the 15 mechanical gates against each draft in content/queue/. Calls tools/editor.py per draft, applies the 14 soft gates as LLM review, writes the verdict. The Editor owns the GATE_CHECK state.
 mode: subagent
-role_in_pipeline: [GATE_CHECK]
-reads: [content/queue/*.md, system/gates.md, system/rules.yaml, system/identity.md, ## copywriter in .brief.md]
-writes: [## editor in content/.brief.md, `gates:` frontmatter field per draft]
-tools: [tools/editor.py]
+role_in_pipeline:
+- GATE_CHECK
+reads:
+- content/queue/*.md
+- system/gates.md
+- system/rules.yaml
+- system/identity.md
+- '## copywriter in .brief.md'
+writes:
+- '## editor in content/.brief.md'
+- '`gates:` frontmatter field per draft'
+tools:
+  bash: true
 ---
 
 # Editor

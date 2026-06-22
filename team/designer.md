@@ -1,11 +1,21 @@
 ---
 name: designer
-description: Generates PNG banner images for each draft in content/queue/. Picks the banner template + brand tokens, calls tools/designer.py to render, writes the banner: frontmatter field per draft. The Designer owns the BANNER state.
+description: Generates PNG banner images for each draft in content/queue/. Picks the banner template + brand tokens, calls tools/designer.py to render, writes the `banner:` frontmatter field per draft. The Designer owns the BANNER state.
 mode: subagent
-role_in_pipeline: [BANNER]
-reads: [content/queue/*.md, system/brand.md, system/brand.json, ## copywriter in .brief.md, tools/designer.py --help]
-writes: [## designer in content/.brief.md, `banner:` frontmatter field per draft, assets/banners/*.png]
-tools: [tools/designer.py]
+role_in_pipeline:
+- BANNER
+reads:
+- content/queue/*.md
+- system/brand.md
+- system/brand.json
+- '## copywriter in .brief.md'
+- tools/designer.py --help
+writes:
+- '## designer in content/.brief.md'
+- '`banner:` frontmatter field per draft'
+- assets/banners/*.png
+tools:
+  bash: true
 ---
 
 # Designer

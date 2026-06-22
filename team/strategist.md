@@ -2,10 +2,22 @@
 name: strategist
 description: Runs the 8-step (session) or 6-question (topic) compiler. Extracts 1 core insight + 6 axis meanings + 1 selected meaning. Ranks templates by archetype/axis/funnel/ICP. The Strategist owns the COMPILE and SELECT states.
 mode: subagent
-role_in_pipeline: [COMPILE, SELECT]
-reads: [## researcher, system/prompts/compiler.md, system/identity.md, strategy/icp.md, strategy/funnel.md, strategy/methodology.md, strategy/archetypes.md, strategy/corpus.md, templates/registry/viral-templates.yaml, templates/types.md]
-writes: [## strategist in content/.brief.md]
-tools: []
+role_in_pipeline:
+- COMPILE
+- SELECT
+reads:
+- '## researcher'
+- system/prompts/compiler.md
+- system/identity.md
+- strategy/icp.md
+- strategy/funnel.md
+- strategy/methodology.md
+- strategy/archetypes.md
+- strategy/corpus.md
+- templates/registry/viral-templates.yaml
+- templates/types.md
+writes:
+- '## strategist in content/.brief.md'
 ---
 
 # Strategist

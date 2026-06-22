@@ -55,6 +55,13 @@ def yaml_quote(s: str) -> str:
 
 def write_brand(form: dict) -> list[str]:
     """Write system/brand.md and system/brand.json."""
+    primary_bg = form.get("primary_bg", "#000000")
+    primary_fg = form.get("primary_fg", "#ffffff")
+    subtitle_color = form.get("subtitle_color", "#8a8a8a")
+    handle_color = form.get("handle_color", "#505050")
+    accent = form.get("accent", "#ff6a00")
+    title_gradient = bool(form.get("title_gradient", False))
+
     md = f"""---
 title: Brand
 type: spec
@@ -76,27 +83,47 @@ The brand identity. The Designer reads this when picking banner tokens.
 brand:
   name: {form.get('brand_name', 'SpielOS')}
   handle: {form.get('handle', '@your_handle')}
-  primary_bg: {form.get('primary_bg', '#000000')}
-  primary_fg: {form.get('primary_fg', '#ffffff')}
-  accent: {form.get('accent', '#ff6a00')}
+  primary_bg: {primary_bg}
+  primary_fg: {primary_fg}
+  subtitle_color: {subtitle_color}
+  handle_color: {handle_color}
+  accent: {accent}
   text_dark: #202020
   text_mid: #5a5959
   tagline: "{form.get('tagline', '')}"
   creator_self: "{form.get('creator_self', '')}"
 ```
 
+## Banner colors
+
+| Token | Purpose | Default |
+|---|---|---|
+| `primary_bg` | Background | `#000000` |
+| `primary_fg` | Title (also: handle icon) | `#ffffff` |
+| `subtitle_color` | Subtitle (Merriweather) | `#8a8a8a` |
+| `handle_color` | Handle (JetBrains Mono, bottom) | `#505050` |
+| `accent` | Reserved for highlights / interactive | `#ff6a00` |
+
+## Banner styles
+
+- **Title gradient**: `{"true — silver gradient white→#888" if title_gradient else "false — solid color (default)"}`
+- Banner template: `default`. Dimensions: 1200x630.
+- Fonts: Inter (heading), Merriweather (subtitle), JetBrains Mono (handle).
+
 ## Banners
 
-Banner template: `default`. Dimensions: 1200x630. Fonts: Inter (heading), Merriweather (subtitle), JetBrains Mono (handle).
+The `tools/designer.py` banner renderer reads these tokens and injects them into `tools/banner-templates/default.html`. To customize the layout beyond colors, edit the HTML template directly.
 """
     (VAULT / "system" / "brand.md").write_text(md, encoding="utf-8")
     brand_json = {
         "brand": {
             "name": form.get("brand_name", "SpielOS"),
             "handle": form.get("handle", "@your_handle"),
-            "primary_bg": form.get("primary_bg", "#000000"),
-            "primary_fg": form.get("primary_fg", "#ffffff"),
-            "accent": form.get("accent", "#ff6a00"),
+            "primary_bg": primary_bg,
+            "primary_fg": primary_fg,
+            "subtitle_color": subtitle_color,
+            "handle_color": handle_color,
+            "accent": accent,
             "tagline": form.get("tagline", ""),
             "creator_self": form.get("creator_self", ""),
         },
@@ -108,8 +135,16 @@ Banner template: `default`. Dimensions: 1200x630. Fonts: Inter (heading), Merriw
         },
         "banner": {
             "template": "default",
+            "title_gradient": title_gradient,
             "dimensions": {"width": 1200, "height": 630},
             "render": {"device_scale_factor": 2, "chrome_path": None},
+            "tokens": {
+                "text_title_color": primary_fg,
+                "text_subtitle_color": subtitle_color,
+                "text_handle_color": handle_color,
+                "text_subtitle_max_chars": 180,
+                "bg": primary_bg,
+            },
         },
     }
     (VAULT / "system" / "brand.json").write_text(json.dumps(brand_json, indent=2), encoding="utf-8")

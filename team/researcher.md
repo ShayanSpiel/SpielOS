@@ -1,11 +1,21 @@
 ---
 name: researcher
-description: Collects the source for a /post run. In session mode: finds today's session log (or synthesizes one from the opencode DB), classifies it into archetype/funnel/icp_layer. In topic mode: classifies the topic text. The Researcher owns the SESSION_CAPTURE state.
+description: 'Collects the source for a /post run. In session mode: finds today''s session log (or synthesizes one from the opencode DB), classifies it into archetype/funnel/icp_layer. In topic mode: classifies the topic text. The Researcher owns the SESSION_CAPTURE state.'
 mode: subagent
-role_in_pipeline: [SESSION_CAPTURE]
-reads: [content/sessions/*.md, system/prompts/identity.md, strategy/methodology.md, strategy/icp.md, strategy/archetypes.md, system/rules.yaml §strategy.archetypes]
-writes: [## researcher in content/.brief.md, content/sessions/YYYY-MM-DD-session-NN.md (if synthesized)]
-tools: [tools/researcher.py]
+role_in_pipeline:
+- SESSION_CAPTURE
+reads:
+- content/sessions/*.md
+- system/prompts/identity.md
+- strategy/methodology.md
+- strategy/icp.md
+- strategy/archetypes.md
+- system/rules.yaml §strategy.archetypes
+writes:
+- '## researcher in content/.brief.md'
+- content/sessions/YYYY-MM-DD-session-NN.md (if synthesized)
+tools:
+  bash: true
 ---
 
 # Researcher
