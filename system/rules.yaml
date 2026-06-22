@@ -1,0 +1,716 @@
+# ShayanWiki — Single source of truth for all mechanical rules.
+# ===============================================================
+# Edit this file to change behavior. Scripts read this at startup
+# and NEVER have hardcoded values. The scripts/ directory is framework.
+# Anything NOT in this file belongs in concepts/*.md (LLM guidance).
+#
+# A new user should be able to:
+#   1. Edit rules.yaml (15 min)
+#   2. Edit concepts/*.md (30 min)  
+#   3. Edit templates/*.md (15 min)
+#   → Engine ready for their voice and strategy
+#
+# ────────────────────────────────────────────────────────────────────
+
+# ─── Posting Behavior ────────────────────────────────────────────────
+posting:
+  mode: manual              # manual | auto-always
+  require_confirm: [blog, linkedin]
+  max_auto_day: 3
+
+# ─── Pipeline Recovery ──────────────────────────────────────────────
+# stale_after_minutes: if PUBLISHING/ARCHIVING is older than this, the next
+# content command auto-resets to IDLE. Prevents the pipeline from getting
+# stuck forever after a half-failed publish.
+pipeline:
+  stale_after_minutes: 5
+  # Fix H2: cap per-file injection size when strategy files are inlined into
+  # the LLM handoff. voice-corpus.md is exempt (full examples required).
+  strategy_injection_cap_chars: 1500
+
+# ─── Strategy Defaults ──────────────────────────────────────────────
+strategy:
+  primary_offer: spiel-engine-dfy
+  icp_profile: technical-founder
+  funnel_default: TOFU
+  conversion_log: content/conversions.md
+  content_verticals:
+    - builder-to-lead-system
+    - content-automation-ai-agents
+    - positioning-and-offers
+    - building-in-public-as-lead-gen
+  session_classifier: active
+
+  # Strategy pages the engine loads (maps to strategy/*.md, falls back to concepts/*.md).
+  # Edit this list to add/remove pages the LLM reads during STRATEGY_LOAD.
+  # Order: positioning/icp/offer (audience side) → methodology/voice/corpus (writing side) → funnel/archetypes/types (routing side).
+  pages:
+    - positioning
+    - icp
+    - offer
+    - methodology
+    - voice
+    - corpus
+    - funnel
+    - archetypes
+    - types
+
+  # Heuristic keywords for automatic classification.
+  # The classifier scores each archetype/vertical/stage/layer
+  # against the session text. Highest score wins.
+  archetypes:
+    S1_system_build:    ["system build", "built the", "architect", "pipeline", "workflow", "framework", "architecture"]
+    S2_ship:            ["ship", "shipped", "released", "deployed", "launched", "v1", "v2", "v3", "feature", "added", "merged", "rolled out", "public beta", "open source"]
+    S3_decision:        ["chose", "picked", "decided", "trade-off", "over ", "vs ", "versus"]
+    S4_lesson:          ["learned", "lesson", "realised", "realized", "taught me", "discovered"]
+    S5_failure:         ["broke", "crash", "failed", "failure", "bug", "went wrong", "postmortem", "post-mortem"]
+    S6_client_work:     ["client", "customer", "for a ", "installed for", "case study", "before/after", "wins", "onboarded", "engagement"]
+    S7_research:        ["research", "analyzed", "analysed", "reading", "study", "benchmark", "compared"]
+    S8_tooling:         ["tool", "script", "automation", "capture", "wrote the", "stack", "setup", "configured"]
+    S9_strategy:        ["strategy", "position", "planning", "decided to", "approach", "framework", "positioning"]
+    S10_meta:           ["wiki", "vault", "restructur", "consolidat", "archive", "refactor", "AGENTS.md"]  # noqa: E501
+  verticals:
+    builder-to-lead-system:            ["builder", "lead", "system", "pipeline", "content engine", "automation"]
+    content-automation-ai-agents:      ["agent", "automation", "ai", "obsidian", "prompt", "llm"]
+    positioning-and-offers:            ["offer", "position", "icp", "price", "pricing", "funnel"]
+    building-in-public-as-lead-gen:    ["building in public", "transparent", "public"]
+  funnel_stages:
+    TOFU:  ["tofu", "awareness", "new", "never", "discover", "first time", "what is"]
+    MOFU:  ["mofu", "consideration", "how it", "the system", "mechanism", "framework", "method"]
+    BOFU:  ["bofu", "conversion", "buy", "purchase", "price", "offer", "close"]
+  icp_layers:
+    L1_surface:  ["time", "busy", "too many", "mess", "unorganized", "overlap"]
+    L2_mid:      ["system", "method", "approach", "process", "workflow", "how to"]
+    L3_deep:     ["identity", "feels like", "status", "threat", "competence", "shame"]
+    L4_root:     ["core", "tension", "trade-off", "fundamental", "root"]
+
+# ─── Character Limits (per surface) ─────────────────────────────────
+char_limits:
+  linkedin_casual: 1500
+  linkedin_polished: 3000
+  x_single: 280
+  x_thread_max_tweets: 12
+  blog_pillar_words: 2500
+  buffer: 2200           # Buffer per-channel limit (used by post_buffer.py)
+
+# ─── Buffer Multi-Platform Publisher ───────────────────────────────
+# post_buffer.py fans a single draft out to all BUFFER_CHANNEL_IDS via
+# Buffer's GraphQL API. Direct post_x.py / post_linkedin.py still work
+# as fallbacks when platform: x | linkedin is set explicitly.
+
+# ─── Safe Openers (pass AP-13 "project as subject" check) ──────────
+# These words/phrases can open a post without it being "project as subject".
+# The LLM naturally varies openings when given multiple options.
+# EDIT: add or remove words to control which openings pass the gate.
+safe_openers:
+  - "the"
+  - "this"
+  - "that"
+  - "these"
+  - "those"
+  - "it"
+  - "its"
+  - "every"
+  - "each"
+  - "some"
+  - "many"
+  - "most"
+  - "few"
+  - "all"
+  - "before"
+  - "after"
+  - "here"
+  - "there"
+  - "now"
+  - "then"
+  - "you"
+  - "your"
+  - "today" 
+  - "yesterday" 
+  - "tomorrow" 
+  - "recently" 
+  - "currently"
+  - "your" 
+  - "you're"           # ← reader-first
+  - "you've"
+  - "i" 
+  - "we" 
+  - "i've" 
+  - "we've"
+  - "my" 
+  - "our" 
+  - "your" 
+  - "their" 
+  - "his" 
+  - "her"
+  - "no" 
+  - "not" 
+  - "never" 
+  - "none"             # ← negative openers
+  - "what" 
+  - "why" 
+  - "how" 
+  - "when" 
+  - "where"            # ← question openers
+  - "stop" 
+  - "if" 
+  - "anyone" 
+  - "everyone"         # ← imperative/address
+  - "actually" 
+  - "basically" 
+  - "honestly" 
+  - "frankly"
+  - "typically" 
+  - "usually" 
+  - "often" 
+  - "always" 
+  - "never"
+  - "already" 
+  - "still" 
+  - "just" 
+  - "even" 
+  - "only" 
+  - "also"
+  - "really" 
+  - "simply" 
+  - "two" 
+  - "three" 
+  - "four" 
+  - "five"
+  - "first" 
+  - "second" 
+  - "third" 
+  - "another" 
+  - "such"
+  - "when" 
+  - "while" 
+  - "since" 
+  - "until" 
+  - "although" 
+  - "though"
+  - "everyone" 
+  - "nobody" 
+  - "somebody" 
+  - "anyone"
+  - "in" 
+  - "on" 
+  - "at" 
+  - "for" 
+  - "with" 
+  - "from"
+  - "same"
+  - "here's"
+  - "there's"
+  - "that's"
+  - "it's"
+  - "they're"
+  - "we're"
+  - "you'll"
+  - "we'll"
+  - "i'll"
+  - "i'd"
+  - "we'd"
+  - "you'd"
+  - "don't"
+  - "can't"
+  - "won't"
+  - "isn't"
+  - "aren't"
+  - "hasn't"
+  - "doesn't"
+  - "didn't"
+  - "so"
+  - "well"
+  - "but"
+  - "and"
+  - "yet"
+  - "because"
+  - "like"
+  - "sure"
+  - "okay"
+  - "right"
+  - "literally"
+  - "a"
+  - "an"
+  - "one"
+  - "hey"
+
+# ─── Banned Opener Patterns (hook starts with these = FAIL) ────────
+# Regex patterns. Post body's first line matched against these.
+banned_openers:
+  - "^today\\s+i\\s+(want\\s+to\\s+)?talk\\s+about"
+  - "^let\\s+me\\s+tell\\s+you\\s+about"
+  - "^i\\s+wanted\\s+to\\s+share"
+  - "^have\\s+you\\s+ever"
+  - "^everyone\\s+talks\\s+about"
+  - "^we\\s+all\\s+know"
+  - "^in\\s+the\\s+(world|realm|era|age)\\s+of"
+  - "^as\\s+a\\s+(founder|builder|creator|developer)"
+  - "^if\\s+you"
+  - "^the\\s+truth\\s+is"
+  - "^i'm\\s+(excited|thrilled)"
+  - "^hey\\s+friends"
+  - "^there's\\s+a\\s+(reason|secret|thing|pattern)"
+
+# ─── Lesson Triggers (body needs at least one) ─────────────────────
+lesson_triggers:
+  - "i learned"
+  - "i realised"
+  - "i realized"
+  - "i noticed"
+  - "lesson"
+  - "what i learned"
+  - "what i realised"
+  - "what i realized"
+  - "here is what"
+  - "here's what"
+  - "taught me"
+  - "the takeaway"
+  - "the insight"
+  - "here's the thing"
+  - "key takeaway"
+
+# ─── Audience Triggers (body must name the reader) ─────────────────
+audience_triggers:
+  - "for "
+  - "to "
+  - "any "
+  - "every "
+  - "builders"
+  - "founders"
+  - "creators"
+  - "developers"
+  - "makers"
+  - "operators"
+  - "engineers"
+  - "designers"
+  - "leaders"
+  - "managers"
+  - "teams"
+  - "people who"
+  - "anyone who"
+  - "if you're"
+  - "your "
+
+# ─── Engagement Ask Bank (for closing detection) ───────────────────
+engagement_bank:
+  - "what's your take?"
+  - "agreed?"
+  - "what are you building?"
+  - "who else"
+  - "curious what you think?"
+  - "i'd love to hear"
+  - "let me know"
+  - "what do YOU think?"
+  - "share your"
+  - "your experience"
+  - "question for you"
+  - "drop a comment"
+  - "reply with"
+  - "dm me"
+
+# ─── Architecture Leaks (internal labels that must NOT be public) ──
+architecture_leaks:
+  # Session-mode archetypes (banned as labels, NOT the words themselves).
+  - "\\bS(?:[1-9]|10)\\b"
+  # Funnel-stage labels.
+  - "\\bTOFU\\b"
+  - "\\bMOFU\\b"
+  - "\\bBOFU\\b"
+  # ICP problem-layer labels.
+  - "\\bL[1-4]\\b"
+  # "ICP" as a label (NOT when used as a person's initials in a name).
+  - "\\bICP\\b"
+  # Pipeline / classifier / gate internal-process labels.
+  - "\\bfunnel.stage\\b"
+  - "\\bcontent.vertical\\b"
+  - "\\bsession.classifier\\b"
+  - "\\bgate.check\\b"
+  # Compiler internals — banned as labels in public drafts.
+  - "\\bcore_insight\\b"
+  - "\\bselected_meaning\\b"
+  - "\\bICP_WORLD_BUILD\\b"
+  - "\\breader_failure_mode\\b"
+  - "\\bDATA_BLOCK_SESSION\\b"
+  - "\\bDATA_BLOCK_TOPIC\\b"
+  # Procedural framing — "the engine runs/does/uses…" as a label for
+  # the system itself (does NOT block "engine" used generically).
+  - "\\bthe\\s+engine\\s+(runs|uses|does|has|processes|evaluates|analyzes|asks|answers|includes|generates|produces|outputs|reads|builds|follows|checks|filters|scores|ranks|selects|orchestrates|manages|handles)\\b"
+  - "\\bthe\\s+pipeline\\s+(runs|uses|does|has|processes|evaluates|analyzes|asks|answers|includes|generates|produces|outputs|reads|builds|follows|checks|filters|scores|ranks|selects|orchestrates|manages|handles)\\b"
+  # First-person procedural framing — "we added", "we changed the system",
+  # "we updated the schema", "in this session", etc.
+  - "\\bwe\\s+added\\b"
+  - "\\bwe\\s+changed\\s+(the\\s+system|the\\s+schema|the\\s+pipeline|the\\s+engine)\\b"
+  - "\\bwe\\s+updated\\s+(the\\s+system|the\\s+schema|the\\s+pipeline|the\\s+engine)\\b"
+  - "\\bin\\s+this\\s+session\\b"
+  - "\\bin\\s+this\\s+post\\b"  # meta framing
+  - "\\bfor\\s+this\\s+run\\b"  # meta framing
+
+# ─── Generic Statement Patterns (platitudes = FAIL) ────────────────
+generic_statements:
+  - "consistency\\s+is\\s+important"
+  - "consistency\\s+matters"
+  - "content\\s+is\\s+king"
+  - "quality\\s+over\\s+quantity"
+  - "hard\\s+work\\s+pays?\\s+off"
+  - "trust\\s+the\\s+process"
+  - "it'?s?\\s+not\\s+about\\s+the\\s+tools?"
+  - "done\\s+is\\s+better\\s+than\\s+perfect"
+  - "fail\\s+(fast|often)"
+
+# ─── Common Words (excluded from word-repetition check) ────────────
+common_words:
+  - "the"
+  - "and"
+  - "for"
+  - "that"
+  - "this"
+  - "with"
+  - "gate"
+  - "draft"
+  - "you"
+  - "your"
+  - "not"
+  - "was"
+  - "are"
+  - "but"
+  - "its"
+  - "all"
+  - "can"
+  - "has"
+  - "had"
+  - "been"
+  - "just"
+  - "like"
+  - "more"
+  - "some"
+  - "than"
+  - "very"
+  - "what"
+  - "when"
+  - "where"
+  - "which"
+  - "who"
+  - "will"
+  - "would"
+  - "could"
+  - "should"
+  - "about"
+  - "into"
+  - "over"
+  - "after"
+  - "also"
+  - "each"
+  - "from"
+  - "have"
+  - "how"
+  - "much"
+  - "most"
+  - "only"
+  - "other"
+  - "our"
+  - "such"
+  - "their"
+  - "them"
+  - "then"
+  - "there"
+  - "these"
+  - "they"
+  - "were"
+  - "because"
+  - "got"
+  - "get"
+  - "did"
+  - "done"
+  - "say"
+  - "said"
+  - "way"
+  - "make"
+  - "made"
+  - "use"
+  - "used"
+  - "using"
+  - "take"
+  - "took"
+  - "know"
+  - "need"
+  - "want"
+  - "thing"
+  - "things"
+  - "does"
+  - "doing"
+  - "work"
+  - "worked"
+  - "working"
+  - "look"
+  - "looking"
+  - "let"
+  - "even"
+  - "still"
+  - "also"
+  - "back"
+  - "here"
+  - "now"
+  - "see"
+  - "think"
+  - "going"
+
+# ─── Known Names (proper noun grounding check) ─────────────────────
+# When these appear in a post body, the post must provide
+# grounding context (who they are, why they matter).
+known_names:
+  - "Andrej Karpathy"
+  - "Bret Victor"
+  - "Charlie Munger"
+  - "Chris Dixon"
+  - "David Deutsch"
+  - "Douglas Engelbart"
+  - "Douglas Hofstadter"
+  - "Douglas Rushkoff"
+  - "Edsger Dijkstra"
+  - "Elon Musk"
+  - "Eric Ries"
+  - "Francesco Cirillo"
+  - "Francis Bacon"
+  - "Frank Herbert"
+  - "Frederick Brooks"
+  - "George Orwell"
+  - "Gerald Weinberg"
+  - "Gregory Bateson"
+  - "Hiroshi Ishii"
+  - "Isaac Asimov"
+  - "Ivan Sutherland"
+  - "Jaron Lanier"
+  - "Jeff Bezos"
+  - "John Boyd"
+  - "John Carmack"
+  - "John Dewey"
+  - "John McCarthy"
+  - "John Muir"
+  - "Kevin Kelly"
+  - "Kurt Vonnegut"
+  - "Larry Page"
+  - "Linus Pauling"
+  - "Linus Torvalds"
+  - "Marc Andreessen"
+  - "Marvin Minsky"
+  - "Marshall McLuhan"
+  - "Norbert Wiener"
+  - "Paul Graham"
+  - "Peter Drucker"
+  - "Peter Thiel"
+  - "Ray Kurzweil"
+  - "Richard Feynman"
+  - "Robert Pirsig"
+  - "Sam Altman"
+  - "Satya Nadella"
+  - "Sebastian Thrun"
+  - "Simon Sinek"
+  - "Steve Jobs"
+  - "Stewart Brand"
+  - "Tim Berners-Lee"
+  - "Tim Urban"
+  - "Vannevar Bush"
+  - "William Gibson"
+  - "Yuval Noah Harari"
+  - "Karpathy"
+  - "Huxley"
+  - "Munger"
+  - "Dijkstra"
+  - "Feynman"
+  - "Vonnegut"
+  - "McLuhan"
+  - "Weinberg"
+  - "Pirsig"
+  - "Brand"
+  - "Deming"
+  - "Ward Cunningham"
+  - "Admiral John Boyd"
+  - "Van Jones"
+
+# ─── Gate Selection (which checks are active) ─────────────────────
+# Set to false to disable any check without editing code.
+gates:
+  char_count: true
+  hook_check: true
+  em_dash: true
+  word_repeat: true
+  architecture_leak: true
+  audience_named: true
+  lesson_surfaced: true
+  generic_statement: true
+  project_as_subject: true
+  closing: true
+  frontmatter: true
+  dollar_in_note: true
+  strategy_void: true
+  icp_present: true
+  grounded_reference: true
+
+# ─── Posting Cadence (rate limits per platform) ─────────────────────
+cadence:
+  x:
+    per_day: 10
+    per_week: 70
+  linkedin:
+    per_day: 3
+    per_week: 21
+  blog:
+    per_day: 1
+    per_week: 7
+
+# ─── Template Selector ───────────────────────────────────────────────
+# Controls the template recommendation engine (runs between ICP_WORLD_BUILD and DRAFTING).
+# Weights sum to 0.90 (0.10 reserved for psych_trigger NLP in future).
+template_selector:
+  enabled: true
+  weights:
+    archetype: 0.30       # archetype match (S1-S10 from strategy_classifier)
+    meaning_axis: 0.25    # selected_meaning axis match
+    funnel_stage: 0.20    # funnel stage match (TOFU/MOFU/BOFU)
+    icp_layer: 0.15       # ICP layer match (L1-L4)
+  # Ranker scoring weights — used by template_ranker.py to score the registry
+  # (substance/archetype/psych_match/anti_density/engagement). Distinct from
+  # `weights` above (which drives selector.py's brief-time matching).
+  # Falls back to built-in DEFAULT_WEIGHTS if this key is absent. Partial
+  # overrides merge onto the defaults. The four content weights are
+  # renormalized against engagement at score time, so they need not sum to 1.0.
+  ranker_weights:
+    substance:       0.30
+    archetype:       0.20
+    psych_match:     0.20
+    anti_density:    0.15
+    engagement:      0.15
+  top_n:
+    x: 5                  # top 5 recommendations for X
+    linkedin: 3           # top 3 for LinkedIn
+    blog: 2               # top 2 for blog
+    pillar: 2             # top 2 for pillar blog
+  # BiP category priors — boost certain categories when archetypes match.
+  # Used by template_ranker.py + selector.py to weight recommendations.
+  # Categories MUST match the registry (templates/registry/viral-templates.yaml):
+  #   x: ship_log, product, milestone
+  #   linkedin: vulnerability, paradigm, authority
+  #   blog: pillar
+  # `archetypes: []` (or omitted) means "apply to all archetypes".
+  category_priors:
+    ship_log:
+      archetypes: [S2, S8, S10]
+      multiplier: 1.3
+    product:
+      archetypes: [S2, S8, S1]
+      multiplier: 1.4
+    milestone:
+      archetypes: [S1, S6, S10]
+      multiplier: 1.5
+    vulnerability:
+      archetypes: [S4, S5, S9]
+      multiplier: 1.3
+    paradigm:
+      archetypes: [S9, S3, S7]
+      multiplier: 1.4
+    authority:
+      archetypes: [S6, S4, S1]
+      multiplier: 1.5
+    pillar:
+      archetypes: [S1, S9, S10]
+      multiplier: 1.5
+
+# ─── Compiler Config ────────────────────────────────────────────────
+# Controls the Content Engine Compiler (runs between STRATEGY_LOAD and DRAFTING).
+compiler:
+  meaning_axes:
+    - systemic
+    - behavioral
+    - philosophical
+    - contrarian
+    - leverage
+    - human
+  # Mode routing: when the user passes a topic to /post, the brief.source.kind
+  # is "topic" and the compiler uses the topic-mode 6-question sequence
+  # (announce, explain, opinion, etc.). When /post is empty, source.kind is
+  # "session" and the build-to-public 8-step sequence runs.
+  # These defaults bias the LLM's selected_meaning axis + funnel routing
+  # when running in topic mode. They are hints, not hard constraints.
+  mode_routing:
+    session:
+      default_axis: human
+      default_funnel: TOFU
+      cta: none
+      archetype_funnel_override: {}
+    topic:
+      default_axis: leverage
+      default_funnel: MOFU
+      cta: try-it
+      # When the topic-mode ship (S2) is detected, route to MOFU (with CTA)
+      # instead of TOFU (no CTA). Announcements drive installs/usage, not
+      # passive authority.
+      archetype_funnel_override:
+        S2: MOFU
+        S8: MOFU
+
+# ─── Gate Parameters (tune algorithmic thresholds) ────────────────
+# These control the behavior of gates.py algorithmic checks.
+# Edit these, not the script, to change gate sensitivity.
+gate_params:
+  close_detect_window: 200             # chars from end of body to scan for closing
+  close_fallback_phrases: ["note:", "?"]  # non-bank closers (🤝 👊 are emoji checks in code)
+  word_repeat_scale_small: 500         # body < this → threshold 3
+  word_repeat_scale_medium: 1500       # body < this → threshold 4
+  word_repeat_scale_large_min: 6       # body >= medium → max(min, max(12, len//300))
+  word_repeat_scale_large_max: 12
+  required_frontmatter_fields: ["title", "created", "tags", "platform", "status"]
+  # Fix H4: strong_audience_triggers for the audience_named gate. These are
+  # higher-signal than the generic audience_triggers list (which is mostly
+  # prepositions and too noisy). Edit this list to control what counts as
+  # "the reader was named" in the body.
+  strong_audience_triggers:
+    - "you "
+    - "your "
+    - "you're"
+    - "you'll"
+    - "founders"
+    - "builders"
+    - "if you"
+    - "when you"
+    - "your team"
+    - "your code"
+  # Optional strategy fields checked by gates (strategy_void + icp_present):
+  # - pillar: which content pillar this draft belongs to (checked by strategy_void gate)
+  # - pattern: the content pattern/archetype (checked by strategy_void gate)
+  # - icp: the ICP descriptor for this draft (checked by icp_present gate)
+  # Either pillar OR pattern must be present; icp must be present.
+
+# ─── Creds Required per Platform ───────────────────────────────────
+# Documents which env vars each publisher needs. Post scripts read
+# ~/.config/opencode/.env and fail loud if any are missing.
+creds_required:
+  buffer:   [BUFFER_ACCESS_TOKEN, BUFFER_CHANNEL_IDS]
+  x:        [X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_SECRET]
+  linkedin: [LINKEDIN_ACCESS_TOKEN, LINKEDIN_PERSON_URN]
+
+# ─── Voice Markers (LLM Guidance — NOT mechanically enforced) ──────
+# These are read by the LLM during drafting. They are NOT enforced
+# by gates.py. The LLM applies, ignores, or varies them naturally
+# based on the post's archetype and voice-corpus examples.
+#
+# The full voice spec lives in strategy/voice.md.
+# The LLM-facing runtime version is in system/prompts/voice.md.
+voice_markers:
+  note: "LLM guidance only. See strategy/voice.md for details."
+
+# ─── Quality Threshold ────────────────────────────────────────────
+# Composite score = (passes / 29 total gates).
+# Gates: 15 mechanical (gates.py) + 1 (4-check baseline) + 10 (10-gate extended) + 5 (ICP quality).
+# Total = 31 gates. The composite score = (passes / 31) is advisory only —
+# not enforced in code (the 15 mechanical checks in `gates.py` are the
+# only ones actually computed at GATE_CHECK time).
+# Lower threshold = stricter. Raise only with LLM-judged-gate confidence.
+quality:
+  composite_threshold: 0.85
+  gates:
+    mechanical: 15
+    four_check: 1
+    ten_gate: 10
+    icp_quality: 5
+    total: 31

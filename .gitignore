@@ -1,0 +1,60 @@
+# OS
+.DS_Store
+*.swp
+*.swo
+
+# Editor
+.idea/
+.vscode/
+*.iml
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+.coverage
+.tox/
+.venv/
+venv/
+
+# Node
+node_modules/
+package-lock.json
+*.log
+
+# Spiel
+.brief/
+content/.brief/
+.engine-state
+.content-brief.json
+.env
+.werk/
+.vault/
+
+# Generated artifacts
+adapters/opencode/agents/*.md
+adapters/opencode/skill/*/SKILL.md
+adapters/claude/agents/*.md
+adapters/cursor/commands/*.md
+adapters/mcp/server.json
+skills/
+
+# Posts
+content/queue/*.md
+content/posted/*.md
+content/rejected/*.md
+content/sessions/*.md
+content/ideas/*.md
+content/archive/
+content/.install-state.json
+
+# Banners
+assets/banners/*.png
+assets/banners/.preview/
+
+# Logs
+logs/
+*.log
+*.jsonl

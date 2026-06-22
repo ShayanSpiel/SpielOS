@@ -1,0 +1,21 @@
+{
+  "name": "spielos",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Markdown-driven marketing team for content pipelines. The project itself needs no Node dependencies — package.json exists only so editor tooling (Cursor, opencode, VS Code) has a place to anchor.",
+  "scripts": {
+    "sync": "python3 tools/sync_adapters.py",
+    "sync:install": "python3 tools/sync_adapters.py --install",
+    "wizard": "python3 install/wizard/serve.py",
+    "wizard:test": "python3 install/wizard/serve.py --port 17331 --target /tmp/spielos-test --no-open",
+    "test": "python3 -m pytest tests/ -v",
+    "test:smoke": "python3 tests/smoke.py",
+    "serve": "python3 install/wizard/serve.py --port 7331"
+  },
+  "engines": {
+    "python": ">=3.10"
+  },
+  "keywords": ["content", "marketing", "agents", "ai", "llm", "obsidian"],
+  "author": "ShayanSpiel",
+  "license": "MIT"
+}

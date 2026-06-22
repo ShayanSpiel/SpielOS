@@ -1,0 +1,309 @@
+#!/usr/bin/env bash
+# bin/spiel — Single entrypoint for SpielOS.
+#
+# Resolves the vault root, then execs the requested command.
+# Works from ANY working directory, in ANY project, in ANY IDE.
+#
+# VAULT_DIR resolution order (first match wins):
+#   1. $VAULT_DIR                  (inline env override)
+#   2. <cwd>/.spiel-vault          (project-local override file; may set VAULT_DIR=…)
+#   3. ~/.spiel/                   (default home install location)
+#   4. <this-shim>/..              (only when this shim lives at <vault>/bin/spiel)
+#
+# Usage (from anywhere):
+#   spiel --version
+#   spiel --where
+#   spiel /post empty
+#   spiel /post "Just shipped v2"
+#   spiel /post @file:./notes.md
+#   spiel status
+#   spiel status --json
+#
+# Install (idempotent, safe to re-run):
+#   install -m 0755 bin/spiel ~/.local/bin/spiel
+#
+# This file is identical wherever it lives. Keep both copies in sync.
+
+set -euo pipefail
+
+VERSION="1.0.0"
+
+# ── Help / version (no vault needed) ──────────────────────────────────
+
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+  cat <<'USAGE'
+spiel — SpielOS orchestrator shim.
+
+USAGE:
+  spiel [--version] [--help] [--where] <command> [args...]
+
+COMMANDS:
+  /post [empty|topic|@file:]
+                         Run the content pipeline end-to-end
+  status                 Show current pipeline state
+  status --json          Same, JSON output
+  init                   Re-run the install wizard
+  sync                   Regenerate IDE adapter files
+  test                   Run the test suite
+  config                 Print resolved vault + tool paths
+  help                   Show this help
+
+VAULT_DIR is resolved (first match wins):
+  1. $VAULT_DIR env var
+  2. <cwd>/.spiel-vault        (a file containing VAULT_DIR=/abs/path)
+  3. ~/.spiel/                 (default home install)
+  4. <shim>/..                 (when shim is bundled at <vault>/bin/spiel)
+
+The shim is path-independent: invoke it from any project, any IDE, any shell.
+USAGE
+  exit 0
+fi
+
+# ── Vault resolution ─────────────────────────────────────────────────
+
+_resolve_vault() {
+  local candidate=""
+
+  # 1. Inline env var
+  if [[ -n "${VAULT_DIR:-}" ]]; then
+    candidate="$VAULT_DIR"
+  fi
+
+  # 2. Project-local override
+  if [[ -z "$candidate" && -f "$PWD/.spiel-vault" ]]; then
+    candidate=$(grep -E '^VAULT_DIR=' "$PWD/.spiel-vault" 2>/dev/null | head -1 | cut -d= -f2- || true)
+  fi
+
+  # 3. Default home install (file or symlink, must contain team/md.md)
+  if [[ -z "$candidate" && -e "$HOME/.spiel" ]]; then
+    # Resolve symlink if needed
+    if [[ -L "$HOME/.spiel" ]]; then
+      local resolved_home
+      resolved_home=$(cd "$HOME/.spiel" && pwd -P 2>/dev/null || echo "")
+      if [[ -n "$resolved_home" && -f "$resolved_home/team/md.md" ]]; then
+        candidate="$resolved_home"
+      fi
+    elif [[ -f "$HOME/.spiel/team/md.md" ]]; then
+      candidate="$HOME/.spiel"
+    fi
+  fi
+
+  # 4. Shim bundled in vault (regular file)
+  if [[ -z "$candidate" ]]; then
+    local shim_path="${BASH_SOURCE[0]:-$0}"
+    # If shim is a symlink, follow it
+    if [[ -L "$shim_path" ]]; then
+      local shim_target
+      shim_target=$(readlink "$shim_path" 2>/dev/null || true)
+      if [[ -n "$shim_target" ]]; then
+        # Resolve relative symlinks
+        local shim_dir
+        shim_dir=$(cd "$(dirname "$shim_path")" && pwd)
+        local resolved
+        if [[ "$shim_target" = /* ]]; then
+          resolved="$shim_target"
+        else
+          resolved="$shim_dir/$shim_target"
+        fi
+        shim_path="$resolved"
+      fi
+    fi
+    local shim_dir
+    shim_dir=$(cd "$(dirname "$shim_path")" && pwd)
+    if [[ "$shim_dir" == */bin ]] && [[ -f "$shim_dir/../team/md.md" ]]; then
+      candidate=$(cd "$shim_dir/.." && pwd)
+    fi
+  fi
+
+  # Strip surrounding quotes / whitespace
+  candidate="${candidate%\"}"; candidate="${candidate#\"}"
+  candidate="${candidate%\'}"; candidate="${candidate#\'}"
+  candidate="${candidate## }";  candidate="${candidate%% }"
+
+  # Validate: must be a directory that contains team/md.md
+  if [[ -z "$candidate" || ! -d "$candidate/team" || ! -f "$candidate/team/md.md" ]]; then
+    echo "ERROR: spiel could not locate the SpielOS vault." >&2
+    echo "" >&2
+    echo "  Tried (in order):" >&2
+    echo "    1. \$VAULT_DIR env var:           ${VAULT_DIR:-<unset>}" >&2
+    if [[ -f "$PWD/.spiel-vault" ]]; then
+      echo "    2. <cwd>/.spiel-vault:           $(cat "$PWD/.spiel-vault" 2>/dev/null | head -3)" >&2
+    else
+      echo "    2. <cwd>/.spiel-vault:           <not found>" >&2
+    fi
+    if [[ -d "$HOME/.spiel" ]]; then
+      echo "    3. ~/.spiel/                     exists" >&2
+    else
+      echo "    3. ~/.spiel/                     <not installed>" >&2
+    fi
+    shim_dir=$(cd "$(dirname "$0")" && pwd)
+    echo "    4. <shim>/..:                    $shim_dir/..  (not a bundle)" >&2
+    echo "" >&2
+    echo "  Fix (pick one):" >&2
+    echo "    a) Install SpielOS:" >&2
+    echo "         curl -fsSL https://spielos.xyz/install.sh | bash" >&2
+    echo "    b) Set VAULT_DIR env var:" >&2
+    echo "         export VAULT_DIR=/path/to/SpielOS" >&2
+    echo "    c) Drop a .spiel-vault file in your project root with: VAULT_DIR=/abs/path" >&2
+    return 1
+  fi
+
+  # Normalize to absolute
+  (cd "$candidate" && pwd)
+}
+
+VAULT=$(_resolve_vault) || exit 1
+
+# ── Version / where (vault already resolved) ─────────────────────────
+
+if [[ "${1:-}" == "--version" || "${1:-}" == "-v" ]]; then
+  echo "spiel $VERSION"
+  echo "vault: $VAULT"
+  exit 0
+fi
+
+if [[ "${1:-}" == "--where" ]]; then
+  echo "$VAULT"
+  exit 0
+fi
+
+# ── Dispatch ─────────────────────────────────────────────────────────
+
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "ERROR: python3 is not on PATH. Install Python 3 and retry." >&2
+  exit 127
+fi
+
+export VAULT_DIR="$VAULT"
+cd "$VAULT"
+
+# /post → invoke the MD orchestrator via the editor tool's runner, or just echo "use /post in your IDE"
+# In SpielOS, /post is run by the IDE's subagent (md). The CLI shim provides status / init / sync / test / config.
+
+case "${1:-}" in
+  status)
+    if [[ "${2:-}" == "--json" ]]; then
+      brief="$VAULT/content/.brief.md"
+      if [[ -f "$brief" ]]; then
+        echo "{ \"brief\": \"$brief\", \"state\": \"$(grep -E '^- ' "$brief" 2>/dev/null | tail -1 | awk '{print $2}' | tr -d 'Z' | tr 'T' ' ')\" }"
+      else
+        echo "{ \"brief\": null, \"state\": \"IDLE\" }"
+      fi
+    else
+      echo "SpielOS vault: $VAULT"
+      brief="$VAULT/content/.brief.md"
+      if [[ -f "$brief" ]]; then
+        state=$(grep -E '^- ' "$brief" 2>/dev/null | tail -1 | awk '{print $2}' | tr -d 'Z' | tr 'T' ' ')
+        echo "Current state: $state"
+        echo "Brief: $brief"
+      else
+        echo "Current state: IDLE (no active brief)"
+      fi
+    fi
+    ;;
+
+  init)
+    # Re-run the install wizard
+    if [[ -f "$VAULT/install/wizard/serve.py" ]]; then
+      echo "Opening SpielOS setup wizard at http://localhost:7331"
+      exec python3 "$VAULT/install/wizard/serve.py" --port 7331 --target "$VAULT"
+    else
+      echo "ERROR: install/wizard/serve.py not found in $VAULT" >&2
+      exit 1
+    fi
+    ;;
+
+  sync)
+    # Regenerate IDE adapter files
+    if [[ -f "$VAULT/tools/sync_adapters.py" ]]; then
+      shift
+      exec python3 "$VAULT/tools/sync_adapters.py" "$@"
+    else
+      echo "ERROR: tools/sync_adapters.py not found" >&2
+      exit 1
+    fi
+    ;;
+
+  test)
+    if command -v pytest >/dev/null 2>&1; then
+      exec pytest "$VAULT/tests/" -v
+    else
+      echo "pytest not installed; running minimal smoke tests..."
+      exec python3 "$VAULT/tests/smoke.py"
+    fi
+    ;;
+
+  config)
+    echo "vault:    $VAULT"
+    echo "editor:   $VAULT/tools/editor.py"
+    echo "designer: $VAULT/tools/designer.py"
+    echo "publisher:$VAULT/tools/publisher/"
+    echo "analyst:  $VAULT/tools/analyst.py"
+    echo "brief:    $VAULT/content/.brief.md"
+    echo "sessions: $VAULT/content/sessions/"
+    echo "queue:    $VAULT/content/queue/"
+    echo "posted:   $VAULT/content/posted/"
+    ;;
+
+  /post)
+    echo ""
+    echo "  /post is a subagent command, not a CLI command."
+    echo ""
+    echo "  Invoke it from your IDE: open opencode, Claude Code, Cursor, or any"
+    echo "  MCP-compatible agent, then type:"
+    echo ""
+    echo "      /post empty           (use today's session log)"
+    echo "      /post \"Just shipped v2\"   (topic mode — ship an announcement)"
+    echo "      /post @file:./notes.md    (topic mode from a file)"
+    echo ""
+    echo "  The MD subagent (in team/md.md) chains the full pipeline."
+    echo ""
+    echo "  For setup: run \`spiel init\` to open the install wizard."
+    echo ""
+    ;;
+
+  "")
+    # Default: print status
+    "$0" status
+    ;;
+
+  *)
+    # Forward unknown commands to the appropriate tool
+    case "$1" in
+      check|gates)
+        if [[ -f "$VAULT/tools/editor.py" ]]; then
+          shift
+          exec python3 "$VAULT/tools/editor.py" check "$@"
+        fi
+        ;;
+      render|banner)
+        if [[ -f "$VAULT/tools/designer.py" ]]; then
+          shift
+          exec python3 "$VAULT/tools/designer.py" "$@"
+        fi
+        ;;
+      publish|dispatch)
+        if [[ -f "$VAULT/tools/publisher/buffer.py" ]]; then
+          shift
+          exec python3 "$VAULT/tools/publisher/buffer.py" "$@"
+        fi
+        ;;
+      analyze|pull|rerank)
+        if [[ -f "$VAULT/tools/analyst.py" ]]; then
+          shift
+          exec python3 "$VAULT/tools/analyst.py" "$@"
+        fi
+        ;;
+      synthesize|classify)
+        if [[ -f "$VAULT/tools/researcher.py" ]]; then
+          shift
+          exec python3 "$VAULT/tools/researcher.py" "$@"
+        fi
+        ;;
+    esac
+
+    echo "Unknown command: $1" >&2
+    echo "Run \`spiel --help\` for usage." >&2
+    exit 1
+    ;;
+esac

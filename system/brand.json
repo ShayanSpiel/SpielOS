@@ -1,0 +1,374 @@
+{
+  "brand": {
+    "name": "ShayanSpiel",
+    "handle": "@ShayanSpiel",
+    "primary_bg": "#e8e8e8",
+    "accent": "#ff6a00",
+    "text_dark": "#202020",
+    "text_mid": "#5a5959",
+    "background": {
+      "type": "solid",
+      "value": "#e8e8e8"
+    },
+    "tagline": "Build to public.",
+    "creator_self": "I am a builder."
+  },
+  "fonts": {
+    "heading": "Inter",
+    "heading_weights": [
+      600,
+      700,
+      900
+    ],
+    "subtitle": "Merriweather",
+    "subtitle_weights": [
+      300,
+      400,
+      700
+    ],
+    "google_fonts": "https://fonts.googleapis.com/css2?family=Inter:wght@600;700;900&family=Merriweather:wght@300;400;700&display=swap",
+    "use_google_fonts": true
+  },
+  "banner": {
+    "template": "default",
+    "icon_collection": {
+      "url": "https://github.com/la-moore/scarlab-icons",
+      "source": "github"
+    },
+    "render": {
+      "device_scale_factor": 2,
+      "chrome_path": null
+    },
+    "dimensions": {
+      "width": 1200,
+      "height": 630
+    },
+    "tokens": {
+      "_comment": "Default tokens match shayanspiel.github.io hero h1/p. Centered layout, silver gradient title, Merriweather subtitle in muted grey, icon watermark centered behind text, @ShayanSpiel handle bottom-centered in JetBrains Mono.",
+      "bg": "#000000",
+      "font_heading": "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+      "font_subtitle": "'Merriweather', Georgia, 'Times New Roman', serif",
+      "text_title_color": "#ffffff",
+      "text_title_size": "120px",
+      "text_title_size_min": 56,
+      "text_title_weight": 900,
+      "text_title_shadow": "none",
+      "text_title_lh": 1.02,
+      "text_title_letterspacing": "-0.05em",
+      "text_subtitle_color": "#8a8a8a",
+      "text_subtitle_size": "30px",
+      "text_subtitle_weight": 400,
+      "text_subtitle_lh": 1.6,
+      "text_subtitle_letterspacing": "0",
+      "text_subtitle_highlight": "transparent",
+      "text_subtitle_max_chars": 180,
+      "text_handle": "#505050",
+      "text_handle_size": "16px",
+      "text_handle_weight": 500,
+      "text_handle_letterspacing": "0.04em",
+      "text_handle_align": "center",
+      "text_handle_bottom": "40px",
+      "icon_color": "#2a2a2a",
+      "icon_opacity": 0.55,
+      "icon_size": "660px",
+      "icon_rotate": "0deg",
+      "icon_position_x": "center",
+      "icon_position_y": "center",
+      "icon_offset_x": "0px",
+      "icon_offset_y": "-50%",
+      "content_padding": "60px 80px 100px",
+      "content_width": "100%",
+      "text_align": "center"
+    },
+    "icon_mapping": {
+      "default": "arrow-up-right",
+      "rules": [
+        {
+          "patterns": [
+            "ai",
+            "agent",
+            "automation",
+            "machine",
+            "llm",
+            "gpt",
+            "model"
+          ],
+          "icon": "sparkles"
+        },
+        {
+          "patterns": [
+            "open source",
+            "github",
+            "repo"
+          ],
+          "icon": "git-pull-request"
+        },
+        {
+          "patterns": [
+            "system",
+            "process",
+            "engine",
+            "workflow",
+            "architecture",
+            "infrastructure",
+            "stack",
+            "framework",
+            "pipeline"
+          ],
+          "icon": "cog"
+        },
+        {
+          "patterns": [
+            "growth",
+            "scale",
+            "business",
+            "revenue",
+            "metrics",
+            "kpi",
+            "analytics",
+            "data",
+            "trend"
+          ],
+          "icon": "trending-up"
+        },
+        {
+          "patterns": [
+            "code",
+            "build",
+            "develop",
+            "ship",
+            "deploy",
+            "api",
+            "script",
+            "dev"
+          ],
+          "icon": "code"
+        },
+        {
+          "patterns": [
+            "terminal",
+            "cli",
+            "command",
+            "console"
+          ],
+          "icon": "terminal"
+        },
+        {
+          "patterns": [
+            "strategy",
+            "plan",
+            "positioning",
+            "offer",
+            "method",
+            "pillar"
+          ],
+          "icon": "crosshair"
+        },
+        {
+          "patterns": [
+            "idea",
+            "learn",
+            "knowledge",
+            "note",
+            "insight",
+            "lesson",
+            "concept",
+            "think"
+          ],
+          "icon": "bulb"
+        },
+        {
+          "patterns": [
+            "goal",
+            "target",
+            "focus",
+            "priority",
+            "mission",
+            "objective",
+            "outcome"
+          ],
+          "icon": "crosshair"
+        },
+        {
+          "patterns": [
+            "launch",
+            "start",
+            "mvp",
+            "product",
+            "release"
+          ],
+          "icon": "award"
+        },
+        {
+          "patterns": [
+            "layer",
+            "level",
+            "tier",
+            "depth"
+          ],
+          "icon": "layers"
+        },
+        {
+          "patterns": [
+            "buffer",
+            "fan-out",
+            "fanout",
+            "multi-platform",
+            "cross-post"
+          ],
+          "icon": "buffer"
+        },
+        {
+          "patterns": [
+            "publish",
+            "content",
+            "post",
+            "draft",
+            "blog",
+            "tweet",
+            "schedule",
+            "queue"
+          ],
+          "icon": "mail"
+        },
+        {
+          "patterns": [
+            "write",
+            "story",
+            "copy",
+            "headline",
+            "hook"
+          ],
+          "icon": "feather"
+        },
+        {
+          "patterns": [
+            "identity",
+            "creator",
+            "builder",
+            "founder",
+            "technical",
+            "engineer"
+          ],
+          "icon": "location"
+        },
+        {
+          "patterns": [
+            "stop",
+            "pause",
+            "limit",
+            "bottleneck",
+            "barrier",
+            "block",
+            "bounce",
+            "ceiling",
+            "trap",
+            "enough",
+            "alert",
+            "warning",
+            "critical",
+            "urgent"
+          ],
+          "icon": "ban"
+        },
+        {
+          "patterns": [
+            "scan",
+            "scanning",
+            "qrcode",
+            "qr code",
+            "decode",
+            "extract",
+            "extracting"
+          ],
+          "icon": "qrcode"
+        }
+      ]
+    },
+    "templates": {
+      "default": {
+        "_comment": "Canonical default template. Lives at tools/banner-templates/default.html. Tokens defined in banner.tokens (no per-template overrides needed)."
+      },
+      "notes": {
+        "_comment": "Sticky-note themed template for short personal notes. Lives at tools/banner-templates/notes.html. Inherits global tokens; override here if you ever fork its look."
+      }
+    }
+  },
+  "icons": {
+    "registry": {
+      "arrow-up-right": {
+        "svg_path": "icons/arrow-up-right.svg"
+      },
+      "award": {
+        "svg_path": "icons/award.svg"
+      },
+      "ban": {
+        "svg_path": "icons/ban.svg"
+      },
+      "buffer": {
+        "svg_path": "icons/buffer.svg"
+      },
+      "bulb": {
+        "svg_path": "icons/bulb.svg"
+      },
+      "code": {
+        "svg_path": "icons/code.svg"
+      },
+      "cog": {
+        "svg_path": "icons/cog.svg"
+      },
+      "crosshair": {
+        "svg_path": "icons/crosshair.svg"
+      },
+      "feather": {
+        "svg_path": "icons/feather.svg"
+      },
+      "git-pull-request": {
+        "svg_path": "icons/git-pull-request.svg"
+      },
+      "layers": {
+        "svg_path": "icons/layers.svg"
+      },
+      "location": {
+        "svg_path": "icons/location.svg"
+      },
+      "mail": {
+        "svg_path": "icons/mail.svg"
+      },
+      "qrcode": {
+        "svg_path": "icons/qrcode.svg"
+      },
+      "sparkles": {
+        "svg_path": "icons/sparkles.svg"
+      },
+      "terminal": {
+        "svg_path": "icons/terminal.svg"
+      },
+      "trending-up": {
+        "svg_path": "icons/trending-up.svg"
+      }
+    }
+  },
+  "voice": {
+    "triple": "dry dense direct",
+    "keywords": [
+      "dry",
+      "dense",
+      "direct"
+    ],
+    "never_sound_like": "motivational bro"
+  },
+  "content": {
+    "verticals": [
+      "AI agents",
+      "technical architecture",
+      "founder ops"
+    ],
+    "primary_cta": "book",
+    "target_platforms": [
+      "x",
+      "linkedin",
+      "blog"
+    ]
+  }
+}
