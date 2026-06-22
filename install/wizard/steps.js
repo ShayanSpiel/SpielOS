@@ -1,5 +1,6 @@
 /* SpielOS Wizard — Alpine.js component.
-   Loaded by index.html. Provides the wizard() component.
+   Production: real progress at top, file path hints per field, live banner
+   preview, real color pickers, auto-install adapters on finish.
 */
 
 function wizard() {
@@ -9,12 +10,14 @@ function wizard() {
     done: false,
     target: '',
     doneLines: [],
+    installResult: null,
+    toast: '',
+    toastTimer: null,
     bufferLoading: false,
     bufferChannels: [],
     bufferError: '',
 
     form: {
-      // Step 1: Brand
       brand_name: 'SpielOS',
       handle: '@your_handle',
       tagline: 'Build to public.',
@@ -22,32 +25,26 @@ function wizard() {
       primary_bg: '#000000',
       primary_fg: '#ffffff',
       accent: '#ff6a00',
-      // Step 2: Identity
       role: '',
       story: '',
       methodology_sources: ['Build sessions'],
-      // Step 3: ICP
       icp_who: '',
       icp_age: '',
       icp_revenue: '',
       icp_goal: '',
       icp_fear: '',
       icp_questions: '',
-      // Step 4: Positioning
       positioning: '',
       category: '',
       core_insight: '',
-      // Step 5: Offer
       offer_name: '',
       offer_price: '',
       offer_stack: '',
       offer_guarantee: '',
-      // Step 6: Funnel
       funnel_tofu: 40,
       funnel_mofu: 40,
       funnel_bofu: 15,
       archetypes: ['System Build', 'Ship', 'Decision', 'Lesson'],
-      // Step 7: Voice
       voice_register: 'confessional-teaching',
       voice_rules: [
         'No em-dashes (use →, colons, commas)',
@@ -55,11 +52,9 @@ function wizard() {
         'Note: closer preferred'
       ],
       banned_openers: '^in this post\n^today i want to talk about\n^hey friends\n^excited to share',
-      // Step 8: Methodology
       methodology_name: 'Session as Content',
       methodology_desc: '',
       platforms: ['x', 'linkedin'],
-      // Step 9: Connect
       buffer_token: '',
       buffer_channels: [],
       x_api_key: '',
@@ -73,17 +68,17 @@ function wizard() {
     },
 
     steps: [
-      { key: 'welcome',     label: 'Welcome',     sub: '5 min, 10 steps' },
-      { key: 'brand',       label: 'Brand',       sub: 'Visual identity' },
-      { key: 'identity',    label: 'Identity',    sub: 'Who you are' },
-      { key: 'icp',         label: 'ICP',         sub: 'Who you serve' },
-      { key: 'positioning', label: 'Positioning', sub: 'Your one-liner' },
-      { key: 'offer',       label: 'Offer',       sub: 'What you sell' },
-      { key: 'funnel',      label: 'Funnel',      sub: 'How readers move' },
-      { key: 'voice',       label: 'Voice',       sub: 'How posts read' },
-      { key: 'methodology', label: 'Methodology', sub: 'Where content comes from' },
-      { key: 'connect',     label: 'Connect',     sub: 'API tokens' },
-      { key: 'done',        label: 'Done',        sub: 'Filed.' },
+      { key: 'welcome',     label: 'Welcome' },
+      { key: 'brand',       label: 'Brand' },
+      { key: 'identity',    label: 'Identity' },
+      { key: 'icp',         label: 'ICP' },
+      { key: 'positioning', label: 'Positioning' },
+      { key: 'offer',       label: 'Offer' },
+      { key: 'funnel',      label: 'Funnel' },
+      { key: 'voice',       label: 'Voice' },
+      { key: 'methodology', label: 'Methodology' },
+      { key: 'connect',     label: 'Connect' },
+      { key: 'done',        label: 'Done' },
     ],
 
     async init() {
@@ -99,14 +94,19 @@ function wizard() {
       }
     },
 
-    async next() {
+    showToast(message, duration = 4500) {
+      this.toast = message;
+      if (this.toastTimer) clearTimeout(this.toastTimer);
+      this.toastTimer = setTimeout(() => { this.toast = ''; }, duration);
+    },
+
+    next() {
       if (this.current < 9) {
         this.current += 1;
         window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
-      // Step 9 → finish
-      await this.finish();
+      this.finish();
     },
 
     back() {
@@ -144,6 +144,7 @@ function wizard() {
           this.bufferChannels = [];
         } else {
           this.bufferChannels = data.channels || [];
+          this.showToast(`Found ${data.channels.length} channels`);
         }
       } catch (e) {
         this.bufferError = String(e);
@@ -162,35 +163,41 @@ function wizard() {
         });
         const data = await r.json();
         if (!r.ok) {
-          alert('Setup failed: ' + (data.error || 'unknown error'));
+          this.showToast('Setup failed: ' + (data.error || 'unknown error'), 8000);
           this.saving = false;
           return;
         }
         this.doneLines = data.written || [];
+        this.installResult = data.install || {};
         this.done = true;
         this.current = 10;
+        // Pick the closer copy from the install result
+        if (this.installResult.adapters_installed > 0) {
+          this.installResult.closer_takeaway = 'Installed. The team is on your IDEs.';
+          this.installResult.closer_echo = `Published ${this.installResult.adapters_generated} agent files, installed ${this.installResult.adapters_installed} to your live IDE.`;
+        }
+        this.showToast('✓ Setup complete', 6000);
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } catch (e) {
-        alert('Setup failed: ' + e);
+        this.showToast('Setup failed: ' + e, 8000);
       } finally {
         this.saving = false;
       }
     },
 
     saveAndQuit() {
-      // Persist current state to localStorage so re-opening picks up
       try {
         localStorage.setItem('spielos-wizard-draft', JSON.stringify(this.form));
-        alert('Saved! Re-run `spiel init` to pick up where you left off.');
-        window.close();
+        this.showToast('Draft saved. Re-run `spiel init` to resume.', 5000);
+        setTimeout(() => { window.close(); }, 1500);
       } catch (e) {
-        alert('Could not save draft: ' + e);
+        this.showToast('Could not save: ' + e, 5000);
       }
     },
 
     closeTab() {
       window.close();
-      setTimeout(() => { window.location.href = 'about:blank'; }, 100);
+      setTimeout(() => { window.location.href = 'about:blank'; }, 200);
     },
   };
 }

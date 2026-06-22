@@ -6,501 +6,542 @@
   <title>SpielOS — Setup</title>
   <link rel="stylesheet" href="design-system.css">
 </head>
-<body>
-  <div class="app" x-data="wizard()" x-init="init()" x-cloak>
+<body x-data="wizard()" x-init="init()" x-cloak>
 
-    <!-- ── Sidebar ──────────────────────────────────────────────── -->
-    <aside class="sidebar">
-      <div class="sidebar-brand">
-        <div class="logo">SpielOS</div>
-        <div class="tag">Setup wizard</div>
+  <!-- ── Top progress (rail + eyebrow) ─────────────────────── -->
+  <div class="progress-rail">
+    <div class="progress-fill" :style="`width: ${(current / 10) * 100}%`"></div>
+  </div>
+  <div class="progress-eyebrow">
+    <span class="step-num-pill" x-text="Math.min(current + 1, 10)"></span>
+    <span class="step-name" x-text="steps[current]?.label || ''"></span>
+    <span class="step-fraction" x-text="`· ${current + 1} / 10`"></span>
+  </div>
+
+  <!-- ── Toast ──────────────────────────────────────────────── -->
+  <div class="toast ok" x-show="toast" x-transition x-text="toast"></div>
+
+  <main class="main">
+
+    <!-- ── Step 0: Welcome ─────────────────────────────────── -->
+    <section class="step-panel" x-show="current === 0" x-transition.opacity>
+      <div class="section-head hero">
+        <div class="section-tag">SpielOS Setup</div>
+        <h1 class="section-title">SpielOS</h1>
+        <p class="section-sub">A markdown-driven marketing team that turns your build sessions into posts for X, LinkedIn, and your blog.</p>
+        <div class="hero-handle" x-text="form.handle || '@your_handle'"></div>
+        <div class="welcome-info">
+          <div class="welcome-info-row">
+            <span class="welcome-info-label">Target</span>
+            <span class="welcome-info-value" x-text="target || '—'"></span>
+          </div>
+          <div class="welcome-info-row">
+            <span class="welcome-info-label">Steps</span>
+            <span class="welcome-info-value">10</span>
+          </div>
+          <div class="welcome-info-row">
+            <span class="welcome-info-label">Time</span>
+            <span class="welcome-info-value">~5 min</span>
+          </div>
+        </div>
       </div>
-      <ul class="steps">
-        <template x-for="(s, i) in steps" :key="s.key">
-          <li class="step"
-              :class="{ active: i === current, done: i < current, disabled: i > current }"
-              @click="i <= current && go(i)">
-            <span class="step-num" x-text="i < current ? '✓' : (i + 1)"></span>
-            <div>
-              <div class="step-label" x-text="s.label"></div>
-              <div class="step-sub" x-text="s.sub"></div>
+    </section>
+
+    <!-- ── Step 1: Brand ───────────────────────────────────── -->
+    <section class="step-panel" x-show="current === 1" x-transition.opacity>
+      <div class="section-head">
+        <div class="section-tag">Step 1 of 10</div>
+        <h2 class="section-title">Brand</h2>
+        <p class="section-sub">Visual identity. The Designer reads this to render banners.</p>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Project / company name</label>
+        <input class="field-input" x-model="form.brand_name" placeholder="SpielOS">
+        <span class="field-hint"><span class="field-target">system/brand.md</span></span>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Handle (with @)</label>
+        <input class="field-input mono" x-model="form.handle" placeholder="@your_handle">
+        <span class="field-hint"><span class="field-target">system/brand.md</span></span>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Tagline <span class="field-counter" x-text="`${form.tagline.length}/80`"></span></label>
+        <input class="field-input" x-model="form.tagline" maxlength="80" placeholder="Build to public.">
+        <span class="field-hint"><span class="field-target">system/brand.md</span></span>
+      </div>
+
+      <div class="field">
+        <label class="field-label">One-line intro of the writer</label>
+        <input class="field-input" x-model="form.creator_self" placeholder="I am a builder.">
+        <span class="field-hint"><span class="field-target">system/brand.md</span></span>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Banner colors <span class="field-counter">click swatch to pick</span></label>
+        <div class="field-grid-3">
+          <div class="color-group">
+            <label class="color-label">Background</label>
+            <div class="color-picker">
+              <label class="color-swatch" :style="`background: ${form.primary_bg}`">
+                <input type="color" x-model="form.primary_bg">
+              </label>
+              <input class="color-input" x-model="form.primary_bg" placeholder="#000000">
             </div>
-          </li>
-        </template>
-      </ul>
-      <div class="sidebar-footer">
-        <a href="https://spielos.xyz" target="_blank" class="footer-link">spielos.xyz</a>
-        <span class="footer-ver">v1.0.0</span>
+          </div>
+          <div class="color-group">
+            <label class="color-label">Title</label>
+            <div class="color-picker">
+              <label class="color-swatch" :style="`background: ${form.primary_fg}`">
+                <input type="color" x-model="form.primary_fg">
+              </label>
+              <input class="color-input" x-model="form.primary_fg" placeholder="#ffffff">
+            </div>
+          </div>
+          <div class="color-group">
+            <label class="color-label">Accent</label>
+            <div class="color-picker">
+              <label class="color-swatch" :style="`background: ${form.accent}`">
+                <input type="color" x-model="form.accent">
+              </label>
+              <input class="color-input" x-model="form.accent" placeholder="#ff6a00">
+            </div>
+          </div>
+        </div>
+        <span class="field-hint"><span class="field-target">system/brand.md + system/brand.json</span></span>
       </div>
-    </aside>
 
-    <!-- ── Progress bar ─────────────────────────────────────────── -->
-    <div class="progress-bar" :style="`width: ${(current / 10) * 100}%`"></div>
-
-    <!-- ── Main ────────────────────────────────────────────────── -->
-    <main class="main">
-
-      <!-- ── Step 0: Welcome ──────────────────────────────────────── -->
-      <section class="step-panel" x-show="current === 0" x-transition.opacity>
-        <div class="hero">
-          <div class="hero-eyebrow">STEP 1 OF 10</div>
-          <h1>SpielOS</h1>
-          <p class="hero-sub">A markdown-driven marketing team for your content pipeline.</p>
+      <!-- Live banner preview -->
+      <div class="banner-preview">
+        <div class="banner-preview-label">Live preview — banner template: default</div>
+        <div class="banner-canvas" :style="`background: ${form.primary_bg}; color: ${form.primary_fg};`">
+          <div>
+            <div class="title" x-text="form.brand_name || 'Your title here'"></div>
+            <div class="subtitle" x-text="form.tagline || 'Your subtitle here'"></div>
+          </div>
           <div class="handle" x-text="form.handle || '@your_handle'"></div>
         </div>
-        <div class="welcome-body">
-          <p>SpielOS is a marketing team that lives inside your IDE.</p>
-          <p>You bring the work. The team — MD, Strategist, Researcher, Copywriter, Editor, Designer, Publisher, Analyst — turns it into posts for X, LinkedIn, and your blog. <strong>You stay a builder.</strong></p>
-          <p>The wizard sets up the 8 roles and the 8 knowledge files the system needs to write posts in <em>your</em> voice, for <em>your</em> audience, about <em>your</em> work.</p>
-          <p>10 steps. About 5 minutes. You can edit everything later.</p>
-        </div>
-        <div class="install-info">
-          <div class="install-row">
-            <span class="install-label">Target</span>
-            <code class="install-value" x-text="target"></code>
-          </div>
-          <div class="install-row">
-            <span class="install-label">Steps</span>
-            <code class="install-value">10</code>
-          </div>
-          <div class="install-row">
-            <span class="install-label">Time</span>
-            <code class="install-value">~5 min</code>
-          </div>
-        </div>
-      </section>
+      </div>
+    </section>
 
-      <!-- ── Step 1: Brand ─────────────────────────────────────────── -->
-      <section class="step-panel" x-show="current === 1" x-transition.opacity>
-        <div class="step-header">
-          <div class="step-counter">STEP 2 OF 10</div>
-          <h2 class="step-title">Brand</h2>
-          <p class="step-subtitle">Visual identity. The Designer reads this to render banners.</p>
-        </div>
-        <div class="step-body">
-          <div class="field-grid">
-            <div class="field">
-              <label class="field-label">Project / company name</label>
-              <input class="field-input" x-model="form.brand_name" placeholder="SpielOS">
-            </div>
-            <div class="field">
-              <label class="field-label">Handle (with @)</label>
-              <input class="field-input mono" x-model="form.handle" placeholder="@your_handle">
-            </div>
-          </div>
-          <div class="field">
-            <label class="field-label">Tagline <span class="field-counter" x-text="`${form.tagline.length}/80`"></span></label>
-            <input class="field-input" x-model="form.tagline" maxlength="80" placeholder="Build to public.">
-          </div>
-          <div class="field">
-            <label class="field-label">One-line intro of the writer</label>
-            <input class="field-input" x-model="form.creator_self" placeholder="I am a builder.">
-          </div>
-          <div class="field">
-            <label class="field-label">Colors</label>
-            <div class="field-grid">
-              <div class="color-group">
-                <label class="color-label">Background</label>
-                <div class="color-row">
-                  <div class="color-swatch" :style="`background: ${form.primary_bg}`"></div>
-                  <input class="color-input mono" x-model="form.primary_bg" placeholder="#000000">
-                </div>
-              </div>
-              <div class="color-group">
-                <label class="color-label">Title</label>
-                <div class="color-row">
-                  <div class="color-swatch" :style="`background: ${form.primary_fg}`"></div>
-                  <input class="color-input mono" x-model="form.primary_fg" placeholder="#ffffff">
-                </div>
-              </div>
-              <div class="color-group">
-                <label class="color-label">Accent</label>
-                <div class="color-row">
-                  <div class="color-swatch" :style="`background: ${form.accent}`"></div>
-                  <input class="color-input mono" x-model="form.accent" placeholder="#ff6a00">
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+    <!-- ── Step 2: Identity ────────────────────────────────── -->
+    <section class="step-panel" x-show="current === 2" x-transition.opacity>
+      <div class="section-head">
+        <div class="section-tag">Step 2 of 10</div>
+        <h2 class="section-title">Identity</h2>
+        <p class="section-sub">Who you are. The Strategist reads this to shape the lens.</p>
+      </div>
 
-      <!-- ── Step 2: Identity ────────────────────────────────────── -->
-      <section class="step-panel" x-show="current === 2" x-transition.opacity>
-        <div class="step-header">
-          <div class="step-counter">STEP 3 OF 10</div>
-          <h2 class="step-title">Identity</h2>
-          <p class="step-subtitle">Who you are. The Strategist reads this to shape the lens.</p>
-        </div>
-        <div class="step-body">
-          <div class="field">
-            <label class="field-label">Your role / job title</label>
-            <input class="field-input" x-model="form.role" placeholder="Solo founder, indie hacker, technical founder...">
-          </div>
-          <div class="field">
-            <label class="field-label">Your story in 3 sentences</label>
-            <textarea class="field-textarea" x-model="form.story" rows="4" placeholder="What you've built. Why you're building. What's the next thing."></textarea>
-            <span class="field-hint">The Strategist pulls from this to find the "what shifts" in your work.</span>
-          </div>
-          <div class="field">
-            <label class="field-label">Where your content comes from</label>
-            <div class="toggle-group">
-              <template x-for="opt in ['Build sessions', 'Customer calls', 'Reading & research', 'Personal experience', 'Decisions / tradeoffs']">
-                <span class="toggle" :class="{ selected: form.methodology_sources.includes(opt) }"
-                      @click="toggle('methodology_sources', opt)" x-text="opt"></span>
-              </template>
-            </div>
-          </div>
-        </div>
-      </section>
+      <div class="field">
+        <label class="field-label">Your role / job title</label>
+        <input class="field-input" x-model="form.role" placeholder="Solo founder, indie hacker, technical founder...">
+        <span class="field-hint"><span class="field-target">strategy/icp.md + strategy/methodology.md</span></span>
+      </div>
 
-      <!-- ── Step 3: ICP ─────────────────────────────────────────── -->
-      <section class="step-panel" x-show="current === 3" x-transition.opacity>
-        <div class="step-header">
-          <div class="step-counter">STEP 4 OF 10</div>
-          <h2 class="step-title">ICP</h2>
-          <p class="step-subtitle">The Ideal Customer Profile. The Strategist writes for this person.</p>
-        </div>
-        <div class="step-body">
-          <div class="field">
-            <label class="field-label">Who you serve (one line)</label>
-            <input class="field-input" x-model="form.icp_who" placeholder="Technical founders, indie hackers, YC operators...">
-          </div>
-          <div class="field-grid">
-            <div class="field">
-              <label class="field-label">Age range</label>
-              <input class="field-input" x-model="form.icp_age" placeholder="28-45">
-            </div>
-            <div class="field">
-              <label class="field-label">Revenue / stage</label>
-              <input class="field-input" x-model="form.icp_revenue" placeholder="$5k–$50k/mo">
-            </div>
-          </div>
-          <div class="field">
-            <label class="field-label">What they're trying to do</label>
-            <textarea class="field-textarea" x-model="form.icp_goal" rows="3" placeholder="The goal / mission / thing they're working on."></textarea>
-          </div>
-          <div class="field">
-            <label class="field-label">What they fear / avoid</label>
-            <textarea class="field-textarea" x-model="form.icp_fear" rows="3" placeholder="The thing that keeps them stuck."></textarea>
-          </div>
-          <div class="field">
-            <label class="field-label">3 internal questions they ask themselves</label>
-            <textarea class="field-textarea" x-model="form.icp_questions" rows="4" placeholder="1. Do I really have to become a content bro?&#10;2. My stuff is too technical. Who would care?&#10;3. I tried posting. 2 likes. What's the point?"></textarea>
-          </div>
-        </div>
-      </section>
+      <div class="field">
+        <label class="field-label">Your story in 3 sentences</label>
+        <textarea class="field-textarea" x-model="form.story" rows="4" placeholder="What you've built. Why you're building. What's the next thing."></textarea>
+        <span class="field-hint"><span class="field-target">strategy/icp.md</span></span>
+      </div>
 
-      <!-- ── Step 4: Positioning ─────────────────────────────────── -->
-      <section class="step-panel" x-show="current === 4" x-transition.opacity>
-        <div class="step-header">
-          <div class="step-counter">STEP 5 OF 10</div>
-          <h2 class="step-title">Positioning</h2>
-          <p class="step-subtitle">Your one-line market position. The Strategist uses this to set the lens.</p>
+      <div class="field">
+        <label class="field-label">Where your content comes from</label>
+        <div class="toggle-group">
+          <template x-for="opt in ['Build sessions', 'Customer calls', 'Reading & research', 'Personal experience', 'Decisions / tradeoffs']">
+            <span class="toggle" :class="{ selected: form.methodology_sources.includes(opt) }"
+                  @click="toggle('methodology_sources', opt)" x-text="opt"></span>
+          </template>
         </div>
-        <div class="step-body">
-          <div class="field">
-            <label class="field-label">Your one-liner</label>
-            <input class="field-input" x-model="form.positioning" placeholder="The thing turns the thing into the thing.">
-            <span class="field-hint">A single sentence that names who you serve, what they get, and why it matters.</span>
-          </div>
-          <div class="field">
-            <label class="field-label">Your category</label>
-            <input class="field-input" x-model="form.category" placeholder="Session-as-Content Infrastructure">
-          </div>
-          <div class="field">
-            <label class="field-label">Your core insight (1-2 sentences)</label>
-            <textarea class="field-textarea" x-model="form.core_insight" rows="3" placeholder="The belief that the reader walks away with after one post."></textarea>
-          </div>
-        </div>
-      </section>
+        <span class="field-hint"><span class="field-target">strategy/methodology.md</span></span>
+      </div>
+    </section>
 
-      <!-- ── Step 5: Offer ───────────────────────────────────────── -->
-      <section class="step-panel" x-show="current === 5" x-transition.opacity>
-        <div class="step-header">
-          <div class="step-counter">STEP 6 OF 10</div>
-          <h2 class="step-title">Offer</h2>
-          <p class="step-subtitle">What you sell. The Strategist uses this for BOFU posts (1 in 5).</p>
-        </div>
-        <div class="step-body">
-          <div class="field-grid">
-            <div class="field">
-              <label class="field-label">What you sell (one line)</label>
-              <input class="field-input" x-model="form.offer_name" placeholder="DFY Install of the system">
-            </div>
-            <div class="field">
-              <label class="field-label">Price</label>
-              <input class="field-input" x-model="form.offer_price" placeholder="$990 one-time">
-            </div>
-          </div>
-          <div class="field">
-            <label class="field-label">What they get (the stack)</label>
-            <textarea class="field-textarea" x-model="form.offer_stack" rows="5" placeholder="✓ Positioning Strategy&#10;✓ Offer Design&#10;✓ The Engine Installation&#10;..."></textarea>
-          </div>
-          <div class="field">
-            <label class="field-label">Guarantee (one line)</label>
-            <input class="field-input" x-model="form.offer_guarantee" placeholder="If after 30 days you've run 5 sessions and don't have 5 drafts, full refund.">
-          </div>
-        </div>
-      </section>
+    <!-- ── Step 3: ICP ─────────────────────────────────────── -->
+    <section class="step-panel" x-show="current === 3" x-transition.opacity>
+      <div class="section-head">
+        <div class="section-tag">Step 3 of 10</div>
+        <h2 class="section-title">ICP</h2>
+        <p class="section-sub">The Ideal Customer Profile. The Strategist writes for this person.</p>
+      </div>
 
-      <!-- ── Step 6: Funnel ──────────────────────────────────────── -->
-      <section class="step-panel" x-show="current === 6" x-transition.opacity>
-        <div class="step-header">
-          <div class="step-counter">STEP 7 OF 10</div>
-          <h2 class="step-title">Funnel</h2>
-          <p class="step-subtitle">How readers move from unaware to buying. The Strategist routes posts by stage.</p>
-        </div>
-        <div class="step-body">
-          <div class="field">
-            <label class="field-label">Funnel distribution (% of content targeting each stage)</label>
-            <div class="funnel-grid">
-              <div class="funnel-input">
-                <label class="funnel-label">Awareness (TOFU)</label>
-                <input class="field-input" type="number" min="0" max="100" x-model.number="form.funnel_tofu" placeholder="40">
-              </div>
-              <div class="funnel-input">
-                <label class="funnel-label">Consideration (MOFU)</label>
-                <input class="field-input" type="number" min="0" max="100" x-model.number="form.funnel_mofu" placeholder="40">
-              </div>
-              <div class="funnel-input">
-                <label class="funnel-label">Conversion (BOFU)</label>
-                <input class="field-input" type="number" min="0" max="100" x-model.number="form.funnel_bofu" placeholder="15">
-              </div>
-            </div>
-            <div class="funnel-bar">
-              <div class="funnel-segment tofu" :style="`flex: ${form.funnel_tofu || 0}`" x-text="form.funnel_tofu ? form.funnel_tofu + '%' : ''"></div>
-              <div class="funnel-segment mofu" :style="`flex: ${form.funnel_mofu || 0}`" x-text="form.funnel_mofu ? form.funnel_mofu + '%' : ''"></div>
-              <div class="funnel-segment bofu" :style="`flex: ${form.funnel_bofu || 0}`" x-text="form.funnel_bofu ? form.funnel_bofu + '%' : ''"></div>
-            </div>
-          </div>
-          <div class="field">
-            <label class="field-label">Archetypes (the session types you write about)</label>
-            <div class="toggle-group">
-              <template x-for="opt in ['System Build', 'Ship', 'Decision', 'Lesson', 'Failure', 'Client Work', 'Research', 'Tooling', 'Strategy', 'Meta']">
-                <span class="toggle" :class="{ selected: form.archetypes.includes(opt) }"
-                      @click="toggle('archetypes', opt)" x-text="opt"></span>
-              </template>
-            </div>
-          </div>
-        </div>
-      </section>
+      <div class="field">
+        <label class="field-label">Who you serve (one line)</label>
+        <input class="field-input" x-model="form.icp_who" placeholder="Technical founders, indie hackers, YC operators...">
+        <span class="field-hint"><span class="field-target">strategy/icp.md</span></span>
+      </div>
 
-      <!-- ── Step 7: Voice ───────────────────────────────────────── -->
-      <section class="step-panel" x-show="current === 7" x-transition.opacity>
-        <div class="step-header">
-          <div class="step-counter">STEP 8 OF 10</div>
-          <h2 class="step-title">Voice</h2>
-          <p class="step-subtitle">How your posts read. The Copywriter matches this register.</p>
+      <div class="field-grid">
+        <div class="field">
+          <label class="field-label">Age range</label>
+          <input class="field-input" x-model="form.icp_age" placeholder="28-45">
+          <span class="field-hint"><span class="field-target">strategy/icp.md</span></span>
         </div>
-        <div class="step-body">
-          <div class="field">
-            <label class="field-label">Default voice register</label>
-            <div class="toggle-group">
-              <template x-for="opt in ['confessional-teaching', 'story-with-lesson', 'listicle-counter-intuitive', 'velocity', 'long-form-blog', 'short-form-x', 'reader-problem-first', 'punchy-direct']">
-                <span class="toggle" :class="{ selected: form.voice_register === opt }"
-                      @click="form.voice_register = opt" x-text="opt"></span>
-              </template>
-            </div>
-          </div>
-          <div class="field">
-            <label class="field-label">Always-on style rules</label>
-            <div class="toggle-group">
-              <template x-for="opt in ['No em-dashes (use →, colons, commas)', 'Standard capitalization', 'No engagement bait', 'No corporate buzzwords', 'No \"hate marketing\" angle', 'Note: closer preferred', 'Single line breaks between sentences']">
-                <span class="toggle" :class="{ selected: form.voice_rules.includes(opt) }"
-                      @click="toggle('voice_rules', opt)" x-text="opt"></span>
-              </template>
-            </div>
-          </div>
-          <div class="field">
-            <label class="field-label">Banned opener patterns (one per line, regex)</label>
-            <textarea class="field-textarea mono" x-model="form.banned_openers" rows="4" placeholder="^in this post&#10;^today i want to talk about&#10;^hey friends&#10;^excited to share"></textarea>
-            <span class="field-hint">Each line is a regex matched against the first line of the post (case-insensitive).</span>
-          </div>
+        <div class="field">
+          <label class="field-label">Revenue / stage</label>
+          <input class="field-input" x-model="form.icp_revenue" placeholder="$5k–$50k/mo">
+          <span class="field-hint"><span class="field-target">strategy/icp.md</span></span>
         </div>
-      </section>
+      </div>
 
-      <!-- ── Step 8: Methodology ─────────────────────────────────── -->
-      <section class="step-panel" x-show="current === 8" x-transition.opacity>
-        <div class="step-header">
-          <div class="step-counter">STEP 9 OF 10</div>
-          <h2 class="step-title">Methodology</h2>
-          <p class="step-subtitle">Where your content comes from. The Researcher uses this to find the source.</p>
-        </div>
-        <div class="step-body">
-          <div class="field">
-            <label class="field-label">Methodology name</label>
-            <input class="field-input" x-model="form.methodology_name" placeholder="Session as Content">
-          </div>
-          <div class="field">
-            <label class="field-label">Methodology description (2-3 sentences)</label>
-            <textarea class="field-textarea" x-model="form.methodology_desc" rows="4" placeholder="How the source of your content turns into posts."></textarea>
-          </div>
-          <div class="field">
-            <label class="field-label">Platforms you publish to</label>
-            <div class="toggle-group">
-              <template x-for="opt in ['x', 'linkedin', 'blog']">
-                <span class="toggle toggle-platform" :class="{ selected: form.platforms.includes(opt) }"
-                      @click="toggle('platforms', opt)" x-text="opt"></span>
-              </template>
-            </div>
-            <span class="field-hint">If you skip all, you'll need to specify platforms at the Format Wizard step every time.</span>
-          </div>
-        </div>
-      </section>
+      <div class="field">
+        <label class="field-label">What they're trying to do</label>
+        <textarea class="field-textarea" x-model="form.icp_goal" rows="3" placeholder="The goal / mission / thing they're working on."></textarea>
+        <span class="field-hint"><span class="field-target">strategy/icp.md</span></span>
+      </div>
 
-      <!-- ── Step 9: Connect ─────────────────────────────────────── -->
-      <section class="step-panel" x-show="current === 9" x-transition.opacity>
-        <div class="step-header">
-          <div class="step-counter">STEP 10 OF 10</div>
-          <h2 class="step-title">Connect</h2>
-          <p class="step-subtitle">API tokens. The Publisher needs these to actually post. <strong>You can skip everything here and add tokens later.</strong></p>
+      <div class="field">
+        <label class="field-label">What they fear / avoid</label>
+        <textarea class="field-textarea" x-model="form.icp_fear" rows="3" placeholder="The thing that keeps them stuck."></textarea>
+        <span class="field-hint"><span class="field-target">strategy/icp.md</span></span>
+      </div>
+
+      <div class="field">
+        <label class="field-label">3 internal questions they ask themselves</label>
+        <textarea class="field-textarea" x-model="form.icp_questions" rows="4" placeholder="1. Do I really have to become a content bro?&#10;2. My stuff is too technical. Who would care?&#10;3. I tried posting. 2 likes. What's the point?"></textarea>
+        <span class="field-hint"><span class="field-target">strategy/icp.md</span></span>
+      </div>
+    </section>
+
+    <!-- ── Step 4: Positioning ─────────────────────────────── -->
+    <section class="step-panel" x-show="current === 4" x-transition.opacity>
+      <div class="section-head">
+        <div class="section-tag">Step 4 of 10</div>
+        <h2 class="section-title">Positioning</h2>
+        <p class="section-sub">Your one-line market position. The Strategist uses this to set the lens.</p>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Your one-liner</label>
+        <input class="field-input" x-model="form.positioning" placeholder="The thing turns the thing into the thing.">
+        <span class="field-hint"><span class="field-target">strategy/positioning.md</span></span>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Your category</label>
+        <input class="field-input" x-model="form.category" placeholder="Session-as-Content Infrastructure">
+        <span class="field-hint"><span class="field-target">strategy/positioning.md</span></span>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Your core insight (1-2 sentences)</label>
+        <textarea class="field-textarea" x-model="form.core_insight" rows="3" placeholder="The belief that the reader walks away with after one post."></textarea>
+        <span class="field-hint"><span class="field-target">strategy/positioning.md</span></span>
+      </div>
+    </section>
+
+    <!-- ── Step 5: Offer ───────────────────────────────────── -->
+    <section class="step-panel" x-show="current === 5" x-transition.opacity>
+      <div class="section-head">
+        <div class="section-tag">Step 5 of 10</div>
+        <h2 class="section-title">Offer</h2>
+        <p class="section-sub">What you sell. The Strategist uses this for BOFU posts (1 in 5).</p>
+      </div>
+
+      <div class="field-grid">
+        <div class="field">
+          <label class="field-label">What you sell (one line)</label>
+          <input class="field-input" x-model="form.offer_name" placeholder="DFY Install of the system">
+          <span class="field-hint"><span class="field-target">strategy/offer.md</span></span>
         </div>
-        <div class="step-body">
-          <div class="connect-card">
-            <div class="connect-card-header">
-              <h3>Buffer <span class="connect-recommended">recommended</span></h3>
-              <p>Multi-platform fan-out. One call posts to X + LinkedIn + Threads.</p>
-            </div>
-            <div class="field">
-              <label class="field-label">Buffer access token</label>
-              <input class="field-input mono" x-model="form.buffer_token" placeholder="From buffer.com/settings/apps">
-            </div>
-            <button class="btn btn-secondary" @click="fetchBufferChannels()" :disabled="!form.buffer_token || bufferLoading">
-              <span x-show="!bufferLoading">Fetch channels</span>
-              <span x-show="bufferLoading">Loading…</span>
-            </button>
-            <div x-show="bufferError" class="log" style="margin-top: 12px;">
-              <span class="log-line err" x-text="bufferError"></span>
-            </div>
-            <div x-show="bufferChannels.length > 0" style="margin-top: 16px;">
-              <label class="field-label" style="font-size: 12px;">Pick 3 channels (Buffer free tier cap):</label>
-              <div class="toggle-group" style="margin-top: 8px;">
-                <template x-for="ch in bufferChannels" :key="ch.id">
-                  <span class="toggle" :class="{ selected: form.buffer_channels.includes(ch.id) }"
-                        @click="toggle('buffer_channels', ch.id)" x-text="`${ch.service} — ${ch.name}`"></span>
-                </template>
-              </div>
-            </div>
+        <div class="field">
+          <label class="field-label">Price</label>
+          <input class="field-input" x-model="form.offer_price" placeholder="$990 one-time">
+          <span class="field-hint"><span class="field-target">strategy/offer.md</span></span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="field-label">What they get (the stack)</label>
+        <textarea class="field-textarea" x-model="form.offer_stack" rows="5" placeholder="✓ Positioning Strategy&#10;✓ Offer Design&#10;✓ The Engine Installation&#10;..."></textarea>
+        <span class="field-hint"><span class="field-target">strategy/offer.md</span></span>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Guarantee (one line)</label>
+        <input class="field-input" x-model="form.offer_guarantee" placeholder="If after 30 days you've run 5 sessions and don't have 5 drafts, full refund.">
+        <span class="field-hint"><span class="field-target">strategy/offer.md</span></span>
+      </div>
+    </section>
+
+    <!-- ── Step 6: Funnel ──────────────────────────────────── -->
+    <section class="step-panel" x-show="current === 6" x-transition.opacity>
+      <div class="section-head">
+        <div class="section-tag">Step 6 of 10</div>
+        <h2 class="section-title">Funnel</h2>
+        <p class="section-sub">How readers move from unaware to buying. The Strategist routes posts by stage.</p>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Funnel distribution (% of content per stage)</label>
+        <div class="funnel-grid">
+          <div class="funnel-input">
+            <label class="funnel-label">Awareness</label>
+            <input class="field-input" type="number" min="0" max="100" x-model.number="form.funnel_tofu" placeholder="40">
           </div>
-
-          <details class="connect-details">
-            <summary>X direct (fallback — skip if you only use Buffer)</summary>
-            <div class="field-grid" style="margin-top: 12px;">
-              <div class="field">
-                <label class="field-label">X_API_KEY</label>
-                <input class="field-input mono" x-model="form.x_api_key">
-              </div>
-              <div class="field">
-                <label class="field-label">X_API_SECRET</label>
-                <input class="field-input mono" x-model="form.x_api_secret">
-              </div>
-              <div class="field">
-                <label class="field-label">X_ACCESS_TOKEN</label>
-                <input class="field-input mono" x-model="form.x_access_token">
-              </div>
-              <div class="field">
-                <label class="field-label">X_ACCESS_SECRET</label>
-                <input class="field-input mono" x-model="form.x_access_secret">
-              </div>
-            </div>
-          </details>
-
-          <details class="connect-details">
-            <summary>LinkedIn direct (fallback — skip if you only use Buffer)</summary>
-            <div class="field-grid" style="margin-top: 12px;">
-              <div class="field">
-                <label class="field-label">LINKEDIN_ACCESS_TOKEN</label>
-                <input class="field-input mono" x-model="form.linkedin_access_token">
-              </div>
-              <div class="field">
-                <label class="field-label">LINKEDIN_PERSON_URN</label>
-                <input class="field-input mono" x-model="form.linkedin_person_urn" placeholder="urn:li:person:...">
-              </div>
-            </div>
-          </details>
-
-          <details class="connect-details">
-            <summary>Blog (GH Pages — skip if you don't blog)</summary>
-            <div class="field-grid" style="margin-top: 12px;">
-              <div class="field">
-                <label class="field-label">BLOG_REPO</label>
-                <input class="field-input mono" x-model="form.blog_repo" placeholder="yourname/yourname.github.io">
-              </div>
-              <div class="field">
-                <label class="field-label">BLOG_TOKEN</label>
-                <input class="field-input mono" x-model="form.blog_token" placeholder="GitHub PAT with repo scope">
-              </div>
-            </div>
-          </details>
-        </div>
-      </section>
-
-      <!-- ── Step 10: Done ───────────────────────────────────────── -->
-      <section class="step-panel" x-show="current === 10" x-transition.opacity>
-        <div class="step-header">
-          <div class="step-counter">DONE</div>
-          <h2 class="step-title">Filed.</h2>
-          <p class="step-subtitle">SpielOS is installed. Here's what just got written.</p>
-        </div>
-        <div class="step-body">
-          <div class="done-summary" x-show="done">
-            <div class="done-list">
-              <template x-for="line in doneLines" :key="line">
-                <div class="done-row">
-                  <span class="done-check">✓</span>
-                  <code class="done-file" x-text="line.split(' ')[0]"></code>
-                  <span class="done-desc" x-text="line.substring(line.indexOf(' ') + 1)"></span>
-                </div>
-              </template>
-            </div>
+          <div class="funnel-input">
+            <label class="funnel-label">Consideration</label>
+            <input class="field-input" type="number" min="0" max="100" x-model.number="form.funnel_mofu" placeholder="40">
           </div>
-          <div class="next-steps" x-show="done">
-            <h3>What's next</h3>
-            <p>From any IDE (opencode, Claude Code, Cursor, MCP), type:</p>
-            <div class="cmd-row">
-              <code class="cmd">/post empty</code>
-              <span class="cmd-desc">turn today's build session into content</span>
-            </div>
-            <div class="cmd-row">
-              <code class="cmd">/post "Just shipped v2"</code>
-              <span class="cmd-desc">topic mode — ship an announcement</span>
-            </div>
-            <div class="cmd-row">
-              <code class="cmd">spiel init</code>
-              <span class="cmd-desc">re-open this wizard any time</span>
-            </div>
+          <div class="funnel-input">
+            <label class="funnel-label">Conversion</label>
+            <input class="field-input" type="number" min="0" max="100" x-model.number="form.funnel_bofu" placeholder="15">
           </div>
         </div>
-      </section>
+        <div class="funnel-bar">
+          <div class="funnel-segment tofu" :style="`flex: ${form.funnel_tofu || 0}`" x-text="form.funnel_tofu ? form.funnel_tofu + '%' : ''"></div>
+          <div class="funnel-segment mofu" :style="`flex: ${form.funnel_mofu || 0}`" x-text="form.funnel_mofu ? form.funnel_mofu + '%' : ''"></div>
+          <div class="funnel-segment bofu" :style="`flex: ${form.funnel_bofu || 0}`" x-text="form.funnel_bofu ? form.funnel_bofu + '%' : ''"></div>
+        </div>
+        <span class="field-hint"><span class="field-target">strategy/funnel.md</span></span>
+      </div>
 
-      <!-- ── Nav buttons ─────────────────────────────────────────── -->
-      <nav class="nav" x-show="current < 10">
-        <button class="btn btn-ghost" @click="back()" :disabled="current === 0 || saving">
-          ← Back
+      <div class="field">
+        <label class="field-label">Archetypes (the session types you write about)</label>
+        <div class="toggle-group">
+          <template x-for="opt in ['System Build', 'Ship', 'Decision', 'Lesson', 'Failure', 'Client Work', 'Research', 'Tooling', 'Strategy', 'Meta']">
+            <span class="toggle" :class="{ selected: form.archetypes.includes(opt) }"
+                  @click="toggle('archetypes', opt)" x-text="opt"></span>
+          </template>
+        </div>
+        <span class="field-hint"><span class="field-target">strategy/archetypes.md + strategy/funnel.md</span></span>
+      </div>
+    </section>
+
+    <!-- ── Step 7: Voice ───────────────────────────────────── -->
+    <section class="step-panel" x-show="current === 7" x-transition.opacity>
+      <div class="section-head">
+        <div class="section-tag">Step 7 of 10</div>
+        <h2 class="section-title">Voice</h2>
+        <p class="section-sub">How your posts read. The Copywriter matches this register.</p>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Default voice register</label>
+        <div class="toggle-group">
+          <template x-for="opt in ['confessional-teaching', 'story-with-lesson', 'listicle-counter-intuitive', 'velocity', 'long-form-blog', 'short-form-x', 'reader-problem-first', 'punchy-direct']">
+            <span class="toggle" :class="{ selected: form.voice_register === opt }"
+                  @click="form.voice_register = opt" x-text="opt"></span>
+          </template>
+        </div>
+        <span class="field-hint"><span class="field-target">strategy/voice.md</span></span>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Always-on style rules</label>
+        <div class="toggle-group">
+          <template x-for="opt in ['No em-dashes (use →, colons, commas)', 'Standard capitalization', 'No engagement bait', 'No corporate buzzwords', 'No \"hate marketing\" angle', 'Note: closer preferred', 'Single line breaks between sentences']">
+            <span class="toggle" :class="{ selected: form.voice_rules.includes(opt) }"
+                  @click="toggle('voice_rules', opt)" x-text="opt"></span>
+          </template>
+        </div>
+        <span class="field-hint"><span class="field-target">strategy/voice.md</span></span>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Banned opener patterns (one per line, regex)</label>
+        <textarea class="field-textarea mono" x-model="form.banned_openers" rows="4" placeholder="^in this post&#10;^today i want to talk about&#10;^hey friends&#10;^excited to share"></textarea>
+        <span class="field-hint"><span class="field-target">system/rules.yaml §banned_openers</span></span>
+      </div>
+    </section>
+
+    <!-- ── Step 8: Methodology ─────────────────────────────── -->
+    <section class="step-panel" x-show="current === 8" x-transition.opacity>
+      <div class="section-head">
+        <div class="section-tag">Step 8 of 10</div>
+        <h2 class="section-title">Methodology</h2>
+        <p class="section-sub">Where your content comes from. The Researcher uses this to find the source.</p>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Methodology name</label>
+        <input class="field-input" x-model="form.methodology_name" placeholder="Session as Content">
+        <span class="field-hint"><span class="field-target">strategy/methodology.md</span></span>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Methodology description (2-3 sentences)</label>
+        <textarea class="field-textarea" x-model="form.methodology_desc" rows="4" placeholder="How the source of your content turns into posts."></textarea>
+        <span class="field-hint"><span class="field-target">strategy/methodology.md</span></span>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Platforms you publish to</label>
+        <div class="toggle-group">
+          <template x-for="opt in ['x', 'linkedin', 'blog']">
+            <span class="toggle toggle-platform" :class="{ selected: form.platforms.includes(opt) }"
+                  @click="toggle('platforms', opt)" x-text="opt"></span>
+          </template>
+        </div>
+        <span class="field-hint">If you skip all, you'll need to specify platforms at the Format Wizard step every time.</span>
+      </div>
+    </section>
+
+    <!-- ── Step 9: Connect ─────────────────────────────────── -->
+    <section class="step-panel" x-show="current === 9" x-transition.opacity>
+      <div class="section-head">
+        <div class="section-tag">Step 9 of 10</div>
+        <h2 class="section-title">Connect</h2>
+        <p class="section-sub">API tokens. The Publisher needs these to actually post. <strong style="color: var(--tx);">You can skip everything here and add tokens later.</strong></p>
+      </div>
+
+      <div class="connect-card">
+        <h3>Buffer <span class="connect-recommended">recommended</span></h3>
+        <p>Multi-platform fan-out. One call posts to X + LinkedIn + Threads.</p>
+        <div class="field">
+          <label class="field-label">Buffer access token</label>
+          <input class="field-input mono" x-model="form.buffer_token" placeholder="From buffer.com/settings/apps">
+          <span class="field-hint"><span class="field-target">~/.spiel/.env → BUFFER_ACCESS_TOKEN</span></span>
+        </div>
+        <button class="btn btn-secondary" @click="fetchBufferChannels()" :disabled="!form.buffer_token || bufferLoading">
+          <span x-show="!bufferLoading">Fetch channels</span>
+          <span x-show="bufferLoading"><span class="spinner"></span> Loading…</span>
         </button>
-        <div class="nav-right">
-          <button x-show="current > 0 && current < 9" class="btn btn-ghost" @click="saveAndQuit()">
-            Save & quit
-          </button>
-          <button class="btn btn-primary" @click="next()" :disabled="saving">
-            <span x-show="current < 9 && !saving">Continue →</span>
-            <span x-show="current === 9 && !saving">Finish & install</span>
-            <span x-show="saving">Writing files…</span>
-          </button>
+        <div x-show="bufferError" class="log" style="margin-top: var(--s-3);">
+          <span class="log-line err" x-text="bufferError"></span>
         </div>
-      </nav>
-
-      <nav class="nav" x-show="current === 10">
-        <div></div>
-        <div class="nav-right">
-          <button class="btn btn-ghost" @click="go(0)">Start over</button>
-          <button class="btn btn-primary" @click="closeTab()">Close wizard</button>
+        <div x-show="bufferChannels.length > 0" style="margin-top: var(--s-4);">
+          <label class="field-label" style="font-size: var(--fs-xs);">Pick 3 channels (Buffer free tier cap):</label>
+          <div class="toggle-group" style="margin-top: var(--s-2);">
+            <template x-for="ch in bufferChannels" :key="ch.id">
+              <span class="toggle" :class="{ selected: form.buffer_channels.includes(ch.id) }"
+                    @click="toggle('buffer_channels', ch.id)" x-text="`${ch.service} — ${ch.name}`"></span>
+            </template>
+          </div>
+          <span class="field-hint"><span class="field-target">~/.spiel/.env → BUFFER_CHANNEL_IDS</span></span>
         </div>
-      </nav>
+      </div>
 
-    </main>
-  </div>
+      <details class="connect-details">
+        <summary>X direct (fallback — skip if you only use Buffer)</summary>
+        <div class="field-grid" style="margin-top: var(--s-3);">
+          <div class="field">
+            <label class="field-label">X_API_KEY</label>
+            <input class="field-input mono" x-model="form.x_api_key">
+            <span class="field-hint"><span class="field-target">~/.spiel/.env</span></span>
+          </div>
+          <div class="field">
+            <label class="field-label">X_API_SECRET</label>
+            <input class="field-input mono" x-model="form.x_api_secret">
+            <span class="field-hint"><span class="field-target">~/.spiel/.env</span></span>
+          </div>
+          <div class="field">
+            <label class="field-label">X_ACCESS_TOKEN</label>
+            <input class="field-input mono" x-model="form.x_access_token">
+            <span class="field-hint"><span class="field-target">~/.spiel/.env</span></span>
+          </div>
+          <div class="field">
+            <label class="field-label">X_ACCESS_SECRET</label>
+            <input class="field-input mono" x-model="form.x_access_secret">
+            <span class="field-hint"><span class="field-target">~/.spiel/.env</span></span>
+          </div>
+        </div>
+      </details>
+
+      <details class="connect-details">
+        <summary>LinkedIn direct (fallback — skip if you only use Buffer)</summary>
+        <div class="field-grid" style="margin-top: var(--s-3);">
+          <div class="field">
+            <label class="field-label">LINKEDIN_ACCESS_TOKEN</label>
+            <input class="field-input mono" x-model="form.linkedin_access_token">
+            <span class="field-hint"><span class="field-target">~/.spiel/.env</span></span>
+          </div>
+          <div class="field">
+            <label class="field-label">LINKEDIN_PERSON_URN</label>
+            <input class="field-input mono" x-model="form.linkedin_person_urn" placeholder="urn:li:person:...">
+            <span class="field-hint"><span class="field-target">~/.spiel/.env</span></span>
+          </div>
+        </div>
+      </details>
+
+      <details class="connect-details">
+        <summary>Blog (GH Pages — skip if you don't blog)</summary>
+        <div class="field-grid" style="margin-top: var(--s-3);">
+          <div class="field">
+            <label class="field-label">BLOG_REPO</label>
+            <input class="field-input mono" x-model="form.blog_repo" placeholder="yourname/yourname.github.io">
+            <span class="field-hint"><span class="field-target">~/.spiel/.env</span></span>
+          </div>
+          <div class="field">
+            <label class="field-label">BLOG_TOKEN</label>
+            <input class="field-input mono" x-model="form.blog_token" placeholder="GitHub PAT with repo scope">
+            <span class="field-hint"><span class="field-target">~/.spiel/.env</span></span>
+          </div>
+        </div>
+      </details>
+    </section>
+
+    <!-- ── Step 10: Done (uses the site's closer component) ── -->
+    <section class="step-panel" x-show="current === 10" x-transition.opacity>
+      <div class="section-head">
+        <div class="section-tag">Step 10 of 10</div>
+        <h2 class="section-title">Filed.</h2>
+        <p class="section-sub">SpielOS is installed. Here's what just got written.</p>
+      </div>
+
+      <div class="done-summary" x-show="done">
+        <template x-for="line in doneLines" :key="line">
+          <div class="done-row">
+            <span class="done-check">✓</span>
+            <code class="done-file" x-text="line.split(' ')[0]"></code>
+            <span class="done-desc" x-text="line.substring(line.indexOf(' ') + 1)"></span>
+          </div>
+        </template>
+      </div>
+
+      <!-- Closer component (matches site /assets/css/components.css) -->
+      <aside class="closer" x-show="done">
+        <div class="closer-icon-wrap">
+          <svg class="closer-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="28" height="28" aria-hidden="true">
+            <path d="M5 13l4 4L19 7"></path>
+          </svg>
+        </div>
+        <p class="closer-takeaway" x-text="installResult?.closer_takeaway || 'You stay a builder. The team ships the post.'"></p>
+        <p class="closer-echo" x-text="installResult?.closer_echo || `From any IDE, type /post empty. The 8 roles take it from there.`"></p>
+        <div class="closer-actions">
+          <a class="btn btn-primary" href="#" @click.prevent="closeTab()">Close wizard</a>
+          <a class="btn btn-ghost" href="#" @click.prevent="go(0)">Start over</a>
+        </div>
+      </aside>
+
+      <!-- What's next (cta-card component) -->
+      <div class="cta-card" x-show="installResult">
+        <h3>What's next</h3>
+        <p>From any IDE (opencode, Claude Code, Cursor, MCP), type one of these to start the pipeline:</p>
+        <div class="cmd-row">
+          <code class="cmd">/post empty</code>
+          <span class="cmd-desc">turn today's build session into content</span>
+        </div>
+        <div class="cmd-row">
+          <code class="cmd">/post "Just shipped v2"</code>
+          <span class="cmd-desc">topic mode — ship an announcement</span>
+        </div>
+        <div class="cmd-row">
+          <code class="cmd">spiel init</code>
+          <span class="cmd-desc">re-open this wizard any time</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Nav ──────────────────────────────────────────────── -->
+    <nav class="nav" x-show="current < 10">
+      <button class="btn btn-ghost" @click="back()" :disabled="current === 0 || saving">
+        ← Back
+      </button>
+      <div class="nav-right">
+        <button class="btn btn-ghost" @click="saveAndQuit()" x-show="current > 0 && current < 9">
+          Save & quit
+        </button>
+        <button class="btn btn-primary" @click="next()" :disabled="saving">
+          <span x-show="current < 9 && !saving">Continue →</span>
+          <span x-show="current === 9 && !saving">Finish & install →</span>
+          <span x-show="saving"><span class="spinner"></span> Writing…</span>
+        </button>
+      </div>
+    </nav>
+
+  </main>
 
   <script src="steps.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.5/dist/cdn.min.js" defer></script>

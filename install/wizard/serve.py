@@ -551,6 +551,102 @@ def write_install_marker() -> list[str]:
     return [".install-state.json"]
 
 
+def run_post_install() -> dict:
+    """After /api/finish: install the shim, sync IDE adapters, and report what was installed.
+
+    This is the bridge between "wizard finished" and "user can /post from any IDE".
+    The user doesn't have to run a single command after the wizard.
+    """
+    import shutil
+    import subprocess
+
+    result = {
+        "shim_installed": None,
+        "shim_path": None,
+        "shim_already_present": False,
+        "adapters_generated": 0,
+        "adapters_installed": 0,
+        "adapters_targets": [],
+        "errors": [],
+    }
+
+    # 1. Install the shim to ~/.local/bin/spiel
+    shim_path = Path.home() / ".local" / "bin" / "spiel"
+    vault_shim = VAULT / "bin" / "spiel"
+    if vault_shim.exists():
+        try:
+            shim_path.parent.mkdir(parents=True, exist_ok=True)
+            # Remove existing (symlink, file, etc.) so we don't hit IsADirectoryError or FileExistsError
+            if shim_path.is_symlink() or shim_path.exists():
+                shim_path.unlink()
+            shutil.copy(vault_shim, shim_path)
+            shim_path.chmod(0o755)
+            result["shim_installed"] = str(shim_path)
+            result["shim_path"] = str(shim_path)
+        except Exception as e:
+            result["errors"].append(f"shim install: {e}")
+    else:
+        result["shim_already_present"] = shim_path.exists()
+
+    # 2. Create ~/.spiel symlink for shim resolution (if needed)
+    home_symlink = Path.home() / ".spiel"
+    try:
+        if home_symlink.is_symlink():
+            home_symlink.unlink()
+        if not home_symlink.exists() and VAULT.resolve() != home_symlink.resolve():
+            home_symlink.symlink_to(VAULT)
+    except Exception as e:
+        result["errors"].append(f"home symlink: {e}")
+
+    # 3. Generate adapters
+    sync_script = VAULT / "tools" / "sync_adapters.py"
+    if sync_script.exists():
+        try:
+            r = subprocess.run(
+                [sys.executable, str(sync_script)],
+                capture_output=True, text=True,
+                cwd=str(VAULT),
+                timeout=30,
+            )
+            if r.returncode == 0:
+                # Count files
+                for sub in ("adapters/opencode/agents", "adapters/claude/agents",
+                            "adapters/cursor/commands"):
+                    p = VAULT / sub
+                    if p.exists():
+                        result["adapters_generated"] += sum(1 for _ in p.glob("*.md"))
+            else:
+                result["errors"].append(f"sync generate: {r.stderr}")
+        except Exception as e:
+            result["errors"].append(f"sync generate: {e}")
+
+    # 4. Install adapters to ~/.config/opencode (live IDE)
+    if sync_script.exists():
+        try:
+            r = subprocess.run(
+                [sys.executable, str(sync_script), "--install"],
+                capture_output=True, text=True,
+                cwd=str(VAULT),
+                timeout=30,
+            )
+            if r.returncode == 0:
+                # Count installed files
+                oc = Path.home() / ".config" / "opencode"
+                if oc.exists():
+                    for sub in ("agents", "skill"):
+                        d = oc / sub
+                        if d.exists():
+                            result["adapters_installed"] += sum(1 for _ in d.iterdir()
+                                                                  if _.name not in (".", ".."))
+                    result["adapters_targets"].append(str(oc))
+            else:
+                result["errors"].append(f"sync install: {r.stderr}")
+        except Exception as e:
+            result["errors"].append(f"sync install: {e}")
+
+    return result
+
+
 def fetch_buffer_channels(token: str) -> list[dict]:
     """Fetch Buffer channels for the wizard's channel picker."""
     query = """
@@ -668,10 +764,13 @@ class WizardHandler(BaseHTTPRequestHandler):
                 written += write_rules_update(data)
                 written += write_env(data)
                 written += write_install_marker()
+                # Auto-install: shim + IDE adapters
+                install_result = run_post_install()
                 return self._send_json(200, {
                     "ok": True,
                     "vault": str(VAULT),
                     "written": written,
+                    "install": install_result,
                 })
             except Exception as e:
                 import traceback
@@ -707,22 +806,99 @@ def open_browser(url: str) -> None:
         sys.stderr.write(f"[wizard] could not open browser: {e}\n")
 
 
+def bootstrap_vault(target: Path, source: Path | None = None) -> None:
+    """Copy the canonical source files into the target vault.
+
+    This is the bridge between "user ran install.sh" and "the wizard
+    has a complete vault to write into". The wizard's `target` directory
+    might be empty (fresh install) or have old data (re-install).
+
+    The strategy: copy any of the 7 deterministic tool files + the
+    8 role files + the 4 system files + bin/spiel that are missing.
+    Don't touch user data (content/, .env, strategy/).
+    """
+    import shutil
+
+    # If target is the source itself (e.g. local dev), no copy needed
+    if source and source.resolve() == target.resolve():
+        return
+
+    # Determine the source. Default: the repo this serve.py lives in.
+    # serve.py is at <repo>/install/wizard/serve.py, so source = <repo>.
+    if source is None:
+        source = WIZARD_DIR.parent.parent  # install/wizard → install → repo root
+
+    # Files/dirs that must exist in the vault
+    must_exist = [
+        "team", "system", "system/prompts", "strategy", "templates", "templates/registry",
+        "tools", "tools/publisher", "assets", "assets/banners", "assets/icons",
+        "adapters", "skills", "tests", "bin", "logs",
+        "content", "content/sessions", "content/queue", "content/posted", "content/rejected",
+    ]
+    for sub in must_exist:
+        target_dir = target / sub
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+    # Files to copy (if missing in target)
+    files_to_copy = [
+        # Role prompts
+        "team/md.md", "team/strategist.md", "team/researcher.md", "team/copywriter.md",
+        "team/editor.md", "team/designer.md", "team/publisher.md", "team/analyst.md",
+        "team/README.md",
+        # System
+        "system/state-machine.md", "system/brief-schema.md", "system/pipeline.md",
+        "system/brand.json", "system/gates.md", "system/rules.yaml",
+        "system/prompts/identity.md", "system/prompts/compiler.md",
+        "system/prompts/leak-guard.md", "system/prompts/wizards.md",
+        # Templates
+        "templates/x-post.md", "templates/linkedin-post.md", "templates/blog-post.md",
+        "templates/session-log.md", "templates/types.md",
+        "templates/registry/viral-templates.yaml",
+        # Tools
+        "tools/editor.py", "tools/designer.py", "tools/researcher.py", "tools/analyst.py",
+        "tools/sync_adapters.py",
+        "tools/publisher/_common.py", "tools/publisher/buffer.py",
+        "tools/publisher/twitter.py", "tools/publisher/linkedin.py",
+        "tools/publisher/blog.sh",
+        # Bin
+        "bin/spiel",
+        # Tests
+        "tests/smoke.py", "tests/test_state_machine.py", "tests/conftest.py",
+        # Root
+        "AGENTS.md", "README.md", "package.json", ".gitignore",
+    ]
+
+    for rel in files_to_copy:
+        src = source / rel
+        dst = target / rel
+        if not src.exists():
+            continue
+        if dst.exists():
+            continue  # don't overwrite user-edited files
+        try:
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dst)
+            # Preserve executable bit for sh + bin scripts
+            if rel.endswith(".sh") or rel == "bin/spiel":
+                dst.chmod(0o755)
+        except Exception as e:
+            sys.stderr.write(f"[wizard] could not copy {rel}: {e}\n")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="SpielOS setup wizard")
     parser.add_argument("--port", type=int, default=7331, help="Port to serve on (default 7331)")
     parser.add_argument("--target", help="Target vault directory (default: VAULT_DIR or ~/.spiel)")
     parser.add_argument("--no-open", action="store_true", help="Don't auto-open browser")
     parser.add_argument("--host", default="127.0.0.1", help="Host to bind (default 127.0.0.1)")
+    parser.add_argument("--source", help="Source repo to copy from (default: this serve.py's repo)")
     args = parser.parse_args()
 
     global VAULT
     VAULT = resolve_vault(args.target)
     VAULT.mkdir(parents=True, exist_ok=True)
-    # Make sure key subdirs exist
-    for sub in ("team", "system", "system/prompts", "strategy", "templates", "templates/registry",
-                "content", "content/sessions", "content/queue", "content/posted", "content/rejected",
-                "assets", "assets/banners", "assets/icons", "logs"):
-        (VAULT / sub).mkdir(parents=True, exist_ok=True)
+    # Make sure key subdirs exist + copy the source files into the vault
+    bootstrap_vault(VAULT, source=Path(args.source) if args.source else None)
 
     port = args.port
     if not is_port_free(port):
