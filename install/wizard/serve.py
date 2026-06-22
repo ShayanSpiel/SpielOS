@@ -791,6 +791,9 @@ class WizardHandler(BaseHTTPRequestHandler):
                 written += write_install_marker()
                 # Auto-install: shim + IDE adapters
                 install_result = run_post_install()
+                # Schedule server shutdown in 3 seconds (so the JS can show the success)
+                import threading
+                threading.Timer(3.0, lambda: os._exit(0)).start()
                 return self._send_json(200, {
                     "ok": True,
                     "vault": str(VAULT),
@@ -801,6 +804,14 @@ class WizardHandler(BaseHTTPRequestHandler):
                 import traceback
                 traceback.print_exc()
                 return self._send_json(500, {"error": str(e)})
+
+        if path == "/api/shutdown":
+            # Allow manual shutdown (used by the JS in some flows)
+            import threading
+            def _do_shutdown():
+                self.server.shutdown()
+            threading.Timer(0.5, _do_shutdown).start()
+            return self._send_json(200, {"ok": True, "message": "shutting down"})
 
         self.send_response(404)
         self.end_headers()
