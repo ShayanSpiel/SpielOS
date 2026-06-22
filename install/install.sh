@@ -134,8 +134,35 @@ ok "arch: $ARCH"
 # Override via $SPIELOS_INSTALL_DIR or a CLI arg.
 INSTALL_DIR=$(resolve_path "$DEFAULT_INSTALL_DIR")
 
-# If directory exists and is non-empty, check it's a SpielOS install
-if [[ -d "$INSTALL_DIR" ]]; then
+# Validate the target path. There are 4 cases:
+#   1. Nothing exists                            → fresh install
+#   2. Regular directory, has team/md.md         → re-install
+#   3. Regular directory, no team/md.md         → error (not SpielOS)
+#   4. Symlink                                   → resolve + check target
+#      a. Target is a valid SpielOS install      → re-install
+#      b. Target missing OR not a SpielOS install → error (with fix instructions)
+#   5. Regular file                              → error (user must remove)
+
+if [[ -L "$INSTALL_DIR" ]]; then
+  # Path is a symlink (may resolve or may be broken)
+  if [[ -d "$INSTALL_DIR" && -f "$INSTALL_DIR/team/md.md" ]]; then
+    # Symlink resolves to a valid SpielOS install
+    note "Existing SpielOS install detected at $INSTALL_DIR (via symlink)"
+  else
+    # Symlink is broken OR points to a non-SpielOS path
+    TARGET=$(readlink "$INSTALL_DIR" 2>/dev/null || echo "(unreadable)")
+    err "Found a symlink at $INSTALL_DIR"
+    err "  → $TARGET"
+    err "But that target is not a valid SpielOS install (no team/md.md)."
+    err ""
+    err "Choose one:"
+    err "  1. Remove the symlink:  rm $INSTALL_DIR"
+    err "  2. Use a different path: SPIELOS_INSTALL_DIR=~/.spiel-v2 bash <(curl ...)"
+    err "  3. Fix the symlink to point at a valid SpielOS vault"
+    exit 1
+  fi
+elif [[ -d "$INSTALL_DIR" ]]; then
+  # Regular directory
   if [[ -f "$INSTALL_DIR/team/md.md" ]]; then
     note "Existing SpielOS install detected at $INSTALL_DIR"
   else
@@ -143,7 +170,13 @@ if [[ -d "$INSTALL_DIR" ]]; then
     err "Pick a different path (set \$SPIELOS_INSTALL_DIR) or remove it first."
     exit 1
   fi
+elif [[ -e "$INSTALL_DIR" ]]; then
+  # Something exists but is not a symlink or directory (regular file, etc.)
+  err "$INSTALL_DIR exists but is not a directory or symlink."
+  err "Remove it:  rm $INSTALL_DIR"
+  exit 1
 else
+  # Nothing exists — fresh install
   note "Installing SpielOS to $INSTALL_DIR"
   mkdir -p "$INSTALL_DIR"
 fi
