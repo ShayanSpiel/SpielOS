@@ -8,15 +8,25 @@
 </head>
 <body x-data="wizard()" x-init="init()" x-cloak>
 
-  <!-- ── Top progress (rail + eyebrow) ─────────────────────── -->
-  <div class="progress-rail">
-    <div class="progress-fill" :style="`width: ${(current / 10) * 100}%`"></div>
-  </div>
-  <div class="progress-eyebrow">
-    <span class="step-num-pill" x-text="Math.min(current + 1, 10)"></span>
-    <span class="step-name" x-text="steps[current]?.label || ''"></span>
-    <span class="step-fraction" x-text="`· ${current + 1} / 10`"></span>
-  </div>
+  <!-- ── Top stepper: all 10 steps, click to jump back ─────── -->
+  <nav class="stepper">
+    <div class="stepper-inner">
+      <template x-for="(s, i) in steps.slice(0, 10)" :key="s.key">
+        <span style="display: flex; align-items: center; flex: 1 1 auto;">
+          <button class="stepper-step"
+                  :class="{ done: i < current, current: i === current, clickable: i <= current }"
+                  @click="i <= current && go(i)"
+                  :aria-current="i === current ? 'step' : null">
+            <span class="stepper-num">
+              <span class="stepper-num-text" x-text="i + 1"></span>
+            </span>
+            <span class="stepper-label" x-text="s.label"></span>
+          </button>
+          <span x-show="i < 9" class="stepper-connector" :class="{ done: i < current }"></span>
+        </span>
+      </template>
+    </div>
+  </nav>
 
   <!-- ── Toast ──────────────────────────────────────────────── -->
   <div class="toast ok" x-show="toast" x-transition x-text="toast"></div>
@@ -29,7 +39,6 @@
         <div class="section-tag">SpielOS Setup</div>
         <h1 class="section-title">SpielOS</h1>
         <p class="section-sub">A markdown-driven marketing team that turns your build sessions into posts for X, LinkedIn, and your blog.</p>
-        <div class="hero-handle" x-text="form.handle || '@your_handle'"></div>
         <div class="welcome-info">
           <div class="welcome-info-row">
             <span class="welcome-info-label">Target</span>
@@ -80,7 +89,7 @@
       </div>
 
       <div class="field">
-        <label class="field-label">Banner colors <span class="field-counter">click swatch to pick</span></label>
+        <label class="field-label">Banner colors <span class="field-counter">click swatch → pick</span></label>
         <div class="field-grid-3">
           <div class="color-group">
             <label class="color-label">Background</label>
@@ -113,13 +122,18 @@
         <span class="field-hint"><span class="field-target">system/brand.md + system/brand.json</span></span>
       </div>
 
-      <!-- Live banner preview -->
+      <!-- Banner preview (mirrors tools/banner-templates/default.html) -->
       <div class="banner-preview">
-        <div class="banner-preview-label">Live preview — banner template: default</div>
-        <div class="banner-canvas" :style="`background: ${form.primary_bg}; color: ${form.primary_fg};`">
-          <div>
-            <div class="title" x-text="form.brand_name || 'Your title here'"></div>
-            <div class="subtitle" x-text="form.tagline || 'Your subtitle here'"></div>
+        <div class="banner-preview-head">
+          <div class="banner-preview-label">Live preview — banner template: default</div>
+          <div class="banner-preview-tag" x-text="iconKey"></div>
+        </div>
+        <div class="banner-canvas" :style="`background: ${form.primary_bg};`">
+          <div class="bg-icon" x-html="iconSvg"></div>
+          <div class="content">
+            <div class="title-line" :style="`background: linear-gradient(180deg, ${form.primary_fg} 0%, #888 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; color: ${form.primary_fg};`"
+                 x-text="form.brand_name || 'Your title'"></div>
+            <div class="subtitle-highlight" x-text="form.tagline || 'Your tagline'"></div>
           </div>
           <div class="handle" x-text="form.handle || '@your_handle'"></div>
         </div>
@@ -300,12 +314,25 @@
       <div class="field">
         <label class="field-label">Archetypes (the session types you write about)</label>
         <div class="toggle-group">
-          <template x-for="opt in ['System Build', 'Ship', 'Decision', 'Lesson', 'Failure', 'Client Work', 'Research', 'Tooling', 'Strategy', 'Meta']">
+          <template x-for="opt in DEFAULT_ARCHETYPES" :key="opt">
             <span class="toggle" :class="{ selected: form.archetypes.includes(opt) }"
                   @click="toggle('archetypes', opt)" x-text="opt"></span>
           </template>
         </div>
-        <span class="field-hint"><span class="field-target">strategy/archetypes.md + strategy/funnel.md</span></span>
+        <div style="margin-top: var(--s-3);" x-show="customArchetypes.length > 0">
+          <div class="toggle-group">
+            <template x-for="opt in customArchetypes" :key="opt">
+              <span class="toggle selected" x-text="opt">
+                <span class="toggle-remove" @click.stop="removeCustomArchetype(opt)" title="Remove">×</span>
+              </span>
+            </template>
+          </div>
+        </div>
+        <div class="add-custom-input" style="margin-top: var(--s-3);">
+          <input x-model="newArchetype" @keydown.enter="addCustomArchetype()" placeholder="Add custom archetype…">
+          <button @click="addCustomArchetype()" :disabled="!newArchetype.trim()">Add</button>
+        </div>
+        <span class="field-hint"><span class="field-target">strategy/archetypes.md</span></span>
       </div>
     </section>
 
@@ -472,7 +499,7 @@
       </details>
     </section>
 
-    <!-- ── Step 10: Done (uses the site's closer component) ── -->
+    <!-- ── Step 10: Done ────────────────────────────────────── -->
     <section class="step-panel" x-show="current === 10" x-transition.opacity>
       <div class="section-head">
         <div class="section-tag">Step 10 of 10</div>
@@ -490,7 +517,6 @@
         </template>
       </div>
 
-      <!-- Closer component (matches site /assets/css/components.css) -->
       <aside class="closer" x-show="done">
         <div class="closer-icon-wrap">
           <svg class="closer-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="28" height="28" aria-hidden="true">
@@ -505,7 +531,6 @@
         </div>
       </aside>
 
-      <!-- What's next (cta-card component) -->
       <div class="cta-card" x-show="installResult">
         <h3>What's next</h3>
         <p>From any IDE (opencode, Claude Code, Cursor, MCP), type one of these to start the pipeline:</p>
@@ -524,24 +549,30 @@
       </div>
     </section>
 
-    <!-- ── Nav ──────────────────────────────────────────────── -->
-    <nav class="nav" x-show="current < 10">
-      <button class="btn btn-ghost" @click="back()" :disabled="current === 0 || saving">
-        ← Back
-      </button>
-      <div class="nav-right">
+  </main>
+
+  <!-- ── Sticky bottom nav (Back + Save + Continue) ──────── -->
+  <nav class="nav-sticky" x-show="current < 10">
+    <div class="nav-sticky-inner">
+      <div class="nav-sticky-left">
+        <button class="btn btn-ghost" @click="back()" :disabled="current === 0 || saving">
+          ← Back
+        </button>
+        <span class="nav-sticky-meta" x-text="`Step ${Math.min(current + 1, 10)} of 10`"></span>
+      </div>
+      <div class="nav-sticky-right">
         <button class="btn btn-ghost" @click="saveAndQuit()" x-show="current > 0 && current < 9">
           Save & quit
         </button>
-        <button class="btn btn-primary" @click="next()" :disabled="saving">
-          <span x-show="current < 9 && !saving">Continue →</span>
-          <span x-show="current === 9 && !saving">Finish & install →</span>
+        <button class="btn btn-primary btn-arrow" @click="next()" :disabled="saving">
+          <span x-show="current < 9 && !saving">Continue</span>
+          <span x-show="current === 9 && !saving">Finish & install</span>
           <span x-show="saving"><span class="spinner"></span> Writing…</span>
+          <span class="arrow-icon" aria-hidden="true">→</span>
         </button>
       </div>
-    </nav>
-
-  </main>
+    </div>
+  </nav>
 
   <script src="steps.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.5/dist/cdn.min.js" defer></script>

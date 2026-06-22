@@ -380,7 +380,11 @@ sources: [wizard]
 
 
 def write_archetypes(form: dict) -> list[str]:
-    """Write strategy/archetypes.md from the wizard's archetype picks."""
+    """Write strategy/archetypes.md from the wizard's archetype picks.
+
+    The 10 default archetypes have fixed S1–S10 codes. User-added custom
+    archetypes get S11+ codes.
+    """
     archetype_table = {
         "System Build": ("S1", "Building a system, architecture, or workflow"),
         "Ship": ("S2", "Shipping a feature, product, or release"),
@@ -394,11 +398,19 @@ def write_archetypes(form: dict) -> list[str]:
         "Meta": ("S10", "Working on the system itself"),
     }
     selected = form.get("archetypes", [])
+    custom = form.get("customArchetypes", [])
+
     rows = []
+    next_code = 11
     for name in selected:
         if name in archetype_table:
             code, desc = archetype_table[name]
             rows.append(f"| {code} | {name} | {desc} |")
+        elif name in custom:
+            code = f"S{next_code}"
+            next_code += 1
+            rows.append(f"| {code} | {name} | Custom archetype |")
+
     table = "\n".join(rows) if rows else "| (none selected) | | |"
 
     md = f"""---
@@ -414,7 +426,7 @@ sources: [wizard]
 
 # Session Archetypes
 
-The 10 archetypes the Researcher uses to classify sessions. **Banned in public posts** (`system/prompts/leak-guard.md`).
+The 10 default archetypes + your custom archetypes. The Researcher uses this to classify sessions. **Banned in public posts** (`system/prompts/leak-guard.md`).
 
 | # | Archetype | Description |
 |---|---|---|
@@ -427,6 +439,10 @@ For each session log, the Researcher:
 2. Matches against archetype keyword indexes in `system/rules.yaml §strategy.archetypes`.
 3. Picks the highest-scoring archetype.
 4. Defaults to S10 (Meta) if the session is about the system itself.
+
+## Custom archetypes
+
+{("Your custom archetypes: " + ", ".join(custom) + ".") if custom else "No custom archetypes."}
 
 ## See also
 
@@ -515,7 +531,7 @@ def write_env(form: dict) -> list[str]:
 
 
 def write_rules_update(form: dict) -> list[str]:
-    """Update system/rules.yaml with the banned_openers from the wizard."""
+    """Update system/rules.yaml with the banned_openers + custom archetypes from the wizard."""
     rules_path = VAULT / "system" / "rules.yaml"
     if not rules_path.exists():
         return []
@@ -531,10 +547,19 @@ def write_rules_update(form: dict) -> list[str]:
     if banned_raw:
         patterns = [p.strip() for p in banned_raw.splitlines() if p.strip()]
         rules.setdefault("banned_openers", [])
-        # Add new ones (dedup)
         for p in patterns:
             if p not in rules["banned_openers"]:
                 rules["banned_openers"].append(p)
+
+    # Add custom archetypes as new archetype keys (S11+)
+    custom_archetypes = form.get("customArchetypes", [])
+    if custom_archetypes:
+        archetypes = rules.setdefault("strategy", {}).setdefault("archetypes", {})
+        for name in custom_archetypes:
+            key = f"S11_{name.lower().replace(' ', '_').replace('-', '_')}"
+            if key not in archetypes:
+                # Default keyword: the lowercased name itself (catches obvious matches)
+                archetypes[key] = [name.lower(), name.lower().replace(" ", "")]
 
     rules_path.write_text(yaml.safe_dump(rules, sort_keys=False, allow_unicode=True), encoding="utf-8")
     return ["system/rules.yaml"]
