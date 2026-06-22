@@ -136,30 +136,25 @@ INSTALL_DIR=$(resolve_path "$DEFAULT_INSTALL_DIR")
 
 # Validate the target path. There are 4 cases:
 #   1. Nothing exists                            → fresh install
-#   2. Regular directory, has team/md.md         → re-install
-#   3. Regular directory, no team/md.md         → error (not SpielOS)
-#   4. Symlink                                   → resolve + check target
-#      a. Target is a valid SpielOS install      → re-install
-#      b. Target missing OR not a SpielOS install → error (with fix instructions)
-#   5. Regular file                              → error (user must remove)
+#   2. Symlink (broken OR points to non-SpielOS) → auto-replace, then fresh install
+#   3. Regular directory, has team/md.md         → re-install
+#   4. Regular directory, no team/md.md         → error (real user data, ask first)
+#   5. Regular file                              → error
 
 if [[ -L "$INSTALL_DIR" ]]; then
-  # Path is a symlink (may resolve or may be broken)
+  # A symlink exists at the target path. This is almost always a leftover
+  # from a previous install that got partially cleaned up. Auto-replace it
+  # and proceed with a fresh install at the same path.
+  TARGET=$(readlink "$INSTALL_DIR" 2>/dev/null || echo "(unreadable)")
   if [[ -d "$INSTALL_DIR" && -f "$INSTALL_DIR/team/md.md" ]]; then
-    # Symlink resolves to a valid SpielOS install
+    # Symlink resolves to a valid SpielOS install → re-install mode
     note "Existing SpielOS install detected at $INSTALL_DIR (via symlink)"
   else
-    # Symlink is broken OR points to a non-SpielOS path
-    TARGET=$(readlink "$INSTALL_DIR" 2>/dev/null || echo "(unreadable)")
-    err "Found a symlink at $INSTALL_DIR"
-    err "  → $TARGET"
-    err "But that target is not a valid SpielOS install (no team/md.md)."
-    err ""
-    err "Choose one:"
-    err "  1. Remove the symlink:  rm $INSTALL_DIR"
-    err "  2. Use a different path: SPIELOS_INSTALL_DIR=~/.spiel-v2 bash <(curl ...)"
-    err "  3. Fix the symlink to point at a valid SpielOS vault"
-    exit 1
+    # Symlink is broken OR points to a non-SpielOS path → auto-replace
+    err "Found a stale symlink at $INSTALL_DIR → $TARGET"
+    err "Removing it and installing fresh at $INSTALL_DIR"
+    rm -f "$INSTALL_DIR"
+    mkdir -p "$INSTALL_DIR"
   fi
 elif [[ -d "$INSTALL_DIR" ]]; then
   # Regular directory
