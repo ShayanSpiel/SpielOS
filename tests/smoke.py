@@ -208,15 +208,19 @@ def test_sync_adapters() -> None:
         capture_output=True, text=True,
     )
     check("sync_adapters.py exits 0", r.returncode == 0, f"stderr: {r.stderr}")
-    # Check the adapters exist
+    # Check the adapters exist (v2: subagents + real skills, no auto-gen role stubs)
     for path in [
         "adapters/opencode/agents/md.md",
         "adapters/opencode/agents/copywriter.md",
         "adapters/claude/agents/md.md",
         "adapters/cursor/commands/md.md",
         "adapters/mcp/server.json",
-        "skills/md/SKILL.md",
-        "skills/copywriter/SKILL.md",
+        # v2: real skills in skills/<name>/SKILL.md (5 user skills, no role stubs)
+        "skills/icp_simulation/SKILL.md",
+        "skills/format_wizard/SKILL.md",
+        "skills/publish_wizard/SKILL.md",
+        "skills/voice_match/SKILL.md",
+        "skills/template_picker/SKILL.md",
     ]:
         check(f"  {path} exists", (ROOT / path).exists())
 

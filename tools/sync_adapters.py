@@ -103,31 +103,50 @@ def role_metadata(src: Path) -> tuple[str, str, dict, str]:
     return src.stem, fm.get("description", ""), fm, body
 
 
+def skills() -> list[Path]:
+    """Return sorted list of canonical skill folders (each has SKILL.md)."""
+    return sorted(p for p in SKILLS_DIR.glob("*/SKILL.md"))
+
+
+def skill_metadata(src: Path) -> tuple[str, str, dict, str]:
+    """Return (skill_name, description, frontmatter, body) from a SKILL.md."""
+    fm, body = parse_frontmatter(src.read_text(encoding="utf-8"))
+    return src.parent.name, fm.get("description", ""), fm, body
+
+
 def write_skill_stub(role_name: str, description: str, target: Path) -> None:
+    """Legacy: kept for backwards compatibility. Use skills() instead."""
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(make_skill_stub(role_name, description), encoding="utf-8")
 
 
 def emit_skill(role_name: str, description: str) -> None:
-    """Write the auto-generated skill stub into the project's skills/ folder."""
-    skill_dir = SKILLS_DIR / role_name
-    write_skill_stub(role_name, description, skill_dir / "SKILL.md")
+    """Legacy: emit auto-gen role stub. v2 uses real skills in skills/ instead."""
 
 
 # ─── opencode adapter ────────────────────────────────────────────────────
 
 def emit_opencode() -> int:
+    """Write per-role subagents + real skills from skills/ to adapters/opencode/.
+
+    Subagents (from team/*.md) → adapters/opencode/agents/<name>.md
+    Skills (from skills/*/SKILL.md) → adapters/opencode/skill/<name>/SKILL.md
+    """
     target = ADAPTERS_DIR / "opencode"
     (target / "agents").mkdir(parents=True, exist_ok=True)
     (target / "skill").mkdir(parents=True, exist_ok=True)
     count = 0
+    # Subagents from team/*.md
     for src in roles():
         role_name, description, _fm, _body = role_metadata(src)
         (target / "agents" / src.name).write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
         count += 1
-        skill_dir = target / "skill" / role_name
+    # Real skills from skills/*/SKILL.md
+    for src in skills():
+        skill_name, description, _fm, _body = skill_metadata(src)
+        skill_dir = target / "skill" / skill_name
         skill_dir.mkdir(parents=True, exist_ok=True)
-        write_skill_stub(role_name, description, skill_dir / "SKILL.md")
+        (skill_dir / "SKILL.md").write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
         count += 1
     return count
 
@@ -246,13 +265,12 @@ def install_cursor_skills(verbose: bool = False) -> int:
     target = CURSOR_CONFIG / "skills"
     target.mkdir(parents=True, exist_ok=True)
     count = 0
-    for src in roles():
-        role_name, description, _fm, body = role_metadata(src)
-        skill_dir = target / role_name
+    for src in skills():
+        skill_name, description, _fm, body = skill_metadata(src)
+        skill_dir = target / skill_name
         skill_dir.mkdir(parents=True, exist_ok=True)
-        # Agent Skills format: SKILL.md with frontmatter
         skill_md = (
-            f"---\nname: {role_name}\ndescription: {description}\n---\n\n"
+            f"---\nname: {skill_name}\ndescription: {description}\n---\n\n"
             + body.lstrip()
         )
         (skill_dir / "SKILL.md").write_text(skill_md, encoding="utf-8")
@@ -272,12 +290,12 @@ def install_claude_skills(verbose: bool = False) -> int:
     target = CLAUDE_CONFIG / "skills"
     target.mkdir(parents=True, exist_ok=True)
     count = 0
-    for src in roles():
-        role_name, description, _fm, body = role_metadata(src)
-        skill_dir = target / role_name
+    for src in skills():
+        skill_name, description, _fm, body = skill_metadata(src)
+        skill_dir = target / skill_name
         skill_dir.mkdir(parents=True, exist_ok=True)
         skill_md = (
-            f"---\nname: {role_name}\ndescription: {description}\n---\n\n"
+            f"---\nname: {skill_name}\ndescription: {description}\n---\n\n"
             + body.lstrip()
         )
         (skill_dir / "SKILL.md").write_text(skill_md, encoding="utf-8")
@@ -316,22 +334,42 @@ def install_claude_agents(verbose: bool = False) -> int:
 
 
 def install_opencode(verbose: bool = False) -> int:
+    """Install subagents (from team/*.md) + real skills (from skills/*/SKILL.md)
+    to ~/.config/opencode/. Subagents go in agents/, skills go in skill/.
+    """
     if not OPENCODE_CONFIG.exists():
         print(f"  {OPENCODE_CONFIG} does not exist — skipping install")
         return 0
     count = 0
     for src in roles():
-        role_name, description, _fm, _body = role_metadata(src)
         dst_agent = OPENCODE_CONFIG / "agents" / src.name
         dst_agent.parent.mkdir(parents=True, exist_ok=True)
         dst_agent.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
         count += 1
-        skill_dir = OPENCODE_CONFIG / "skill" / role_name
+    for src in skills():
+        skill_name, _desc, _fm, _body = skill_metadata(src)
+        skill_dir = OPENCODE_CONFIG / "skill" / skill_name
         skill_dir.mkdir(parents=True, exist_ok=True)
-        write_skill_stub(role_name, description, skill_dir / "SKILL.md")
+        (skill_dir / "SKILL.md").write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
         count += 1
     if verbose:
-        print(f"  installed {count} files to {OPENCODE_CONFIG}")
+        print(f"  installed {count} files (subagents + skills) to {OPENCODE_CONFIG}")
+    return count
+
+
+def install_opencode_skills(verbose: bool = False) -> int:
+    """Install only the real skills (from skills/*/SKILL.md) to ~/.config/opencode/skill/."""
+    if not OPENCODE_CONFIG.exists():
+        return 0
+    target = OPENCODE_CONFIG / "skill"
+    target.mkdir(parents=True, exist_ok=True)
+    count = 0
+    for src in skills():
+        skill_name, _desc, _fm, _body = skill_metadata(src)
+        skill_dir = target / skill_name
+        skill_dir.mkdir(parents=True, exist_ok=True)
+        (skill_dir / "SKILL.md").write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+        count += 1
     return count
 
 
@@ -368,12 +406,9 @@ def main() -> int:
         return 0
 
     SKILLS_DIR.mkdir(parents=True, exist_ok=True)
-    n_skills = 0
-    for src in roles():
-        role_name, desc, _, _ = role_metadata(src)
-        emit_skill(role_name, desc)
-        n_skills += 1
-    print(f"Generated {n_skills} skill stub(s) in skills/")
+    # Real skills live in skills/*/SKILL.md (user-managed, not auto-generated)
+    n_skills = sum(1 for _ in SKILLS_DIR.glob("*/SKILL.md"))
+    print(f"Found {n_skills} canonical skill(s) in skills/")
 
     n_oc = emit_opencode()
     n_cl = emit_claude()

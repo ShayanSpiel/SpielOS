@@ -1,328 +1,320 @@
 # SpielOS v2 — Plan
 
-**Status:** Approved direction, not yet implemented. Work begins in next session.
-
-**Goal:** Fix three structural problems in v1 and ship v2.
+**Status:** Approved direction. Build in progress.
+**Architecture:** Subagents + Skills + Tools. No LangGraph, no external LLM, no engine/ folder. The IDE's LLM (Claude / GPT / local — whatever the user is using) IS the orchestrator. The MD agent owns the 8-step procedure.
 
 ---
 
 ## The 3 problems (v1, shipped)
 
 ### P1. Hidden install = invisible drafts
-Vault lives at `~/.spiel/`. So `content/queue/*.md` is hidden from the user's
-IDE project tree. User can't open drafts in Cursor/VS Code/opencode to edit or
-publish them. "Open project" in the IDE opens the user's project, not the
-Spiel vault. Drafts, banners, and the brief file are out of sight.
+Vault lived at `~/.spiel/`. Drafts hidden from IDE project tree. User couldn't open drafts, edit, or publish from their project. "Open project" in the IDE opened the user's project, not the Spiel vault.
 
 ### P2. Slash commands improvise instead of dispatch
-`/post` loads `post.md` (a prompt). The LLM reads "delegate to MD". It then
-makes a judgment call. Most calls are wrong:
-- Writes a draft directly to cwd (user reported)
-- Asks clarifying questions
-- Skips states
-- Picks formats without the human checkpoint
-- Doesn't invoke the deterministic tools (banner.py, gates.py, buffer.py)
+`/post` loaded `post.md` (a prompt). The LLM read "delegate to MD" and **made a judgment call**. Most calls were wrong:
+- Wrote a draft directly to cwd (user reported)
+- Asked clarifying questions
+- Skipped states
+- Picked formats without the human checkpoint
+- Never invoked the deterministic tools (banner.py, gates.py, buffer.py)
 
-The LLM is the orchestrator. The role prompts (`team/*.md`) are decoration the
-LLM reads and improvises from. **None of the deterministic tools run.**
+The LLM was the orchestrator. The role prompts in `team/*.md` were decoration the LLM read and improvised from. **None of the deterministic tools actually ran.**
 
-### P3. Wizard is ~40% complete
-Covers brand, ICP, positioning, offer, funnel, voice, methodology, archetypes.
-Missing:
-- API token verification (Buffer, X, LinkedIn, blog) — just stores raw strings
-- Engine knobs (post cadence, max_drafts, auto-publish mode, max rev rounds)
-- Banner template picker (only `default`, no choice)
-- Gate strictness (composite score threshold, hard vs soft)
-- Template favorites (3-5 from registry, no way to pre-pick)
-- Platform preferences (X vs LinkedIn tone, length, hashtag style)
-- Voice corpus (just a starter, no real example posts)
-- Time/date format preferences
-- Per-platform CTA style
+### P3. Wizard was ~40% complete
+Covers brand, ICP, positioning, offer, funnel, voice, methodology, archetypes. Missing: API token verification, engine knobs, banner template picker, gate strictness, template favorites, platform preferences, voice corpus, time/date format, per-platform CTA style.
 
 ---
 
 ## The 3 fixes (v2, this plan)
 
-### F1. Install in user's project directory
+### F1. Subagents + Skills + Tools (the natural primitives)
+The IDE's natural primitives map directly to the pipeline:
+
+| Primitive | What it is | In SpielOS |
+|---|---|---|
+| **Subagent** | LLM with its own system prompt + tools, invokable by name | Each role (md, researcher, strategist, copywriter, editor, designer, publisher, analyst) |
+| **Skill** | Reusable prompt bundle the LLM can invoke | icp_simulation, format_wizard, publish_wizard, voice_match, template_picker |
+| **Tool** | Atomic Python operation the subagent calls via bash | gates.py, banner.py, publisher/*.py, analyst.py |
+| **Orchestrator** | The agent that calls subagents in order | MD agent (its prompt IS the procedure) |
+
+### F2. MD agent owns the strict 8-step procedure
+MD's prompt is the pipeline. It walks 8 steps by delegating to subagents. Two human interrupts (types picker at copywriter, p/h/r at publisher). The LLM cannot skip steps, reorder, or add steps.
+
+### F3. Same LLM as the user is already paying for
+No external LLM API (no Anthropic API key needed). The IDE's primary LLM is the orchestrator. The role subagents are all the same LLM, just with different system prompts. The user pays for one model, one subscription.
+
+### F4. (From prior discussion) Wizard expansion
+Deferred. Wizard stays at 10 steps for v2. Can expand in v3.
+
+---
+
+## The 8 subagents (one per role)
 
 ```
-cd ~/projects/my-startup                # or any project folder
-curl -fsSL https://...install.sh | bash
-# SpielOS now lives at ~/projects/my-startup/
-# Open ~/projects/my-startup in the IDE
-# content/queue/, content/posted/, assets/banners/ are visible
-# Drafts are real files you can click on, edit, copy
+team/md.md           → orchestrator. Owns the 8-step procedure.
+team/researcher.md   → reads source, writes research notes to brief
+team/strategist.md   → picks angle. Calls icp_simulation skill if session mode.
+team/copywriter.md   → calls format_wizard skill (HUMAN). Writes drafts to queue/.
+team/editor.md       → calls tools/gates.py. Loops back to copywriter on fail.
+team/designer.md     → calls tools/banner.py. Writes banner path to frontmatter.
+team/publisher.md    → calls publish_wizard skill (HUMAN). Dispatches via tools/publisher/*.
+team/analyst.md      → calls tools/analyst.py. Updates perf.json.
 ```
 
-**Vault resolution (in priority order):**
-1. `$SPIELOS_PROJECT_DIR` env var
-2. Walk up from cwd looking for `team/md.md` (find project root marker)
-3. `~/.spiel` symlink (legacy fallback)
+Installed to `~/.config/opencode/agents/<name>.md` (and equivalents for Cursor, Claude Code).
 
-**Shim:** `bin/spiel` in the project + symlink to `~/.local/bin/spiel` for
-global access. Shim uses the resolution above to find the vault.
+## The 5 skills (reusable prompt bundles)
 
-### F2. Strict slash command prompts
+```
+skills/icp_simulation/SKILL.md      → LLM-as-ICP reacts to a session
+skills/format_wizard/SKILL.md       → asks "What types? X, LinkedIn, Blog, All"
+skills/publish_wizard/SKILL.md      → asks "publish / hold / reject" per draft
+skills/voice_match/SKILL.md         → how to match the user's voice register
+skills/template_picker/SKILL.md     → how to score templates from the registry
+```
 
-`/post` stays a prompt (not pure bash). The prompt has hard rules:
+Installed to `~/.config/opencode/skill/<name>/SKILL.md` (and equivalents).
+
+## The 6 tools (deterministic Python, called via bash)
+
+```
+tools/gates.py                  → 15 mechanical checks. CLI: check <draft>
+tools/banner.py                 → render banner PNG. CLI: render <draft>
+tools/publisher/buffer.py       → publish via Buffer. CLI: publish <draft>
+tools/publisher/twitter.py      → publish via X. CLI: publish <draft>
+tools/publisher/linkedin.py     → publish via LinkedIn. CLI: publish <draft>
+tools/analyst.py                → pull engagement. CLI: pull <post-id>
+```
+
+These are pure Python. No LLM. The subagent calls them via bash.
+
+---
+
+## The MD agent's prompt (the procedure)
 
 ```markdown
----
-description: Run the /post content pipeline.
----
+# MD — Marketing Director (orchestrator)
 
-# /post — Content Pipeline Dispatcher
+You orchestrate the SpielOS content pipeline. For each /post invocation:
 
-The user is invoking the SpielOS content pipeline. Your only action:
+## The 8-step procedure
 
-1. Run this exact bash command: `spiel content run $ARGUMENTS`
-2. Show the user the output
-3. Stop.
+1. **Parse the request** — read user args, decide session/topic/file mode
+2. **Delegate to @researcher** — pass source + ICP. Wait for return.
+   Verify brief has `## research` section.
+3. **Delegate to @strategist** — pass brief.
+   If session mode, strategist calls icp_simulation skill first.
+   Wait. Verify brief has `## strategy` section.
+4. **Delegate to @copywriter** — copywriter calls format_wizard skill
+   (HUMAN INTERRUPT: types X/LinkedIn/Blog/All).
+   Writes drafts. Wait. Verify drafts exist in content/queue/.
+5. **Delegate to @editor** — editor calls tools/gates.py for each draft.
+   If any fail, loop to step 4 (max 3 rounds). If all pass, continue.
+6. **Delegate to @designer** — designer calls tools/banner.py for each draft.
+   Wait. Verify each draft has `banner:` in frontmatter.
+7. **Delegate to @publisher** — publisher calls publish_wizard skill
+   (HUMAN INTERRUPT: publish/hold/reject per draft).
+   For "publish": calls tools/publisher/*. For "reject": moves to rejected/.
+   For "hold": leaves in queue.
+8. **Delegate to @analyst** — analyst calls tools/analyst.py for each
+   published draft. Updates perf.json. Done.
 
-Hard rules (zero exceptions):
-- Do NOT write any file outside the bash command's output
-- Do NOT interpret the request
-- Do NOT explain the pipeline
-- Do NOT ask clarifying questions
-- Do NOT call any other tool
-- Do NOT spawn a subagent yourself
-- Do NOT improvise
+## Subagent map
+- @researcher → reads source, writes research
+- @strategist → picks angle (uses icp_simulation skill for session mode)
+- @copywriter → writes drafts (uses format_wizard skill)
+- @editor → runs gates (uses tools/gates.py)
+- @designer → renders banner (uses tools/banner.py)
+- @publisher → runs p/h/r + dispatch (uses publish_wizard skill + tools/publisher/*)
+- @analyst → pulls engagement, updates perf (uses tools/analyst.py)
 
-The `spiel` CLI is the deterministic orchestrator. It walks the 12-state
-pipeline and invokes the role subagents at the right moments. You are a
-dispatcher, not a writer.
-
-If `spiel` is not found: "Run `spiel init` to set up SpielOS."
+## Hard rules
+- Always delegate. Never do the subagent's work yourself.
+- Wait for subagent return before next step.
+- Verify each step's output before proceeding.
+- Two human interrupts are mandatory: at step 4 (types) and step 7 (p/h/r).
+- No step can be skipped.
+- If a subagent fails 3 times, escalate to user.
 ```
 
-The LLM reads the prompt, runs the bash command, reports the output. The
-pipeline runs deterministically. The LLM cannot write a draft to cwd because
-the prompt forbids it AND the CLI writes only to `content/queue/`.
-
-### F3. LangGraph as the orchestrator
-
-The state machine is implemented in **LangGraph** (not raw Python). The
-reasons:
-
-| Failure mode (v1) | LangGraph solution |
-|---|---|
-| State file gets corrupted mid-run | built-in checkpointing (SQLite/Postgres) |
-| Error in one node crashes the whole run | built-in retry + error nodes |
-| Human checkpoint interrupted (Ctrl+C) | `interrupt()` + resume from last checkpoint |
-| Race conditions between tool calls | graph execution model is serial |
-| Conditional transitions ("if gates fail, go back") | declarative edges in the graph |
-| "Where am I in the pipeline?" | graph viz out of the box |
-| Pure-Python orchestration broke before | battle-tested for this exact pattern |
-
-**Why not raw Python:** the user has direct experience with raw-Python
-orchestration breaking at exactly these failure modes. LangGraph is built for
-multi-actor LLM workflows with persistence + retry + human-in-the-loop.
-
-**Why not Rust:** orchestration runs a few times a day for marketing content,
-not 10k req/s. Python iteration cost dominates. Wizard, banner, gates, and
-publishers all stay in Python. If a single binary is needed later, `pyinstaller`
-or `shiv` packages the Python CLI.
-
 ---
 
-## The architecture (v2)
+## The flow for `/post empty` (session mode)
 
 ```
-User types: /post topic
-   ↓
-opencode loads: post.md (strict prompt)
-   ↓
-LLM reads: "run `spiel content run $ARGUMENTS`, do nothing else"
-   ↓
-LLM runs bash: !`spiel content run topic`
-   ↓
-bin/spiel content run → LangGraph graph.invoke()
-   ↓
-graph state machine (deterministic, 12 nodes):
-   IDLE
-     → SESSION_CAPTURE   [python: source session log or topic]
-     → COMPILE           [LLM: read team/md.md, write insights to brief]
-     → SELECT            [LLM: read team/strategist.md, pick templates]
-     → FORMAT_WIZARD     [HUMAN: pick formats, interrupt()]
-     → DRAFTING          [LLM: read team/copywriter.md, write drafts]
-     → BANNER            [python: tools/banner.py for each draft]
-     → GATE_CHECK        [python: tools/gates.py for each draft]
-     → PUBLISH_REVIEW    [HUMAN: pick per-draft, interrupt()]
-     → PUBLISHING        [python: tools/publisher/buffer.py for each draft]
-     → ANALYZING_POST    [python: tools/analyst.py, can be deferred]
-     → COMPLETE_POST     [python: archive, return to IDLE]
-   ↓
-LLM invoked at exactly 3 nodes: COMPILE, SELECT, DRAFTING
-Python at: IDLE, SESSION_CAPTURE, BANNER, GATE_CHECK, PUBLISHING, ANALYZING_POST, COMPLETE_POST
-HUMAN at: FORMAT_WIZARD, PUBLISH_REVIEW
+1. /post empty in IDE
+2. LLM (MD agent) reads post.md command: "delegate to @md"
+3. @md runs the 8-step procedure:
+   step 1: parse → scenario=session, source=today's session log
+   step 2: @researcher
+     - reads source, reads strategy/icp.md
+     - calls LLM: extract patterns/decisions/shipped/numbers/lesson
+     - writes to content/.brief.md under ## research
+   step 3: @strategist
+     - reads brief, calls icp_simulation skill (LLM-as-ICP reacts)
+     - calls LLM: pick angle, template, archetype, funnel
+     - writes to brief under ## strategy
+   step 4: @copywriter
+     - calls format_wizard skill (HUMAN: types picker)
+     - user picks "X + LinkedIn"
+     - reads brief, corpus, gates
+     - picks 2 templates, calls LLM to write each
+     - writes drafts to content/queue/2026-06-23-x.md, content/queue/2026-06-23-linkedin.md
+   step 5: @editor
+     - for each draft: `python3 tools/gates.py check <draft>`
+     - if any fail: loop to step 4 (max 3)
+     - if all pass: write gates: pass to frontmatter
+   step 6: @designer
+     - for each draft: `python3 tools/banner.py render <draft>`
+     - writes banner: path to frontmatter
+   step 7: @publisher
+     - calls publish_wizard skill (HUMAN: p/h/r per draft)
+     - for "publish": `python3 tools/publisher/buffer.py publish <draft>`
+       → move to content/posted/
+     - for "reject": move to content/rejected/
+     - for "hold": leave in queue
+   step 8: @analyst
+     - for each published: `python3 tools/analyst.py pull <post-id>`
+     - updates system/perf.json
+4. MD reports summary to user
 ```
 
-### The graph (sketch)
+---
 
-```python
-# engine/graph.py
-from langgraph.graph import StateGraph, END
-from langgraph.checkpoint.sqlite import SqliteSaver
+## What the LLM does (3 things, not more)
 
-builder = StateGraph(SpielState)
+| Step | LLM call | Subagent |
+|---|---|---|
+| 2 (researcher) | Extract patterns/decisions/shipped/numbers/lesson from source | @researcher |
+| 3 (strategist) | Pick angle, template, archetype, funnel | @strategist |
+| 4 (copywriter) | Write N drafts (one per type) | @copywriter |
 
-# LLM nodes (the ONLY places the LLM is invoked)
-builder.add_node("compile", make_agent_node("team/md.md", mode="compile"))
-builder.add_node("select",  make_agent_node("team/strategist.md", mode="select"))
-builder.add_node("draft",   make_agent_node("team/copywriter.md", mode="draft"))
+**Three LLM invocations per /post run.** Everything else is Python (gates, banner, publish) or human (types, p/h/r).
 
-# Python nodes (deterministic, no LLM)
-builder.add_node("session_capture", session_capture_node)  # sources session/topic
-builder.add_node("banner",          banner_node)            # tools/banner.py
-builder.add_node("gates",           gates_node)             # tools/gates.py
-builder.add_node("publish",         publish_node)           # tools/publisher/buffer.py
-builder.add_node("analyze",         analyze_node)           # tools/analyst.py
-builder.add_node("complete",        complete_node)          # archive
+---
 
-# Human-in-the-loop nodes (interrupt)
-builder.add_node("format_wizard",   format_wizard_node)     # pick formats
-builder.add_node("publish_review",  publish_review_node)    # pick per-draft
+## File structure (no engine/ folder)
 
-# Edges (deterministic transitions, LLM never decides)
-builder.add_edge("session_capture", "compile")
-builder.add_edge("compile", "select")
-builder.add_edge("select", "format_wizard")
-builder.add_edge("format_wizard", "draft")      # after human confirms
-builder.add_edge("draft", "banner")
-builder.add_edge("banner", "gates")
-
-# Conditional edge: gates can loop back to draft (the "rabbit hole" escape)
-def gate_check(state):
-    if state["gates_passed"]:
-        return "publish_review"
-    elif state["rev_rounds"] < 3:
-        return "draft"             # loop back, retry
-    else:
-        return "publish_review"    # human decides after 3 revs
-builder.add_conditional_edges("gates", gate_check)
-
-builder.add_edge("publish_review", "publish")   # after human confirms
-builder.add_edge("publish", "analyze")
-builder.add_edge("analyze", "complete")
-builder.add_edge("complete", END)
+```
+spielos/
+├── team/                       # subagent prompts (8 files)
+│   ├── README.md
+│   ├── md.md                   # ORCHESTRATOR (the procedure)
+│   ├── researcher.md
+│   ├── strategist.md
+│   ├── copywriter.md
+│   ├── editor.md
+│   ├── designer.md
+│   ├── publisher.md
+│   ├── analyst.md
+│   └── post.md                 # user-facing entry, delegates to @md
+│
+├── skills/                     # reusable prompt bundles
+│   ├── icp_simulation/SKILL.md
+│   ├── format_wizard/SKILL.md
+│   ├── publish_wizard/SKILL.md
+│   ├── voice_match/SKILL.md
+│   └── template_picker/SKILL.md
+│
+├── tools/                      # deterministic Python
+│   ├── gates.py
+│   ├── banner.py
+│   ├── analyst.py
+│   ├── researcher.py
+│   ├── sync_adapters.py
+│   └── publisher/
+│       ├── buffer.py
+│       ├── twitter.py
+│       ├── linkedin.py
+│       └── blog.sh
+│
+├── system/                     # config + state
+│   ├── state.json
+│   ├── perf.json
+│   ├── brand.json
+│   ├── rules.yaml
+│   └── gates.md
+│
+├── strategy/                   # user-edited knowledge
+│   ├── icp.md, positioning.md, offer.md, funnel.md
+│   ├── voice.md, corpus.md, methodology.md, archetypes.md
+│
+├── content/                    # pipeline output
+│   ├── .brief.md
+│   ├── .brief/                 # archived
+│   └── {sessions, queue, posted, rejected}/
+│
+├── templates/                  # post templates
+│   ├── x-post.md, linkedin-post.md, blog-post.md
+│   └── registry/viral-templates.yaml
+│
+├── assets/                     # banners, icons, fonts
+│
+├── install/                    # install + wizard
+│   ├── install.sh
+│   ├── uninstall.sh
+│   └── wizard/
+│
+├── adapters/                   # auto-gen per-IDE
+│
+├── bin/spiel                   # thin CLI
+│
+├── tests/
+│
+├── AGENTS.md
+├── README.md
+├── V2-PLAN.md (this file)
+└── package.json
 ```
 
-### The role prompts
+---
 
-`team/md.md`, `team/strategist.md`, `team/copywriter.md` are **unchanged** as
-prompt text. They become LangGraph agent system prompts. The CLI passes the
-right prompt + the right input to the LLM at each node. The LLM writes a
-string output. The CLI writes the string to a file.
+## The "no rabbit hole" invariants
+
+1. **LLM is invoked at exactly 3 subagents**: researcher, strategist, copywriter. Each is one LLM call.
+2. **LLM never decides state transitions**. The MD agent's prompt defines the order; no improvisation.
+3. **LLM never picks formats or publish decisions**. Human does, via skills (format_wizard, publish_wizard).
+4. **LLM always writes a string to a file the subagent controls**. The subagent calls a tool to write.
+5. **No tool is invoked by the LLM directly**. Subagents call tools via bash. The LLM doesn't run bash on its own initiative.
+6. **No step can be skipped**. The MD agent's procedure has 8 fixed steps. No conditional branching except the editor→copywriter loop.
 
 ---
 
-## The invariants (the "no rabbit hole" rule, written in code)
+## Build order (in progress)
 
-```python
-# engine/graph.py — top of file
-"""
-SpielOS state machine — INVARIANTS
-
-1. The LLM is invoked at exactly 3 nodes: compile, select, draft.
-   These are the only nodes where the LLM is creative.
-
-2. The LLM never decides:
-   - State transitions (graph edges are static)
-   - What to publish (human decides at publish_review)
-   - What format to use (human decides at format_wizard)
-   - File locations outside content/queue/ and content/posted/
-
-3. The LLM always:
-   - Receives a system prompt from team/*.md
-   - Receives an input (brief, session, template)
-   - Produces a string output that the CLI writes to a file
-   - Never calls tools that aren't in the LangGraph tool registry
-
-4. Any PR that violates 1-3 gets rejected.
-"""
-```
-
-This is the rule. The LLM is a tool the graph uses at specific nodes. The
-graph is the orchestrator. The human is the decision-maker at checkpoints.
+- [x] **A.** Delete my 11 drafts + .venv/ (already done in the cleanup)
+- [ ] **B.** Update `team/md.md` to be the strict 8-step orchestrator
+- [ ] **C.** Build `skills/` with 5 SKILL.md files
+- [ ] **D.** Verify `tools/gates.py`, `tools/banner.py`, `tools/publisher/*`, `tools/analyst.py` work as CLIs
+- [ ] **E.** Update `tools/sync_adapters.py` to install team/*.md as subagents + skills/*.md as Agent Skills
+- [ ] **F.** Tests: subagent installs, skill installs, gates CLI
+- [ ] **G.** Update `AGENTS.md`, `V2-PLAN.md`, `README.md`
 
 ---
 
-## Scope
-
-| ID | Change | LOC | Time | Notes |
-|---|---|---|---|---|
-| A | Install in project dir | ~150 | 1h | path resolution, vault finder, walk-up logic |
-| B | Strict slash command prompts | ~100 | 30m | rewrite post.md; add publish.md, analyze.md, setup.md, health.md |
-| C1 | Comprehensive wizard (10 → 16 steps) | ~400 | 1.5h | 6 new steps |
-| C2 | LangGraph state machine | ~600 | 2h | engine/graph.py, nodes, edges, persistence |
-| C3 | Role prompts as LangGraph agents | ~200 | 1h | wrap team/*.md as agents with tools |
-| T  | Tests for graph + shim | ~200 | 30m | unit + E2E |
-| D  | Docs (AGENTS.md, README) | ~200 | 30m | update architecture diagram |
-| **Total** | | **~1850** | **~7h** | |
-
-**New dependencies:** `langgraph`, `langchain-core`, `langchain-openai` (or
-`langchain-anthropic`). ~50MB on disk.
-
-### New wizard steps
-
-| Step | What |
-|---|---|
-| 11 | API tokens + verification: paste Buffer token, click Verify, see channels. Same for X / LinkedIn / blog. |
-| 12 | Engine knobs: post cadence (per week), max drafts in queue, auto-publish mode (manual / always), max rev rounds |
-| 13 | Gate strictness: composite score threshold (default 0.85), hard vs soft enforcement |
-| 14 | Banner template picker: preview 4 templates, click to pick |
-| 15 | Template favorites: pick 3-5 from registry |
-| 16 | Voice corpus: paste 2-3 real posts as canonical examples |
-
----
-
-## Build order
-
-1. **A** (project-dir install) — visible value, low risk
-2. **B** (strict prompts) — fixes the broken `/post` immediately
-3. **C2** (LangGraph graph) — the real orchestrator
-4. **C3** (role agents) — the role prompts become real
-5. **C1** (wizard expansion) — config completeness
-6. **T** (tests) — lock in the contract
-7. **D** (docs) — reflect the new architecture
-
----
-
-## Acceptance criteria
-
-- [ ] `cd ~/projects/my-startup && curl ... | bash` installs in the project
-- [ ] Drafts in `~/projects/my-startup/content/queue/` are visible in the IDE
-- [ ] `/post empty` runs the full 12-state pipeline deterministically
-- [ ] `/post topic` does NOT write a draft to cwd (forbidden by prompt + CLI)
-- [ ] LLM is invoked at exactly 3 nodes: compile, select, draft
-- [ ] Human is interrupted at exactly 2 nodes: format_wizard, publish_review
-- [ ] Gate-check failure loops back to draft (max 3 rounds)
-- [ ] Wizard covers all 16 config areas
-- [ ] All tools (banner, gates, publishers) actually run as Python nodes
-- [ ] 88/88 smoke + new graph tests pass
-- [ ] E2E test: full pipeline from /post to /posted
-
----
-
-## Decisions
+## Decisions log
 
 | Question | Answer | Why |
 |---|---|---|
-| LangGraph vs raw Python? | LangGraph | user has direct experience with raw-Python orchestration breaking |
-| Rust vs Python? | Python | iteration cost dominates; orchestration runs a few times a day |
-| `/post` prompt vs bash? | Prompt | user explicit: "/post stays a prompt" |
-| Hide vault or project-dir? | Project-dir | drafts must be visible in IDE |
-| Role prompts change? | No | they become LangGraph agent system prompts, same text |
-| LLM in state transitions? | No | only at compile/select/draft; never decides transitions |
+| LangGraph or subagents? | Subagents | The IDE's natural primitive. No external orchestration layer. |
+| External LLM (Anthropic API) or same LLM? | Same LLM | User is paying for one subscription. No separate API key. |
+| Where does the procedure live? | team/md.md | The MD agent's prompt IS the procedure. No separate doc. |
+| Where do skills live? | skills/<name>/SKILL.md | Standard Agent Skills format. |
+| Where do tools live? | tools/<name>.py | Existing. Called via bash from subagents. |
+| How does MD delegate? | `@-mention` subagent in opencode / `Agent` tool in Claude Code | Native primitive of each IDE. |
+| How does a subagent invoke a skill? | Read the SKILL.md, follow its instructions | Native primitive. |
+| How does a subagent invoke a tool? | `python3 tools/<name>.py <args>` via bash | Native primitive. |
+| Where does state live? | Files: content/.brief.md, content/queue/*.md, system/perf.json | No database. Atomic per /post run. |
+| Wizard expansion (F4)? | Deferred to v3 | v2 ships the pipeline refactor first. |
 
 ---
 
 ## Open questions
 
-- Which LLM provider per role? (Anthropic for drafting, OpenAI for compiler?)
-- SQLite or Postgres for the checkpointer? (SQLite for v2; Postgres for production)
-- Single-user or multi-user from the start? (Single-user for v2)
-- Should the wizard be a CLI or stay HTML? (stay HTML, matches v1 UX)
+- **Two human interrupts** (types picker + p/h/r) — confirmed by user. Mandatory.
+- **Designer is its own node after editor** — confirmed. v1 model.
+- **LLM provider** — same as the IDE's. Whatever the user is using.
+- **State tracking** — not in v2. Each /post run is atomic.
 
 ---
 
@@ -331,9 +323,10 @@ graph is the orchestrator. The human is the decision-maker at checkpoints.
 **To resume this work in a new session:**
 
 > "Continue the SpielOS v2 plan at `/Users/shayan/Desktop/SpielOS/V2-PLAN.md`.
-> Start with F1 (project-dir install). Run `cd ~/projects/test-vault && bash
-> /Users/shayan/Desktop/SpielOS/install/install.sh` to verify each step."
+> Current step: B. Update `team/md.md` to be the strict 8-step orchestrator.
+> The current build is at commit `d75272f` (the plan) and the prior commits
+> on `cc42f5a` (slash commands fix) and `252249a` (auto-fix broken symlink)."
 
-The first task is **F1.A** (vault resolution: walk up from cwd looking for
-`team/md.md`). The second is **F1.B** (default install path = cwd, not
-`~/.spiel`). Both are small and verifiable in isolation.
+The next concrete step is **B**: read `team/md.md`, rewrite it as the
+strict 8-step orchestrator prompt. Then **C**: create the 5 skills/ folders
+with SKILL.md files. Then **D**: verify tools/.py work as CLIs.
