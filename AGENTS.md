@@ -240,7 +240,7 @@ Adding a new state is **one row in the table** + one role file (or a delegation 
 | Deterministic tools | `tools/editor.py`, `tools/designer.py`, `tools/publisher/*`, `tools/analyst.py`, `tools/researcher.py` |
 | Sync adapters | `tools/sync_adapters.py` |
 | IDE adapter files | `adapters/` (auto-gen) |
-| Live install | `~/.config/opencode/{agents,skill}/` |
+| Live install | `~/.config/opencode/{agents,skill,commands}/`, `~/.cursor/skills/`, `~/.claude/{agents,skills}/` |
 | Vault shim | `bin/spiel` |
 | Install + wizard | `install/install.sh`, `install/wizard/` |
 | Brief file (active) | `content/.brief.md` |
@@ -275,7 +275,7 @@ curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/Spiel-OS/main/install/i
 3. Installer polls for `.install-state.json` (the wizard writes this on Finish)
 4. Wizard walks 10 steps: Welcome → Brand → Identity → ICP → Positioning → Offer → Funnel → Voice → Methodology → Connect
 5. Wizard writes 8 strategy files + brand + .env on Finish, then auto-shuts down
-6. Installer continues: shim at `~/.local/bin/spiel` + IDE adapters at `~/.config/opencode/`
+6. Installer continues: shim at `~/.local/bin/spiel` + IDE adapters at all 3 IDEs (opencode, Cursor, Claude Code — whichever is installed)
 7. Prints `DONE. Run 'spiel /post empty' from any IDE.`
 
 The install is fully non-blocking — the user never has to type anything into the terminal during the install. They just fill the form in the browser.

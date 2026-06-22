@@ -680,7 +680,7 @@ def run_post_install() -> dict:
         except Exception as e:
             result["errors"].append(f"sync generate: {e}")
 
-    # 4. Install adapters to ~/.config/opencode (live IDE)
+    # 4. Install adapters to all detected IDEs (opencode, Cursor, Claude Code)
     if sync_script.exists():
         try:
             r = subprocess.run(
@@ -690,15 +690,25 @@ def run_post_install() -> dict:
                 timeout=30,
             )
             if r.returncode == 0:
-                # Count installed files
-                oc = Path.home() / ".config" / "opencode"
-                if oc.exists():
-                    for sub in ("agents", "skill"):
-                        d = oc / sub
-                        if d.exists():
-                            result["adapters_installed"] += sum(1 for _ in d.iterdir()
-                                                                  if _.name not in (".", ".."))
-                    result["adapters_targets"].append(str(oc))
+                # Count installed files across all 3 IDEs
+                ide_dirs = [
+                    (Path.home() / ".config" / "opencode", ["agents", "skill", "commands"]),
+                    (Path.home() / ".cursor" / "skills", []),
+                    (Path.home() / ".claude", ["agents", "skills"]),
+                ]
+                for ide_dir, subs in ide_dirs:
+                    if not ide_dir.exists():
+                        continue
+                    if subs:
+                        for sub in subs:
+                            d = ide_dir / sub
+                            if d.exists():
+                                n = sum(1 for f in d.iterdir() if f.name not in (".", ".."))
+                                result["adapters_installed"] += n
+                    else:
+                        n = sum(1 for f in ide_dir.iterdir() if f.name not in (".", ".."))
+                        result["adapters_installed"] += n
+                    result["adapters_targets"].append(str(ide_dir))
             else:
                 result["errors"].append(f"sync install: {r.stderr}")
         except Exception as e:
@@ -913,7 +923,8 @@ def bootstrap_vault(target: Path, source: Path | None = None) -> None:
     # Files to copy (if missing in target)
     files_to_copy = [
         # Role prompts
-        "team/md.md", "team/strategist.md", "team/researcher.md", "team/copywriter.md",
+        "team/md.md", "team/post.md",
+        "team/strategist.md", "team/researcher.md", "team/copywriter.md",
         "team/editor.md", "team/designer.md", "team/publisher.md", "team/analyst.md",
         "team/README.md",
         # System

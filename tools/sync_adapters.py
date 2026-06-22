@@ -30,6 +30,8 @@ TEAM_DIR = VAULT / "team"
 SKILLS_DIR = VAULT / "skills"
 ADAPTERS_DIR = VAULT / "adapters"
 OPENCODE_CONFIG = Path.home() / ".config" / "opencode"
+CURSOR_CONFIG = Path.home() / ".cursor"
+CLAUDE_CONFIG = Path.home() / ".claude"
 
 
 def parse_frontmatter(text: str) -> tuple[dict, str]:
@@ -177,6 +179,142 @@ def emit_mcp() -> int:
 
 # ─── Live install ────────────────────────────────────────────────────────
 
+def detect_ide(config_dir: Path, name: str) -> bool:
+    """Return True if this IDE's config dir looks like it's installed."""
+    if not config_dir.parent.exists():
+        return False
+    if not config_dir.exists():
+        print(f"  [{name}] {config_dir} not found — skipping")
+        return False
+    return True
+
+
+def make_slash_command(role_name: str, description: str, body: str) -> str:
+    """Build a slash-command markdown file from a role.
+
+    Format: YAML frontmatter with description + body that delegates to the
+    subagent (or runs the spiel shim as fallback). The body must be the
+    role's full prompt — when the LLM sees this command, it acts as if it
+    were the role for this turn.
+    """
+    import yaml
+    fm = {"description": description}
+    return "---\n" + yaml.safe_dump(fm, sort_keys=False, allow_unicode=True).rstrip() + "\n---\n\n" + body.lstrip()
+
+
+def install_opencode_commands(verbose: bool = False) -> int:
+    """Install slash commands at ~/.config/opencode/commands/<name>.md.
+
+    Each file becomes a /name slash command in opencode. The body delegates
+    to the subagent (if available) or falls back to the spiel CLI.
+    """
+    if not detect_ide(OPENCODE_CONFIG, "opencode"):
+        return 0
+    target = OPENCODE_CONFIG / "commands"
+    target.mkdir(parents=True, exist_ok=True)
+    count = 0
+    for src in roles():
+        role_name, description, _fm, body = role_metadata(src)
+        # If body lacks a clear "delegate to subagent X" instruction, append one
+        if "delegate" not in body.lower() and "subagent" not in body.lower():
+            suffix = (
+
+                "\n\n## Delegation\n\n"
+                f"When this command fires, you ARE the `{role_name}` role. "
+                "Do not explain, do not ask clarifying questions, do not offer a menu. "
+                "Take the role's full body above as your system prompt and run the user's request.\n"
+            )
+            body = body.rstrip() + suffix
+        (target / src.name).write_text(
+            make_slash_command(role_name, description, body),
+            encoding="utf-8",
+        )
+        count += 1
+    if verbose:
+        print(f"  [opencode] installed {count} slash commands to {target}")
+    return count
+
+
+def install_cursor_skills(verbose: bool = False) -> int:
+    """Install Agent Skills at ~/.cursor/skills/<name>/SKILL.md.
+
+    Cursor's "Agent Skills" feature reads skills from this dir. Each skill
+    directory becomes a /name slash command in the Cursor chat box.
+    """
+    if not detect_ide(CURSOR_CONFIG, "cursor"):
+        return 0
+    target = CURSOR_CONFIG / "skills"
+    target.mkdir(parents=True, exist_ok=True)
+    count = 0
+    for src in roles():
+        role_name, description, _fm, body = role_metadata(src)
+        skill_dir = target / role_name
+        skill_dir.mkdir(parents=True, exist_ok=True)
+        # Agent Skills format: SKILL.md with frontmatter
+        skill_md = (
+            f"---\nname: {role_name}\ndescription: {description}\n---\n\n"
+            + body.lstrip()
+        )
+        (skill_dir / "SKILL.md").write_text(skill_md, encoding="utf-8")
+        count += 1
+    if verbose:
+        print(f"  [cursor] installed {count} skills to {target}")
+    return count
+
+
+def install_claude_skills(verbose: bool = False) -> int:
+    """Install Agent Skills at ~/.claude/skills/<name>/SKILL.md.
+
+    Claude Code's slash commands come from skills. Each skill becomes /name.
+    """
+    if not detect_ide(CLAUDE_CONFIG, "claude"):
+        return 0
+    target = CLAUDE_CONFIG / "skills"
+    target.mkdir(parents=True, exist_ok=True)
+    count = 0
+    for src in roles():
+        role_name, description, _fm, body = role_metadata(src)
+        skill_dir = target / role_name
+        skill_dir.mkdir(parents=True, exist_ok=True)
+        skill_md = (
+            f"---\nname: {role_name}\ndescription: {description}\n---\n\n"
+            + body.lstrip()
+        )
+        (skill_dir / "SKILL.md").write_text(skill_md, encoding="utf-8")
+        count += 1
+    if verbose:
+        print(f"  [claude] installed {count} skills to {target}")
+    return count
+
+
+def install_claude_agents(verbose: bool = False) -> int:
+    """Install subagent files at ~/.claude/agents/<name>.md.
+
+    Claude Code discovers subagents from this dir (scanned recursively).
+    The user's existing agents dir may have stale files from a prior install
+    — this overwrites them with the current canonical prompts.
+    """
+    if not detect_ide(CLAUDE_CONFIG, "claude"):
+        return 0
+    target = CLAUDE_CONFIG / "agents"
+    target.mkdir(parents=True, exist_ok=True)
+    count = 0
+    for src in roles():
+        # Strip our opencode-specific frontmatter keys; Claude uses a subset
+        role_name, description, _fm, body = role_metadata(src)
+        import yaml
+        clean_fm = {"name": role_name, "description": description}
+        # If the role uses tools: {...} (opencode format), keep it; Claude accepts it
+        if "tools" in _fm:
+            clean_fm["tools"] = _fm["tools"]
+        out = "---\n" + yaml.safe_dump(clean_fm, sort_keys=False, allow_unicode=True).rstrip() + "\n---\n\n" + body.lstrip()
+        (target / src.name).write_text(out, encoding="utf-8")
+        count += 1
+    if verbose:
+        print(f"  [claude] installed {count} agents to {target}")
+    return count
+
+
 def install_opencode(verbose: bool = False) -> int:
     if not OPENCODE_CONFIG.exists():
         print(f"  {OPENCODE_CONFIG} does not exist — skipping install")
@@ -202,9 +340,16 @@ def install_opencode(verbose: bool = False) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Generate IDE adapter files from team/*.md")
     parser.add_argument("--install", action="store_true",
-                        help="Also copy opencode adapters to ~/.config/opencode/")
+                        help="Install to all detected IDE configs "
+                             "(opencode: agents + commands, Cursor: skills, Claude Code: skills + agents)")
+    parser.add_argument("--install-opencode", action="store_true",
+                        help="Install to opencode only (agents + commands + skills)")
+    parser.add_argument("--install-cursor", action="store_true",
+                        help="Install to Cursor only (skills)")
+    parser.add_argument("--install-claude", action="store_true",
+                        help="Install to Claude Code only (skills + agents)")
     parser.add_argument("--check", action="store_true",
-                        help="Exit 1 if installed opencode adapters are out of date.")
+                        help="Exit 1 if installed adapters are out of date.")
     parser.add_argument("--show", metavar="IDE", choices=["opencode", "claude", "cursor", "mcp"],
                         help="Print what would be generated for one IDE (no files written).")
     args = parser.parse_args()
@@ -238,11 +383,35 @@ def main() -> int:
     print(f"Generated {total} adapter files in adapters/  "
           f"(opencode={n_oc}, claude={n_cl}, cursor={n_cu}, mcp={n_mc})")
 
-    if args.install:
-        n_inst = install_opencode()
-        print(f"Installed {n_inst} files to {OPENCODE_CONFIG}")
+    if args.install or args.install_opencode or args.install_cursor or args.install_claude:
+        do_oc = args.install or args.install_opencode
+        do_cu = args.install or args.install_cursor
+        do_cl = args.install or args.install_claude
+
+        n_oc_inst = 0
+        n_cu_inst = 0
+        n_cl_inst = 0
+        if do_oc:
+            n_oc_inst = install_opencode() + install_opencode_commands()
+        if do_cu:
+            n_cu_inst = install_cursor_skills()
+        if do_cl:
+            n_cl_inst = install_claude_skills() + install_claude_agents()
+
+        print()
+        print(f"Installed to live IDEs:")
+        if do_oc:
+            print(f"  opencode:    {OPENCODE_CONFIG}  (agents + commands)")
+        if do_cu:
+            print(f"  cursor:      {CURSOR_CONFIG / 'skills'}")
+        if do_cl:
+            print(f"  claude:      {CLAUDE_CONFIG}  (agents + skills)")
     else:
-        print(f"To install opencode adapters to {OPENCODE_CONFIG}, re-run with --install")
+        print()
+        print(f"To install to all detected IDEs, re-run with --install")
+        print(f"  opencode:    {OPENCODE_CONFIG}")
+        print(f"  cursor:      {CURSOR_CONFIG / 'skills'}")
+        print(f"  claude:      {CLAUDE_CONFIG}")
     return 0
 
 

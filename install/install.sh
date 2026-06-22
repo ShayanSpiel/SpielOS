@@ -14,7 +14,10 @@
 #   4. Starts the local setup wizard at http://localhost:7331
 #   5. Waits for the wizard to write files (user clicks "Finish" in browser)
 #   6. Installs the `spiel` shim to ~/.local/bin/spiel
-#   7. Syncs IDE adapter files to ~/.config/opencode/
+#   7. Syncs IDE adapter files to all detected IDEs:
+#        - opencode:    ~/.config/opencode/{agents,skill,commands}
+#        - Cursor:      ~/.cursor/skills/
+#        - Claude Code: ~/.claude/{agents,skills}
 #
 # On completion: `spiel /post empty` from any IDE works.
 
@@ -348,9 +351,17 @@ if [[ $WIZARD_EXIT -eq 0 && -f "$INSTALL_DIR/.env" ]]; then
     fi
   fi
 
-  # Sync IDE adapters
+  # Sync IDE adapters (opencode + Cursor + Claude Code, whichever is installed)
   if python3 "$INSTALL_DIR/tools/sync_adapters.py" --install </dev/null >/dev/null 2>&1; then
-    ok "IDE adapters synced to ~/.config/opencode/"
+    IDE_TARGETS=""
+    [[ -d "$HOME/.config/opencode" ]]  && IDE_TARGETS+="opencode  "
+    [[ -d "$HOME/.cursor" ]]            && IDE_TARGETS+="Cursor  "
+    [[ -d "$HOME/.claude" ]]            && IDE_TARGETS+="Claude Code  "
+    if [[ -n "$IDE_TARGETS" ]]; then
+      ok "Slash commands installed: $IDE_TARGETS"
+    else
+      ok "Adapters generated (no IDEs detected on this machine)"
+    fi
   fi
 
   # Check PATH
