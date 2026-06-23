@@ -4,8 +4,8 @@ type: concept
 tags: [strategy, positioning]
 status: living
 audience: strategist
-created: 2026-01-01
-updated: 2026-01-01
+created: --DATE--
+updated: --DATE--
 sources: [wizard]
 ---
 

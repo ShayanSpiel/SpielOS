@@ -1,0 +1,19 @@
+# ─── Strategy Defaults ──────────────────────────────────────────────
+# Override these after the wizard completes to match your brand.
+strategy:
+  primary_offer: your-offer-key
+  icp_profile: your-icp-label
+  funnel_default: TOFU
+  content_verticals:
+    - your-first-vertical
+    - your-second-vertical
+  pages:
+    - positioning
+    - icp
+    - offer
+    - methodology
+    - voice
+    - corpus
+    - funnel
+    - archetypes
+    - types

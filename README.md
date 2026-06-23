@@ -18,7 +18,7 @@ WORK SESSION → [Strategist] → [Copywriter] → [Editor] → [Publisher] → 
 One command. Any Mac/Linux. Any IDE.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/Spiel-OS/main/install/install.sh | bash
+curl -fsSL https://spielos.xyz/spielos | bash
 ```
 
 The installer:
@@ -112,16 +112,16 @@ The 10-step wizard at `http://localhost:7331`:
 
 1. **Welcome** — overview, target, time
 2. **Brand** — name, handle, tagline, colors + live banner preview
-3. **Identity** — role, story, content sources
-4. **ICP** — who you serve, goals, fears, internal monologue
-5. **Positioning** — your one-liner, category, core insight
-6. **Offer** — what you sell, stack, price, guarantee
-7. **Funnel** — distribution + archetypes (with custom archetype input)
-8. **Voice** — register, style rules, banned openers
-9. **Methodology** — name, description, platforms
+3. **ICP** — your audience profile (markdown editor with skeleton)
+4. **Positioning** — your one-liner, category, insight (markdown editor)
+5. **Offer** — what you sell (markdown editor)
+6. **Funnel + Archetypes** — distribution sliders + archetype toggles (hybrid)
+7. **Voice + Corpus** — register, style rules, voice examples (hybrid)
+8. **Methodology** — name, sources, platforms (markdown editor)
+9. **Rules** — mechanical config defaults (markdown editor)
 10. **Connect** — Buffer / X / LinkedIn / blog tokens (all skippable)
 
-The wizard mirrors the shayanspiel.github.io design system — same tokens, same components, same gradient. Every input shows a `→ file/path` chip so you know where each value lands. The 10-step stepper at the top is clickable. The bottom nav is sticky.
+The wizard uses a minimal design system with live banner previews, color pickers, and toggle groups. Every input shows a `→ file/path` chip so you know where each value lands. The 10-step stepper at the top is clickable. The bottom nav is sticky.
 
 On Finish, the wizard auto-installs the `spiel` shim to `~/.local/bin/spiel`, syncs the IDE adapter files, and installs the 8 agent + 8 skill stubs to `~/.config/opencode/`. From then on, `/post` works from any IDE.
 

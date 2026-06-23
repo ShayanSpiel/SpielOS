@@ -41,8 +41,25 @@ def resolve_vault(arg: str | None) -> Path:
 
 
 VAULT = None  # set in main()
+SKELETON_DIR = Path(__file__).resolve().parent / "skeletons"
 
-# ─── File writers ───────────────────────────────────────────────────────
+# ─── Helpers ────────────────────────────────────────────────────────────
+
+def write_text_area(rel_path: str, content: str | None) -> list[str]:
+    """Write a file from textarea content. Skip if content is empty."""
+    if not content or not content.strip():
+        return []
+    (VAULT / rel_path).write_text(content, encoding="utf-8")
+    return [rel_path]
+
+
+def load_skeleton(name: str) -> str:
+    """Load a skeleton file, or return empty string."""
+    path = SKELETON_DIR / name
+    if path.exists():
+        return path.read_text(encoding="utf-8")
+    return ""
+
 
 def yaml_quote(s: str) -> str:
     """Quote a string for YAML if it contains special chars."""
@@ -81,7 +98,7 @@ The brand identity. The Designer reads this when picking banner tokens.
 
 ```yaml
 brand:
-  name: {form.get('brand_name', 'SpielOS')}
+  name: {form.get('brand_name', 'YourBrand')}
   handle: {form.get('handle', '@your_handle')}
   primary_bg: {primary_bg}
   primary_fg: {primary_fg}
@@ -117,7 +134,7 @@ The `tools/designer.py` banner renderer reads these tokens and injects them into
     (VAULT / "system" / "brand.md").write_text(md, encoding="utf-8")
     brand_json = {
         "brand": {
-            "name": form.get("brand_name", "SpielOS"),
+            "name": form.get("brand_name", "YourBrand"),
             "handle": form.get("handle", "@your_handle"),
             "primary_bg": primary_bg,
             "primary_fg": primary_fg,
@@ -151,273 +168,10 @@ The `tools/designer.py` banner renderer reads these tokens and injects them into
     return ["system/brand.md", "system/brand.json"]
 
 
-def write_icp(form: dict) -> list[str]:
-    md = f"""---
-title: ICP — {form.get('icp_who', 'target audience')[:60]}
-type: concept
-tags: [strategy, icp, audience]
-status: living
-audience: strategist, copywriter
-created: {datetime.now().strftime("%Y-%m-%d")}
-updated: {datetime.now().strftime("%Y-%m-%d")}
-sources: [wizard]
----
-
-# ICP — {form.get('icp_who', 'target audience')}
-
-## Demographics
-
-| Attribute | Value |
-|---|---|
-| Age | {form.get('icp_age', '—')} |
-| Role | {form.get('icp_who', '—')} |
-| Revenue / stage | {form.get('icp_revenue', '—')} |
-
-## Goal
-
-{form.get('icp_goal', '—')}
-
-## Fear
-
-{form.get('icp_fear', '—')}
-
-## Internal monologue
-
-{form.get('icp_questions', '—')}
-
-## How this ICP buys
-
-When a follower has read ≥3 posts AND clicked bio AND DMed with a specific question → treat as a buying signal.
-
-**The buying signal:** "tell me more" or "how does it work" — not "how much."
-
-**The objection:** "Can I do this myself?" → "You could, but it'll take 3 months and every mistake I already made. Or you can get it in 14 days."
-
-## See also
-
-- [[positioning]] — your one-line market position
-- [[offer]] — what you sell to this audience
-- [[funnel]] — the path from unaware to buying
-"""
-    (VAULT / "strategy" / "icp.md").write_text(md, encoding="utf-8")
-    return ["strategy/icp.md"]
-
-
-def write_positioning(form: dict) -> list[str]:
-    md = f"""---
-title: Positioning
-type: concept
-tags: [strategy, positioning]
-status: living
-audience: strategist
-created: {datetime.now().strftime("%Y-%m-%d")}
-updated: {datetime.now().strftime("%Y-%m-%d")}
-sources: [wizard]
----
-
-# Positioning
-
-**Category:** {form.get('category', '—')}
-
-**One line:** {form.get('positioning', '—')}
-
-**Core insight:** {form.get('core_insight', '—')}
-
-## The transformation
-
-**Before:** Build → stop → think → write → post (rare, inconsistent)
-
-**After:** Build → session captured → content generated → publish (continuous, invisible overhead)
-
-## See also
-
-- [[icp]] — the audience this serves
-- [[offer]] — what you sell
-- [[funnel]] — the path the ICP walks
-"""
-    (VAULT / "strategy" / "positioning.md").write_text(md, encoding="utf-8")
-    return ["strategy/positioning.md"]
-
-
-def write_offer(form: dict) -> list[str]:
-    md = f"""---
-title: Offer — {form.get('offer_name', 'your offer')[:60]}
-type: concept
-tags: [strategy, offer, conversion]
-status: living
-audience: strategist
-created: {datetime.now().strftime("%Y-%m-%d")}
-updated: {datetime.now().strftime("%Y-%m-%d")}
-sources: [wizard]
----
-
-# Offer — {form.get('offer_name', '—')}
-
-**Price:** {form.get('offer_price', '—')}
-
-## The stack
-
-{form.get('offer_stack', '—')}
-
-## The guarantee
-
-{form.get('offer_guarantee', '—')}
-
-## The pitch
-
-> "We [deliver] so you can [outcome] without [sacrifice]."
-
-## See also
-
-- [[positioning]] — the one-liner this offer delivers on
-- [[icp]] — the buyer profile
-- [[funnel]] — the BOFU routing
-"""
-    (VAULT / "strategy" / "offer.md").write_text(md, encoding="utf-8")
-    return ["strategy/offer.md"]
-
-
-def write_funnel(form: dict) -> list[str]:
-    md = f"""---
-title: Funnel
-type: concept
-tags: [strategy, funnel, routing]
-status: living
-audience: strategist
-created: {datetime.now().strftime("%Y-%m-%d")}
-updated: {datetime.now().strftime("%Y-%m-%d")}
-sources: [wizard]
----
-
-# Funnel
-
-The pipeline that walks the ICP from "I don't know this exists" to "I want it."
-
-```
-Awareness (TOFU) → Consideration (MOFU) → Conversion (BOFU) → Post-Purchase
-```
-
-## Distribution
-
-| Stage | % of content | Offer presence |
-|---|---|---|
-| Awareness (TOFU) | {form.get('funnel_tofu', 40)}% | None |
-| Consideration (MOFU) | {form.get('funnel_mofu', 40)}% | Soft CTA |
-| Conversion (BOFU) | {form.get('funnel_bofu', 15)}% | Direct pitch |
-
-## Archetypes
-
-{', '.join(form.get('archetypes', []))}
-
-## The 1-in-5 rule
-
-Of all drafts in a 30-day rolling window, exactly 1/5 may carry an offer reference. Of those, exactly 1/2 are direct pitches.
-
-## See also
-
-- [[icp]] — the audience this funnel walks through
-- [[offer]] — the offer this funnel feeds toward
-- [[positioning]] — the one-liner
-"""
-    (VAULT / "strategy" / "funnel.md").write_text(md, encoding="utf-8")
-    return ["strategy/funnel.md"]
-
-
-def write_voice(form: dict) -> list[str]:
-    md = f"""---
-title: Voice
-type: concept
-tags: [strategy, voice, writing]
-status: living
-audience: copywriter
-created: {datetime.now().strftime("%Y-%m-%d")}
-updated: {datetime.now().strftime("%Y-%m-%d")}
-sources: [wizard]
----
-
-# Voice
-
-How your posts read. The Copywriter matches this register.
-
-## Default voice register
-
-**{form.get('voice_register', 'confessional-teaching')}**
-
-## Always-on style rules
-
-{chr(10).join('- ' + r for r in form.get('voice_rules', []))}
-
-## Banned opener patterns
-
-```
-{form.get('banned_openers', '')}
-```
-
-## Voice modes
-
-- **Session mode** — peer builder is reading. Casual, lowercase OK, self-deprecating, voice-corpus register.
-- **Topic mode** — stranger is scrolling. Professional, confident, stop-the-scroll energy.
-
-## Character limits (hard gates)
-
-- X: ≤ 280 chars
-- LinkedIn casual: ≤ 1500 chars
-- LinkedIn polished: ≤ 3000 chars
-- Blog pillar: ≤ 2500 words
-
-## See also
-
-- [[icp]] — who you're writing for
-- [[funnel]] — which stage each post targets
-- `corpus.md` — 8 canonical voice examples (read before drafting)
-"""
-    (VAULT / "strategy" / "voice.md").write_text(md, encoding="utf-8")
-    return ["strategy/voice.md"]
-
-
-def write_methodology(form: dict) -> list[str]:
-    md = f"""---
-title: Methodology — {form.get('methodology_name', 'Session as Content')}
-type: concept
-tags: [strategy, methodology, runtime]
-status: living
-audience: researcher
-created: {datetime.now().strftime("%Y-%m-%d")}
-updated: {datetime.now().strftime("%Y-%m-%d")}
-sources: [wizard]
----
-
-# Methodology — {form.get('methodology_name', 'Session as Content')}
-
-> Coined by {form.get('brand_name', 'you')}, {datetime.now().strftime("%Y")}.
-
-## What it is
-
-{form.get('methodology_desc', 'Your content methodology. The Researcher uses this to find the source for every /post run.')}
-
-## Source kinds
-
-{chr(10).join('- ' + s for s in form.get('methodology_sources', []))}
-
-## Platforms
-
-{', '.join(form.get('platforms', []))}
-
-## Pipeline
-
-```
-{form.get('methodology_name', 'Source')} → Researcher (classify) → Strategist (compile + select)
-       → Copywriter (draft) → Designer (banner) → Editor (gates) → Publisher (dispatch) → Analyst (engage)
-```
-"""
-    (VAULT / "strategy" / "methodology.md").write_text(md, encoding="utf-8")
-    return ["strategy/methodology.md"]
-
-
 def write_archetypes(form: dict) -> list[str]:
     """Write strategy/archetypes.md from the wizard's archetype picks.
 
-    The 10 default archetypes have fixed S1–S10 codes. User-added custom
+    The 10 default archetypes have fixed S1-S10 codes. User-added custom
     archetypes get S11+ codes.
     """
     archetype_table = {
@@ -467,14 +221,6 @@ The 10 default archetypes + your custom archetypes. The Researcher uses this to 
 |---|---|---|
 {table}
 
-## How the Researcher classifies
-
-For each session log, the Researcher:
-1. Reads the body sections (Patterns, Decisions, What we did, Shipped, Numbers, Lesson).
-2. Matches against archetype keyword indexes in `system/rules.yaml §strategy.archetypes`.
-3. Picks the highest-scoring archetype.
-4. Defaults to S10 (Meta) if the session is about the system itself.
-
 ## Custom archetypes
 
 {("Your custom archetypes: " + ", ".join(custom) + ".") if custom else "No custom archetypes."}
@@ -486,54 +232,6 @@ For each session log, the Researcher:
 """
     (VAULT / "strategy" / "archetypes.md").write_text(md, encoding="utf-8")
     return ["strategy/archetypes.md"]
-
-
-def write_corpus(form: dict) -> list[str]:
-    """Write a starter corpus with one example per the chosen voice register."""
-    register = form.get("voice_register", "confessional-teaching")
-    md = f"""---
-title: Voice Corpus — Starter
-type: concept
-tags: [voice, reference, corpus]
-status: starter
-audience: copywriter
-created: {datetime.now().strftime("%Y-%m-%d")}
-updated: {datetime.now().strftime("%Y-%m-%d")}
-sources: [wizard]
----
-
-# Voice Corpus — Starter
-
-This page collects canonical examples of your voice. The Copywriter reads this before drafting.
-
-> **Starter state.** The wizard wrote this on install. Add 3-5 of your own real posts as examples. Until you do, the Copywriter will write in the closest-matching register to "{register}".
-
-## Register: {register}
-
-### How to use this corpus
-
-Before drafting, the Copywriter picks the closest example and matches the *voice register* (tone, rhythm, opening pattern) — not the structure.
-
-## Add your own
-
-Drop a `## <label>` section per post:
-
-```markdown
-## 1. <post name>
-
-**Hook (2 lines):**
-> <first 2 lines from the post>
-
-**Close (1-2 lines):**
-> <last 1-2 lines>
-
-**Signature moves:**
-- <pattern 1>
-- <pattern 2>
-```
-"""
-    (VAULT / "strategy" / "corpus.md").write_text(md, encoding="utf-8")
-    return ["strategy/corpus.md"]
 
 
 def write_env(form: dict) -> list[str]:
@@ -566,38 +264,37 @@ def write_env(form: dict) -> list[str]:
 
 
 def write_rules_update(form: dict) -> list[str]:
-    """Update system/rules.yaml with the banned_openers + custom archetypes from the wizard."""
+    """Merge the user's rules textarea (strategy section) into system/rules.yaml."""
     rules_path = VAULT / "system" / "rules.yaml"
     if not rules_path.exists():
         return []
+    rules_content = (form.get("rules_content") or "").strip()
+    if not rules_content:
+        return []
     try:
         import yaml
+        # Parse the user's textarea as a YAML doc
+        user_rules = yaml.safe_load(rules_content)
+        if not isinstance(user_rules, dict):
+            return []
+        # Read existing rules.yaml
         text = rules_path.read_text(encoding="utf-8")
-        rules = yaml.safe_load(text) or {}
+        existing = yaml.safe_load(text) or {}
+        # Deep-merge the strategy section
+        strategy = existing.get("strategy", {})
+        if isinstance(strategy, dict) and isinstance(user_rules.get("strategy"), dict):
+            strategy.update(user_rules["strategy"])
+            existing["strategy"] = strategy
+        elif isinstance(user_rules.get("strategy"), dict):
+            existing["strategy"] = user_rules["strategy"]
+        # Preserve banned_openers and other top-level keys from textarea
+        for key in ("banned_openers", "known_names"):
+            if key in user_rules:
+                existing[key] = user_rules[key]
+        rules_path.write_text(yaml.safe_dump(existing, sort_keys=False, allow_unicode=True), encoding="utf-8")
+        return ["system/rules.yaml"]
     except Exception:
         return []
-
-    # Parse banned_openers from the form (one per line)
-    banned_raw = form.get("banned_openers", "")
-    if banned_raw:
-        patterns = [p.strip() for p in banned_raw.splitlines() if p.strip()]
-        rules.setdefault("banned_openers", [])
-        for p in patterns:
-            if p not in rules["banned_openers"]:
-                rules["banned_openers"].append(p)
-
-    # Add custom archetypes as new archetype keys (S11+)
-    custom_archetypes = form.get("customArchetypes", [])
-    if custom_archetypes:
-        archetypes = rules.setdefault("strategy", {}).setdefault("archetypes", {})
-        for name in custom_archetypes:
-            key = f"S11_{name.lower().replace(' ', '_').replace('-', '_')}"
-            if key not in archetypes:
-                # Default keyword: the lowercased name itself (catches obvious matches)
-                archetypes[key] = [name.lower(), name.lower().replace(" ", "")]
-
-    rules_path.write_text(yaml.safe_dump(rules, sort_keys=False, allow_unicode=True), encoding="utf-8")
-    return ["system/rules.yaml"]
 
 
 def write_install_marker() -> list[str]:
@@ -806,6 +503,16 @@ class WizardHandler(BaseHTTPRequestHandler):
                 "target": str(VAULT),
                 "existing": {"summary": {}},
             })
+        if path == "/api/skeletons":
+            # List available skeleton file names
+            skeletons = sorted(f.name for f in SKELETON_DIR.iterdir() if f.is_file())
+            return self._send_json(200, {"skeletons": skeletons})
+        if path.startswith("/api/skeleton/"):
+            name = path[len("/api/skeleton/"):]
+            content = load_skeleton(name)
+            if not content:
+                return self._send_json(404, {"error": f"skeleton not found: {name}"})
+            return self._send_json(200, {"name": name, "content": content})
         if path == "/api/health":
             return self._send_json(200, {"ok": True, "vault": str(VAULT)})
         self.send_response(404)
@@ -834,17 +541,24 @@ class WizardHandler(BaseHTTPRequestHandler):
         if path == "/api/finish":
             try:
                 written: list[str] = []
+                # Structured writers (brand, archetypes, env)
                 written += write_brand(data)
-                written += write_icp(data)
-                written += write_positioning(data)
-                written += write_offer(data)
-                written += write_funnel(data)
-                written += write_voice(data)
                 written += write_archetypes(data)
-                written += write_methodology(data)
-                written += write_corpus(data)
+                written += write_text_area("strategy/icp.md", data.get("icp_content"))
+                written += write_text_area("strategy/positioning.md", data.get("positioning_content"))
+                written += write_text_area("strategy/offer.md", data.get("offer_content"))
+                # Funnel: use textarea (JS already replaced markers with slider/toggle values)
+                written += write_text_area("strategy/funnel.md", data.get("funnel_content"))
+                # Voice + Corpus: use textarea content
+                written += write_text_area("strategy/voice.md", data.get("voice_content"))
+                written += write_text_area("strategy/corpus.md", data.get("corpus_content"))
+                # Methodology: use textarea (JS already replaced markers)
+                written += write_text_area("strategy/methodology.md", data.get("methodology_content"))
+                # Rules: merge strategy section from textarea
                 written += write_rules_update(data)
+                # .env
                 written += write_env(data)
+                # Install marker
                 written += write_install_marker()
                 # Auto-install: shim + IDE adapters
                 install_result = run_post_install()

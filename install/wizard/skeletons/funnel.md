@@ -4,8 +4,8 @@ type: concept
 tags: [strategy, funnel, routing]
 status: living
 audience: strategist
-created: 2026-01-01
-updated: 2026-01-01
+created: --DATE--
+updated: --DATE--
 sources: [wizard]
 ---
 
@@ -17,13 +17,13 @@ The pipeline that walks the ICP from unaware to buyer.
 
 | Stage | % of content | Offer presence |
 |---|---|---|
-| Awareness (TOFU) | 40% | None |
-| Consideration (MOFU) | 40% | Soft CTA |
-| Conversion (BOFU) | 15% | Direct pitch |
+| Awareness (TOFU) | --TOFU_PCT--% | None |
+| Consideration (MOFU) | --MOFU_PCT--% | Soft CTA |
+| Conversion (BOFU) | --BOFU_PCT--% | Direct pitch |
 
 ## Archetypes
 
-System Build, Ship, Decision, Lesson, Failure, Client Work, Research, Tooling, Strategy, Meta
+--ARCHETYPES--
 
 ## The 1-in-5 rule
 

@@ -1,13 +1,11 @@
-# ShayanWiki — Single source of truth for all mechanical rules.
+# SpielOS — Single source of truth for all mechanical rules.
 # ===============================================================
 # Edit this file to change behavior. Scripts read this at startup
-# and NEVER have hardcoded values. The scripts/ directory is framework.
-# Anything NOT in this file belongs in concepts/*.md (LLM guidance).
+# and NEVER have hardcoded values.
 #
 # A new user should be able to:
 #   1. Edit rules.yaml (15 min)
-#   2. Edit concepts/*.md (30 min)  
-#   3. Edit templates/*.md (15 min)
+#   2. Edit prompts + templates (30 min)
 #   → Engine ready for their voice and strategy
 #
 # ────────────────────────────────────────────────────────────────────
@@ -30,15 +28,13 @@ pipeline:
 
 # ─── Strategy Defaults ──────────────────────────────────────────────
 strategy:
-  primary_offer: spiel-engine-dfy
-  icp_profile: technical-founder
+  primary_offer: your-offer
+  icp_profile: your-icp
   funnel_default: TOFU
   conversion_log: content/conversions.md
   content_verticals:
-    - builder-to-lead-system
-    - content-automation-ai-agents
-    - positioning-and-offers
-    - building-in-public-as-lead-gen
+    - your-first-vertical
+    - your-second-vertical
   session_classifier: active
 
   # Strategy pages the engine loads (maps to strategy/*.md, falls back to concepts/*.md).

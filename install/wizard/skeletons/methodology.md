@@ -1,11 +1,11 @@
 ---
-title: Methodology — Your Methodology
+title: Methodology — --METHODOLOGY_NAME--
 type: concept
 tags: [strategy, methodology, runtime]
 status: living
 audience: researcher
-created: 2026-01-01
-updated: 2026-01-01
+created: --DATE--
+updated: --DATE--
 sources: [wizard]
 ---
 
@@ -17,14 +17,12 @@ Your content methodology. The Researcher uses this to find the source for every 
 
 ## Source kinds
 
-- Build sessions
-- Customer calls
-- Reading & research
+--METHODOLOGY_SOURCES--
 
 ## Platforms
 
-x, linkedin, blog
+--PLATFORMS--
 
 ## Pipeline
 
-Your Methodology → Researcher → Strategist → Copywriter → Designer → Editor → Publisher → Analyst
+--METHODOLOGY_NAME-- → Researcher → Strategist → Copywriter → Designer → Editor → Publisher → Analyst

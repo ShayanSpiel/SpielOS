@@ -189,7 +189,7 @@ _resolve_vault() {
     fi
     echo "" >&2
     echo "  Fix: re-run the installer:" >&2
-    echo "    curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/Spiel-OS/main/install/install.sh | bash" >&2
+    echo "    curl -fsSL https://spielos.xyz/spielos | bash" >&2
     return 1
   fi
 
@@ -206,7 +206,8 @@ _SPielos_SKIP_DIRS="team skills strategy content"
 _SPielos_SKIP_FILES=".env system/brand.md system/brand.json"
 
 _update_via_tarball() {
-  local tarball="https://github.com/ShayanSpiel/Spiel-OS/archive/refs/heads/main.tar.gz"
+SPIELOS_REPO="${SPIELOS_REPO:-spielos/spielos}"
+  local tarball="${TARBALL_URL:-https://github.com/$SPIELOS_REPO/archive/refs/heads/main.tar.gz}"
   local tmpdir
   tmpdir=$(mktemp -d) || { echo "  ⚠ mktemp failed" >&2; return 1; }
 

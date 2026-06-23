@@ -77,7 +77,10 @@ if [[ -d "$HOME/.config/opencode" ]]; then
   fi
 fi
 
+SPIELOS_REPO="${SPIELOS_REPO:-spielos/spielos}"
+INSTALL_URL="${INSTALL_URL:-https://raw.githubusercontent.com/$SPIELOS_REPO/main/install/install.sh}"
+
 echo ""
 echo "  Done. Re-install any time:"
-echo "    curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/Spiel-OS/main/install/install.sh | bash"
+echo "    curl -fsSL $INSTALL_URL | bash"
 echo ""

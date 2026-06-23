@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# scripts/publish-blog.sh — vault pillar blog → GitHub Pages
+# tools/publisher/blog.sh — vault pillar blog → GitHub Pages
 #
-# Publishes a pillar blog post from the vault (content/queue/*.md) to the
-# GitHub Pages Jekyll site (~ShayanSpiel.github.io/_posts/*.md), with
-# referenced screenshots copied to assets/uploads/ and frontmatter
-# transformed to Jekyll format. Then git add + commit + (optional) push.
+# Publishes a pillar blog post from the vault (content/queue/*.md) to a
+# GitHub Pages Jekyll site (_posts/*.md), with referenced screenshots
+# copied to assets/uploads/ and frontmatter transformed to Jekyll format.
+# Then git add + commit + (optional) push.
 #
 # Usage:
-#   bash scripts/publish-blog.sh <pillar-blog-file>
-#   bash scripts/publish-blog.sh <pillar-blog-file> --dry-run
-#   bash scripts/publish-blog.sh <pillar-blog-file> --yes
-#   bash scripts/publish-blog.sh --list
+#   bash tools/publisher/blog.sh <pillar-blog-file>
+#   bash tools/publisher/blog.sh <pillar-blog-file> --dry-run
+#   bash tools/publisher/blog.sh <pillar-blog-file> --yes
+#   bash tools/publisher/blog.sh --list
 #
 # Flags:
 #   --list      List all pillar blog posts in content/queue/ that are
@@ -23,8 +23,8 @@
 #
 # Requirements:
 #   - bash 4+, python3, git
-#   - The vault is at $VAULT (default: $HOME/ShayanWiki)
-#   - The GH Pages repo is at $GH_PAGES (default: $HOME/ShayanSpiel.github.io)
+#   - The vault is at $VAULT (from .env or env var)
+#   - The GH Pages repo is at $GH_PAGES (from env var, default: ~/github/<BLOG_REPO>)
 #   - The GH Pages repo is initialized as a git repo with a remote
 #
 # Behavior:
@@ -39,12 +39,19 @@
 #   - Other local image references are LEFT ALONE (likely broken on
 #     the live site, but flagged for the user to review)
 #   - Git commit is always created; git push only with --yes
-
+#
 set -euo pipefail
 
 # ─── Config ────────────────────────────────────────────────────────────────
-VAULT="${VAULT:-$HOME/ShayanWiki}"
-GH_PAGES="${GH_PAGES:-$HOME/ShayanSpiel.github.io}"
+# Load .env if present (for VAULT_DIR, BLOG_REPO, BLOG_TOKEN)
+ENV_FILE="$(dirname "$0")/../../.env"
+[[ -f "$ENV_FILE" ]] && source "$ENV_FILE"
+# VAULT from env var or default to cwd
+VAULT="${VAULT:-${VAULT_DIR:-$PWD}}"
+# GH_PAGES from env var or default to ~/github/<BLOG_REPO>
+BLOG_REPO="${BLOG_REPO:-yourname/yourname.github.io}"
+GH_PAGES="${GH_PAGES:-$HOME/github/$(basename "$BLOG_REPO" .git)}"
+BLOG_OWNER="${BLOG_OWNER:-$(echo "$BLOG_REPO" | cut -d/ -f1)}"
 QUEUE_DIR="$VAULT/content/queue"
 POSTS_DIR="$GH_PAGES/_posts"
 UPLOADS_DIR="$GH_PAGES/assets/uploads"
@@ -556,7 +563,7 @@ ok "Committed."
 if $YES_FLAG; then
   info "Pushing to remote..."
   git push
-  ok "Pushed. GitHub Pages will rebuild in ~30s. Post will be live at https://shayanspiel.github.io/${SLUG}/"
+  ok "Pushed. GitHub Pages will rebuild in ~30s. Post will be live at https://${BLOG_OWNER}.github.io/${SLUG}/"
 else
   warn "Not pushing (no --yes). Run: cd $GH_PAGES && git push"
 fi

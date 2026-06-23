@@ -36,9 +36,13 @@ content/.brief/
 
 # Generated artifacts
 adapters/opencode/agents/*.md
+adapters/opencode/commands/*.md
 adapters/opencode/skill/*/SKILL.md
 adapters/claude/agents/*.md
+adapters/claude/commands/*.md
 adapters/cursor/commands/*.md
+adapters/codex/**/*.toml
+adapters/codex/**/*.md
 adapters/mcp/server.json
 skills/
 
@@ -59,3 +63,6 @@ assets/banners/.preview/
 logs/
 *.log
 *.jsonl
+V2-PLAN.md
+templates/registry/rank-history.jsonl
+templates/registry/_archive/

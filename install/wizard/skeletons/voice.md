@@ -4,8 +4,8 @@ type: concept
 tags: [strategy, voice, writing]
 status: living
 audience: copywriter
-created: 2026-01-01
-updated: 2026-01-01
+created: --DATE--
+updated: --DATE--
 sources: [wizard]
 ---
 
@@ -13,19 +13,15 @@ sources: [wizard]
 
 ## Default voice register
 
-**confessional-teaching**
+**--VOICE_REGISTER--**
 
 ## Always-on style rules
 
-- No em-dashes (use →, colons, commas)
-- Standard capitalization
-- No engagement bait
-- Note: closer preferred
+--VOICE_RULES--
 
 ## Banned opener patterns
 
-- ^in this post
-- ^today i want to talk about
+--BANNED_OPENERS--
 
 ## Character limits
 

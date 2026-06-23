@@ -3,7 +3,7 @@
 #
 # One command. Any Mac/Linux. Any IDE.
 #
-#   curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/Spiel-OS/main/install/install.sh | bash
+#   curl -fsSL https://spielos.xyz/spielos | bash
 #
 # What this does:
 #   1. Detects arch, python, git, curl/wget
@@ -36,9 +36,10 @@ else
   HAS_TTY=0
 fi
 
-GITHUB_REPO="https://github.com/ShayanSpiel/Spiel-OS.git"
-TARBALL_URL="https://github.com/ShayanSpiel/Spiel-OS/archive/refs/heads/main.tar.gz"
-RAW_INSTALL_URL="https://raw.githubusercontent.com/ShayanSpiel/Spiel-OS/main/install/install.sh"
+SPIELOS_REPO="${SPIELOS_REPO:-spielos/spielos}"
+GITHUB_REPO="${GITHUB_REPO:-https://github.com/$SPIELOS_REPO.git}"
+TARBALL_URL="${TARBALL_URL:-https://github.com/$SPIELOS_REPO/archive/refs/heads/main.tar.gz}"
+RAW_INSTALL_URL="${RAW_INSTALL_URL:-https://raw.githubusercontent.com/$SPIELOS_REPO/main/install/install.sh}"
 VERSION="${SPIELOS_VERSION:-main}"
 DEFAULT_INSTALL_DIR="${SPIELOS_INSTALL_DIR:-$PWD}"
 SHIM_PATH="$HOME/.local/bin/spiel"

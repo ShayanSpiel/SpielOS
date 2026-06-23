@@ -231,14 +231,14 @@ Adding a new state is **one row in the table** + one role file (or a delegation 
 ## The install flow
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/Spiel-OS/main/install/install.sh | bash
+curl -fsSL https://spielos.xyz/spielos | bash
 ```
 
 1. Installer downloads the repo into the **current directory** (your project root becomes the vault, marked by `.spiel-vault`)
 2. Starts the local dashboard at `http://localhost:7331` (auto-opens in browser)
 3. Installer polls for `.install-state.json` (the wizard writes this on Finish)
-4. Wizard walks 10 steps: Welcome → Brand → Identity → ICP → Positioning → Offer → Funnel → Voice → Methodology → Connect
-5. Wizard writes 8 strategy files + brand + .env on Finish, then auto-shuts down
+4. Wizard walks 10 steps: Welcome → Brand → ICP → Positioning → Offer → Funnel + Archetypes → Voice + Corpus → Methodology → Rules → Connect
+5. Wizard writes 8 strategy files (textarea-based editors) + brand + .env on Finish, then auto-shuts down
 6. Installer continues: writes `<vault>/.spiel-vault` (vault pointer), `~/.config/spielos/config` (global config — makes vault resolvable from ANY directory), shim at `~/.local/bin/spiel` + IDE adapters at all 3 IDEs (opencode, Cursor, Claude Code — whichever is installed)
 7. Prints `DONE. From any IDE, type /post to ship a post.`
 

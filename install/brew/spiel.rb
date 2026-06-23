@@ -10,10 +10,10 @@
 class Spiel < Formula
   desc "Markdown-driven marketing team for content pipelines"
   homepage "https://spielos.xyz"
-  url "https://github.com/ShayanSpiel/Spiel-OS/archive/refs/tags/v1.0.0.tar.gz"
+  url "https://github.com/spielos/spielos/archive/refs/tags/v1.0.0.tar.gz"
   sha256 "REPLACE_WITH_TARBALL_SHA256"
   license "MIT"
-  head "https://github.com/ShayanSpiel/Spiel-OS.git", branch: "main"
+  head "https://github.com/spielos/spielos.git", branch: "main"
 
   depends_on "python@3.11"
 

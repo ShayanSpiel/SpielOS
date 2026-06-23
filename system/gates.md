@@ -137,8 +137,8 @@ pipeline:
 
 ```yaml
 strategy:
-  primary_offer: spiel-engine-dfy
-  icp_profile: technical-founder
+  primary_offer: your-offer-key
+  icp_profile: your-icp-label
   funnel_default: TOFU
   content_verticals: [builder-to-lead-system, content-automation-ai-agents, ...]
   pages: [icp, funnel, voice, session, corpus]    # injected at handoff
