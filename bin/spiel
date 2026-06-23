@@ -364,6 +364,10 @@ case "${1:-}" in
     fi
 
     # Rewrite vault pointer files (always, to keep them in sync with current path)
+    # Write global config directly (not via _rewrite_vault_pointers) so it works
+    # even when this shim is an old version that doesn't have it.
+    mkdir -p "$HOME/.config/spielos"
+    printf 'VAULT_DIR=%s\n' "$VAULT" > "$HOME/.config/spielos/config"
     _rewrite_vault_pointers
 
     echo ""
