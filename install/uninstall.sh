@@ -35,6 +35,13 @@ if [[ -f "$INSTALL_DIR/.spiel-vault" ]]; then
   echo "  ✓ Removed $INSTALL_DIR/.spiel-vault"
 fi
 
+# Remove global config
+if [[ -f "$HOME/.config/spielos/config" ]]; then
+  rm -f "$HOME/.config/spielos/config"
+  rmdir "$HOME/.config/spielos" 2>/dev/null || true
+  echo "  ✓ Removed $HOME/.config/spielos/config"
+fi
+
 # Remove vault
 if [[ -d "$INSTALL_DIR" ]]; then
   rm -rf "$INSTALL_DIR"

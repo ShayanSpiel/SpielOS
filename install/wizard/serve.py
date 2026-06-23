@@ -651,6 +651,10 @@ def run_post_install() -> dict:
     # 2. Write vault pointer file + update .env VAULT_DIR
     try:
         (VAULT / ".spiel-vault").write_text(f"VAULT_DIR={VAULT}\n", encoding="utf-8")
+        # Global config (~/.config/spielos/config) — makes vault resolvable from ANY cwd
+        spielos_cfg = Path.home() / ".config" / "spielos" / "config"
+        spielos_cfg.parent.mkdir(parents=True, exist_ok=True)
+        spielos_cfg.write_text(f"VAULT_DIR={VAULT}\n", encoding="utf-8")
         env_file = VAULT / ".env"
         if env_file.exists():
             text = env_file.read_text(encoding="utf-8")

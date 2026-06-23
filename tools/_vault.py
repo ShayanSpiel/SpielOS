@@ -4,8 +4,9 @@
 Resolution order (matching bin/spiel):
   1. --vault CLI arg (if provided)
   2. $VAULT_DIR env var
-  3. Walk up from cwd for .spiel-vault file
-  4. Walk up from cwd for team/md.md
+  3. ~/.config/spielos/config  (global config set by installer)
+  4. Walk up from cwd for .spiel-vault file
+  5. Walk up from cwd for team/md.md
 
 Returns None if no vault found (caller falls back to cwd or errors).
 """
@@ -14,6 +15,32 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+
+
+GLOBAL_CONFIG = Path.home() / ".config" / "spielos" / "config"
+
+
+def _read_global_config() -> Path | None:
+    """Read VAULT_DIR from ~/.config/spielos/config, validate team/md.md exists."""
+    try:
+        if not GLOBAL_CONFIG.is_file():
+            return None
+        text = GLOBAL_CONFIG.read_text(encoding="utf-8").strip()
+        for line in text.splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "=" not in line:
+                continue
+            k, _, v = line.partition("=")
+            if k.strip().upper() != "VAULT_DIR":
+                continue
+            p = Path(v.strip().strip("\"'")).expanduser().resolve()
+            if (p / "team" / "md.md").is_file():
+                return p
+        return None
+    except Exception:
+        return None
 
 
 def resolve_vault(cli_vault: str | None = None) -> Path | None:
@@ -30,9 +57,14 @@ def resolve_vault(cli_vault: str | None = None) -> Path | None:
         if (p / "team" / "md.md").is_file():
             return p
 
+    # 3. Global config (~/.config/spielos/config) — set by installer, not cwd-dependent
+    global_cfg = _read_global_config()
+    if global_cfg is not None:
+        return global_cfg
+
     cwd = Path.cwd().resolve()
 
-    # 3. Walk up for .spiel-vault
+    # 4. Walk up for .spiel-vault
     for parent in [cwd] + list(cwd.parents):
         spiel_vault = parent / ".spiel-vault"
         if spiel_vault.is_file():
@@ -48,7 +80,7 @@ def resolve_vault(cli_vault: str | None = None) -> Path | None:
             except Exception:
                 pass
 
-    # 4. Walk up for team/md.md
+    # 5. Walk up for team/md.md
     for parent in [cwd] + list(cwd.parents):
         if (parent / "team" / "md.md").is_file():
             return parent

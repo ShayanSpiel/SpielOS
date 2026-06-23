@@ -352,6 +352,11 @@ if [[ $WIZARD_EXIT -eq 0 && -f "$INSTALL_DIR/.env" ]]; then
   printf 'VAULT_DIR=%s\n' "$INSTALL_DIR" > "$INSTALL_DIR/.spiel-vault"
   ok "Vault pointer: $INSTALL_DIR/.spiel-vault"
 
+  # Write global config (~/.config/spielos/config) — makes vault resolvable from ANY cwd
+  mkdir -p "$HOME/.config/spielos"
+  printf 'VAULT_DIR=%s\n' "$INSTALL_DIR" > "$HOME/.config/spielos/config"
+  ok "Global config: $HOME/.config/spielos/config -> $INSTALL_DIR"
+
   # Rewrite VAULT_DIR= line in .env (add if missing, preserves all other lines)
   if [[ -f "$INSTALL_DIR/.env" ]]; then
     if grep -q '^VAULT_DIR=' "$INSTALL_DIR/.env" 2>/dev/null; then

@@ -161,6 +161,9 @@ What did you ship this week?
 
 def test_wizard_server() -> None:
     print("\n[4] Wizard server (install/wizard/serve.py)")
+    # Save and restore the global config so test doesn't corrupt the user's setup
+    global_cfg = Path.home() / ".config" / "spielos" / "config"
+    saved_cfg = global_cfg.read_text() if global_cfg.exists() else None
     with tempfile.TemporaryDirectory() as tmp:
         port = 19331
         proc = subprocess.Popen(
@@ -199,6 +202,11 @@ def test_wizard_server() -> None:
         finally:
             proc.terminate()
             proc.wait(timeout=3)
+            # Restore global config
+            if saved_cfg is not None:
+                global_cfg.write_text(saved_cfg, encoding="utf-8")
+            elif global_cfg.exists():
+                global_cfg.unlink()
 
 
 def test_sync_adapters() -> None:
@@ -229,6 +237,7 @@ def test_shim() -> None:
     print("\n[6] bin/spiel shim")
     env = os.environ.copy()
     env.pop("VAULT_DIR", None)
+    env["VAULT_DIR"] = str(ROOT)  # override global config for test isolation
     # The shim is at <vault>/bin/spiel
     shim = ROOT / "bin" / "spiel"
     check("bin/spiel exists", shim.exists())

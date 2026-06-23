@@ -5,11 +5,11 @@
 # Works from ANY working directory, in ANY project, in ANY IDE.
 #
 # VAULT_DIR resolution order (first match wins):
-#   1. $VAULT_DIR                  (inline env override)
+#   0. $VAULT_DIR                  (env override — most explicit)
+#   1. ~/.config/spielos/config     (global config set by installer — primary)
 #   2. <cwd>/.spiel-vault          (project-local override file; may set VAULT_DIR=…)
-#   3. ~/.spielos/                 (default home install location)
-#   4. ~/.spiel/                   (legacy fallback for old installs)
-#   5. <this-shim>/..              (only when this shim lives at <vault>/bin/spiel)
+#   3. <cwd>/team/md.md            (any parent with the vault marker)
+#   4. <this-shim>/..              (only when this shim lives at <vault>/bin/spiel)
 #
 # Usage (from anywhere):
 #   spiel --version
@@ -28,6 +28,7 @@
 set -euo pipefail
 
 VERSION="1.0.0"
+SHIM_PATH="$HOME/.local/bin/spiel"
 
 # ── Help / version (no vault needed) ──────────────────────────────────
 
@@ -53,6 +54,7 @@ COMMANDS:
   help                   Show this help
 
 VAULT_DIR is resolved (first match wins):
+  0. ~/.config/spielos/config           (global config set by installer)
   1. $VAULT_DIR env var
   2. walk up from cwd for .spiel-vault  (a file containing VAULT_DIR=/abs/path)
   3. walk up from cwd for team/md.md    (any parent with the vault marker)
@@ -66,16 +68,29 @@ fi
 
 # ── Vault resolution ─────────────────────────────────────────────────
 
+SPIELOS_GLOBAL_CONFIG="$HOME/.config/spielos/config"
+
 # A candidate is only accepted if it points to a directory that contains
 # team/md.md. Each option below is tried in order; an invalid env var,
 # stale symlink, or missing path falls through to the next option.
 _resolve_vault() {
   local candidate=""
 
-  # 1. Inline env var — validate before committing.
-  if [[ -n "${VAULT_DIR:-}" ]]; then
+  # 0. Inline env var — most explicit override.
+  if [[ -z "$candidate" && -n "${VAULT_DIR:-}" ]]; then
     if [[ -d "${VAULT_DIR}/team" && -f "${VAULT_DIR}/team/md.md" ]]; then
       candidate="${VAULT_DIR}"
+    fi
+  fi
+
+  # 1. Global config (~/.config/spielos/config) — set by installer, not cwd-dependent
+  if [[ -z "$candidate" && -f "$SPIELOS_GLOBAL_CONFIG" ]]; then
+    local override
+    override=$(grep -E '^VAULT_DIR=' "$SPIELOS_GLOBAL_CONFIG" 2>/dev/null | head -1 | cut -d= -f2- || true)
+    override="${override%\"}"; override="${override#\"}"
+    override="${override%\'}"; override="${override#\'}"
+    if [[ -n "$override" && -d "$override/team" && -f "$override/team/md.md" ]]; then
+      candidate="$override"
     fi
   fi
 
@@ -140,7 +155,8 @@ _resolve_vault() {
     echo "ERROR: spiel could not locate the SpielOS vault." >&2
     echo "" >&2
     echo "  Tried (in order):" >&2
-    echo "    1. \$VAULT_DIR env var:           ${VAULT_DIR:-<unset>}" >&2
+    echo "    0. \$VAULT_DIR env var:           ${VAULT_DIR:-<unset>}" >&2
+    echo "    1. ~/.config/spielos/config:     $SPIELOS_GLOBAL_CONFIG" >&2
     local _sv=""
     local d="$PWD"
     while [[ "$d" != "/" ]]; do
@@ -171,7 +187,7 @@ _resolve_vault() {
       echo "    4. <shim>/..:                    $sd/.. (not a bundle)" >&2
     fi
     echo "" >&2
-    echo "  Fix: run the installer from the directory you want as your vault:" >&2
+    echo "  Fix: re-run the installer:" >&2
     echo "    curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/Spiel-OS/main/install/install.sh | bash" >&2
     return 1
   fi
@@ -231,15 +247,27 @@ PYEOF
 
 _rewrite_vault_pointers() {
   printf 'VAULT_DIR=%s\n' "$VAULT" > "$VAULT/.spiel-vault"
+
+  # Global config — makes vault resolvable from ANY cwd
+  mkdir -p "$HOME/.config/spielos"
+  printf 'VAULT_DIR=%s\n' "$VAULT" > "$HOME/.config/spielos/config"
+
+  # Re-copy shim so next invocation uses the latest vault resolution logic
+  if [[ -f "$VAULT/bin/spiel" ]]; then
+    mkdir -p "$(dirname "$SHIM_PATH")"
+    cp "$VAULT/bin/spiel" "$SHIM_PATH"
+    chmod 0755 "$SHIM_PATH"
+  fi
+
   if [[ -f "$VAULT/.env" ]]; then
     if grep -q '^VAULT_DIR=' "$VAULT/.env" 2>/dev/null; then
       sed -i '' "s|^VAULT_DIR=.*|VAULT_DIR=$VAULT|" "$VAULT/.env"
     else
       printf '\nVAULT_DIR=%s\n' "$VAULT" >> "$VAULT/.env"
     fi
-    echo "  ✓ VAULT_DIR → $VAULT (in .env + .spiel-vault)"
+    echo "  ✓ VAULT_DIR → $VAULT (global config + .env + .spiel-vault + shim)"
   else
-    echo "  ✓ VAULT_DIR → $VAULT (in .spiel-vault only)"
+    echo "  ✓ VAULT_DIR → $VAULT (global config + .spiel-vault + shim)"
   fi
 }
 
