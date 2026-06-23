@@ -32,6 +32,7 @@ ADAPTERS_DIR = VAULT / "adapters"
 OPENCODE_CONFIG = Path.home() / ".config" / "opencode"
 CURSOR_CONFIG = Path.home() / ".cursor"
 CLAUDE_CONFIG = Path.home() / ".claude"
+CODEX_CONFIG = Path.home() / ".codex"
 
 
 def parse_frontmatter(text: str) -> tuple[dict, str]:
@@ -272,7 +273,104 @@ def emit_mcp() -> int:
     return 1
 
 
-# ─── Live install ────────────────────────────────────────────────────────
+# ─── Codex adapter ──────────────────────────────────────────────────────
+
+def _toml_agent(name: str, description: str, body: str) -> str:
+    """Build a Codex agent TOML file from name + description + markdown body."""
+    import yaml
+    # Escape any triple-quotes in the body to avoid breaking the TOML literal.
+    safe_body = body.replace('"""', '\\"\\"\\"')
+    return (
+        f'name = "{name}"\n'
+        f'description = "{description}"\n'
+        f'developer_instructions = """\n'
+        f'{safe_body}\n'
+        f'"""\n'
+    )
+
+
+def emit_codex() -> int:
+    """Write per-role TOML agents + post command to adapters/codex/agents/.
+
+    Codex agents use TOML format with name, description, and developer_instructions.
+    The frontmatter fields (reads, writes, permission, etc.) are stripped —
+    only the markdown body is embedded in developer_instructions.
+    """
+    target = ADAPTERS_DIR / "codex" / "agents"
+    target.mkdir(parents=True, exist_ok=True)
+    count = 0
+    # Subagents from team/*.md (excludes post.md + README.md).
+    for src in roles():
+        role_name, description, fm, body = role_metadata(src)
+        body_with_vault = templated_text(body)
+        toml = _toml_agent(src.stem, description, body_with_vault)
+        (target / f"{src.stem}.toml").write_text(toml, encoding="utf-8")
+        count += 1
+    # Post dispatcher: a minimal agent that delegates to @md.
+    post_toml = _toml_agent(
+        name="post",
+        description="Dispatch a /post request. Delegates to @md with the user's args. See team/post.md for details.",
+        body=(
+            "# /post — Dispatch to @md\n\n"
+            "You are a dispatch agent, not a pipeline runner. Your ONLY action:\n\n"
+            "1. Read the user's message after `/post`.\n"
+            "2. Invoke @md with the exact text the user typed after /post.\n"
+            "3. If the user typed just `/post` with no args, invoke @md with no args.\n"
+            "4. Return @md's response. Do nothing else.\n\n"
+            "Hard rules:\n"
+            "- No preamble, menu, or clarification.\n"
+            "- No running tools (bash, read, write, grep, glob).\n"
+            "- No deciding mode (session/topic/file) — @md parses the args.\n"
+            "- No writing files.\n"
+            "- No explaining the pipeline.\n"
+        ),
+    )
+    (target / "post.toml").write_text(post_toml, encoding="utf-8")
+    count += 1
+    return count
+
+
+def install_codex(verbose: bool = False) -> int:
+    """Install to ~/.codex/agents/: TOML-format agent files for all 8 roles + post dispatcher."""
+    if not CODEX_CONFIG.exists():
+        if verbose:
+            print(f"  [codex] {CODEX_CONFIG} not found — skipping")
+        return 0
+    target = CODEX_CONFIG / "agents"
+    target.mkdir(parents=True, exist_ok=True)
+    count = 0
+    for src in roles():
+        role_name, description, fm, body = role_metadata(src)
+        body_with_vault = templated_text(body)
+        toml = _toml_agent(src.stem, description, body_with_vault)
+        (target / f"{src.stem}.toml").write_text(toml, encoding="utf-8")
+        count += 1
+    # Post dispatcher
+    (target / "post.toml").write_text(
+        _toml_agent(
+            name="post",
+            description="Dispatch a /post request. Delegates to @md with the user's args. See team/post.md for details.",
+            body=(
+                "# /post — Dispatch to @md\n\n"
+                "You are a dispatch agent, not a pipeline runner. Your ONLY action:\n\n"
+                "1. Read the user's message after `/post`.\n"
+                "2. Invoke @md with the exact text the user typed after /post.\n"
+                "3. If the user typed just `/post` with no args, invoke @md with no args.\n"
+                "4. Return @md's response. Do nothing else.\n\n"
+                "Hard rules:\n"
+                "- No preamble, menu, or clarification.\n"
+                "- No running tools (bash, read, write, grep, glob).\n"
+                "- No deciding mode (session/topic/file) — @md parses the args.\n"
+                "- No writing files.\n"
+                "- No explaining the pipeline.\n"
+            ),
+        ),
+        encoding="utf-8",
+    )
+    count += 1
+    if verbose:
+        print(f"  [codex] installed {count} agents to {target}")
+    return count
 
 def detect_ide(config_dir: Path, name: str) -> bool:
     """Return True if this IDE's config dir looks like it's installed."""
@@ -500,6 +598,8 @@ def _collect_installed_paths() -> dict[Path, str]:
     _walk(CURSOR_CONFIG, ["skills", "commands"], "cursor")
     # Claude Code: agents/, skills/, commands/
     _walk(CLAUDE_CONFIG, ["agents", "skills", "commands"], "claude")
+    # Codex: agents/
+    _walk(CODEX_CONFIG, ["agents"], "codex")
     return out
 
 
@@ -571,6 +671,34 @@ def _expected_content() -> dict[Path, str]:
                 src.read_text(encoding="utf-8")
             )
 
+    # Codex agents (TOML format)
+    if CODEX_CONFIG.exists():
+        for src in roles():
+            role_name, description, _fm, body = role_metadata(src)
+            expected[CODEX_CONFIG / "agents" / f"{src.stem}.toml"] = (
+                _toml_agent(src.stem, description, templated_text(body))
+            )
+        expected[CODEX_CONFIG / "agents" / "post.toml"] = (
+            _toml_agent(
+                name="post",
+                description="Dispatch a /post request. Delegates to @md with the user's args. See team/post.md for details.",
+                body=(
+                    "# /post — Dispatch to @md\n\n"
+                    "You are a dispatch agent, not a pipeline runner. Your ONLY action:\n\n"
+                    "1. Read the user's message after `/post`.\n"
+                    "2. Invoke @md with the exact text the user typed after /post.\n"
+                    "3. If the user typed just `/post` with no args, invoke @md with no args.\n"
+                    "4. Return @md's response. Do nothing else.\n\n"
+                    "Hard rules:\n"
+                    "- No preamble, menu, or clarification.\n"
+                    "- No running tools (bash, read, write, grep, glob).\n"
+                    "- No deciding mode (session/topic/file) — @md parses the args.\n"
+                    "- No writing files.\n"
+                    "- No explaining the pipeline.\n"
+                ),
+            )
+        )
+
     return expected
 
 
@@ -581,19 +709,22 @@ def main() -> int:
     parser.add_argument("--install", action="store_true",
                         help="Install to all detected IDE configs "
                              "(opencode: agents + commands + skills, "
-                             "Cursor: skills + commands, Claude Code: skills + agents + commands)")
+                             "Cursor: skills + commands, Claude Code: skills + agents + commands, "
+                             "Codex: agents)")
     parser.add_argument("--install-opencode", action="store_true",
                         help="Install to opencode only (agents + commands + skills)")
     parser.add_argument("--install-cursor", action="store_true",
                         help="Install to Cursor only (skills + commands)")
     parser.add_argument("--install-claude", action="store_true",
                         help="Install to Claude Code only (skills + agents + commands)")
+    parser.add_argument("--install-codex", action="store_true",
+                        help="Install to Codex only (agents)")
     parser.add_argument("--check", action="store_true",
                         help="Compare installed adapters against canonical "
                              "team/*.md + skills/*.md. Exit 0 if in sync, "
                              "1 if any file would be regenerated, 2 if any "
                              "files are missing entirely.")
-    parser.add_argument("--show", metavar="IDE", choices=["opencode", "claude", "cursor", "mcp"],
+    parser.add_argument("--show", metavar="IDE", choices=["opencode", "claude", "cursor", "mcp", "codex"],
                         help="Print what would be generated for one IDE (no files written).")
     args = parser.parse_args()
 
@@ -653,18 +784,21 @@ def main() -> int:
     n_cl = emit_claude()
     n_cu = emit_cursor()
     n_mc = emit_mcp()
-    total = n_oc + n_cl + n_cu + n_mc
+    n_cx = emit_codex()
+    total = n_oc + n_cl + n_cu + n_mc + n_cx
     print(f"Generated {total} adapter files in adapters/  "
-          f"(opencode={n_oc}, claude={n_cl}, cursor={n_cu}, mcp={n_mc})")
+          f"(opencode={n_oc}, claude={n_cl}, cursor={n_cu}, mcp={n_mc}, codex={n_cx})")
 
-    if args.install or args.install_opencode or args.install_cursor or args.install_claude:
+    if args.install or args.install_opencode or args.install_cursor or args.install_claude or args.install_codex:
         do_oc = args.install or args.install_opencode
         do_cu = args.install or args.install_cursor
         do_cl = args.install or args.install_claude
+        do_cx = args.install or args.install_codex
 
         n_oc_inst = install_opencode() if do_oc else 0
         n_cu_inst = (install_cursor_skills() + install_cursor_commands()) if do_cu else 0
         n_cl_inst = (install_claude_skills() + install_claude_agents() + install_claude_commands()) if do_cl else 0
+        n_cx_inst = install_codex() if do_cx else 0
 
         print()
         print(f"Installed to live IDEs:")
@@ -674,6 +808,8 @@ def main() -> int:
             print(f"  cursor:      {CURSOR_CONFIG}  (skills + commands)")
         if do_cl:
             print(f"  claude:      {CLAUDE_CONFIG}  (agents + skills + commands)")
+        if do_cx:
+            print(f"  codex:       {CODEX_CONFIG}  (agents)")
     else:
         print()
         print(f"To install to all detected IDEs, re-run with --install")
