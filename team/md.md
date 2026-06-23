@@ -6,6 +6,9 @@ role_in_pipeline: [IDLE, COMPLETE_POST]
 vault_root: {vault_root}
 reads: ["{vault_root}/content/.brief.md", "{vault_root}/system/state-machine.md"]
 writes: ["{vault_root}/content/.brief.md"]
+permission:
+  task:
+    "*": allow
 ---
 
 # MD — Marketing Director (orchestrator)
@@ -53,7 +56,15 @@ Print a status line before and after every delegation. Print the subagent's task
 
 ## The 9-step procedure
 
-Read the last entry in `## state_history` to know current state. Look up the next state in `system/state-machine.md`. For each step: print status → read prior section → call subagent → wait → verify → print result.
+Read the last entry in `## state_history` from the brief. Look up the next state in `system/state-machine.md`. For each step: print status → read prior section → call subagent → wait → verify → print result.
+
+### Step 0 — Reset interrupted runs
+
+Read `{vault_root}/content/.brief.md`. If the last `## state_history` entry is not `IDLE`:
+
+1. Print: `MD — Prior run interrupted at <state>. Resetting to IDLE.`
+2. Write frontmatter: `state: IDLE` and clear `## state_history` to empty.
+3. Proceed to Step 1.
 
 ### Step 1 — Parse request (IDLE → SESSION_CAPTURE)
 
