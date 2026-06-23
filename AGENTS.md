@@ -203,7 +203,8 @@ Adding a new state is **one row in the table** + one role file (or a delegation 
 | Sync adapters | `tools/sync_adapters.py` |
 | IDE adapter files | `adapters/` (auto-gen) |
 | Live install | `~/.config/opencode/{agents,skill,commands}/`, `~/.cursor/skills/`, `~/.claude/{agents,skills}/` |
-| Vault shim | `bin/spiel` |
+| Vault shim | `bin/spiel` (installed to `~/.local/bin/spiel`) |
+| Global config | `~/.config/spielos/config` — stores `VAULT_DIR=`, makes vault resolvable from ANY cwd |
 | Vault pointer | `<vault>/.spiel-vault` (marks the vault root; auto-created on install/update) |
 | Install + wizard | `install/install.sh`, `install/wizard/` |
 | Brief file (active) | `content/.brief.md` |
@@ -238,7 +239,7 @@ curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/Spiel-OS/main/install/i
 3. Installer polls for `.install-state.json` (the wizard writes this on Finish)
 4. Wizard walks 10 steps: Welcome → Brand → Identity → ICP → Positioning → Offer → Funnel → Voice → Methodology → Connect
 5. Wizard writes 8 strategy files + brand + .env on Finish, then auto-shuts down
-6. Installer continues: writes `<vault>/.spiel-vault` (vault pointer), shim at `~/.local/bin/spiel` + IDE adapters at all 3 IDEs (opencode, Cursor, Claude Code — whichever is installed)
+6. Installer continues: writes `<vault>/.spiel-vault` (vault pointer), `~/.config/spielos/config` (global config — makes vault resolvable from ANY directory), shim at `~/.local/bin/spiel` + IDE adapters at all 3 IDEs (opencode, Cursor, Claude Code — whichever is installed)
 7. Prints `DONE. From any IDE, type /post to ship a post.`
 
 The install is fully non-blocking — the user never has to type anything into the terminal during the install. They just fill the form in the browser.
@@ -253,6 +254,24 @@ The install is fully non-blocking — the user never has to type anything into t
 | `SPIELOS_VERSION` | `main` | Git branch / tag / tarball ref |
 
 After install, the user never touches this repo. They edit `strategy/*.md` and `content/*` only.
+
+If they ever install to the wrong directory or move the vault, run:
+```
+spiel set-vault /path/to/vault
+```
+This rewrites `~/.config/spielos/config` to point to the correct vault. No re-install needed.
+
+### Vault resolution order
+
+The vault is resolved (first match wins):
+
+1. **`$VAULT_DIR` env var** — explicit per-session override
+2. **`~/.config/spielos/config`** — global config (set by installer, persistent)
+3. **`<cwd>/.spiel-vault`** — cwd walk-up for `.spiel-vault` file
+4. **`<cwd>/team/md.md`** — cwd walk-up for vault marker
+5. **`<shim>/..`** — detected when shim lives at `<vault>/bin/spiel`
+
+After install, step 2 (`~/.config/spielos/config`) is always set, so spiel resolves the vault regardless of your current working directory. `/post` content always saves to the vault, even when your IDE is open in a different project.
 
 ---
 

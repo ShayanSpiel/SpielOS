@@ -27,12 +27,13 @@ The installer:
 3. Starts the setup wizard at `http://localhost:7331` (auto-opens in your browser)
 4. Waits for you to click **Finish** in the wizard
 5. Installs the `spiel` shim to `~/.local/bin/spiel`
-6. Syncs the 8 role agents + 5 skills to `~/.config/opencode/`, `~/.claude/`, `~/.cursor/`
-7. Prints `DONE. From any IDE, type /post to ship a post.`
+6. Writes `~/.config/spielos/config` — a **global config** that makes the vault resolvable from ANY working directory, not just inside the vault
+7. Syncs the 8 role agents + 5 skills to `~/.config/opencode/`, `~/.claude/`, `~/.cursor/`
+8. Prints `DONE. From any IDE, type /post to ship a post.`
 
 Override the install path: `SPIELOS_INSTALL_DIR=/some/path bash <(curl ...)`. Override the wizard port: `SPIELOS_WIZARD_PORT=8080`. Override the timeout (default 30 min): `SPIELOS_WIZARD_TIMEOUT=300`.
 
-The vault is the directory you ran the installer from. A `.spiel-vault` file marks it. `cd` anywhere inside the vault and `spiel` finds it automatically (walks up the directory tree).
+The vault is the directory you ran the installer from. A global config at `~/.config/spielos/config` stores the vault path and is used by `spiel` and all tools — **no cwd walk-up needed**. `/post` content always saves to the vault, even when your IDE is open in a different project.
 
 Brew (when published):
 
@@ -42,13 +43,16 @@ brew install spielos/tap/spiel
 
 ---
 
-## The 3 commands
+## The commands
 
 | Command | What | When |
 |---|---|---|
-| `curl ... \| bash` | Fresh install: clone vault → run wizard → sync to IDEs | First time only |
+| `curl ... \| bash` | Fresh install: clone vault → run wizard → write global config → sync to IDEs | First time only |
+| `spiel set-vault <path>` | Change which vault `spiel` resolves to (rewrites `~/.config/spielos/config`) | Moved vault or installed to wrong dir |
 | `spiel init` | Re-run the wizard (rewrites `.env`, `strategy/`, `system/brand.*`) | Want to redo setup |
 | `spiel update` | Pull latest tools/install/wizards → sync to IDEs. **Preserves `team/`, `skills/`, `strategy/`, `content/`, `.env`, `system/brand.*`** | When a new version ships |
+
+`spiel set-vault /path/to/vault` changes the global config. After running it, every `spiel` invocation and every `/post` resolves to the new vault — regardless of your current directory or which project your IDE is open to.
 
 `spiel update` is the one to use after we push a new tool, gate, or wizard. It does NOT touch your prompts, strategies, drafts, or brand — only the tool sources, install scripts, and IDE adapters.
 
@@ -66,11 +70,12 @@ From any IDE (opencode, Claude Code, Cursor, MCP), type:
 
 The MD subagent picks the right next role, hands off via `.brief.md`, and chains the full pipeline: **Researcher → Strategist → Copywriter → Designer → Editor → Publisher → Analyst**. You get two human pauses — pick platforms, pick publish/hold/reject per draft.
 
-CLI shortcuts (work from any terminal):
+CLI shortcuts (work from any terminal — **not cwd-dependent**):
 
 ```bash
 spiel --version             # show version + vault path
 spiel --where               # print resolved vault path
+spiel set-vault <path>      # change which vault spiel resolves to
 spiel config                # show vault + tool paths
 spiel status                # show current pipeline state
 spiel check <draft.md>      # run the 15 mechanical gates
@@ -79,6 +84,8 @@ spiel sync                  # regenerate IDE adapter files (no pull)
 spiel init                  # re-open the setup wizard
 spiel update                # pull latest + sync to IDEs (preserves your data)
 ```
+
+All CLI commands resolve the vault from `~/.config/spielos/config` (set once at install time). You can run `spiel --where` from `/tmp`, `/home/project-x`, or any IDE project directory — it always returns the same vault path.
 
 ---
 
@@ -185,7 +192,8 @@ spielos/
 │   ├── icons/             # 17 SVG icons (sparkles, rocket, etc.)
 │   └── banners/           # generated banner PNGs
 │
-├── bin/spiel              # vault-resolver shim
+├── bin/spiel              # vault-resolver shim + CLI
+│                          # (~/.config/spielos/config is the global vault pointer)
 │
 ├── install/               # single-command install
 │   ├── install.sh         # curl | bash entry
