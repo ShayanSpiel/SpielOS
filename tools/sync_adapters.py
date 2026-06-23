@@ -93,8 +93,20 @@ def make_skill_stub(role_name: str, description: str) -> str:
 
 
 def roles() -> list[Path]:
-    """Return sorted list of canonical role files (excluding README)."""
-    return sorted(p for p in TEAM_DIR.glob("*.md") if p.name != "README.md")
+    """Return sorted list of canonical SUBAGENT role files (excluding README + commands).
+
+    Subagents are: md, researcher, strategist, copywriter, editor, designer, publisher, analyst.
+    Commands (like post.md) are NOT subagents — they go in commands/, not agents/.
+    """
+    return sorted(
+        p for p in TEAM_DIR.glob("*.md")
+        if p.name not in ("README.md", "post.md")
+    )
+
+
+def commands() -> list[Path]:
+    """Return sorted list of canonical SLASH COMMAND files (currently just post.md)."""
+    return sorted(p for p in (TEAM_DIR / "post.md",) if p.exists())
 
 
 def role_metadata(src: Path) -> tuple[str, str, dict, str]:
@@ -221,39 +233,6 @@ def make_slash_command(role_name: str, description: str, body: str) -> str:
     return "---\n" + yaml.safe_dump(fm, sort_keys=False, allow_unicode=True).rstrip() + "\n---\n\n" + body.lstrip()
 
 
-def install_opencode_commands(verbose: bool = False) -> int:
-    """Install slash commands at ~/.config/opencode/commands/<name>.md.
-
-    Each file becomes a /name slash command in opencode. The body delegates
-    to the subagent (if available) or falls back to the spiel CLI.
-    """
-    if not detect_ide(OPENCODE_CONFIG, "opencode"):
-        return 0
-    target = OPENCODE_CONFIG / "commands"
-    target.mkdir(parents=True, exist_ok=True)
-    count = 0
-    for src in roles():
-        role_name, description, _fm, body = role_metadata(src)
-        # If body lacks a clear "delegate to subagent X" instruction, append one
-        if "delegate" not in body.lower() and "subagent" not in body.lower():
-            suffix = (
-
-                "\n\n## Delegation\n\n"
-                f"When this command fires, you ARE the `{role_name}` role. "
-                "Do not explain, do not ask clarifying questions, do not offer a menu. "
-                "Take the role's full body above as your system prompt and run the user's request.\n"
-            )
-            body = body.rstrip() + suffix
-        (target / src.name).write_text(
-            make_slash_command(role_name, description, body),
-            encoding="utf-8",
-        )
-        count += 1
-    if verbose:
-        print(f"  [opencode] installed {count} slash commands to {target}")
-    return count
-
-
 def install_cursor_skills(verbose: bool = False) -> int:
     """Install Agent Skills at ~/.cursor/skills/<name>/SKILL.md.
 
@@ -333,19 +312,82 @@ def install_claude_agents(verbose: bool = False) -> int:
     return count
 
 
+def install_claude_commands(verbose: bool = False) -> int:
+    """Install slash commands at ~/.claude/commands/<name>.md.
+
+    Claude Code discovers slash commands from this dir. The `post.md` slash
+    command lives here and dispatches to the `md` subagent.
+    """
+    if not detect_ide(CLAUDE_CONFIG, "claude"):
+        return 0
+    target = CLAUDE_CONFIG / "commands"
+    target.mkdir(parents=True, exist_ok=True)
+    count = 0
+    for src in commands():
+        role_name, description, _fm, body = role_metadata(src)
+        import yaml
+        clean = {"description": description}
+        out = "---\n" + yaml.safe_dump(clean, sort_keys=False, allow_unicode=True).rstrip() + "\n---\n\n" + body.lstrip()
+        (target / src.name).write_text(out, encoding="utf-8")
+        count += 1
+    if verbose:
+        print(f"  [claude] installed {count} commands to {target}")
+    return count
+
+
+def install_cursor_commands(verbose: bool = False) -> int:
+    """Install slash commands at ~/.cursor/commands/<name>.md.
+
+    Cursor discovers slash commands from this dir.
+    """
+    if not detect_ide(CURSOR_CONFIG, "cursor"):
+        return 0
+    target = CURSOR_CONFIG / "commands"
+    target.mkdir(parents=True, exist_ok=True)
+    count = 0
+    for src in commands():
+        role_name, description, _fm, body = role_metadata(src)
+        import yaml
+        clean = {"description": description}
+        out = "---\n" + yaml.safe_dump(clean, sort_keys=False, allow_unicode=True).rstrip() + "\n---\n\n" + body.lstrip()
+        (target / src.name).write_text(out, encoding="utf-8")
+        count += 1
+    if verbose:
+        print(f"  [cursor] installed {count} commands to {target}")
+    return count
+
+
 def install_opencode(verbose: bool = False) -> int:
-    """Install subagents (from team/*.md) + real skills (from skills/*/SKILL.md)
-    to ~/.config/opencode/. Subagents go in agents/, skills go in skill/.
+    """Install to ~/.config/opencode/:
+
+      - subagents (from team/*.md, excluding post.md) → agents/<name>.md
+      - commands (from team/post.md) → commands/post.md
+      - skills (from skills/*/SKILL.md) → skill/<name>/SKILL.md
     """
     if not OPENCODE_CONFIG.exists():
         print(f"  {OPENCODE_CONFIG} does not exist — skipping install")
         return 0
     count = 0
+    # Subagents: team/*.md except post.md
     for src in roles():
         dst_agent = OPENCODE_CONFIG / "agents" / src.name
         dst_agent.parent.mkdir(parents=True, exist_ok=True)
         dst_agent.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
         count += 1
+    # Commands: post.md (and any future command files)
+    for src in commands():
+        role_name, description, _fm, body = role_metadata(src)
+        dst_cmd = OPENCODE_CONFIG / "commands" / src.name
+        dst_cmd.parent.mkdir(parents=True, exist_ok=True)
+        # Strip the `mode: subagent` field if present (commands don't need it)
+        fm, _ = role_metadata(src)[:2], role_metadata(src)[2]
+        # Build clean command frontmatter
+        import yaml
+        clean = {"description": description}
+        out = "---\n" + yaml.safe_dump(clean, sort_keys=False, allow_unicode=True).rstrip() + "\n---\n\n" + body.lstrip()
+        dst_cmd.write_text(out, encoding="utf-8")
+        count += 1
+    # Skills: skills/*/SKILL.md
     for src in skills():
         skill_name, _desc, _fm, _body = skill_metadata(src)
         skill_dir = OPENCODE_CONFIG / "skill" / skill_name
@@ -353,7 +395,7 @@ def install_opencode(verbose: bool = False) -> int:
         (skill_dir / "SKILL.md").write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
         count += 1
     if verbose:
-        print(f"  installed {count} files (subagents + skills) to {OPENCODE_CONFIG}")
+        print(f"  installed {count} files (subagents + commands + skills) to {OPENCODE_CONFIG}")
     return count
 
 
@@ -427,11 +469,12 @@ def main() -> int:
         n_cu_inst = 0
         n_cl_inst = 0
         if do_oc:
-            n_oc_inst = install_opencode() + install_opencode_commands()
+            # install_opencode now installs subagents + commands + skills in one call
+            n_oc_inst = install_opencode()
         if do_cu:
-            n_cu_inst = install_cursor_skills()
+            n_cu_inst = install_cursor_skills() + install_cursor_commands()
         if do_cl:
-            n_cl_inst = install_claude_skills() + install_claude_agents()
+            n_cl_inst = install_claude_skills() + install_claude_agents() + install_claude_commands()
 
         print()
         print(f"Installed to live IDEs:")
