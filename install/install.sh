@@ -5,11 +5,9 @@
 #
 #   curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/Spiel-OS/main/install/install.sh | bash
 #
-# (The spielos.xyz mirror is preferred when available.)
-#
 # What this does:
 #   1. Detects arch, python, git, curl/wget
-#   2. Resolves install path (default ~/.spiel; override with $SPIELOS_INSTALL_DIR)
+  # 2. Resolves install path (default ~/.spielos; override with $SPIELOS_INSTALL_DIR)
 #   3. Downloads the SpielOS vault (git clone preferred, tarball fallback)
 #   4. Starts the local setup wizard at http://localhost:7331
 #   5. Waits for the wizard to write files (user clicks "Finish" in browser)
@@ -18,6 +16,9 @@
 #        - opencode:    ~/.config/opencode/{agents,skill,commands}
 #        - Cursor:      ~/.cursor/skills/
 #        - Claude Code: ~/.claude/{agents,skills}
+#
+# The vault root is ~/.spielos (override with $SPIELOS_INSTALL_DIR).
+# The shim is ~/.local/bin/spiel.
 #
 # On completion: `spiel /post` (or just `/post` in any IDE) works.
 
@@ -39,7 +40,7 @@ GITHUB_REPO="https://github.com/ShayanSpiel/Spiel-OS.git"
 TARBALL_URL="https://github.com/ShayanSpiel/Spiel-OS/archive/refs/heads/main.tar.gz"
 RAW_INSTALL_URL="https://raw.githubusercontent.com/ShayanSpiel/Spiel-OS/main/install/install.sh"
 VERSION="${SPIELOS_VERSION:-main}"
-DEFAULT_INSTALL_DIR="${SPIELOS_INSTALL_DIR:-$HOME/.spiel}"
+DEFAULT_INSTALL_DIR="${SPIELOS_INSTALL_DIR:-$HOME/.spielos}"
 SHIM_PATH="$HOME/.local/bin/spiel"
 WIZARD_PORT="${SPIELOS_WIZARD_PORT:-7331}"
 WIZARD_TIMEOUT="${SPIELOS_WIZARD_TIMEOUT:-1800}"  # 30 min max
@@ -207,46 +208,60 @@ if [[ ! -f "team/md.md" ]]; then
     fi
   fi
 else
-  # Re-install: vault already has team/md.md. Just refresh the source files
-  # (team/, tools/, system/ source files) without touching user data
-  # (strategy/, content/, .env, system/brand.*).
+  # Re-install: vault already has team/md.md. Refresh the tool sources
+  # (tools/, install/, system/, wizards/, bin/spiel, package.json, etc.)
+  # WITHOUT touching user data:
+  #   - team/         (your prompt files)
+  #   - skills/       (your skill overrides)
+  #   - strategy/     (your brand/ICP/voice)
+  #   - content/      (your drafts/briefs/sessions)
+  #   - .env          (your secrets)
+  #   - system/brand.* (your brand tokens)
+  # To overwrite these, run `spiel init` (re-runs the wizard).
   IS_REINSTALL=1
   note "Existing install detected at $INSTALL_DIR"
   note "Re-install mode: refreshing tool sources only."
-  note "  → team/, tools/, system/ source files: refreshed (your edits to these are preserved)"
-  note "  → strategy/, content/, .env, system/brand.*: NOT touched (run \`spiel init\` to redo the wizard)"
-  note "  → IDE adapters: re-synced"
+  note "  → PRESERVED (your data, not touched): team/, skills/, strategy/, content/, .env, system/brand.*"
+  note "  → REFRESHED (from upstream): tools/, install/, system/, wizards/, bin/spiel, package.json"
+  note "  → IDE adapters: re-synced (your local team/ pushed to all 3 IDEs)"
 
-  if [[ $HAS_GIT -eq 1 ]]; then
-    # Stage 1: git pull to get the latest tool source
-    if git pull origin "$VERSION" --ff-only 2>/dev/null; then
-      ok "git pull: tool sources updated"
-    else
-      # git pull failed (not a git repo, or no network). Fall back to tarball.
-      err "git pull failed; falling back to tarball overlay..."
-      if [[ $HAS_CURL -eq 1 ]]; then
-        TMPDIR_OVERLAY=$(mktemp -d)
-        curl -fsSL "$TARBALL_URL" | tar -xz -C "$TMPDIR_OVERLAY" --strip-components=1
-        # Copy only files that don't exist in the target (preserve user edits)
-        python3 - <<PYEOF
+  # Always use tarball overlay (NEVER `git pull`, which would clobber user data).
+  if [[ $HAS_CURL -eq 1 ]]; then
+    TMPDIR_OVERLAY=$(mktemp -d)
+    if curl -fsSL "$TARBALL_URL" | tar -xz -C "$TMPDIR_OVERLAY" --strip-components=1 2>/dev/null; then
+      (cd "$INSTALL_DIR" && python3 - <<PYEOF
 import os, shutil
 src = "$TMPDIR_OVERLAY"
 dst = "$INSTALL_DIR"
+# Directories: never overlay (user's custom data)
+skip_dirs = {"team", "skills", "strategy", "content"}
+# Individual files: never overlay
+skip_files = {".env", "system/brand.md", "system/brand.json"}
 copied = 0
+skipped = 0
 for root, dirs, files in os.walk(src):
+    rel = os.path.relpath(root, src)
+    parts = rel.split(os.sep) if rel != "." else []
+    if any(p in skip_dirs for p in parts):
+        skipped += len(files)
+        continue
     for f in files:
+        rel_file = os.path.relpath(os.path.join(root, f), src)
+        if rel_file in skip_files:
+            skipped += 1
+            continue
         sp = os.path.join(root, f)
-        dp = os.path.join(dst, os.path.relpath(sp, src))
-        if os.path.exists(dp):
-            continue  # preserve user edits
+        dp = os.path.join(dst, rel_file)
         os.makedirs(os.path.dirname(dp), exist_ok=True)
         shutil.copy2(sp, dp)
         copied += 1
-print(f'  overlaid {copied} new files (existing files preserved)')
+print(f"  overlaid {copied} tool source files (skipped {skipped} user-data files)")
 PYEOF
-        rm -rf "$TMPDIR_OVERLAY"
-      fi
+)
+    else
+      err "tarball download failed; tool sources NOT refreshed"
     fi
+    rm -rf "$TMPDIR_OVERLAY"
   fi
 fi
 ok "SpielOS source at $INSTALL_DIR (re-install=$IS_REINSTALL)"
@@ -340,14 +355,14 @@ if [[ $WIZARD_EXIT -eq 0 && -f "$INSTALL_DIR/.env" ]]; then
   chmod 0755 "$SHIM_PATH"
   ok "Shim installed: $SHIM_PATH"
 
-  # Create ~/.spiel symlink for shim resolution (if needed)
-  if [[ "$INSTALL_DIR" != "$HOME/.spiel" ]]; then
-    if [[ -L "$HOME/.spiel" ]]; then
-      rm -f "$HOME/.spiel"
+  # Create ~/.spielos symlink for shim resolution (if needed)
+  if [[ "$INSTALL_DIR" != "$HOME/.spielos" ]]; then
+    if [[ -L "$HOME/.spielos" ]]; then
+      rm -f "$HOME/.spielos"
     fi
-    if [[ ! -e "$HOME/.spiel" ]]; then
-      ln -s "$INSTALL_DIR" "$HOME/.spiel"
-      ok "Symlink: $HOME/.spiel → $INSTALL_DIR"
+    if [[ ! -e "$HOME/.spielos" ]]; then
+      ln -s "$INSTALL_DIR" "$HOME/.spielos"
+      ok "Symlink: $HOME/.spielos → $INSTALL_DIR"
     fi
   fi
 
@@ -372,6 +387,23 @@ if [[ $WIZARD_EXIT -eq 0 && -f "$INSTALL_DIR/.env" ]]; then
       note "  export PATH=\"\$HOME/.local/bin:\$PATH\""
       ;;
   esac
+
+  # Sanity-check the new tools. Catches missing-file bugs on first install
+  # (e.g., broken tarball, partial clone, etc.) so the user finds out at
+  # install time, not the first time they type /post.
+  if [[ -x "$INSTALL_DIR/tools/capture-session.py" ]] && \
+     python3 "$INSTALL_DIR/tools/capture-session.py" --help >/dev/null 2>&1; then
+    ok "tools/capture-session.py is callable"
+  else
+    err "tools/capture-session.py is missing or not executable — /post will fail"
+    err "  re-run: curl ... | bash  (full install)"
+  fi
+  if [[ -x "$INSTALL_DIR/tools/researcher.py" ]] && \
+     python3 "$INSTALL_DIR/tools/researcher.py" classify --input "shipped a feature" >/dev/null 2>&1; then
+    ok "tools/researcher.py classify is callable"
+  else
+    err "tools/researcher.py is missing or broken — topic-mode classification will fail"
+  fi
 
   note "DONE. From any IDE, type /post to ship a post."
   note "To re-run the wizard and update your config:"

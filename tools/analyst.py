@@ -38,9 +38,9 @@ def find_vault() -> Path:
     for p in [cwd, *cwd.parents]:
         if (p / "team" / "md.md").exists() and (p / "system" / "state-machine.md").exists():
             return p
-    home_vault = Path.home() / ".spiel"
-    if (home_vault / "team" / "md.md").exists():
-        return home_vault
+    for home_vault in [Path.home() / ".spielos", Path.home() / ".spiel"]:
+        if (home_vault / "team" / "md.md").exists():
+            return home_vault
     import os
     env_vault = os.environ.get("VAULT_DIR")
     if env_vault:

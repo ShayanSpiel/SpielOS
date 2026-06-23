@@ -4,7 +4,7 @@
 
 set -euo pipefail
 
-DEFAULT_INSTALL_DIR="$HOME/.spiel"
+DEFAULT_INSTALL_DIR="$HOME/.spielos"
 SHIM_PATH="$HOME/.local/bin/spiel"
 
 echo ""
@@ -66,5 +66,5 @@ fi
 
 echo ""
 echo "  Done. Re-install any time:"
-echo "    curl -fsSL https://spielos.xyz/install.sh | bash"
+echo "    curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/Spiel-OS/main/install/install.sh | bash"
 echo ""

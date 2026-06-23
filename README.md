@@ -23,20 +23,32 @@ curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/Spiel-OS/main/install/i
 
 The installer:
 1. Detects arch, python, git, curl/wget
-2. Downloads the vault (git clone preferred, tarball fallback)
+2. Downloads the vault to `~/.spielos` (git clone preferred, tarball fallback)
 3. Starts the setup wizard at `http://localhost:7331` (auto-opens in your browser)
 4. Waits for you to click **Finish** in the wizard
 5. Installs the `spiel` shim to `~/.local/bin/spiel`
-6. Syncs the 8 role agents + 8 skill stubs to `~/.config/opencode/`
+6. Syncs the 8 role agents + 5 skills to `~/.config/opencode/`, `~/.claude/`, `~/.cursor/`
 7. Prints `DONE. From any IDE, type /post to ship a post.`
 
-Override the install path: `SPIELOS_INSTALL_DIR=/path/to/.spiel bash <(curl ...)`. Override the wizard port: `SPIELOS_WIZARD_PORT=8080`. Override the timeout (default 30 min): `SPIELOS_WIZARD_TIMEOUT=300`.
+Override the install path: `SPIELOS_INSTALL_DIR=/path/to/.spielos bash <(curl ...)`. Override the wizard port: `SPIELOS_WIZARD_PORT=8080`. Override the timeout (default 30 min): `SPIELOS_WIZARD_TIMEOUT=300`.
 
 Brew (when published):
 
 ```bash
 brew install spielos/tap/spiel
 ```
+
+---
+
+## The 3 commands
+
+| Command | What | When |
+|---|---|---|
+| `curl ... \| bash` | Fresh install: clone vault → run wizard → sync to IDEs | First time only |
+| `spiel init` | Re-run the wizard (rewrites `.env`, `strategy/`, `system/brand.*`) | Want to redo setup |
+| `spiel update` | Pull latest tools/install/wizards → sync to IDEs. **Preserves `team/`, `skills/`, `strategy/`, `content/`, `.env`, `system/brand.*`** | When a new version ships |
+
+`spiel update` is the one to use after we push a new tool, gate, or wizard. It does NOT touch your prompts, strategies, drafts, or brand — only the tool sources, install scripts, and IDE adapters.
 
 ---
 
@@ -56,11 +68,14 @@ CLI shortcuts (work from any terminal):
 
 ```bash
 spiel --version             # show version + vault path
+spiel --where               # print resolved vault path
 spiel config                # show vault + tool paths
 spiel status                # show current pipeline state
 spiel check <draft.md>      # run the 15 mechanical gates
 spiel analyze               # pull engagement, re-rank templates
+spiel sync                  # regenerate IDE adapter files (no pull)
 spiel init                  # re-open the setup wizard
+spiel update                # pull latest + sync to IDEs (preserves your data)
 ```
 
 ---
@@ -123,10 +138,10 @@ spielos/
 │   ├── pipeline.md        # role ↔ state map
 │   ├── brand.md           # brand tokens (human-readable)
 │   ├── brand.json         # banner tokens (machine-readable)
-│   ├── identity.md        # LLM-facing runtime identity
 │   ├── gates.md           # 15 mechanical + 14 soft gates
 │   ├── rules.yaml         # mechanical config values
 │   └── prompts/           # LLM-facing text per role
+│       ├── identity.md    # LLM-facing runtime identity + hard constraints
 │
 ├── strategy/              # 8 knowledge files (filled by wizard)
 │   ├── icp.md             # Ideal Customer Profile
@@ -153,7 +168,8 @@ spielos/
 │   ├── designer.py        # banner gen (Playwright + system Chrome)
 │   ├── publisher/         # Buffer / X direct / LinkedIn direct / blog.sh
 │   ├── analyst.py         # engagement pull + re-rank
-│   ├── researcher.py      # session synthesis from opencode DB
+│   ├── capture-session.py # captures the CURRENT session → content/sessions/YYYY-MM-DD-session-current.md
+│   ├── researcher.py      # mechanical classify + opencode session-list (debug)
 │   └── sync_adapters.py   # generates IDE adapter files
 │
 ├── content/               # generated content
@@ -204,7 +220,8 @@ These 4 tools the LLM can't replace:
 | `tools/designer.py` | Designer | Banner PNG render (Playwright + system Chrome) |
 | `tools/publisher/*.py` | Publisher | API dispatch + archive (Buffer primary, X/LinkedIn direct fallback, blog.sh) |
 | `tools/analyst.py` | Analyst | Buffer engagement pull + perf ledger + re-rank |
-| `tools/researcher.py` | Researcher | Session log synthesis from opencode DB + classify |
+| `tools/researcher.py` | Researcher | Mechanical classify + opencode session-list (debug) |
+| `tools/capture-session.py` | Researcher | Capture the current session → `content/sessions/YYYY-MM-DD-session-current.md` (overwrites). The canonical "current" log. |
 
 Everything else is LLM-driven (the 8 role `.md` files).
 

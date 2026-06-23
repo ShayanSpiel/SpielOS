@@ -53,6 +53,19 @@ def parse_frontmatter(text: str) -> tuple[dict, str]:
     return fm, body
 
 
+def templated_text(text: str) -> str:
+    """Replace `{vault_root}` placeholders with the absolute vault path.
+
+    This is the bridge between the canonical team/*.md (which has
+    `{vault_root}` in the frontmatter and body) and the installed copy
+    (which has the absolute path baked in). The LLM running the MD subagent
+    gets the absolute path, so it never gets confused by cwd.
+
+    Called by emit_*() and install_*() for every role file.
+    """
+    return text.replace("{vault_root}", str(VAULT))
+
+
 def make_frontmatter(d: dict) -> str:
     """Render a dict as YAML frontmatter.
 
@@ -70,6 +83,18 @@ def make_frontmatter(d: dict) -> str:
             # Treat as "this role can invoke CLI tools via bash"
             d["tools"] = {"bash": True}
     return "---\n" + yaml.safe_dump(d, sort_keys=False, allow_unicode=True).rstrip() + "\n---\n\n"
+
+
+def build_command_md(description: str, body: str) -> str:
+    """Build a slash-command markdown file from a description + body.
+
+    Single source of truth for how a slash command is rendered. Used by
+    both the emit_*() and install_*() paths so the adapter/ folder and
+    the live IDE config stay in sync byte-for-byte.
+    """
+    import yaml
+    clean = {"description": description}
+    return "---\n" + yaml.safe_dump(clean, sort_keys=False, allow_unicode=True).rstrip() + "\n---\n\n" + body.lstrip() + "\n"
 
 
 def make_skill_stub(role_name: str, description: str) -> str:
@@ -139,19 +164,29 @@ def emit_skill(role_name: str, description: str) -> None:
 # ─── opencode adapter ────────────────────────────────────────────────────
 
 def emit_opencode() -> int:
-    """Write per-role subagents + real skills from skills/ to adapters/opencode/.
+    """Write per-role subagents + slash commands + real skills to adapters/opencode/.
 
-    Subagents (from team/*.md) → adapters/opencode/agents/<name>.md
-    Skills (from skills/*/SKILL.md) → adapters/opencode/skill/<name>/SKILL.md
+    Subagents (from team/*.md, excluding post.md + README) → adapters/opencode/agents/<name>.md
+    Slash commands (from team/post.md + any future *.md)   → adapters/opencode/commands/<name>.md
+    Skills (from skills/*/SKILL.md)                        → adapters/opencode/skill/<name>/SKILL.md
     """
     target = ADAPTERS_DIR / "opencode"
     (target / "agents").mkdir(parents=True, exist_ok=True)
+    (target / "commands").mkdir(parents=True, exist_ok=True)
     (target / "skill").mkdir(parents=True, exist_ok=True)
     count = 0
-    # Subagents from team/*.md
+    # Subagents from team/*.md (excludes post.md + README.md).
     for src in roles():
         role_name, description, _fm, _body = role_metadata(src)
-        (target / "agents" / src.name).write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+        (target / "agents" / src.name).write_text(templated_text(src.read_text(encoding="utf-8")), encoding="utf-8")
+        count += 1
+    # Slash commands from team/post.md (and any future command files).
+    for src in commands():
+        role_name, description, _fm, body = role_metadata(src)
+        (target / "commands" / src.name).write_text(
+            build_command_md(description, body),
+            encoding="utf-8",
+        )
         count += 1
     # Real skills from skills/*/SKILL.md
     for src in skills():
@@ -166,11 +201,27 @@ def emit_opencode() -> int:
 # ─── Claude Code adapter ─────────────────────────────────────────────────
 
 def emit_claude() -> int:
-    target = ADAPTERS_DIR / "claude" / "agents"
-    target.mkdir(parents=True, exist_ok=True)
+    """Write per-role subagents + slash commands to adapters/claude/.
+
+    Subagents (from team/*.md, excluding post.md + README) → adapters/claude/agents/<name>.md
+    Slash commands (from team/post.md + any future *.md)   → adapters/claude/commands/<name>.md
+    """
+    agents_target = ADAPTERS_DIR / "claude" / "agents"
+    commands_target = ADAPTERS_DIR / "claude" / "commands"
+    agents_target.mkdir(parents=True, exist_ok=True)
+    commands_target.mkdir(parents=True, exist_ok=True)
     count = 0
+    # Subagents (full role prompts — Claude discovers these as agents).
     for src in roles():
-        (target / src.name).write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+        (agents_target / src.name).write_text(templated_text(src.read_text(encoding="utf-8")), encoding="utf-8")
+        count += 1
+    # Slash commands (stripped frontmatter, with `description:` only).
+    for src in commands():
+        role_name, description, _fm, body = role_metadata(src)
+        (commands_target / src.name).write_text(
+            build_command_md(description, body),
+            encoding="utf-8",
+        )
         count += 1
     return count
 
@@ -178,12 +229,25 @@ def emit_claude() -> int:
 # ─── Cursor adapter ──────────────────────────────────────────────────────
 
 def emit_cursor() -> int:
+    """Write all roles (subagents + post command) as Cursor slash commands.
+
+    Cursor doesn't have a separate subagent concept — every role is exposed
+    as a /<name> slash command, including the 8 subagents AND the post
+    command (which delegates to @md). All written to adapters/cursor/commands/.
+    """
     target = ADAPTERS_DIR / "cursor" / "commands"
     target.mkdir(parents=True, exist_ok=True)
     count = 0
+    # All roles (subagents) become /<role> slash commands.
     for src in roles():
         role_name, description, _fm, body = role_metadata(src)
-        out = make_frontmatter({"description": description}) + body + "\n"
+        out = build_command_md(description, templated_text(body))
+        (target / src.name).write_text(out, encoding="utf-8")
+        count += 1
+    # Plus post.md as /post (one-line dispatcher to @md).
+    for src in commands():
+        role_name, description, _fm, body = role_metadata(src)
+        out = build_command_md(description, body)
         (target / src.name).write_text(out, encoding="utf-8")
         count += 1
     return count
@@ -245,14 +309,12 @@ def install_cursor_skills(verbose: bool = False) -> int:
     target.mkdir(parents=True, exist_ok=True)
     count = 0
     for src in skills():
-        skill_name, description, _fm, body = skill_metadata(src)
+        skill_name, _d, _fm, _body = skill_metadata(src)
         skill_dir = target / skill_name
         skill_dir.mkdir(parents=True, exist_ok=True)
-        skill_md = (
-            f"---\nname: {skill_name}\ndescription: {description}\n---\n\n"
-            + body.lstrip()
-        )
-        (skill_dir / "SKILL.md").write_text(skill_md, encoding="utf-8")
+        # Write the canonical SKILL.md verbatim — the parser reads
+        # `name:` + `description:` from frontmatter, the rest is body.
+        (skill_dir / "SKILL.md").write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
         count += 1
     if verbose:
         print(f"  [cursor] installed {count} skills to {target}")
@@ -270,14 +332,11 @@ def install_claude_skills(verbose: bool = False) -> int:
     target.mkdir(parents=True, exist_ok=True)
     count = 0
     for src in skills():
-        skill_name, description, _fm, body = skill_metadata(src)
+        skill_name, _d, _fm, _body = skill_metadata(src)
         skill_dir = target / skill_name
         skill_dir.mkdir(parents=True, exist_ok=True)
-        skill_md = (
-            f"---\nname: {skill_name}\ndescription: {description}\n---\n\n"
-            + body.lstrip()
-        )
-        (skill_dir / "SKILL.md").write_text(skill_md, encoding="utf-8")
+        # Write the canonical SKILL.md verbatim.
+        (skill_dir / "SKILL.md").write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
         count += 1
     if verbose:
         print(f"  [claude] installed {count} skills to {target}")
@@ -304,7 +363,10 @@ def install_claude_agents(verbose: bool = False) -> int:
         # If the role uses tools: {...} (opencode format), keep it; Claude accepts it
         if "tools" in _fm:
             clean_fm["tools"] = _fm["tools"]
-        out = "---\n" + yaml.safe_dump(clean_fm, sort_keys=False, allow_unicode=True).rstrip() + "\n---\n\n" + body.lstrip()
+        # Also preserve vault_root (Claude should also know the absolute vault path)
+        if "vault_root" in _fm:
+            clean_fm["vault_root"] = str(VAULT)
+        out = "---\n" + yaml.safe_dump(clean_fm, sort_keys=False, allow_unicode=True).rstrip() + "\n---\n\n" + templated_text(body).lstrip()
         (target / src.name).write_text(out, encoding="utf-8")
         count += 1
     if verbose:
@@ -325,10 +387,7 @@ def install_claude_commands(verbose: bool = False) -> int:
     count = 0
     for src in commands():
         role_name, description, _fm, body = role_metadata(src)
-        import yaml
-        clean = {"description": description}
-        out = "---\n" + yaml.safe_dump(clean, sort_keys=False, allow_unicode=True).rstrip() + "\n---\n\n" + body.lstrip()
-        (target / src.name).write_text(out, encoding="utf-8")
+        (target / src.name).write_text(build_command_md(description, body), encoding="utf-8")
         count += 1
     if verbose:
         print(f"  [claude] installed {count} commands to {target}")
@@ -345,12 +404,16 @@ def install_cursor_commands(verbose: bool = False) -> int:
     target = CURSOR_CONFIG / "commands"
     target.mkdir(parents=True, exist_ok=True)
     count = 0
+    # Cursor treats every role as a /<role> slash command (no separate
+    # subagent concept). So we write both the canonical subagents AND
+    # the slash commands (post.md, etc.) here, mirroring adapters/cursor/commands/.
+    for src in roles():
+        role_name, description, _fm, body = role_metadata(src)
+        (target / src.name).write_text(build_command_md(description, templated_text(body)), encoding="utf-8")
+        count += 1
     for src in commands():
         role_name, description, _fm, body = role_metadata(src)
-        import yaml
-        clean = {"description": description}
-        out = "---\n" + yaml.safe_dump(clean, sort_keys=False, allow_unicode=True).rstrip() + "\n---\n\n" + body.lstrip()
-        (target / src.name).write_text(out, encoding="utf-8")
+        (target / src.name).write_text(build_command_md(description, body), encoding="utf-8")
         count += 1
     if verbose:
         print(f"  [cursor] installed {count} commands to {target}")
@@ -372,20 +435,14 @@ def install_opencode(verbose: bool = False) -> int:
     for src in roles():
         dst_agent = OPENCODE_CONFIG / "agents" / src.name
         dst_agent.parent.mkdir(parents=True, exist_ok=True)
-        dst_agent.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+        dst_agent.write_text(templated_text(src.read_text(encoding="utf-8")), encoding="utf-8")
         count += 1
     # Commands: post.md (and any future command files)
     for src in commands():
         role_name, description, _fm, body = role_metadata(src)
         dst_cmd = OPENCODE_CONFIG / "commands" / src.name
         dst_cmd.parent.mkdir(parents=True, exist_ok=True)
-        # Strip the `mode: subagent` field if present (commands don't need it)
-        fm, _ = role_metadata(src)[:2], role_metadata(src)[2]
-        # Build clean command frontmatter
-        import yaml
-        clean = {"description": description}
-        out = "---\n" + yaml.safe_dump(clean, sort_keys=False, allow_unicode=True).rstrip() + "\n---\n\n" + body.lstrip()
-        dst_cmd.write_text(out, encoding="utf-8")
+        dst_cmd.write_text(build_command_md(description, body), encoding="utf-8")
         count += 1
     # Skills: skills/*/SKILL.md
     for src in skills():
@@ -415,21 +472,127 @@ def install_opencode_skills(verbose: bool = False) -> int:
     return count
 
 
+def _collect_installed_paths() -> dict[Path, str]:
+    """Walk every installed IDE location and return {path: content} for every
+    file we manage (subagents, commands, skills).
+
+    Used by --check to compare against freshly-emitted content.
+    """
+    out: dict[Path, str] = {}
+
+    def _walk(ide_root: Path, subdirs: list[str], kind: str) -> None:
+        if not ide_root.exists():
+            return
+        for sub in subdirs:
+            d = ide_root / sub
+            if not d.exists():
+                continue
+            for f in d.rglob("*"):
+                if f.is_file():
+                    try:
+                        out[f] = f.read_text(encoding="utf-8")
+                    except OSError:
+                        pass
+
+    # opencode: agents/, commands/, skill/
+    _walk(OPENCODE_CONFIG, ["agents", "commands", "skill"], "opencode")
+    # Cursor: skills/, commands/
+    _walk(CURSOR_CONFIG, ["skills", "commands"], "cursor")
+    # Claude Code: agents/, skills/, commands/
+    _walk(CLAUDE_CONFIG, ["agents", "skills", "commands"], "claude")
+    return out
+
+
+def _expected_content() -> dict[Path, str]:
+    """Compute what every installed IDE file SHOULD be, based on the canonical
+    team/*.md + skills/*/SKILL.md. Returns {installed_path: expected_content}.
+
+    Mirrors the install_*() functions so --check can diff cleanly.
+    """
+    expected: dict[Path, str] = {}
+
+    # opencode subagents (team/*.md except post.md) → agents/<name>.md
+    if OPENCODE_CONFIG.exists():
+        for src in roles():
+            expected[OPENCODE_CONFIG / "agents" / src.name] = templated_text(src.read_text(encoding="utf-8"))
+        # opencode commands (post.md + future) → commands/<name>.md
+        for src in commands():
+            role_name, description, _fm, body = role_metadata(src)
+            expected[OPENCODE_CONFIG / "commands" / src.name] = (
+                build_command_md(description, body)
+            )
+        # opencode skills (skills/*/SKILL.md) → skill/<name>/SKILL.md
+        for src in skills():
+            skill_name, _d, _fm, _body = skill_metadata(src)
+            expected[OPENCODE_CONFIG / "skill" / skill_name / "SKILL.md"] = (
+                src.read_text(encoding="utf-8")
+            )
+
+    # Cursor commands + skills
+    if CURSOR_CONFIG.exists():
+        for src in roles():
+            role_name, description, _fm, body = role_metadata(src)
+            expected[CURSOR_CONFIG / "commands" / src.name] = (
+                build_command_md(description, templated_text(body))
+            )
+        for src in commands():
+            role_name, description, _fm, body = role_metadata(src)
+            expected[CURSOR_CONFIG / "commands" / src.name] = (
+                build_command_md(description, body)
+            )
+        for src in skills():
+            skill_name, _d, _fm, _body = skill_metadata(src)
+            expected[CURSOR_CONFIG / "skills" / skill_name / "SKILL.md"] = (
+                src.read_text(encoding="utf-8")
+            )
+
+    # Claude Code agents + commands + skills
+    if CLAUDE_CONFIG.exists():
+        for src in roles():
+            role_name, description, _fm, body = role_metadata(src)
+            import yaml as _yaml
+            clean = {"name": role_name, "description": description}
+            if "tools" in _fm:
+                clean["tools"] = _fm["tools"]
+            expected[CLAUDE_CONFIG / "agents" / src.name] = (
+                "---\n"
+                + _yaml.safe_dump(clean, sort_keys=False, allow_unicode=True).rstrip()
+                + "\n---\n\n"
+                + templated_text(body).lstrip()
+            )
+        for src in commands():
+            role_name, description, _fm, body = role_metadata(src)
+            expected[CLAUDE_CONFIG / "commands" / src.name] = (
+                build_command_md(description, body)
+            )
+        for src in skills():
+            skill_name, _d, _fm, _body = skill_metadata(src)
+            expected[CLAUDE_CONFIG / "skills" / skill_name / "SKILL.md"] = (
+                src.read_text(encoding="utf-8")
+            )
+
+    return expected
+
+
 # ─── CLI ─────────────────────────────────────────────────────────────────
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Generate IDE adapter files from team/*.md")
     parser.add_argument("--install", action="store_true",
                         help="Install to all detected IDE configs "
-                             "(opencode: agents + commands, Cursor: skills, Claude Code: skills + agents)")
+                             "(opencode: agents + commands + skills, "
+                             "Cursor: skills + commands, Claude Code: skills + agents + commands)")
     parser.add_argument("--install-opencode", action="store_true",
                         help="Install to opencode only (agents + commands + skills)")
     parser.add_argument("--install-cursor", action="store_true",
-                        help="Install to Cursor only (skills)")
+                        help="Install to Cursor only (skills + commands)")
     parser.add_argument("--install-claude", action="store_true",
-                        help="Install to Claude Code only (skills + agents)")
+                        help="Install to Claude Code only (skills + agents + commands)")
     parser.add_argument("--check", action="store_true",
-                        help="Exit 1 if installed adapters are out of date.")
+                        help="Compare installed adapters against canonical "
+                             "team/*.md + skills/*.md. Exit 0 if in sync, "
+                             "1 if any file would be regenerated, 2 if any "
+                             "files are missing entirely.")
     parser.add_argument("--show", metavar="IDE", choices=["opencode", "claude", "cursor", "mcp"],
                         help="Print what would be generated for one IDE (no files written).")
     args = parser.parse_args()
@@ -447,8 +610,42 @@ def main() -> int:
             print(make_skill_stub(role_name, desc))
         return 0
 
+    # --check: diff installed adapters against canonical. No file writes.
+    if args.check:
+        expected = _expected_content()
+        installed = _collect_installed_paths()
+        mismatched: list[Path] = []
+        missing: list[Path] = []
+        ok = 0
+        for path, want in expected.items():
+            if path not in installed:
+                missing.append(path)
+                continue
+            if installed[path] != want:
+                mismatched.append(path)
+            else:
+                ok += 1
+        # Also report stale files (installed but no longer expected).
+        expected_paths = set(expected.keys())
+        stale = [p for p in installed if p in (
+            OPENCODE_CONFIG.rglob("*") if OPENCODE_CONFIG.exists() else [],
+            CURSOR_CONFIG.rglob("*") if CURSOR_CONFIG.exists() else [],
+            CLAUDE_CONFIG.rglob("*") if CLAUDE_CONFIG.exists() else [],
+        ) and isinstance(p, Path) and p.is_file()
+            and p.suffix in (".md",) and not any(p.match(str(ep)) for ep in expected_paths)]
+        if ok and not mismatched and not missing and not stale:
+            print(f"  ✓ {ok} installed adapter file(s) match canonical. nothing to do.")
+            return 0
+        print(f"  ✗ {len(mismatched)} mismatched, {len(missing)} missing, {len(stale)} stale.")
+        for p in mismatched[:20]:
+            print(f"    diff: {p}")
+        for p in missing[:20]:
+            print(f"    miss: {p}")
+        for p in stale[:20]:
+            print(f"    stale: {p}")
+        return 1 if missing else 2
+
     SKILLS_DIR.mkdir(parents=True, exist_ok=True)
-    # Real skills live in skills/*/SKILL.md (user-managed, not auto-generated)
     n_skills = sum(1 for _ in SKILLS_DIR.glob("*/SKILL.md"))
     print(f"Found {n_skills} canonical skill(s) in skills/")
 
@@ -465,30 +662,23 @@ def main() -> int:
         do_cu = args.install or args.install_cursor
         do_cl = args.install or args.install_claude
 
-        n_oc_inst = 0
-        n_cu_inst = 0
-        n_cl_inst = 0
-        if do_oc:
-            # install_opencode now installs subagents + commands + skills in one call
-            n_oc_inst = install_opencode()
-        if do_cu:
-            n_cu_inst = install_cursor_skills() + install_cursor_commands()
-        if do_cl:
-            n_cl_inst = install_claude_skills() + install_claude_agents() + install_claude_commands()
+        n_oc_inst = install_opencode() if do_oc else 0
+        n_cu_inst = (install_cursor_skills() + install_cursor_commands()) if do_cu else 0
+        n_cl_inst = (install_claude_skills() + install_claude_agents() + install_claude_commands()) if do_cl else 0
 
         print()
         print(f"Installed to live IDEs:")
         if do_oc:
-            print(f"  opencode:    {OPENCODE_CONFIG}  (agents + commands)")
+            print(f"  opencode:    {OPENCODE_CONFIG}  (agents + commands + skills)")
         if do_cu:
-            print(f"  cursor:      {CURSOR_CONFIG / 'skills'}")
+            print(f"  cursor:      {CURSOR_CONFIG}  (skills + commands)")
         if do_cl:
-            print(f"  claude:      {CLAUDE_CONFIG}  (agents + skills)")
+            print(f"  claude:      {CLAUDE_CONFIG}  (agents + skills + commands)")
     else:
         print()
         print(f"To install to all detected IDEs, re-run with --install")
         print(f"  opencode:    {OPENCODE_CONFIG}")
-        print(f"  cursor:      {CURSOR_CONFIG / 'skills'}")
+        print(f"  cursor:      {CURSOR_CONFIG}")
         print(f"  claude:      {CLAUDE_CONFIG}")
     return 0
 

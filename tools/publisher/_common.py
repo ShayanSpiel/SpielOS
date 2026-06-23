@@ -19,14 +19,14 @@ from pathlib import Path
 # ─── Vault detection ─────────────────────────────────────────────────────
 
 def find_vault() -> Path:
-    """Find the SpielOS vault root. Walk up from cwd, then check ~/.spiel/."""
+    """Find the SpielOS vault root. Walk up from cwd, then check ~/.spielos/, ~/.spiel/ (legacy)."""
     cwd = Path.cwd()
     for p in [cwd, *cwd.parents]:
         if (p / "team" / "md.md").exists() and (p / "system" / "state-machine.md").exists():
             return p
-    home_vault = Path.home() / ".spiel"
-    if (home_vault / "team" / "md.md").exists():
-        return home_vault
+    for home_vault in [Path.home() / ".spielos", Path.home() / ".spiel"]:
+        if (home_vault / "team" / "md.md").exists():
+            return home_vault
     # Fall back to env var
     env_vault = os.environ.get("VAULT_DIR")
     if env_vault:

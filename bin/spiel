@@ -7,8 +7,9 @@
 # VAULT_DIR resolution order (first match wins):
 #   1. $VAULT_DIR                  (inline env override)
 #   2. <cwd>/.spiel-vault          (project-local override file; may set VAULT_DIR=…)
-#   3. ~/.spiel/                   (default home install location)
-#   4. <this-shim>/..              (only when this shim lives at <vault>/bin/spiel)
+#   3. ~/.spielos/                 (default home install location)
+#   4. ~/.spiel/                   (legacy fallback for old installs)
+#   5. <this-shim>/..              (only when this shim lives at <vault>/bin/spiel)
 #
 # Usage (from anywhere):
 #   spiel --version
@@ -43,7 +44,9 @@ COMMANDS:
   /post                  (no args = session mode, use today's session log)
   status                 Show current pipeline state
   status --json          Same, JSON output
-  init                   Re-run the install wizard
+  init                   Re-run the install wizard (rewrites .env, strategy, brand)
+  update                 Pull latest tools/install + sync to IDEs
+                         (preserves team/, skills/, strategy/, content/, .env, brand.*)
   sync                   Regenerate IDE adapter files
   test                   Run the test suite
   config                 Print resolved vault + tool paths
@@ -52,8 +55,9 @@ COMMANDS:
 VAULT_DIR is resolved (first match wins):
   1. $VAULT_DIR env var
   2. <cwd>/.spiel-vault        (a file containing VAULT_DIR=/abs/path)
-  3. ~/.spiel/                 (default home install)
-  4. <shim>/..                 (when shim is bundled at <vault>/bin/spiel)
+  3. ~/.spielos/               (default home install)
+  4. ~/.spiel/                 (legacy fallback for old installs)
+  5. <shim>/..                 (when shim is bundled at <vault>/bin/spiel)
 
 The shim is path-independent: invoke it from any project, any IDE, any shell.
 USAGE
@@ -62,42 +66,66 @@ fi
 
 # ── Vault resolution ─────────────────────────────────────────────────
 
+# A candidate is only accepted if it points to a directory that contains
+# team/md.md. Each option below is tried in order; an invalid env var,
+# stale symlink, or missing path falls through to the next option.
 _resolve_vault() {
   local candidate=""
 
-  # 1. Inline env var
+  # 1. Inline env var — validate before committing.
   if [[ -n "${VAULT_DIR:-}" ]]; then
-    candidate="$VAULT_DIR"
-  fi
-
-  # 2. Project-local override
-  if [[ -z "$candidate" && -f "$PWD/.spiel-vault" ]]; then
-    candidate=$(grep -E '^VAULT_DIR=' "$PWD/.spiel-vault" 2>/dev/null | head -1 | cut -d= -f2- || true)
-  fi
-
-  # 3. Default home install (file or symlink, must contain team/md.md)
-  if [[ -z "$candidate" && -e "$HOME/.spiel" ]]; then
-    # Resolve symlink if needed
-    if [[ -L "$HOME/.spiel" ]]; then
-      local resolved_home
-      resolved_home=$(cd "$HOME/.spiel" && pwd -P 2>/dev/null || echo "")
-      if [[ -n "$resolved_home" && -f "$resolved_home/team/md.md" ]]; then
-        candidate="$resolved_home"
-      fi
-    elif [[ -f "$HOME/.spiel/team/md.md" ]]; then
-      candidate="$HOME/.spiel"
+    if [[ -d "${VAULT_DIR}/team" && -f "${VAULT_DIR}/team/md.md" ]]; then
+      candidate="${VAULT_DIR}"
     fi
   fi
 
-  # 4. Shim bundled in vault (regular file)
+  # 2. Project-local override.
+  if [[ -z "$candidate" && -f "$PWD/.spiel-vault" ]]; then
+    local override
+    override=$(grep -E '^VAULT_DIR=' "$PWD/.spiel-vault" 2>/dev/null | head -1 | cut -d= -f2- || true)
+    override="${override%\"}"; override="${override#\"}"
+    override="${override%\'}"; override="${override#\'}"
+    if [[ -n "$override" && -d "$override/team" && -f "$override/team/md.md" ]]; then
+      candidate="$override"
+    fi
+  fi
+
+  # 3. Default home install (file or symlink, must contain team/md.md).
+  if [[ -z "$candidate" && -e "$HOME/.spielos" ]]; then
+    local resolved_home=""
+    if [[ -L "$HOME/.spielos" ]]; then
+      # Follow the symlink. `cd` errors (e.g. target is a regular file) are
+      # silenced — we fall through to option 4 if anything goes wrong.
+      resolved_home=$(cd "$HOME/.spielos" 2>/dev/null && pwd -P 2>/dev/null || echo "")
+    elif [[ -d "$HOME/.spielos" ]]; then
+      resolved_home="$HOME/.spielos"
+    fi
+    if [[ -n "$resolved_home" && -d "$resolved_home/team" && -f "$resolved_home/team/md.md" ]]; then
+      candidate="$resolved_home"
+    fi
+  fi
+
+  # 4. Legacy fallback for old ~/.spiel installs.
+  if [[ -z "$candidate" && -e "$HOME/.spiel" ]]; then
+    local resolved_legacy=""
+    if [[ -L "$HOME/.spiel" ]]; then
+      resolved_legacy=$(cd "$HOME/.spiel" 2>/dev/null && pwd -P 2>/dev/null || echo "")
+    elif [[ -d "$HOME/.spiel" ]]; then
+      resolved_legacy="$HOME/.spiel"
+    fi
+    if [[ -n "$resolved_legacy" && -d "$resolved_legacy/team" && -f "$resolved_legacy/team/md.md" ]]; then
+      candidate="$resolved_legacy"
+    fi
+  fi
+
+  # 5. Shim bundled in vault (this file is at <vault>/bin/spiel).
   if [[ -z "$candidate" ]]; then
     local shim_path="${BASH_SOURCE[0]:-$0}"
-    # If shim is a symlink, follow it
+    # If shim is a symlink, follow it.
     if [[ -L "$shim_path" ]]; then
       local shim_target
       shim_target=$(readlink "$shim_path" 2>/dev/null || true)
       if [[ -n "$shim_target" ]]; then
-        # Resolve relative symlinks
         local shim_dir
         shim_dir=$(cd "$(dirname "$shim_path")" && pwd)
         local resolved
@@ -116,12 +144,7 @@ _resolve_vault() {
     fi
   fi
 
-  # Strip surrounding quotes / whitespace
-  candidate="${candidate%\"}"; candidate="${candidate#\"}"
-  candidate="${candidate%\'}"; candidate="${candidate#\'}"
-  candidate="${candidate## }";  candidate="${candidate%% }"
-
-  # Validate: must be a directory that contains team/md.md
+  # Validate (defense in depth — every option above already validated).
   if [[ -z "$candidate" || ! -d "$candidate/team" || ! -f "$candidate/team/md.md" ]]; then
     echo "ERROR: spiel could not locate the SpielOS vault." >&2
     echo "" >&2
@@ -132,28 +155,79 @@ _resolve_vault() {
     else
       echo "    2. <cwd>/.spiel-vault:           <not found>" >&2
     fi
-    if [[ -d "$HOME/.spiel" ]]; then
-      echo "    3. ~/.spiel/                     exists" >&2
+    if [[ -e "$HOME/.spielos" ]]; then
+      echo "    3. ~/.spielos/                   exists (but invalid)" >&2
     else
-      echo "    3. ~/.spiel/                     <not installed>" >&2
+      echo "    3. ~/.spielos/                   <not installed>" >&2
+    fi
+    if [[ -e "$HOME/.spiel" ]]; then
+      echo "    4. ~/.spiel/  (legacy)           exists (but invalid)" >&2
+    else
+      echo "    4. ~/.spiel/  (legacy)           <not installed>" >&2
     fi
     shim_dir=$(cd "$(dirname "$0")" && pwd)
-    echo "    4. <shim>/..:                    $shim_dir/..  (not a bundle)" >&2
+    echo "    5. <shim>/..:                    $shim_dir/..  (not a bundle)" >&2
     echo "" >&2
     echo "  Fix (pick one):" >&2
     echo "    a) Install SpielOS:" >&2
-    echo "         curl -fsSL https://spielos.xyz/install.sh | bash" >&2
-    echo "    b) Set VAULT_DIR env var:" >&2
+    echo "         curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/Spiel-OS/main/install/install.sh | bash" >&2
+    echo "    b) Set VAULT_DIR env var to a vault with team/md.md:" >&2
     echo "         export VAULT_DIR=/path/to/SpielOS" >&2
     echo "    c) Drop a .spiel-vault file in your project root with: VAULT_DIR=/abs/path" >&2
     return 1
   fi
 
-  # Normalize to absolute
+  # Normalize to absolute.
   (cd "$candidate" && pwd)
 }
 
 VAULT=$(_resolve_vault) || exit 1
+
+# ── Tarball overlay (fallback for `update` when git pull fails) ────────
+
+# Directories and files that update must NEVER overwrite (user data).
+# These match what install.sh preserves during re-install.
+_SPielos_SKIP_DIRS="team skills strategy content"
+_SPielos_SKIP_FILES=".env system/brand.md system/brand.json"
+
+_update_via_tarball() {
+  local tarball="https://github.com/ShayanSpiel/Spiel-OS/archive/refs/heads/main.tar.gz"
+  local tmpdir
+  tmpdir=$(mktemp -d) || { echo "  ⚠ mktemp failed" >&2; return 1; }
+
+  if ! curl -fsSL "$tarball" | tar -xz -C "$tmpdir" --strip-components=1 2>/dev/null; then
+    rm -rf "$tmpdir"
+    echo "  ⚠ tarball download failed" >&2
+    return 1
+  fi
+
+  # Overlay files from $tmpdir onto $VAULT, skipping user data dirs/files.
+  (cd "$VAULT" && python3 - <<PYEOF
+import os, shutil
+src = "$tmpdir"
+dst = "$VAULT"
+skip_dirs  = set("$SPielos_SKIP_DIRS".split())
+skip_files = set("$SPielos_SKIP_FILES".split())
+copied = 0
+for root, dirs, files in os.walk(src):
+    rel = os.path.relpath(root, src)
+    parts = rel.split(os.sep) if rel != "." else []
+    if any(p in skip_dirs for p in parts):
+        continue
+    for f in files:
+        rel_file = os.path.relpath(os.path.join(root, f), src)
+        if rel_file in skip_files:
+            continue
+        sp = os.path.join(root, f)
+        dp = os.path.join(dst, rel_file)
+        os.makedirs(os.path.dirname(dp), exist_ok=True)
+        shutil.copy2(sp, dp)
+        copied += 1
+print(f"  → tarball overlay: {copied} files updated (user data preserved)")
+PYEOF
+)
+  rm -rf "$tmpdir"
+}
 
 # ── Version / where (vault already resolved) ─────────────────────────
 
@@ -225,6 +299,50 @@ case "${1:-}" in
     fi
     ;;
 
+  update)
+    # Pull the latest tool sources, then sync to IDEs.
+    # Preserves your custom team/, skills/, strategy/, content/, .env, brand.*
+    # (just like the install.sh re-install branch with a SKIP list).
+    if [[ ! -d "$VAULT/.git" ]] && [[ ! -f "$VAULT/.spielos-update-marker" ]]; then
+      echo "" >&2
+      echo "  ERROR: $VAULT is not a SpielOS git repo (no .git/)." >&2
+      echo "  Re-run the installer to get a proper install:" >&2
+      echo "    curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/Spiel-OS/main/install/install.sh | bash" >&2
+      exit 1
+    fi
+
+    echo ""
+    echo "  Updating SpielOS vault at $VAULT"
+    echo "  (preserves: team/, skills/, strategy/, content/, .env, system/brand.*)"
+    echo ""
+
+    # Path A: vault is a git repo
+    if [[ -d "$VAULT/.git" ]] && command -v git >/dev/null 2>&1; then
+      echo "  → git pull origin main --ff-only"
+      if (cd "$VAULT" && git pull origin main --ff-only 2>&1 | sed 's/^/    /'); then
+        echo "  ✓ tool sources updated"
+      else
+        echo "  ⚠ git pull failed; falling back to tarball overlay"
+        _update_via_tarball
+      fi
+    else
+      _update_via_tarball
+    fi
+
+    echo ""
+    echo "  → sync_adapters --install (push to all IDEs)"
+    if python3 "$VAULT/tools/sync_adapters.py" --install 2>&1 | sed 's/^/    /'; then
+      echo "  ✓ IDE adapters refreshed"
+    else
+      echo "  ⚠ sync failed; run 'spiel sync' to retry" >&2
+    fi
+
+    echo ""
+    echo "  ✓ Update complete."
+    echo "    To re-run setup wizard:  spiel init"
+    echo ""
+    ;;
+
   test)
     if command -v pytest >/dev/null 2>&1; then
       exec pytest "$VAULT/tests/" -v
@@ -261,6 +379,41 @@ case "${1:-}" in
     echo ""
     echo "  For setup: run \`spiel init\` to open the install wizard."
     echo ""
+    ;;
+
+  content)
+    # Fallback for IDEs that can't invoke subagents. The slash command file
+    # (team/post.md) documents: "fall back to bash: spiel content run <args>".
+    # The bash CLI cannot run the LLM-driven pipeline by itself, so we
+    # dispatch the same way /post does (with a clear message).
+    shift  # consume "content"
+    case "${1:-}" in
+      run)
+        shift  # consume "run"
+        echo ""
+        echo "  spiel content run <args> is the bash fallback for /post."
+        echo ""
+        echo "  The /post pipeline is LLM-driven and runs inside your IDE's"
+        echo "  subagent runtime. The CLI shim cannot run it standalone."
+        echo ""
+        echo "  Open opencode, Claude Code, Cursor, or any MCP agent and type:"
+        echo ""
+        echo "      /post                       (session mode)"
+        echo "      /post Just shipped v2       (topic mode)"
+        echo "      /post @file:./notes.md      (topic mode from a file)"
+        echo ""
+        if [[ -n "$*" ]]; then
+          echo "  Args received: $*"
+          echo "  (Pass them to /post in your IDE to run the pipeline.)"
+        fi
+        echo ""
+        ;;
+      *)
+        echo "Unknown content subcommand: ${1:-}" >&2
+        echo "Usage: spiel content run <args>" >&2
+        exit 1
+        ;;
+    esac
     ;;
 
   "")
