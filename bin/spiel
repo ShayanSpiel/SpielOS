@@ -211,8 +211,12 @@ SPIELOS_REPO="${SPIELOS_REPO:-ShayanSpiel/Spiel-OS}"
   local tmpdir
   tmpdir=$(mktemp -d) || { echo "  ⚠ mktemp failed" >&2; return 1; }
 
+  # Ensure tmpdir is cleaned up even if set -e kills the script midway
+  # (e.g. Python overlay error, curl failure, etc.)
+  _spiel_cleanup_tmp() { rm -rf "$tmpdir"; }
+  trap _spiel_cleanup_tmp EXIT
+
   if ! curl -fsSL "$tarball" | tar -xz -C "$tmpdir" --strip-components=1 2>/dev/null; then
-    rm -rf "$tmpdir"
     echo "  ⚠ tarball download failed" >&2
     return 1
   fi
@@ -222,8 +226,8 @@ SPIELOS_REPO="${SPIELOS_REPO:-ShayanSpiel/Spiel-OS}"
 import os, shutil
 src = "$tmpdir"
 dst = "$VAULT"
-skip_dirs  = set("$_SPielos_SKIP_DIRS".split())
-skip_files = set("$_SPielos_SKIP_FILES".split())
+skip_dirs  = set("${_SPielos_SKIP_DIRS}".split())
+skip_files = set("${_SPielos_SKIP_FILES}".split())
 copied = 0
 for root, dirs, files in os.walk(src):
     rel = os.path.relpath(root, src)
@@ -242,12 +246,27 @@ for root, dirs, files in os.walk(src):
 print(f"  → tarball overlay: {copied} files updated (user data preserved)")
 PYEOF
 )
+
+  trap - EXIT
   rm -rf "$tmpdir"
 }
 
 # ── Rewrite vault pointer files (always, on update / install) ────────
 
 _rewrite_vault_pointers() {
+  # Safety: never write a temp-directory path to persistent config.
+  # A tempdir leak would make spiel unresolvable on next invocation.
+  case "$VAULT" in
+    /tmp/*|/private/var/folders/*)
+      echo "  ⚠ VAULT ($VAULT) looks like a temp directory — refusing to write" >&2
+      return 1
+      ;;
+  esac
+  if [[ ! -d "$VAULT/team" || ! -f "$VAULT/team/md.md" ]]; then
+    echo "  ⚠ VAULT ($VAULT) is not a valid vault (no team/md.md) — refusing to write" >&2
+    return 1
+  fi
+
   printf 'VAULT_DIR=%s\n' "$VAULT" > "$VAULT/.spiel-vault"
 
   # Global config — makes vault resolvable from ANY cwd
@@ -344,6 +363,40 @@ case "${1:-}" in
     ;;
 
   update)
+    # Pre-flight: validate $VAULT is NOT a leaked temp directory.
+    # If it is, re-resolve from scratch using cwd + shim path.
+    case "$VAULT" in
+      /tmp/*|/private/var/folders/*)
+        echo ""
+        echo "  ⚠ VAULT resolved to temp directory: $VAULT"
+        echo "  → Re-resolving from shim location..."
+        VAULT_DIR=""
+        # Walk up from cwd first (most reliable when cwd is inside a vault)
+        local d="$PWD"
+        while [[ "$d" != "/" ]]; do
+          if [[ -d "$d/team" && -f "$d/team/md.md" ]]; then
+            VAULT="$d"
+            break
+          fi
+          d=$(dirname "$d")
+        done
+        # Fall back to shim location
+        if [[ ! -d "$VAULT/team" || ! -f "$VAULT/team/md.md" ]]; then
+          local sd
+          sd=$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd 2>/dev/null || true)
+          if [[ -n "$sd" && -f "$sd/../team/md.md" ]]; then
+            VAULT=$(cd "$sd/.." && pwd)
+          fi
+        fi
+        if [[ ! -d "$VAULT/team" || ! -f "$VAULT/team/md.md" ]]; then
+          echo "  ✗ Cannot recover — no valid vault found. Run installer again." >&2
+          exit 1
+        fi
+        echo "  → Re-resolved to: $VAULT"
+        echo ""
+        ;;
+    esac
+
     # Pull the latest tool sources, then sync to IDEs.
     # Preserves your custom team/, skills/, strategy/, content/, .env, brand.*
 
@@ -365,11 +418,8 @@ case "${1:-}" in
       _update_via_tarball
     fi
 
-    # Rewrite vault pointer files (always, to keep them in sync with current path)
-    # Write global config directly (not via _rewrite_vault_pointers) so it works
-    # even when this shim is an old version that doesn't have it.
-    mkdir -p "$HOME/.config/spielos"
-    printf 'VAULT_DIR=%s\n' "$VAULT" > "$HOME/.config/spielos/config"
+    # Rewrite vault pointer files — _rewrite_vault_pointers validates the path
+    # and refuses to write if VAULT looks like a temp dir or is not a real vault.
     _rewrite_vault_pointers
 
     echo ""
