@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Install SpielOS</title>
+  <meta name="description" content="Install SpielOS in your project with one curl command. Mac, Linux, any IDE.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #000;
+      --bg-1: #0a0a0a;
+      --bg-2: #111;
+      --bg-3: #161616;
+      --tx: #fff;
+      --tx-2: #b0b0b0;
+      --tx-3: #888;
+      --bd: #1a1a1a;
+      --bd-1: #252525;
+      --bd-2: #333;
+      --ac: #ff6a00;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--tx);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      font-size: 16px; line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: var(--tx); text-decoration: none; }
+    a:hover { color: var(--ac); }
+    code { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 0.92em; }
+    main { max-width: 720px; margin: 0 auto; padding: 96px 24px 64px; }
+    .tag {
+      display: inline-block; font-size: 11px; font-family: 'JetBrains Mono', monospace;
+      color: var(--ac); text-transform: uppercase; letter-spacing: 0.1em;
+      padding: 4px 10px; border: 1px solid var(--bd-1); border-radius: 999px;
+      margin-bottom: 24px;
+    }
+    h1 { font-size: clamp(40px, 6vw, 56px); font-weight: 800; letter-spacing: -0.03em; line-height: 1.05; margin: 0 0 16px; }
+    .sub { font-size: 18px; color: var(--tx-2); margin: 0 0 40px; line-height: 1.6; }
+    .cmd-box {
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--bg-2); border: 1px solid var(--bd-1);
+      border-radius: 8px; padding: 12px 16px; gap: 12px;
+      margin-bottom: 12px;
+    }
+    .cmd-box .cmd { flex: 1; color: var(--tx); overflow-x: auto; white-space: nowrap; font-size: 14px; }
+    .copy-btn {
+      background: var(--bg-3); color: var(--tx-2); border: 1px solid var(--bd-2);
+      padding: 4px 10px; border-radius: 4px; font-size: 11px;
+      font-family: 'JetBrains Mono', monospace; cursor: pointer; white-space: nowrap;
+    }
+    .copy-btn:hover { border-color: var(--ac); color: var(--ac); }
+    .fine { font-size: 13px; color: var(--tx-3); margin-top: 16px; }
+    .fine code { background: var(--bg-2); padding: 1px 6px; border-radius: 4px; color: var(--tx); border: 1px solid var(--bd-1); }
+    h2 { font-size: 13px; font-family: 'JetBrains Mono', monospace; color: var(--ac); text-transform: uppercase; letter-spacing: 0.1em; margin: 64px 0 24px; }
+    h3 { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 8px; }
+    h3 code { background: var(--bg-2); padding: 1px 6px; border-radius: 4px; font-size: 0.85em; color: var(--ac); }
+    .step { padding: 24px; background: var(--bg-2); border: 1px solid var(--bd-1); border-radius: 12px; margin-bottom: 16px; }
+    .step p { margin: 0; color: var(--tx-2); font-size: 14px; line-height: 1.6; }
+    .step strong { color: var(--tx); font-weight: 500; }
+    .step ol { margin: 8px 0 0; padding-left: 20px; color: var(--tx-2); font-size: 14px; }
+    .step ol li { margin-bottom: 4px; }
+    .step ol li::marker { color: var(--ac); }
+    .thin { max-width: 480px; }
+    .cta { display: inline-flex; align-items: center; gap: 8px; padding: 12px 20px; background: var(--ac); color: #000; border-radius: 6px; font-size: 14px; font-weight: 500; margin-top: 16px; }
+    .cta:hover { background: #ff8533; color: #000; }
+    .cta .arrow { transition: transform 0.12s; }
+    .cta:hover .arrow { transform: translateX(2px); }
+    footer { text-align: center; padding: 32px 24px; font-size: 12px; color: var(--tx-3); border-top: 1px solid var(--bd); margin-top: 64px; }
+    footer a { color: var(--tx-3); margin: 0 8px; }
+  </style>
+</head>
+<body>
+
+  <main>
+
+    <div class="tag">one command</div>
+    <h1>Install SpielOS</h1>
+    <p class="sub">Run this in any project directory on your Mac or Linux machine. The installer puts the vault at your current directory, starts the setup wizard, and syncs the 5 role agents + 3 skills to all your IDEs.</p>
+
+    <div class="cmd-box">
+      <code class="cmd" id="cmd">curl -fsSL https://spielos.xyz/spielos | bash</code>
+      <button class="copy-btn" onclick="copyCmd()" aria-label="Copy"><span id="copy-label">Copy</span></button>
+    </div>
+
+    <p class="fine">Requires <code>python3</code> and <code>git</code> on PATH. Install: <code>brew install python git</code> (Mac) or <code>apt install python3 git</code> (Linux).</p>
+
+    <h2>What just happened</h2>
+
+    <div class="step">
+      <h3>1. Vault installed at <code>$PWD</code></h3>
+      <p>The installer cloned the SpielOS repo into your current directory. This is your <strong>vault</strong> — the project where your drafts, strategy files, and brand tokens live. Any IDE opened in this directory sees your project.</p>
+    </div>
+
+    <div class="step">
+      <h3>2. Wizard wrote 8 files</h3>
+      <p>The setup wizard at <code>http://localhost:7331</code> walked you through 6 steps: brand, audience, offer, voice, examples, connect. On Finish it wrote your <code>system/brand.*</code>, 4 <code>strategy/*.md</code> files, and the <code>.env</code> for API tokens.</p>
+    </div>
+
+    <div class="step">
+      <h3>3. Adapters installed in 4 IDEs</h3>
+      <p>The shim <code>~/.local/bin/spiel</code> is on your PATH. Global config <code>~/.config/spielos/config</code> points at this vault. The 5 role agents (Director, Strategist, Writer, Editor, Publisher) and 3 skills (format, publish, voice) are now in <code>~/.config/opencode/</code>, <code>~/.claude/</code>, <code>~/.cursor/</code>, and <code>~/.codex/</code>.</p>
+    </div>
+
+    <h2>Now</h2>
+
+    <p style="color: var(--tx-2); margin-bottom: 16px;">Open this project in Cursor, opencode, Claude Code, or Codex. The chat box now has a <code>/post</code> slash command. Try:</p>
+
+    <div class="cmd-box thin">
+      <code class="cmd">/post "Just shipped v2"</code>
+    </div>
+
+    <p style="color: var(--tx-2); margin: 24px 0 8px;">The Director subagent will:</p>
+    <ol style="color: var(--tx-2); padding-left: 20px; line-height: 1.8; margin: 0 0 24px;">
+      <li>Write <code>content/current.md</code> with your source</li>
+      <li>Strategist compiles reader / pain / point / proof / angle</li>
+      <li>Writer asks you which platforms (X, LinkedIn, blog)</li>
+      <li>Drafts land in <code>content/drafts/</code></li>
+      <li>Editor runs 4 mechanical gates, moves passing drafts to <code>content/ready/</code></li>
+      <li>Publisher asks publish / hold / reject, dispatches approved ones</li>
+    </ol>
+
+    <a class="cta" href="https://github.com/ShayanSpiel/Spiel-OS/blob/main/AGENTS.md" target="_blank" rel="noopener">
+      Read the docs <span class="arrow">→</span>
+    </a>
+
+    <h2>Updating later</h2>
+
+    <p style="color: var(--tx-2); margin-bottom: 12px;">When a new version ships:</p>
+    <div class="cmd-box thin">
+      <code class="cmd">spiel update</code>
+    </div>
+    <p class="fine" style="margin-top: 16px;">Pulls the latest tools and wizard, syncs your IDEs, preserves your <code>team/</code>, <code>skills/</code>, <code>strategy/</code>, <code>content/</code>, <code>.env</code>, and <code>system/brand.*</code>.</p>
+
+  </main>
+
+  <footer>
+    <a href="https://github.com/ShayanSpiel/Spiel-OS" target="_blank" rel="noopener">GitHub</a>
+    <a href="https://github.com/ShayanSpiel/Spiel-OS/blob/main/AGENTS.md" target="_blank" rel="noopener">Docs</a>
+    <a href="https://github.com/ShayanSpiel/Spiel-OS/blob/main/LICENSE" target="_blank" rel="noopener">MIT</a>
+  </footer>
+
+  <script>
+    function copyCmd() {
+      const cmd = document.getElementById('cmd').innerText.trim();
+      navigator.clipboard.writeText(cmd).then(() => {
+        const btn = document.getElementById('copy-label');
+        const original = btn.innerText;
+        btn.innerText = 'Copied';
+        setTimeout(() => { btn.innerText = original; }, 1500);
+      }).catch(() => {
+        const ta = document.createElement('textarea');
+        ta.value = cmd;
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); } catch (e) {}
+        document.body.removeChild(ta);
+      });
+    }
+  </script>
+
+</body>
+</html>
