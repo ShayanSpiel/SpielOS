@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -33,6 +34,16 @@ OPENCODE_CONFIG = Path.home() / ".config" / "opencode"
 CURSOR_CONFIG = Path.home() / ".cursor"
 CLAUDE_CONFIG = Path.home() / ".claude"
 CODEX_CONFIG = Path.home() / ".codex"
+
+
+# When the wizard runs sync_adapters from the canonical source repo but
+# installs into a different target, VAULT_ROOT env var overrides the
+# path that gets templated into the installed adapter files.
+TEMPLATED_VAULT_ROOT = (
+    Path(os.environ["VAULT_ROOT"]).expanduser().resolve()
+    if os.environ.get("VAULT_ROOT")
+    else VAULT
+)
 
 
 def parse_frontmatter(text: str) -> tuple[dict, str]:
@@ -64,7 +75,7 @@ def templated_text(text: str) -> str:
 
     Called by emit_*() and install_*() for every role file.
     """
-    return text.replace("{vault_root}", str(VAULT))
+    return text.replace("{vault_root}", str(TEMPLATED_VAULT_ROOT))
 
 
 def make_frontmatter(d: dict) -> str:
@@ -481,7 +492,7 @@ def install_claude_agents(verbose: bool = False) -> int:
             clean_fm["tools"] = _fm["tools"]
         # Also preserve vault_root (Claude should also know the absolute vault path)
         if "vault_root" in _fm:
-            clean_fm["vault_root"] = str(VAULT)
+            clean_fm["vault_root"] = str(TEMPLATED_VAULT_ROOT)
         out = "---\n" + yaml.safe_dump(clean_fm, sort_keys=False, allow_unicode=True).rstrip() + "\n---\n\n" + templated_text(body).lstrip()
         (target / src.name).write_text(out, encoding="utf-8")
         count += 1
@@ -673,7 +684,7 @@ def _expected_content() -> dict[Path, str]:
             if "tools" in _fm:
                 clean["tools"] = _fm["tools"]
             if "vault_root" in _fm:
-                clean["vault_root"] = str(VAULT)
+                clean["vault_root"] = str(TEMPLATED_VAULT_ROOT)
             expected[CLAUDE_CONFIG / "agents" / src.name] = (
                 "---\n"
                 + _yaml.safe_dump(clean, sort_keys=False, allow_unicode=True).rstrip()

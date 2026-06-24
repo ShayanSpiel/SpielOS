@@ -249,17 +249,23 @@ def run_post_install(source_vault: Path | None = None) -> dict:
     # 3+4. Generate + install adapters. Use the SOURCE sync_adapters.py so the
     # installed adapter files have the correct vault_root baked in. In
     # production install (source == target), this is a no-op distinction.
+    # VAULT_ROOT env var tells sync_adapters which absolute path to bake into
+    # the templated adapter files — must be the install target, not the source.
     sync_script = None
     if source_vault and (source_vault / "tools" / "sync_adapters.py").exists():
         sync_script = source_vault / "tools" / "sync_adapters.py"
     elif (VAULT / "tools" / "sync_adapters.py").exists():
         sync_script = VAULT / "tools" / "sync_adapters.py"
 
+    adapter_env = os.environ.copy()
+    adapter_env["VAULT_ROOT"] = str(VAULT)
+
     if sync_script:
         try:
             r = subprocess.run(
                 [sys.executable, str(sync_script)],
                 capture_output=True, text=True,
+                env=adapter_env,
                 timeout=30,
             )
             if r.returncode == 0:
@@ -277,6 +283,7 @@ def run_post_install(source_vault: Path | None = None) -> dict:
             r = subprocess.run(
                 [sys.executable, str(sync_script), "--install"],
                 capture_output=True, text=True,
+                env=adapter_env,
                 timeout=30,
             )
             if r.returncode == 0:
