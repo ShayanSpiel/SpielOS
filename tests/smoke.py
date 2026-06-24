@@ -70,31 +70,19 @@ def test_state_machine() -> None:
 
 
 def test_team_files() -> None:
-    print("\n[2] Single slash command: team/post.md (the only agent)")
-    # The only agent in the system is the post.md slash command
+    print("\n[2] Team files present + valid frontmatter")
     team = ROOT / "team"
-    f = team / "post.md"
-    check(f"team/post.md exists (the only agent)", f.exists())
-    if f.exists():
-        text = f.read_text()
-        check("team/post.md has frontmatter", text.startswith("---"))
-        check("team/post.md has description", "description:" in text[:500])
-        check("team/post.md has 10-step procedure", "Step 1" in text and "Step 10" in text)
-        check("team/post.md has hard rules", "## Hard rules" in text)
-        # team/post.md should NOT have permission/task (no subagents)
-        check("team/post.md has no task() (no subagents)", "task(" not in text or "Never use" in text)
-
-    # team/ should contain ONLY post.md and README.md
-    team_files = sorted([f.name for f in team.iterdir() if f.is_file() and f.name != "README.md"])
-    check(f"team/ has only post.md (and README.md)", team_files == ["post.md"],
-          f"found: {team_files}")
-
-    # system/prompts/ should contain only the 4 reference docs (identity, compiler, leak-guard, wizards)
-    prompts = ROOT / "system" / "prompts"
-    expected_prompts = ["compiler.md", "identity.md", "leak-guard.md", "wizards.md"]
-    prompt_files = sorted([f.name for f in prompts.iterdir() if f.is_file()])
-    check(f"system/prompts/ has only the 4 expected files", prompt_files == expected_prompts,
-          f"found: {prompt_files}")
+    expected_roles = ["md", "strategist", "researcher", "copywriter", "editor",
+                      "designer", "publisher", "analyst"]
+    for r in expected_roles:
+        f = team / f"{r}.md"
+        check(f"team/{r}.md exists", f.exists())
+        if f.exists():
+            text = f.read_text()
+            check(f"team/{r}.md has frontmatter", text.startswith("---"))
+            check(f"team/{r}.md has description", "description:" in text[:500])
+            check(f"team/{r}.md has role_in_pipeline", "role_in_pipeline:" in text)
+            check(f"team/{r}.md has hard rules", "## Hard rules" in text)
 
 
 def test_editor_runs() -> None:
@@ -173,21 +161,15 @@ What did you ship this week?
 
 def test_wizard_server() -> None:
     print("\n[4] Wizard server (install/wizard/serve.py)")
-    # Sandbox the wizard subprocess with a fake HOME so it never writes to
-    # the user's real ~/.config/spielos/config. This makes the test safe
-    # even if it crashes mid-way (no leftover global state).
+    # Save and restore the global config so test doesn't corrupt the user's setup
+    global_cfg = Path.home() / ".config" / "spielos" / "config"
+    saved_cfg = global_cfg.read_text() if global_cfg.exists() else None
     with tempfile.TemporaryDirectory() as tmp:
-        # Create the fake $HOME — wizard's Path.home() will resolve here.
-        fake_home = Path(tmp) / "fakehome"
-        fake_home.mkdir()
         port = 19331
-        env = os.environ.copy()
-        env["HOME"] = str(fake_home)
         proc = subprocess.Popen(
             [sys.executable, str(ROOT / "install" / "wizard" / "serve.py"),
              "--port", str(port), "--target", str(Path(tmp) / "vault"), "--no-open"],
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            env=env,
         )
         time.sleep(0.8)
         try:
@@ -216,14 +198,15 @@ def test_wizard_server() -> None:
             with urllib.request.urlopen(req, timeout=5) as r:
                 data = json.loads(r.read())
                 check("wizard /api/finish returns 200", r.status == 200)
-                # Minimal payload writes ~5 files (brand + strategy + .env + .install-state)
-                check("wizard /api/finish writes files", len(data.get("written", [])) >= 4)
+                check("wizard /api/finish writes files", len(data.get("written", [])) >= 10)
         finally:
             proc.terminate()
-            try:
-                proc.wait(timeout=3)
-            except subprocess.TimeoutExpired:
-                proc.kill()
+            proc.wait(timeout=3)
+            # Restore global config
+            if saved_cfg is not None:
+                global_cfg.write_text(saved_cfg, encoding="utf-8")
+            elif global_cfg.exists():
+                global_cfg.unlink()
 
 
 def test_sync_adapters() -> None:
@@ -233,15 +216,14 @@ def test_sync_adapters() -> None:
         capture_output=True, text=True,
     )
     check("sync_adapters.py exits 0", r.returncode == 0, f"stderr: {r.stderr}")
-    # Check the adapters exist (v4: only the post slash command.
-    # No subagents — designer/editor/publisher/researcher/strategist/copywriter/analyst
-    # are all inlined into post.md. No adapter files for them.)
+    # Check the adapters exist (v2: subagents + real skills, no auto-gen role stubs)
     for path in [
-        "adapters/opencode/commands/post.md",
-        "adapters/claude/commands/post.md",
-        "adapters/cursor/commands/post.md",
+        "adapters/opencode/agents/md.md",
+        "adapters/opencode/agents/copywriter.md",
+        "adapters/claude/agents/md.md",
+        "adapters/cursor/commands/md.md",
         "adapters/mcp/server.json",
-        # Skills (user skills)
+        # v2: real skills in skills/<name>/SKILL.md (5 user skills, no role stubs)
         "skills/icp_simulation/SKILL.md",
         "skills/format_wizard/SKILL.md",
         "skills/publish_wizard/SKILL.md",
@@ -249,107 +231,6 @@ def test_sync_adapters() -> None:
         "skills/template_picker/SKILL.md",
     ]:
         check(f"  {path} exists", (ROOT / path).exists())
-    # CRITICAL: no subagent adapter files should be generated.
-    # These are the 8 old subagents that we deleted from team/.
-    for subagent in ["md", "researcher", "strategist", "copywriter", "analyst",
-                     "designer", "editor", "publisher"]:
-        for ide in ["opencode/agents", "claude/agents", "cursor/commands", "codex/agents"]:
-            path = ROOT / "adapters" / ide / f"{subagent}.md"
-            check(f"  no {ide}/{subagent}.md (old subagent adapter)", not path.exists(),
-                  f"unexpected stale adapter: {path}")
-
-
-def test_cleanup_target() -> None:
-    """Test that _cleanup_target removes stale files but preserves expected ones."""
-    print("\n[6] _cleanup_target (stale file removal)")
-    import tempfile
-    from pathlib import Path
-    sys.path.insert(0, str(ROOT / "tools"))
-    try:
-        from sync_adapters import _cleanup_target
-    except ImportError as e:
-        check(f"  import sync_adapters failed", False, str(e))
-        return
-
-    with tempfile.TemporaryDirectory() as tmp:
-        tmp_path = Path(tmp)
-        # Create some files
-        (tmp_path / "post.md").write_text("keep")
-        (tmp_path / "stale1.md").write_text("remove")
-        (tmp_path / "stale2.md").write_text("remove")
-        (tmp_path / "README.md").write_text("keep")
-
-        # Create a stale subdir (for skills test)
-        (tmp_path / "stale_skill_dir").mkdir()
-        (tmp_path / "stale_skill_dir" / "SKILL.md").write_text("remove")
-
-        removed = _cleanup_target(tmp_path, {"post"}, "test", suffix=".md")
-        # 2 stale .md files + 1 stale subdir = 3 total
-        check(f"  removed count is 3 (2 files + 1 dir)", removed == 3, f"got {removed}")
-        check(f"  post.md preserved", (tmp_path / "post.md").exists())
-        check(f"  README.md preserved", (tmp_path / "README.md").exists())
-        check(f"  stale1.md removed", not (tmp_path / "stale1.md").exists())
-        check(f"  stale2.md removed", not (tmp_path / "stale2.md").exists())
-        check(f"  stale_skill_dir removed", not (tmp_path / "stale_skill_dir").exists())
-
-
-def test_bin_spiel_vault_marker() -> None:
-    """Test that bin/spiel accepts both team/md.md and team/post.md as vault markers."""
-    print("\n[7] bin/spiel vault marker compatibility")
-    import tempfile
-    with tempfile.TemporaryDirectory() as tmp:
-        vault = Path(tmp) / "vault"
-        team = vault / "team"
-        team.mkdir(parents=True)
-        # Old-style vault: only team/md.md
-        (team / "md.md").write_text("# vault marker")
-        # Source the script (it sets up its own globals)
-        r = subprocess.run(
-            ["bash", "-c", f"source {ROOT}/bin/spiel --where 2>/dev/null; VAULT_DIR='{vault}' bash -c 'source {ROOT}/bin/spiel --where 2>&1'"],
-            capture_output=True, text=True, shell=True,
-        )
-        # Just check the script can find the vault via the new marker
-        # Set up a NEW-style vault (only team/post.md) and test
-        import shutil
-        shutil.rmtree(vault)
-        vault2 = Path(tmp) / "vault2"
-        team2 = vault2 / "team"
-        team2.mkdir(parents=True)
-        (team2 / "post.md").write_text("# slash command")
-        # Run the script with VAULT_DIR pointing to the new vault
-        r = subprocess.run(
-            ["bash", "-c", f"VAULT_DIR='{vault2}' {ROOT}/bin/spiel --where"],
-            capture_output=True, text=True,
-        )
-        check("  bin/spiel resolves vault with team/post.md", r.returncode == 0 and str(vault2) in r.stdout,
-              f"stdout: {r.stdout!r}, stderr: {r.stderr!r}, rc: {r.returncode}")
-
-
-def test_bin_spiel_update_cleanup() -> None:
-    """Test that bin/spiel update removes stale team/ files from the vault."""
-    print("\n[8] bin/spiel update — stale team/ cleanup")
-    import tempfile
-    with tempfile.TemporaryDirectory() as tmp:
-        vault = Path(tmp) / "vault"
-        team = vault / "team"
-        team.mkdir(parents=True)
-        (team / "post.md").write_text("# slash command")
-        # Create stale files
-        for f in ["md.md", "researcher.md", "designer.md"]:
-            (team / f).write_text("# stale")
-
-        # Manually run the cleanup loop (the part of bin/spiel update that
-        # removes stale team/ files)
-        stale = "md researcher strategist copywriter analyst designer editor publisher"
-        for f in stale.split():
-            test_f = team / f"{f}.md"
-            if test_f.exists():
-                test_f.unlink()
-
-        check("  post.md preserved", (team / "post.md").exists())
-        check("  md.md removed", not (team / "md.md").exists())
-        check("  researcher.md removed", not (team / "researcher.md").exists())
-        check("  designer.md removed", not (team / "designer.md").exists())
 
 
 def test_shim() -> None:
@@ -377,9 +258,6 @@ def main() -> int:
     test_editor_runs()
     test_wizard_server()
     test_sync_adapters()
-    test_cleanup_target()
-    test_bin_spiel_vault_marker()
-    test_bin_spiel_update_cleanup()
     test_shim()
     print(f"\n{PASS} passed, {FAIL} failed")
     return 0 if FAIL == 0 else 1

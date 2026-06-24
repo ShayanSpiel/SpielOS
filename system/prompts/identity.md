@@ -2,15 +2,14 @@
 title: LLM Identity + Hard Constraints
 type: prompt
 tags: [identity, hard-constraints, runtime]
-audience: LLM (the /post pipeline agent)
+audience: LLM (every subagent in team/*.md)
 status: canonical
 ---
 
 # LLM Identity + Hard Constraints
 
 > The single canonical source for the runtime identity and the always-banned
-> rules. The /post pipeline agent (in `team/post.md`) reads this on first
-> invocation.
+> rules. Every subagent in `team/*.md` reads this on first invocation.
 > Mechanical forms live in `system/rules.yaml` (regex) and `tools/editor.py`
 > (gate runner). This file is the LLM-facing narrative form.
 

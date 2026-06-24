@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
 """capture-session.py — Capture the CURRENT session and save it as the canonical log.
 
-The pipeline's session capture (in `team/post.md` Step 2) uses
-`tools/researcher.py synthesize-session` as the primary path (5s SQLite timeout
-when reading the opencode DB). This tool is a fallback for when the LLM has the
-full conversation in context and wants to write a clean transcript directly.
-
-The tool writes a single canonical file:
+The Researcher subagent runs this on every /post (no args). The LLM is the only
+thing that has the live transcript of the conversation it is in, so it builds a
+clean transcript (drop tool noise, keep user/assistant text) and hands it to
+this tool. The tool writes it to a single canonical file:
 
     <vault>/content/sessions/YYYY-MM-DD-session-current.md
 
 Always overwrites. There is exactly one "current" session log per day. No NN
 numbering, no per-message subdirs, no fallback to older logs.
+
+The Researcher must NEVER scan content/sessions/ for any existing log, NEVER
+call tools/researcher.py synthesize-session, and NEVER read a log other than
+the one this tool just wrote. That is by design (see team/researcher.md).
 
 CLI:
     python3 tools/capture-session.py \

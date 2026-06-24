@@ -648,8 +648,10 @@ def bootstrap_vault(target: Path, source: Path | None = None) -> None:
 
     # Files to copy (if missing in target)
     files_to_copy = [
-        # The single slash command — the only agent
-        "team/post.md",
+        # Role prompts
+        "team/md.md", "team/post.md",
+        "team/strategist.md", "team/researcher.md", "team/copywriter.md",
+        "team/editor.md", "team/designer.md", "team/publisher.md", "team/analyst.md",
         "team/README.md",
         # System
         "system/state-machine.md", "system/brief-schema.md", "system/pipeline.md",

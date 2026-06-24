@@ -338,10 +338,7 @@ def emit_codex() -> int:
 
 
 def install_codex(verbose: bool = False) -> int:
-    """Install to ~/.codex/agents/: TOML-format agent files for all 8 roles + post dispatcher.
-
-    Also cleans up stale .toml files from previous installs.
-    """
+    """Install to ~/.codex/agents/: TOML-format agent files for all 8 roles + post dispatcher."""
     if not CODEX_CONFIG.exists():
         if verbose:
             print(f"  [codex] {CODEX_CONFIG} not found — skipping")
@@ -355,26 +352,29 @@ def install_codex(verbose: bool = False) -> int:
         toml = _toml_agent(src.stem, description, body_with_vault)
         (target / f"{src.stem}.toml").write_text(toml, encoding="utf-8")
         count += 1
-    # Post command (slash command equivalent for codex)
+    # Post dispatcher
     (target / "post.toml").write_text(
         _toml_agent(
             name="post",
-            description="Run the /post content pipeline. Reads team/post.md and executes the full 10-state pipeline inline in your chat.",
+            description="Dispatch a /post request. Delegates to @md with the user's args. See team/post.md for details.",
             body=(
-                "# /post — Run the content pipeline\n\n"
-                "The full pipeline procedure is in your vault at team/post.md. "
-                "Read it, then execute the 10 steps inline. Use bash, read, write, "
-                "and question tools. Never use task() — there are no subagents. "
-                "The user typed some text after /post (or nothing). Parse the mode "
-                "from the user's arg and run the pipeline."
+                "# /post — Dispatch to @md\n\n"
+                "You are a dispatch agent, not a pipeline runner. Your ONLY action:\n\n"
+                "1. Read the user's message after `/post`.\n"
+                "2. Invoke @md with the exact text the user typed after /post.\n"
+                "3. If the user typed just `/post` with no args, invoke @md with no args.\n"
+                "4. Return @md's response. Do nothing else.\n\n"
+                "Hard rules:\n"
+                "- No preamble, menu, or clarification.\n"
+                "- No running tools (bash, read, write, grep, glob).\n"
+                "- No deciding mode (session/topic/file) — @md parses the args.\n"
+                "- No writing files.\n"
+                "- No explaining the pipeline.\n"
             ),
         ),
         encoding="utf-8",
     )
     count += 1
-    # Clean up stale files: only "post.toml" is expected (no subagents)
-    expected = {src.stem for src in roles()} | {"post"}
-    _cleanup_target(target, expected, "codex/agents", suffix=".toml")
     if verbose:
         print(f"  [codex] installed {count} agents to {target}")
     return count
@@ -402,50 +402,11 @@ def make_slash_command(role_name: str, description: str, body: str) -> str:
     return "---\n" + yaml.safe_dump(fm, sort_keys=False, allow_unicode=True).rstrip() + "\n---\n\n" + body.lstrip()
 
 
-def _cleanup_target(target_dir: Path, expected_stems: set[str], ide_label: str, suffix: str = ".md") -> int:
-    """Remove stale files in target_dir that are not in expected_stems.
-
-    Spielos's old architecture installed 8 subagent files (md.md, researcher.md,
-    etc.) into each IDE's config dir. The new architecture only has 1 slash
-    command (post). This function removes the old files so the IDE's agent
-    list is clean.
-
-    Only removes files matching `suffix` (default: .md). Subdirectories that
-    don't match expected_stems are also removed (for the skills case).
-
-    Returns the number of files/dirs removed.
-    """
-    if not target_dir.exists():
-        return 0
-    import shutil
-    removed = 0
-    # Remove stale files
-    for f in list(target_dir.glob(f"*{suffix}")):
-        if f.stem not in expected_stems and f.stem != "README":
-            try:
-                f.unlink()
-                print(f"  [{ide_label}] removed stale file: {f}")
-                removed += 1
-            except OSError as e:
-                print(f"  [{ide_label}] could not remove {f}: {e}")
-    # Remove stale subdirectories (e.g. old skill dirs)
-    for d in list(target_dir.iterdir()):
-        if d.is_dir() and d.name not in expected_stems and d.name != "README":
-            try:
-                shutil.rmtree(d)
-                print(f"  [{ide_label}] removed stale dir: {d}")
-                removed += 1
-            except OSError as e:
-                print(f"  [{ide_label}] could not remove {d}: {e}")
-    return removed
-
-
 def install_cursor_skills(verbose: bool = False) -> int:
     """Install Agent Skills at ~/.cursor/skills/<name>/SKILL.md.
 
     Cursor's "Agent Skills" feature reads skills from this dir. Each skill
     directory becomes a /name slash command in the Cursor chat box.
-    Also cleans up stale skill dirs from previous installs.
     """
     if not detect_ide(CURSOR_CONFIG, "cursor"):
         return 0
@@ -460,8 +421,6 @@ def install_cursor_skills(verbose: bool = False) -> int:
         # `name:` + `description:` from frontmatter, the rest is body.
         (skill_dir / "SKILL.md").write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
         count += 1
-    # Clean up stale skill dirs
-    _cleanup_target(target, {src.parent.name for src in skills()}, "cursor/skills")
     if verbose:
         print(f"  [cursor] installed {count} skills to {target}")
     return count
@@ -471,7 +430,6 @@ def install_claude_skills(verbose: bool = False) -> int:
     """Install Agent Skills at ~/.claude/skills/<name>/SKILL.md.
 
     Claude Code's slash commands come from skills. Each skill becomes /name.
-    Also cleans up stale skill dirs from previous installs.
     """
     if not detect_ide(CLAUDE_CONFIG, "claude"):
         return 0
@@ -485,8 +443,6 @@ def install_claude_skills(verbose: bool = False) -> int:
         # Write the canonical SKILL.md verbatim.
         (skill_dir / "SKILL.md").write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
         count += 1
-    # Clean up stale skill dirs
-    _cleanup_target(target, {src.parent.name for src in skills()}, "claude/skills")
     if verbose:
         print(f"  [claude] installed {count} skills to {target}")
     return count
@@ -496,7 +452,8 @@ def install_claude_agents(verbose: bool = False) -> int:
     """Install subagent files at ~/.claude/agents/<name>.md.
 
     Claude Code discovers subagents from this dir (scanned recursively).
-    Also cleans up stale files from previous installs.
+    The user's existing agents dir may have stale files from a prior install
+    — this overwrites them with the current canonical prompts.
     """
     if not detect_ide(CLAUDE_CONFIG, "claude"):
         return 0
@@ -517,8 +474,6 @@ def install_claude_agents(verbose: bool = False) -> int:
         out = "---\n" + yaml.safe_dump(clean_fm, sort_keys=False, allow_unicode=True).rstrip() + "\n---\n\n" + templated_text(body).lstrip()
         (target / src.name).write_text(out, encoding="utf-8")
         count += 1
-    # Clean up stale files
-    _cleanup_target(target, {src.stem for src in roles()}, "claude/agents")
     if verbose:
         print(f"  [claude] installed {count} agents to {target}")
     return count
@@ -528,8 +483,7 @@ def install_claude_commands(verbose: bool = False) -> int:
     """Install slash commands at ~/.claude/commands/<name>.md.
 
     Claude Code discovers slash commands from this dir. The `post.md` slash
-    command runs the full pipeline inline (no subagent dispatch).
-    Also cleans up stale commands from previous installs.
+    command lives here and dispatches to the `md` subagent.
     """
     if not detect_ide(CLAUDE_CONFIG, "claude"):
         return 0
@@ -540,8 +494,6 @@ def install_claude_commands(verbose: bool = False) -> int:
         role_name, description, _fm, body = role_metadata(src)
         (target / src.name).write_text(build_command_md(description, body, _fm), encoding="utf-8")
         count += 1
-    # Clean up stale commands
-    _cleanup_target(target, {src.stem for src in commands()}, "claude/commands")
     if verbose:
         print(f"  [claude] installed {count} commands to {target}")
     return count
@@ -551,7 +503,6 @@ def install_cursor_commands(verbose: bool = False) -> int:
     """Install slash commands at ~/.cursor/commands/<name>.md.
 
     Cursor discovers slash commands from this dir.
-    Also cleans up stale commands from previous installs.
     """
     if not detect_ide(CURSOR_CONFIG, "cursor"):
         return 0
@@ -569,9 +520,6 @@ def install_cursor_commands(verbose: bool = False) -> int:
         role_name, description, _fm, body = role_metadata(src)
         (target / src.name).write_text(build_command_md(description, body, _fm), encoding="utf-8")
         count += 1
-    # Clean up stale commands
-    expected = {src.stem for src in roles()} | {src.stem for src in commands()}
-    _cleanup_target(target, expected, "cursor/commands")
     if verbose:
         print(f"  [cursor] installed {count} commands to {target}")
     return count
@@ -583,9 +531,6 @@ def install_opencode(verbose: bool = False) -> int:
       - subagents (from team/*.md, excluding post.md) → agents/<name>.md
       - commands (from team/post.md) → commands/post.md
       - skills (from skills/*/SKILL.md) → skill/<name>/SKILL.md
-
-    Also cleans up stale files from previous installs (old subagent
-    adapter files, old skill dirs, etc.).
     """
     if not OPENCODE_CONFIG.exists():
         print(f"  {OPENCODE_CONFIG} does not exist — skipping install")
@@ -611,26 +556,6 @@ def install_opencode(verbose: bool = False) -> int:
         skill_dir.mkdir(parents=True, exist_ok=True)
         (skill_dir / "SKILL.md").write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
         count += 1
-    # Clean up stale files from previous installs (destructive — only removes
-    # files we created, never touches third-party agent files of unknown stems).
-    # But user opted in: "destructive enough to remove ALL files that don't
-    # match the new source". So we remove any file in agents/ or commands/
-    # whose stem is not in the current expected set.
-    _cleanup_target(
-        OPENCODE_CONFIG / "agents",
-        {src.stem for src in roles()},
-        "opencode/agents",
-    )
-    _cleanup_target(
-        OPENCODE_CONFIG / "commands",
-        {src.stem for src in commands()},
-        "opencode/commands",
-    )
-    _cleanup_target(
-        OPENCODE_CONFIG / "skill",
-        {src.parent.name for src in skills()},
-        "opencode/skill",
-    )
     if verbose:
         print(f"  installed {count} files (subagents + commands + skills) to {OPENCODE_CONFIG}")
     return count
