@@ -1,8 +1,8 @@
 # Brand
 
-The brand identity for your content. Designer reads this when picking banner tokens. The wizard writes it from your inputs in step 2 (Brand).
+The brand identity for your content. Banner rendering is dormant (Designer role is archived), but the tokens stay here so the wizard has a single home for visual identity and the machine-readable mirror is at `system/brand.json`.
 
-The same values are mirrored to `system/brand.json` for the designer's tool. Keep them in sync — MD will warn if they drift.
+The wizard writes both files from your inputs in step 2 (Brand). Keep them in sync by re-running the wizard with `spiel init`.
 
 ---
 
@@ -27,7 +27,7 @@ fonts:
   use_google_fonts: true|false
 
 banner:
-  template: <default|notes>    # see tools/designer.py
+  template: <default|notes>    # see tools/designer.py (dormant)
   width: 1200
   height: 630
   device_scale_factor: 2
@@ -35,7 +35,7 @@ banner:
 
 ## Optional tokens (advanced)
 
-These map to the designer's `:root` CSS variables. Defaults are listed; override only if you know what you want.
+These map to the dormant designer's `:root` CSS variables. Defaults are listed; override only if you know what you want.
 
 ```yaml
 banner_tokens:
@@ -59,38 +59,6 @@ banner_tokens:
   text_align: "center"
 ```
 
-## Icon mapping (optional)
-
-If you want different icons for different content themes, define patterns here. Designer matches the draft's `tags` against `patterns` and picks the icon. First match wins.
-
-```yaml
-banner_icon_mapping:
-  default: <icon-name>          # e.g. "arrow-up-right"
-  rules:
-    - patterns: [ai, agent, automation, machine, llm, gpt, model]
-      icon: sparkles
-    - patterns: [open, source, github, public, repo]
-      icon: github
-    - patterns: [ship, release, launch, deploy, feature, build]
-      icon: rocket
-    - patterns: [decision, choose, picked, tradeoff, vs]
-      icon: scales
-    - patterns: [lesson, learned, takeaway, insight]
-      icon: lightbulb
-    - patterns: [failure, broke, bug, fix, postmortem]
-      icon: bandage
-    - patterns: [strategy, position, plan, framework]
-      icon: chess
-    - patterns: [client, customer, case, study, work]
-      icon: handshake
-    - patterns: [research, read, study, analyzed]
-      icon: book
-    - patterns: [tool, script, automation, stack]
-      icon: gear
-```
-
 ## Validation
 
 The wizard validates the brand step on submit. Reject empty values. Default to the values above if the user types nothing.
-
-MD runs the brand sanity check at every BANNER state: if `system/brand.md` and `system/brand.json` disagree, log a warning to `logs/brand-drift.log`.

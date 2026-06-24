@@ -1,40 +1,20 @@
----
-title: Voice
-type: concept
-tags: [strategy, voice, writing]
-status: living
-audience: copywriter
-created: 2026-01-01
-updated: 2026-01-01
-sources: [wizard]
----
-
 # Voice
 
-## Default voice register
+Sounds like:
 
-**confessional-teaching**
+Does not sound like:
 
-## Always-on style rules
+Rules:
+- No em dashes.
+- No engagement bait.
+- Prefer concrete build details.
+- One idea per post.
+- Strong first line.
+- Plain language.
 
-- No em-dashes (use →, colons, commas)
-- Standard capitalization
-- No engagement bait
-- Note: closer preferred
+Default rhythm:
+- short paragraphs
+- specific proof
+- no fake authority
+- no generic marketing language
 
-## Banned opener patterns
-
-- ^in this post
-- ^today i want to talk about
-
-## Character limits
-
-- X: ≤ 280 chars
-- LinkedIn: ≤ 3000 chars
-- Blog: ≤ 2500 words
-
-## See also
-
-- [[icp]]
-- [[funnel]]
-- [[corpus]]

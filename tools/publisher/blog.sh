@@ -1,24 +1,23 @@
 #!/usr/bin/env bash
-# tools/publisher/blog.sh — vault pillar blog → GitHub Pages
+# tools/publisher/blog.sh — vault blog post → GitHub Pages
 #
-# Publishes a pillar blog post from the vault (content/queue/*.md) to a
+# Publishes a blog post from the vault (content/ready/*.md) to a
 # GitHub Pages Jekyll site (_posts/*.md), with referenced screenshots
 # copied to assets/uploads/ and frontmatter transformed to Jekyll format.
 # Then git add + commit + (optional) push.
 #
 # Usage:
-#   bash tools/publisher/blog.sh <pillar-blog-file>
-#   bash tools/publisher/blog.sh <pillar-blog-file> --dry-run
-#   bash tools/publisher/blog.sh <pillar-blog-file> --yes
+#   bash tools/publisher/blog.sh <blog-file>
+#   bash tools/publisher/blog.sh <blog-file> --dry-run
+#   bash tools/publisher/blog.sh <blog-file> --yes
 #   bash tools/publisher/blog.sh --list
 #
 # Flags:
-#   --list      List all pillar blog posts in content/queue/ that are
-#               eligible to publish (status: ready-to-publish)
+#   --list      List all blog posts in content/ready/ that are
+#               eligible to publish (status: ready)
 #   --dry-run   Do everything except git push. Show the diff and ask.
 #   --yes       Skip the "are you sure?" prompt; push automatically.
-#   --force     Publish even if status != ready-to-publish or
-#               standalone_test != passed|skipped. USE WITH CARE.
+#   --force     Publish even if status != ready. USE WITH CARE.
 #   --no-build  Skip the local `bundle exec jekyll build` step.
 #
 # Requirements:
@@ -30,9 +29,7 @@
 # Behavior:
 #   - Re-runnable (idempotent): if the target file already exists, asks
 #     before overwriting
-#   - Standalone test is a hard gate: standalone_test must be
-#     `passed` or `skipped` (or --force)
-#   - Status must be `ready-to-publish` (or --force)
+#   - Status must be `ready` (or --force)
 #   - Image references in the post body that point into the vault's
 #     assets/screenshots/ are copied to GH Pages
 #     assets/uploads/YYYY-MM-DD-slug/ and rewritten as relative paths
@@ -52,7 +49,7 @@ VAULT="${VAULT:-${VAULT_DIR:-$PWD}}"
 BLOG_REPO="${BLOG_REPO:-yourname/yourname.github.io}"
 GH_PAGES="${GH_PAGES:-$HOME/github/$(basename "$BLOG_REPO" .git)}"
 BLOG_OWNER="${BLOG_OWNER:-$(echo "$BLOG_REPO" | cut -d/ -f1)}"
-QUEUE_DIR="$VAULT/content/queue"
+READY_DIR="$VAULT/content/ready"
 POSTS_DIR="$GH_PAGES/_posts"
 UPLOADS_DIR="$GH_PAGES/assets/uploads"
 SCREENSHOTS_DIR="$VAULT/assets/screenshots"
@@ -103,7 +100,7 @@ done
 [[ -d "$VAULT" ]]      || die "Vault not found: $VAULT (set \$VAULT to override)"
 [[ -d "$GH_PAGES" ]]   || die "GH Pages repo not found: $GH_PAGES (set \$GH_PAGES to override)"
 [[ -d "$GH_PAGES/.git" ]] || die "$GH_PAGES is not a git repo"
-[[ -d "$QUEUE_DIR" ]]  || die "Queue dir not found: $QUEUE_DIR"
+[[ -d "$READY_DIR" ]]  || die "Queue dir not found: $READY_DIR"
 [[ -d "$POSTS_DIR" ]]  || die "Jekyll _posts dir not found: $POSTS_DIR"
 
 command -v python3 >/dev/null || die "python3 not found in PATH"
@@ -111,10 +108,10 @@ command -v git >/dev/null      || die "git not found in PATH"
 
 # ─── List mode ─────────────────────────────────────────────────────────────
 if $LIST_MODE; then
-  echo "Pillar blog posts in $QUEUE_DIR with status: ready-to-publish"
+  echo "Pillar blog posts in $READY_DIR with status: ready"
   hr
   count=0
-  for f in "$QUEUE_DIR"/*-pillar-blog.md; do
+  for f in "$READY_DIR"/*-pillar-blog.md; do
     [[ -f "$f" ]] || continue
     status=$(python3 -c '
 import re, sys
@@ -128,17 +125,12 @@ with open(sys.argv[1]) as fh: c = fh.read()
 m = re.search(r"^title:\s*(.+)$", c, re.M)
 print(m.group(1).strip() if m else "untitled")
 ' "$f")
-    standalone=$(python3 -c '
-import re, sys
-with open(sys.argv[1]) as fh: c = fh.read()
-m = re.search(r"^standalone_test:\s*(.+)$", c, re.M)
-print(m.group(1).strip() if m else "unknown")
-' "$f")
-    if [[ "$status" == "ready-to-publish" ]]; then
-      printf "${GREEN}✓${NC} %-40s | %s\n  status=%s standalone=%s\n" "$(basename "$f")" "$title" "$status" "$standalone"
+    standalone=""
+    if [[ "$status" == "ready" ]]; then
+      printf "${GREEN}✓${NC} %-40s | %s\n  status=%s\n" "$(basename "$f")" "$title" "$status"
       count=$((count+1))
     else
-      printf "${YELLOW}–${NC} %-40s | %s\n  status=%s standalone=%s\n" "$(basename "$f")" "$title" "$status" "$standalone"
+      printf "${YELLOW}–${NC} %-40s | %s\n  status=%s\n" "$(basename "$f")" "$title" "$status"
     fi
   done
   hr
@@ -159,16 +151,30 @@ info "Vault: $VAULT"
 info "GH Pages: $GH_PAGES"
 hr
 
-# ─── Extract frontmatter fields (via Python helper script) ─────────────────
-# The script dir contains a parse-frontmatter.py helper that reads YAML
-# frontmatter and outputs shell-safe `export KEY=value` lines on stdout.
-# We source those lines into the current shell to set TITLE, STATUS, etc.
+# ─── Extract frontmatter fields ────────────────────────────────────────────
+# Inline Python helper reads YAML frontmatter and emits shell-safe
+# `export KEY=value` lines on stdout. We source those into the current
+# shell to set TITLE, STATUS, etc.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FM_FILE="$(mktemp -t publish-blog-fm.XXXXXX)"
 trap 'rm -f "$FM_FILE"' EXIT
 
-python3 "$SCRIPT_DIR/parse-frontmatter.py" "$_SOURCE_PATH" > "$FM_FILE" \
-  || die "Failed to parse frontmatter from $_SOURCE_PATH"
+python3 - "$_SOURCE_PATH" > "$FM_FILE" <<'PYEOF' || die "Failed to parse frontmatter from $_SOURCE_PATH"
+import re, sys
+text = open(sys.argv[1]).read()
+m = re.match(r"^---\n(.*?)\n---", text, re.DOTALL)
+if not m:
+    sys.exit(1)
+for line in m.group(1).splitlines():
+    if ":" not in line:
+        continue
+    k, _, v = line.partition(":")
+    k = k.strip()
+    v = v.strip().strip('"').strip("'")
+    # shell-safe: escape single quotes
+    v_safe = v.replace("'", "'\\''")
+    print(f"export {k}='{v_safe}'")
+PYEOF
 
 [[ ! -s "$FM_FILE" ]] && die "No frontmatter found in $_SOURCE_PATH"
 
@@ -180,17 +186,11 @@ SOURCE="$_SOURCE_PATH"   # restore after frontmatter may have overwritten it
 [[ -z "${STATUS:-}" ]] && die "Missing 'status' in frontmatter"
 
 # ─── Gates ─────────────────────────────────────────────────────────────────
-if [[ "$STATUS" != "ready-to-publish" ]] && ! $FORCE_FLAG; then
-  die "Status is '$STATUS', not 'ready-to-publish'. Set status: ready-to-publish in the frontmatter, or use --force."
+if [[ "$STATUS" != "ready" ]] && ! $FORCE_FLAG; then
+  die "Status is '$STATUS', not 'ready'. Set status: ready in the frontmatter, or use --force."
 fi
 
-if ! $FORCE_FLAG; then
-  if [[ "$STANDALONE" != "passed" && "$STANDALONE" != "skipped" ]]; then
-    die "standalone_test is '$STANDALONE', not 'passed' or 'skipped'. Run the standalone-quality-test and update the frontmatter, or use --force."
-  fi
-fi
-
-ok "Gates passed: status=$STATUS, standalone_test=$STANDALONE"
+ok "Gates passed: status=$STATUS"
 
 # ─── Compute target ────────────────────────────────────────────────────────
 # Extract YYYY-MM-DD from source filename (the first 10 chars of basename)

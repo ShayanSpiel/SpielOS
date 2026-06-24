@@ -140,18 +140,18 @@ ok "arch: $ARCH"
 INSTALL_DIR=$(resolve_path "$DEFAULT_INSTALL_DIR")
 
 # Validate the target path. There are 4 cases:
-#   1. Nothing exists                            → fresh install
-#   2. Symlink (broken OR points to non-SpielOS) → auto-replace, then fresh install
-#   3. Regular directory, has team/md.md         → re-install
-#   4. Regular directory, no team/md.md         → error (real user data, ask first)
-#   5. Regular file                              → error
+#   1. Nothing exists                                 → fresh install
+#   2. Symlink (broken OR points to non-SpielOS)      → auto-replace, then fresh install
+#   3. Regular directory, has team/director.md        → re-install
+#   4. Regular directory, no team/director.md         → error (real user data, ask first)
+#   5. Regular file                                   → error
 
 if [[ -L "$INSTALL_DIR" ]]; then
   # A symlink exists at the target path. This is almost always a leftover
   # from a previous install that got partially cleaned up. Auto-replace it
   # and proceed with a fresh install at the same path.
   TARGET=$(readlink "$INSTALL_DIR" 2>/dev/null || echo "(unreadable)")
-  if [[ -d "$INSTALL_DIR" && -f "$INSTALL_DIR/team/md.md" ]]; then
+  if [[ -d "$INSTALL_DIR" && -f "$INSTALL_DIR/team/director.md" ]]; then
     # Symlink resolves to a valid SpielOS install → re-install mode
     note "Existing SpielOS install detected at $INSTALL_DIR (via symlink)"
   else
@@ -163,7 +163,7 @@ if [[ -L "$INSTALL_DIR" ]]; then
   fi
 elif [[ -d "$INSTALL_DIR" ]]; then
   # Regular directory
-  if [[ -f "$INSTALL_DIR/team/md.md" ]]; then
+  if [[ -f "$INSTALL_DIR/team/director.md" ]]; then
     note "Existing SpielOS install detected at $INSTALL_DIR"
   else
     note "Installing into existing directory: $INSTALL_DIR"
@@ -184,7 +184,7 @@ fi
 
 cd "$INSTALL_DIR"
 IS_REINSTALL=0
-if [[ ! -f "team/md.md" ]]; then
+if [[ ! -f "team/director.md" ]]; then
   if [[ $HAS_GIT -eq 1 ]]; then
     note "Cloning $GITHUB_REPO ..."
     if ! git clone --depth 1 --branch "$VERSION" "$GITHUB_REPO" "$INSTALL_DIR.tmp" 2>/dev/null; then
@@ -208,13 +208,13 @@ if [[ ! -f "team/md.md" ]]; then
     fi
   fi
 else
-  # Re-install: vault already has team/md.md. Refresh the tool sources
-  # (tools/, install/, system/, wizards/, bin/spiel, package.json, etc.)
+  # Re-install: vault already has team/director.md. Refresh the tool sources
+  # (tools/, install/, system/, bin/spiel, package.json, etc.)
   # WITHOUT touching user data:
   #   - team/         (your prompt files)
   #   - skills/       (your skill overrides)
-  #   - strategy/     (your brand/ICP/voice)
-  #   - content/      (your drafts/briefs/sessions)
+  #   - strategy/     (your audience/offer/voice/examples)
+  #   - content/      (your drafts/briefs/ready/posted/rejected)
   #   - .env          (your secrets)
   #   - system/brand.* (your brand tokens)
   # To overwrite these, run `spiel init` (re-runs the wizard).
@@ -222,8 +222,8 @@ else
   note "Existing install detected at $INSTALL_DIR"
   note "Re-install mode: refreshing tool sources only."
   note "  → PRESERVED (your data, not touched): team/, skills/, strategy/, content/, .env, system/brand.*"
-  note "  → REFRESHED (from upstream): tools/, install/, system/, wizards/, bin/spiel, package.json"
-  note "  → IDE adapters: re-synced (your local team/ pushed to all 3 IDEs)"
+  note "  → REFRESHED (from upstream): tools/, install/, system/, templates/, bin/spiel, package.json"
+  note "  → IDE adapters: re-synced (your local team/ pushed to all 4 IDEs)"
 
   # Always use tarball overlay (NEVER `git pull`, which would clobber user data).
   if [[ $HAS_CURL -eq 1 ]]; then
@@ -278,7 +278,7 @@ if [[ $IS_REINSTALL -eq 1 ]]; then
 else
   note "Opening the setup wizard"
   echo "  → URL:  http://localhost:$WIZARD_PORT/"
-  echo "  → Fill the 10 steps (about 5 minutes)"
+  echo "  → Fill the setup steps (about 5 minutes)"
   echo "  → Click 'Finish & install' to write the files"
   echo "  → Then:  /post  (from any IDE)"
   echo ""
@@ -375,6 +375,7 @@ if [[ $WIZARD_EXIT -eq 0 && -f "$INSTALL_DIR/.env" ]]; then
     [[ -d "$HOME/.config/opencode" ]]  && IDE_TARGETS+="opencode  "
     [[ -d "$HOME/.cursor" ]]            && IDE_TARGETS+="Cursor  "
     [[ -d "$HOME/.claude" ]]            && IDE_TARGETS+="Claude Code  "
+    [[ -d "$HOME/.codex" ]]             && IDE_TARGETS+="Codex  "
     if [[ -n "$IDE_TARGETS" ]]; then
       ok "Slash commands installed: $IDE_TARGETS"
     else
@@ -394,18 +395,23 @@ if [[ $WIZARD_EXIT -eq 0 && -f "$INSTALL_DIR/.env" ]]; then
   # Sanity-check the new tools. Catches missing-file bugs on first install
   # (e.g., broken tarball, partial clone, etc.) so the user finds out at
   # install time, not the first time they type /post.
-  if [[ -x "$INSTALL_DIR/tools/capture-session.py" ]] && \
-     python3 "$INSTALL_DIR/tools/capture-session.py" --help >/dev/null 2>&1; then
-    ok "tools/capture-session.py is callable"
+  if [[ -x "$INSTALL_DIR/tools/editor.py" ]] && \
+     python3 "$INSTALL_DIR/tools/editor.py" check --help >/dev/null 2>&1; then
+    ok "tools/editor.py is callable"
   else
-    err "tools/capture-session.py is missing or not executable — /post will fail"
+    err "tools/editor.py is missing or not executable — /post will fail"
     err "  re-run: curl ... | bash  (full install)"
   fi
-  if [[ -x "$INSTALL_DIR/tools/researcher.py" ]] && \
-     python3 "$INSTALL_DIR/tools/researcher.py" classify --input "shipped a feature" >/dev/null 2>&1; then
-    ok "tools/researcher.py classify is callable"
+  if [[ -x "$INSTALL_DIR/tools/sync_adapters.py" ]] && \
+     python3 "$INSTALL_DIR/tools/sync_adapters.py" --help >/dev/null 2>&1; then
+    ok "tools/sync_adapters.py is callable"
   else
-    err "tools/researcher.py is missing or broken — topic-mode classification will fail"
+    err "tools/sync_adapters.py is missing or broken — adapter sync will fail"
+  fi
+  if [[ -x "$INSTALL_DIR/bin/spiel" ]]; then
+    ok "bin/spiel shim is executable"
+  else
+    err "bin/spiel is missing or not executable — /post will fail"
   fi
 
   note "DONE. From any IDE, type /post to ship a post."

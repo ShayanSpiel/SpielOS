@@ -8,7 +8,7 @@
 #   0. $VAULT_DIR                  (env override — most explicit)
 #   1. ~/.config/spielos/config     (global config set by installer — primary)
 #   2. <cwd>/.spiel-vault          (project-local override file; may set VAULT_DIR=…)
-#   3. <cwd>/team/md.md            (any parent with the vault marker)
+#   3. <cwd>/team/director.md      (any parent with the vault marker)
 #   4. <this-shim>/..              (only when this shim lives at <vault>/bin/spiel)
 #
 # Usage (from anywhere):
@@ -42,7 +42,7 @@ USAGE:
 COMMANDS:
   /post [topic|@file:]
                          Run the content pipeline end-to-end
-  /post                  (no args = session mode, use today's session log)
+  /post                  (no args = use current IDE conversation if it has real source)
   status                 Show current pipeline state
   status --json          Same, JSON output
   set-vault <path>       Change which vault spiel resolves to (writes global config)
@@ -58,7 +58,7 @@ VAULT_DIR is resolved (first match wins):
   0. ~/.config/spielos/config           (global config set by installer)
   1. $VAULT_DIR env var
   2. walk up from cwd for .spiel-vault  (a file containing VAULT_DIR=/abs/path)
-  3. walk up from cwd for team/md.md    (any parent with the vault marker)
+  3. walk up from cwd for team/director.md (any parent with the vault marker)
   4. <shim>/..                          (when shim is bundled at <vault>/bin/spiel)
 
 The vault is the directory you install into (your project root).
@@ -72,14 +72,14 @@ fi
 SPIELOS_GLOBAL_CONFIG="$HOME/.config/spielos/config"
 
 # A candidate is only accepted if it points to a directory that contains
-# team/md.md. Each option below is tried in order; an invalid env var,
+# team/director.md. Each option below is tried in order; an invalid env var,
 # stale symlink, or missing path falls through to the next option.
 _resolve_vault() {
   local candidate=""
 
   # 0. Inline env var — most explicit override.
   if [[ -z "$candidate" && -n "${VAULT_DIR:-}" ]]; then
-    if [[ -d "${VAULT_DIR}/team" && -f "${VAULT_DIR}/team/md.md" ]]; then
+    if [[ -d "${VAULT_DIR}/team" && -f "${VAULT_DIR}/team/director.md" ]]; then
       candidate="${VAULT_DIR}"
     fi
   fi
@@ -90,7 +90,7 @@ _resolve_vault() {
     override=$(grep -E '^VAULT_DIR=' "$SPIELOS_GLOBAL_CONFIG" 2>/dev/null | head -1 | cut -d= -f2- || true)
     override="${override%\"}"; override="${override#\"}"
     override="${override%\'}"; override="${override#\'}"
-    if [[ -n "$override" && -d "$override/team" && -f "$override/team/md.md" ]]; then
+    if [[ -n "$override" && -d "$override/team" && -f "$override/team/director.md" ]]; then
       candidate="$override"
     fi
   fi
@@ -104,7 +104,7 @@ _resolve_vault() {
         override=$(grep -E '^VAULT_DIR=' "$dir/.spiel-vault" 2>/dev/null | head -1 | cut -d= -f2- || true)
         override="${override%\"}"; override="${override#\"}"
         override="${override%\'}"; override="${override#\'}"
-        if [[ -n "$override" && -d "$override/team" && -f "$override/team/md.md" ]]; then
+        if [[ -n "$override" && -d "$override/team" && -f "$override/team/director.md" ]]; then
           candidate="$override"
           break
         fi
@@ -113,11 +113,11 @@ _resolve_vault() {
     done
   fi
 
-  # 3. Walk up from cwd for team/md.md
+  # 3. Walk up from cwd for team/director.md
   if [[ -z "$candidate" ]]; then
     local dir="$PWD"
     while [[ "$dir" != "/" ]]; do
-      if [[ -d "$dir/team" && -f "$dir/team/md.md" ]]; then
+      if [[ -d "$dir/team" && -f "$dir/team/director.md" ]]; then
         candidate="$dir"
         break
       fi
@@ -146,13 +146,13 @@ _resolve_vault() {
     fi
     local shim_dir
     shim_dir=$(cd "$(dirname "$shim_path")" && pwd)
-    if [[ "$shim_dir" == */bin ]] && [[ -f "$shim_dir/../team/md.md" ]]; then
+    if [[ "$shim_dir" == */bin ]] && [[ -f "$shim_dir/../team/director.md" ]]; then
       candidate=$(cd "$shim_dir/.." && pwd)
     fi
   fi
 
   # Validate
-  if [[ -z "$candidate" || ! -d "$candidate/team" || ! -f "$candidate/team/md.md" ]]; then
+  if [[ -z "$candidate" || ! -d "$candidate/team" || ! -f "$candidate/team/director.md" ]]; then
     echo "ERROR: spiel could not locate the SpielOS vault." >&2
     echo "" >&2
     echo "  Tried (in order):" >&2
@@ -172,17 +172,17 @@ _resolve_vault() {
     local _tm=""
     d="$PWD"
     while [[ "$d" != "/" ]]; do
-      if [[ -f "$d/team/md.md" ]]; then _tm="$d/team/md.md"; break; fi
+      if [[ -f "$d/team/director.md" ]]; then _tm="$d/team/director.md"; break; fi
       d=$(dirname "$d")
     done
     if [[ -n "$_tm" ]]; then
-      echo "    3. <walk up> team/md.md:           $_tm (invalid)" >&2
+      echo "    3. <walk up> team/director.md:     $_tm (invalid)" >&2
     else
-      echo "    3. <walk up> team/md.md:           <not found>" >&2
+      echo "    3. <walk up> team/director.md:     <not found>" >&2
     fi
     local sd
     sd=$(cd "$(dirname "$0")" && pwd)
-    if [[ -f "$sd/../team/md.md" ]]; then
+    if [[ -f "$sd/../team/director.md" ]]; then
       echo "    4. <shim>/..:                    $sd/.." >&2
     else
       echo "    4. <shim>/..:                    $sd/.. (not a bundle)" >&2
@@ -262,8 +262,8 @@ _rewrite_vault_pointers() {
       return 1
       ;;
   esac
-  if [[ ! -d "$VAULT/team" || ! -f "$VAULT/team/md.md" ]]; then
-    echo "  ⚠ VAULT ($VAULT) is not a valid vault (no team/md.md) — refusing to write" >&2
+  if [[ ! -d "$VAULT/team" || ! -f "$VAULT/team/director.md" ]]; then
+    echo "  ⚠ VAULT ($VAULT) is not a valid vault (no team/director.md) - refusing to write" >&2
     return 1
   fi
 
@@ -315,27 +315,24 @@ fi
 export VAULT_DIR="$VAULT"
 cd "$VAULT"
 
-# /post → invoke the MD orchestrator via the editor tool's runner, or just echo "use /post in your IDE"
-# In SpielOS, /post is run by the IDE's subagent (md). The CLI shim provides status / init / sync / test / config.
+# /post is run by the IDE's Director subagent. The CLI shim provides status / init / sync / test / config.
 
 case "${1:-}" in
   status)
     if [[ "${2:-}" == "--json" ]]; then
-      brief="$VAULT/content/.brief.md"
-      if [[ -f "$brief" ]]; then
-        echo "{ \"brief\": \"$brief\", \"state\": \"$(grep -E '^- ' "$brief" 2>/dev/null | tail -1 | awk '{print $2}' | tr -d 'Z' | tr 'T' ' ')\" }"
+      current="$VAULT/content/current.md"
+      if [[ -f "$current" ]]; then
+        echo "{ \"current\": \"$current\", \"state\": \"active\" }"
       else
-        echo "{ \"brief\": null, \"state\": \"IDLE\" }"
+        echo "{ \"current\": null, \"state\": \"idle\" }"
       fi
     else
       echo "SpielOS vault: $VAULT"
-      brief="$VAULT/content/.brief.md"
-      if [[ -f "$brief" ]]; then
-        state=$(grep -E '^- ' "$brief" 2>/dev/null | tail -1 | awk '{print $2}' | tr -d 'Z' | tr 'T' ' ')
-        echo "Current state: $state"
-        echo "Brief: $brief"
+      current="$VAULT/content/current.md"
+      if [[ -f "$current" ]]; then
+        echo "Current run: $current"
       else
-        echo "Current state: IDLE (no active brief)"
+        echo "Current run: idle"
       fi
     fi
     ;;
@@ -372,23 +369,22 @@ case "${1:-}" in
         echo "  → Re-resolving from shim location..."
         VAULT_DIR=""
         # Walk up from cwd first (most reliable when cwd is inside a vault)
-        local d="$PWD"
+        d="$PWD"
         while [[ "$d" != "/" ]]; do
-          if [[ -d "$d/team" && -f "$d/team/md.md" ]]; then
+          if [[ -d "$d/team" && -f "$d/team/director.md" ]]; then
             VAULT="$d"
             break
           fi
           d=$(dirname "$d")
         done
         # Fall back to shim location
-        if [[ ! -d "$VAULT/team" || ! -f "$VAULT/team/md.md" ]]; then
-          local sd
+        if [[ ! -d "$VAULT/team" || ! -f "$VAULT/team/director.md" ]]; then
           sd=$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd 2>/dev/null || true)
-          if [[ -n "$sd" && -f "$sd/../team/md.md" ]]; then
+          if [[ -n "$sd" && -f "$sd/../team/director.md" ]]; then
             VAULT=$(cd "$sd/.." && pwd)
           fi
         fi
-        if [[ ! -d "$VAULT/team" || ! -f "$VAULT/team/md.md" ]]; then
+        if [[ ! -d "$VAULT/team" || ! -f "$VAULT/team/director.md" ]]; then
           echo "  ✗ Cannot recover — no valid vault found. Run installer again." >&2
           exit 1
         fi
@@ -423,7 +419,7 @@ case "${1:-}" in
     _rewrite_vault_pointers
 
     echo ""
-    echo "  → sync_adapters --install (push to all IDEs)"
+    echo "  → sync_adapters --install (push to all IDEs, including Codex)"
     if python3 "$VAULT/tools/sync_adapters.py" --install 2>&1 | sed 's/^/    /'; then
       echo "  ✓ IDE adapters refreshed"
     else
@@ -441,10 +437,9 @@ case "${1:-}" in
       echo "ERROR: usage: spiel set-vault <path>" >&2
       exit 1
     fi
-    local target
     target=$(cd "$2" 2>/dev/null && pwd) || { echo "ERROR: cannot access $2" >&2; exit 1; }
-    if [[ ! -d "$target/team" || ! -f "$target/team/md.md" ]]; then
-      echo "ERROR: $target is not a SpielOS vault (no team/md.md)" >&2
+    if [[ ! -d "$target/team" || ! -f "$target/team/director.md" ]]; then
+      echo "ERROR: $target is not a SpielOS vault (no team/director.md)" >&2
       exit 1
     fi
     # Write global config to point to the new vault
@@ -474,13 +469,14 @@ case "${1:-}" in
   config)
     echo "vault:    $VAULT"
     echo "editor:   $VAULT/tools/editor.py"
-    echo "designer: $VAULT/tools/designer.py"
     echo "publisher:$VAULT/tools/publisher/"
-    echo "analyst:  $VAULT/tools/analyst.py"
-    echo "brief:    $VAULT/content/.brief.md"
-    echo "sessions: $VAULT/content/sessions/"
-    echo "queue:    $VAULT/content/queue/"
+    echo "sync:     $VAULT/tools/sync_adapters.py"
+    echo "current:  $VAULT/content/current.md"
+    echo "inbox:    $VAULT/content/inbox/"
+    echo "drafts:   $VAULT/content/drafts/"
+    echo "ready:    $VAULT/content/ready/"
     echo "posted:   $VAULT/content/posted/"
+    echo "rejected: $VAULT/content/rejected/"
     ;;
 
   /post)
@@ -490,11 +486,10 @@ case "${1:-}" in
     echo "  Invoke it from your IDE: open opencode, Claude Code, Cursor, or any"
     echo "  MCP-compatible agent, then type:"
     echo ""
-    echo "      /post                   (use today's session log)"
-    echo "      /post \"Just shipped v2\"   (topic mode — ship an announcement)"
-    echo "      /post @file:./notes.md    (topic mode from a file)"
+    echo "      /post \"Just shipped v2\"   (topic or announcement)"
+    echo "      /post @file:./notes.md    (from a file)"
     echo ""
-    echo "  The MD subagent (in team/md.md) chains the full pipeline."
+    echo "  The Director subagent (team/director.md) runs the lean team."
     echo ""
     echo "  For setup: run \`spiel init\` to open the install wizard."
     echo ""
@@ -559,18 +554,6 @@ case "${1:-}" in
         if [[ -f "$VAULT/tools/publisher/buffer.py" ]]; then
           shift
           exec python3 "$VAULT/tools/publisher/buffer.py" "$@"
-        fi
-        ;;
-      analyze|pull|rerank)
-        if [[ -f "$VAULT/tools/analyst.py" ]]; then
-          shift
-          exec python3 "$VAULT/tools/analyst.py" "$@"
-        fi
-        ;;
-      synthesize|classify)
-        if [[ -f "$VAULT/tools/researcher.py" ]]; then
-          shift
-          exec python3 "$VAULT/tools/researcher.py" "$@"
         fi
         ;;
     esac

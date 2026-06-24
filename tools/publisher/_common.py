@@ -31,7 +31,7 @@ def find_vault() -> Path:
 
 VAULT = find_vault()
 ENV_FILE = VAULT / ".env"
-QUEUE_DIR = VAULT / "content" / "queue"
+READY_DIR = VAULT / "content" / "ready"
 POSTED_DIR = VAULT / "content" / "posted"
 BANNERS_ROOT = (VAULT / "assets" / "banners").resolve()
 ICONS_ROOT = (VAULT / "assets" / "icons").resolve()

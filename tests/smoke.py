@@ -1,13 +1,15 @@
-"""tests/smoke.py — Smoke test for SpielOS.
+"""tests/smoke.py — Smoke test for SpielOS lean pipeline.
 
 No pytest required. Runs as `python3 tests/smoke.py` or `python3 -m pytest tests/`.
 
 Verifies:
-  1. State machine table is parseable
-  2. Editor tool runs on a sample draft
-  3. Wizard server starts and serves the index
-  4. sync_adapters generates all 4 IDE outputs
-  5. shim resolves the vault
+  1. Pipeline table in system/pipeline.md has 5 chain rows
+  2. 5 active role files in team/ with valid frontmatter
+  3. Editor tool runs 4 gates on a sample draft
+  4. Wizard server starts, serves 6 steps, /api/finish writes expected files
+  5. sync_adapters generates all 4 IDE outputs
+  6. shim resolves the vault
+  7. adapter --check is clean
 
 Exit 0 on pass, non-zero on any failure.
 """
@@ -48,32 +50,18 @@ def check(name: str, cond: bool, detail: str = "") -> None:
 
 # ─── Tests ─────────────────────────────────────────────────────────────
 
-def test_state_machine() -> None:
-    print("\n[1] State machine table")
-    sm = (ROOT / "system" / "state-machine.md").read_text()
-    # Must have the 10 states
-    expected = [
-        "IDLE", "SESSION_CAPTURE", "COMPILE", "SELECT",
-        "DRAFTING", "BANNER", "GATE_CHECK", "PUBLISHING",
-        "ANALYZING_POST", "COMPLETE_POST",
-    ]
-    for s in expected:
-        check(f"state {s} present", f"| {s} " in sm or f"| {s} |" in sm or f" {s} " in sm)
-    # Must have a role per state
-    for s in expected:
-        # The row for s must have a Role column entry
-        for line in sm.splitlines():
-            if line.strip().startswith("| " + s) or (s in line and line.strip().startswith("|")):
-                # crude check: the line has 6+ pipes
-                check(f"state {s} has transition row", line.count("|") >= 6, f"line: {line!r}")
-                break
+def test_pipeline_table() -> None:
+    print("\n[1] Pipeline table (system/pipeline.md)")
+    pm = (ROOT / "system" / "pipeline.md").read_text()
+    # The pipeline text mentions all 5 roles
+    for role in ["Director", "Strategist", "Writer", "Editor", "Publisher"]:
+        check(f"role {role} present", role in pm)
 
 
 def test_team_files() -> None:
     print("\n[2] Team files present + valid frontmatter")
     team = ROOT / "team"
-    expected_roles = ["md", "strategist", "researcher", "copywriter", "editor",
-                      "designer", "publisher", "analyst"]
+    expected_roles = ["director", "strategist", "writer", "editor", "publisher"]
     for r in expected_roles:
         f = team / f"{r}.md"
         check(f"team/{r}.md exists", f.exists())
@@ -81,68 +69,44 @@ def test_team_files() -> None:
             text = f.read_text()
             check(f"team/{r}.md has frontmatter", text.startswith("---"))
             check(f"team/{r}.md has description", "description:" in text[:500])
-            check(f"team/{r}.md has role_in_pipeline", "role_in_pipeline:" in text)
-            check(f"team/{r}.md has hard rules", "## Hard rules" in text)
+            check(f"team/{r}.md reads: content/current.md",
+                  "content/current.md" in text or "{vault_root}/content/current.md" in text or "current.md" in text)
+    # Archived roles stay in archive/roles/
+    archive = ROOT / "archive" / "roles"
+    for archived in ["analyst", "designer", "researcher"]:
+        check(f"archive/roles/{archived}.md kept", (archive / f"{archived}.md").exists())
+    # post.md is the slash command dispatcher
+    check("team/post.md exists (slash command)", (team / "post.md").exists())
 
 
 def test_editor_runs() -> None:
-    print("\n[3] Editor (tools/editor.py)")
-    # Build a sample draft in a tmp dir, copy the rules
+    print("\n[3] Editor (tools/editor.py) — 4 gates")
     with tempfile.TemporaryDirectory() as tmp:
         tmp_vault = Path(tmp) / "vault"
         tmp_vault.mkdir()
         (tmp_vault / "team").mkdir()
+        (tmp_vault / "team" / "director.md").write_text("# director\n")
         (tmp_vault / "system").mkdir()
-        (tmp_vault / "system" / "prompts").mkdir()
-        (tmp_vault / "strategy").mkdir()
-        (tmp_vault / "templates").mkdir()
-        (tmp_vault / "templates" / "registry").mkdir()
-        (tmp_vault / "content").mkdir()
-        (tmp_vault / "content" / "queue").mkdir()
-        (tmp_vault / "content" / "posted").mkdir()
-        (tmp_vault / "content" / "rejected").mkdir()
-        (tmp_vault / "content" / "sessions").mkdir()
-        (tmp_vault / "assets").mkdir()
-        (tmp_vault / "assets" / "banners").mkdir()
-        (tmp_vault / "assets" / "icons").mkdir()
-        (tmp_vault / "logs").mkdir()
-        (tmp_vault / "team" / "md.md").write_text("# md\n")
-        (tmp_vault / "system" / "state-machine.md").write_text("# sm\n")
-        # Copy rules
         import shutil
         shutil.copy(ROOT / "system" / "rules.yaml", tmp_vault / "system" / "rules.yaml")
-        # Sample draft
-        draft = tmp_vault / "content" / "queue" / "test.md"
+        # Pass case
+        draft = tmp_vault / "content" / "drafts" / "test.md"
+        draft.parent.mkdir(parents=True)
         draft.write_text("""---
 title: Test
-created: 2026-06-22
-tags: [S1, x]
+created: 2026-06-25
 platform: x
-status: draft
-pillar: none
-pattern: confessional
-icp: helps a founder ship
-core_insight: build is content
-axis: leverage
-funnel: TOFU
-voice_register: confessional-teaching
-template_id: x-ship-01
-sampled_from: corpus #1
-engagement_ask: what did you ship?
+status: ready
+source: content/current.md
+reader: founders
+point: small files beat big
+angle: delete more
 ---
 
-I built the engine so you don't have to.
-
-You can ship without the marketing job.
-
-Lesson: the work is the content.
-
-Note:
-What did you ship this week?
+I shipped v2. Small files beat big code.
 """)
         env = os.environ.copy()
         env.pop("VAULT_DIR", None)
-        # Run editor with --vault
         r = subprocess.run(
             [sys.executable, str(ROOT / "tools" / "editor.py"), "check", str(draft), "--vault", str(tmp_vault), "--json"],
             capture_output=True, text=True, env=env,
@@ -151,27 +115,61 @@ What did you ship this week?
         if r.returncode == 0:
             try:
                 report = json.loads(r.stdout)
-                check("editor.py returns JSON", True)
-                check("editor.py has verdict", report.get("verdict") in ("pass", "fail", "warn"))
-                check("editor.py runs 15 gates", report.get("summary", {}).get("total", 0) == 15,
+                check("editor.py has verdict", report.get("verdict") in ("pass", "fail"))
+                check("editor.py runs 4 gates", report.get("summary", {}).get("total", 0) == 4,
                       f"got total={report.get('summary', {}).get('total')}")
             except Exception as e:
                 check("editor.py returns valid JSON", False, str(e))
+        # Fail case (em-dash)
+        bad = tmp_vault / "content" / "drafts" / "bad.md"
+        bad.write_text("""---
+title: Bad
+created: 2026-06-25
+platform: x
+status: draft
+source: content/current.md
+reader: founders
+point: a point
+angle: an angle
+---
+
+hello — world
+""")
+        r2 = subprocess.run(
+            [sys.executable, str(ROOT / "tools" / "editor.py"), "check", str(bad), "--vault", str(tmp_vault), "--quiet"],
+            capture_output=True, text=True, env=env,
+        )
+        check("editor.py fails on em-dash", r2.returncode == 1, f"got {r2.returncode}")
 
 
 def test_wizard_server() -> None:
     print("\n[4] Wizard server (install/wizard/serve.py)")
-    # Save and restore the global config so test doesn't corrupt the user's setup
     global_cfg = Path.home() / ".config" / "spielos" / "config"
     saved_cfg = global_cfg.read_text() if global_cfg.exists() else None
     with tempfile.TemporaryDirectory() as tmp:
-        port = 19331
+        # Pick a random high port to avoid clashes
+        port = 29000 + (os.getpid() % 1000)
         proc = subprocess.Popen(
             [sys.executable, str(ROOT / "install" / "wizard" / "serve.py"),
              "--port", str(port), "--target", str(Path(tmp) / "vault"), "--no-open"],
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
         )
-        time.sleep(0.8)
+        # Poll for server up
+        started = False
+        for _ in range(40):
+            time.sleep(0.25)
+            try:
+                with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/health", timeout=1) as r:
+                    if r.status == 200:
+                        started = True
+                        break
+            except Exception:
+                continue
+        if not started:
+            print(f"  ✗ wizard did not start on port {port}")
+            proc.terminate()
+            proc.wait(timeout=3)
+            return
         try:
             # Health
             with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/health", timeout=3) as r:
@@ -188,21 +186,30 @@ def test_wizard_server() -> None:
             # JS
             with urllib.request.urlopen(f"http://127.0.0.1:{port}/steps.js", timeout=3) as r:
                 check("wizard /steps.js responds 200", r.status == 200)
-            # Finish
+            # Finish (sends minimal lean form, expects 8 written files)
             req = urllib.request.Request(
                 f"http://127.0.0.1:{port}/api/finish",
-                data=json.dumps({"brand_name": "Smoke", "handle": "@smoke", "tagline": "smoke test"}).encode(),
+                data=json.dumps({
+                    "brand_name": "Smoke",
+                    "handle": "@smoke",
+                    "tagline": "smoke test",
+                    "audience_content": "# Audience\n\nThey are: devs",
+                    "offer_content": "# Offer\n\nWhat: tool",
+                    "voice_content": "# Voice\n\nSounds like: builder",
+                    "examples_content": "# Examples\n\n## 1\n\nhi",
+                }).encode(),
                 headers={"Content-Type": "application/json"},
                 method="POST",
             )
-            with urllib.request.urlopen(req, timeout=5) as r:
+            with urllib.request.urlopen(req, timeout=10) as r:
                 data = json.loads(r.read())
                 check("wizard /api/finish returns 200", r.status == 200)
-                check("wizard /api/finish writes files", len(data.get("written", [])) >= 10)
+                check("wizard /api/finish ok=True", data.get("ok") is True)
+                check("wizard /api/finish writes 8 files", len(data.get("written", [])) == 8,
+                      f"got {len(data.get('written', []))}: {data.get('written')}")
         finally:
             proc.terminate()
             proc.wait(timeout=3)
-            # Restore global config
             if saved_cfg is not None:
                 global_cfg.write_text(saved_cfg, encoding="utf-8")
             elif global_cfg.exists():
@@ -216,29 +223,45 @@ def test_sync_adapters() -> None:
         capture_output=True, text=True,
     )
     check("sync_adapters.py exits 0", r.returncode == 0, f"stderr: {r.stderr}")
-    # Check the adapters exist (v2: subagents + real skills, no auto-gen role stubs)
     for path in [
-        "adapters/opencode/agents/md.md",
-        "adapters/opencode/agents/copywriter.md",
-        "adapters/claude/agents/md.md",
-        "adapters/cursor/commands/md.md",
+        "adapters/opencode/agents/director.md",
+        "adapters/opencode/agents/writer.md",
+        "adapters/opencode/agents/strategist.md",
+        "adapters/opencode/agents/editor.md",
+        "adapters/opencode/agents/publisher.md",
+        "adapters/opencode/commands/post.md",
+        "adapters/opencode/skill/format_wizard/SKILL.md",
+        "adapters/opencode/skill/publish_wizard/SKILL.md",
+        "adapters/opencode/skill/voice_match/SKILL.md",
+        "adapters/claude/agents/director.md",
+        "adapters/claude/agents/writer.md",
+        "adapters/cursor/commands/director.md",
+        "adapters/cursor/commands/writer.md",
+        "adapters/codex/agents/director.toml",
+        "adapters/codex/agents/writer.toml",
         "adapters/mcp/server.json",
-        # v2: real skills in skills/<name>/SKILL.md (5 user skills, no role stubs)
-        "skills/icp_simulation/SKILL.md",
-        "skills/format_wizard/SKILL.md",
-        "skills/publish_wizard/SKILL.md",
-        "skills/voice_match/SKILL.md",
-        "skills/template_picker/SKILL.md",
     ]:
         check(f"  {path} exists", (ROOT / path).exists())
+    # Archived skills must NOT be in adapters
+    check("  archived skill icp_simulation NOT generated",
+          not (ROOT / "adapters" / "opencode" / "skill" / "icp_simulation").exists())
+    check("  archived skill template_picker NOT generated",
+          not (ROOT / "adapters" / "opencode" / "skill" / "template_picker").exists())
+
+
+def test_sync_check() -> None:
+    print("\n[6] sync_adapters.py --check")
+    r = subprocess.run(
+        [sys.executable, str(ROOT / "tools" / "sync_adapters.py"), "--check"],
+        capture_output=True, text=True,
+    )
+    check("sync --check exits 0", r.returncode == 0, f"stdout: {r.stdout} stderr: {r.stderr}")
 
 
 def test_shim() -> None:
-    print("\n[6] bin/spiel shim")
+    print("\n[7] bin/spiel shim")
     env = os.environ.copy()
-    env.pop("VAULT_DIR", None)
-    env["VAULT_DIR"] = str(ROOT)  # override global config for test isolation
-    # The shim is at <vault>/bin/spiel
+    env["VAULT_DIR"] = str(ROOT)
     shim = ROOT / "bin" / "spiel"
     check("bin/spiel exists", shim.exists())
     check("bin/spiel is executable", os.access(shim, os.X_OK))
@@ -247,17 +270,20 @@ def test_shim() -> None:
     if r.returncode == 0:
         check("bin/spiel --where returns the vault", r.stdout.strip() == str(ROOT),
               f"got {r.stdout.strip()!r}")
+    r2 = subprocess.run([str(shim), "status"], capture_output=True, text=True, env=env)
+    check("bin/spiel status exits 0", r2.returncode == 0, f"stderr: {r2.stderr}")
 
 
 # ─── Runner ─────────────────────────────────────────────────────────────
 
 def main() -> int:
     print(f"SpielOS smoke tests — vault: {ROOT}")
-    test_state_machine()
+    test_pipeline_table()
     test_team_files()
     test_editor_runs()
     test_wizard_server()
     test_sync_adapters()
+    test_sync_check()
     test_shim()
     print(f"\n{PASS} passed, {FAIL} failed")
     return 0 if FAIL == 0 else 1

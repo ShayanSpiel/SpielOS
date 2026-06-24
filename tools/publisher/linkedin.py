@@ -15,7 +15,7 @@ import sys
 import urllib.request
 from pathlib import Path
 
-from _common import VAULT, QUEUE_DIR, load_creds, extract_body, sanitize, archive
+from _common import VAULT, READY_DIR, load_creds, extract_body, sanitize, archive
 
 
 REQUIRED_CREDS = ("LINKEDIN_ACCESS_TOKEN", "LINKEDIN_PERSON_URN")
@@ -68,7 +68,7 @@ def main() -> int:
     args = parser.parse_args()
     post_file = Path(args.post_file)
     if not post_file.is_absolute():
-        post_file = QUEUE_DIR / post_file.name if not post_file.exists() else post_file
+        post_file = READY_DIR / post_file.name if not post_file.exists() else post_file
     if not post_file.exists():
         print(f"ERROR: not found: {post_file}")
         return 1

@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
-"""install/wizard/serve.py — Local setup wizard server.
+"""install/wizard/serve.py — Local setup wizard server (lean 6-step).
 
 Self-contained stdlib http.server. No Flask, no FastAPI. Serves the
-multi-step HTML form and writes the 8 strategy files + brand tokens +
-.env to the target vault on submit.
+6-step HTML form and writes the 4 strategy files + brand tokens + .env
+to the target vault on submit.
 
 CLI:
     python3 install/wizard/serve.py --port 7331 --target /path/to/vault
-    python3 install/wizard/serve.py --port 7331 --target ~/.spiel
 
 On first hit at `/`, the wizard loads. On `POST /api/finish`, the
 wizard writes the files and returns a JSON report of what was written.
@@ -21,6 +20,7 @@ import os
 import re
 import socket
 import sys
+import threading
 import urllib.parse
 import urllib.request
 import webbrowser
@@ -61,17 +61,8 @@ def load_skeleton(name: str) -> str:
     return ""
 
 
-def yaml_quote(s: str) -> str:
-    """Quote a string for YAML if it contains special chars."""
-    if not s:
-        return '""'
-    if re.match(r"^[a-zA-Z0-9_\-./@]+$", s):
-        return s
-    return '"' + s.replace("\\", "\\\\").replace('"', '\\"') + '"'
-
-
 def write_brand(form: dict) -> list[str]:
-    """Write system/brand.md and system/brand.json."""
+    """Write system/brand.md and system/brand.json from the wizard form."""
     primary_bg = form.get("primary_bg", "#000000")
     primary_fg = form.get("primary_fg", "#ffffff")
     subtitle_color = form.get("subtitle_color", "#8a8a8a")
@@ -79,20 +70,13 @@ def write_brand(form: dict) -> list[str]:
     accent = form.get("accent", "#ff6a00")
     title_gradient = bool(form.get("title_gradient", False))
 
-    md = f"""---
-title: Brand
-type: spec
-tags: [brand, design]
-status: living
-audience: designer
-sources: [wizard]
-created: {datetime.now().strftime("%Y-%m-%d")}
-updated: {datetime.now().strftime("%Y-%m-%d")}
+    md = f"""# Brand
+
+The brand identity for your content. Banner rendering is dormant (Designer role is archived), but the tokens stay here so the wizard has a single home for visual identity and the machine-readable mirror is at `system/brand.json`.
+
+The wizard writes both files from your inputs in step 2 (Brand). Keep them in sync by re-running the wizard with `spiel init`.
+
 ---
-
-# Brand
-
-The brand identity. The Designer reads this when picking banner tokens.
 
 ## Required fields
 
@@ -102,8 +86,6 @@ brand:
   handle: {form.get('handle', '@your_handle')}
   primary_bg: {primary_bg}
   primary_fg: {primary_fg}
-  subtitle_color: {subtitle_color}
-  handle_color: {handle_color}
   accent: {accent}
   text_dark: #202020
   text_mid: #5a5959
@@ -116,7 +98,7 @@ brand:
 | Token | Purpose | Default |
 |---|---|---|
 | `primary_bg` | Background | `#000000` |
-| `primary_fg` | Title (also: handle icon) | `#ffffff` |
+| `primary_fg` | Title | `#ffffff` |
 | `subtitle_color` | Subtitle (Merriweather) | `#8a8a8a` |
 | `handle_color` | Handle (JetBrains Mono, bottom) | `#505050` |
 | `accent` | Reserved for highlights / interactive | `#ff6a00` |
@@ -126,10 +108,6 @@ brand:
 - **Title gradient**: `{"true — silver gradient white→#888" if title_gradient else "false — solid color (default)"}`
 - Banner template: `default`. Dimensions: 1200x630.
 - Fonts: Inter (heading), Merriweather (subtitle), JetBrains Mono (handle).
-
-## Banners
-
-The `tools/designer.py` banner renderer reads these tokens and injects them into `tools/banner-templates/default.html`. To customize the layout beyond colors, edit the HTML template directly.
 """
     (VAULT / "system" / "brand.md").write_text(md, encoding="utf-8")
     brand_json = {
@@ -168,72 +146,6 @@ The `tools/designer.py` banner renderer reads these tokens and injects them into
     return ["system/brand.md", "system/brand.json"]
 
 
-def write_archetypes(form: dict) -> list[str]:
-    """Write strategy/archetypes.md from the wizard's archetype picks.
-
-    The 10 default archetypes have fixed S1-S10 codes. User-added custom
-    archetypes get S11+ codes.
-    """
-    archetype_table = {
-        "System Build": ("S1", "Building a system, architecture, or workflow"),
-        "Ship": ("S2", "Shipping a feature, product, or release"),
-        "Decision": ("S3", "Choosing X over Y, documented trade-offs"),
-        "Lesson": ("S4", "Something learned, abstracted into insight"),
-        "Failure": ("S5", "Something broke, went wrong, got fixed"),
-        "Client Work": ("S6", "Work done for/with someone else"),
-        "Research": ("S7", "Learning, reading, analyzing"),
-        "Tooling": ("S8", "Building tools, scripts, automations"),
-        "Strategy": ("S9", "Planning, positioning, thinking"),
-        "Meta": ("S10", "Working on the system itself"),
-    }
-    selected = form.get("archetypes", [])
-    custom = form.get("customArchetypes", [])
-
-    rows = []
-    next_code = 11
-    for name in selected:
-        if name in archetype_table:
-            code, desc = archetype_table[name]
-            rows.append(f"| {code} | {name} | {desc} |")
-        elif name in custom:
-            code = f"S{next_code}"
-            next_code += 1
-            rows.append(f"| {code} | {name} | Custom archetype |")
-
-    table = "\n".join(rows) if rows else "| (none selected) | | |"
-
-    md = f"""---
-title: Session Archetypes
-type: concept
-tags: [strategy, archetypes, classification]
-status: living
-audience: researcher, strategist
-created: {datetime.now().strftime("%Y-%m-%d")}
-updated: {datetime.now().strftime("%Y-%m-%d")}
-sources: [wizard]
----
-
-# Session Archetypes
-
-The 10 default archetypes + your custom archetypes. The Researcher uses this to classify sessions. **Banned in public posts** (`system/prompts/leak-guard.md`).
-
-| # | Archetype | Description |
-|---|---|---|
-{table}
-
-## Custom archetypes
-
-{("Your custom archetypes: " + ", ".join(custom) + ".") if custom else "No custom archetypes."}
-
-## See also
-
-- [[funnel]] — funnel stage routing per archetype
-- [[voice]] — voice register per archetype
-"""
-    (VAULT / "strategy" / "archetypes.md").write_text(md, encoding="utf-8")
-    return ["strategy/archetypes.md"]
-
-
 def write_env(form: dict) -> list[str]:
     """Write .env with the API tokens."""
     lines = [f"VAULT_DIR={VAULT}", ""]
@@ -263,56 +175,25 @@ def write_env(form: dict) -> list[str]:
     return [".env"]
 
 
-def write_rules_update(form: dict) -> list[str]:
-    """Merge the user's rules textarea (strategy section) into system/rules.yaml."""
-    rules_path = VAULT / "system" / "rules.yaml"
-    if not rules_path.exists():
-        return []
-    rules_content = (form.get("rules_content") or "").strip()
-    if not rules_content:
-        return []
-    try:
-        import yaml
-        # Parse the user's textarea as a YAML doc
-        user_rules = yaml.safe_load(rules_content)
-        if not isinstance(user_rules, dict):
-            return []
-        # Read existing rules.yaml
-        text = rules_path.read_text(encoding="utf-8")
-        existing = yaml.safe_load(text) or {}
-        # Deep-merge the strategy section
-        strategy = existing.get("strategy", {})
-        if isinstance(strategy, dict) and isinstance(user_rules.get("strategy"), dict):
-            strategy.update(user_rules["strategy"])
-            existing["strategy"] = strategy
-        elif isinstance(user_rules.get("strategy"), dict):
-            existing["strategy"] = user_rules["strategy"]
-        # Preserve banned_openers and other top-level keys from textarea
-        for key in ("banned_openers", "known_names"):
-            if key in user_rules:
-                existing[key] = user_rules[key]
-        rules_path.write_text(yaml.safe_dump(existing, sort_keys=False, allow_unicode=True), encoding="utf-8")
-        return ["system/rules.yaml"]
-    except Exception:
-        return []
-
-
 def write_install_marker() -> list[str]:
-    """Write a .install-state.json so re-running the wizard can resume / merge."""
+    """Write .install-state.json so re-running the wizard can resume / merge."""
     state = {
         "installed_at": datetime.now().isoformat(timespec="seconds"),
         "vault": str(VAULT),
-        "version": "1.0.0",
+        "version": "2.0.0",
     }
     (VAULT / ".install-state.json").write_text(json.dumps(state, indent=2), encoding="utf-8")
     return [".install-state.json"]
 
 
-def run_post_install() -> dict:
+def run_post_install(source_vault: Path | None = None) -> dict:
     """After /api/finish: install the shim, sync IDE adapters, and report what was installed.
 
-    This is the bridge between "wizard finished" and "user can /post from any IDE".
-    The user doesn't have to run a single command after the wizard.
+    `source_vault` is the path of the canonical SpielOS repo the wizard copied from.
+    It's used to invoke sync_adapters.py, because the copy in the target VAULT
+    would compute its own path as VAULT (which is the new install) and bake the
+    wrong vault_root into the installed adapters. In production the source and
+    target are the same directory, so this matters only in dev / smoke-test mode.
     """
     import shutil
     import subprocess
@@ -333,7 +214,6 @@ def run_post_install() -> dict:
     if vault_shim.exists():
         try:
             shim_path.parent.mkdir(parents=True, exist_ok=True)
-            # Remove existing (symlink, file, etc.) so we don't hit IsADirectoryError or FileExistsError
             if shim_path.is_symlink() or shim_path.exists():
                 shim_path.unlink()
             shutil.copy(vault_shim, shim_path)
@@ -345,10 +225,9 @@ def run_post_install() -> dict:
     else:
         result["shim_already_present"] = shim_path.exists()
 
-    # 2. Write vault pointer file + update .env VAULT_DIR
+    # 2. Write vault pointer file + global config
     try:
         (VAULT / ".spiel-vault").write_text(f"VAULT_DIR={VAULT}\n", encoding="utf-8")
-        # Global config (~/.config/spielos/config) — makes vault resolvable from ANY cwd
         spielos_cfg = Path.home() / ".config" / "spielos" / "config"
         spielos_cfg.parent.mkdir(parents=True, exist_ok=True)
         spielos_cfg.write_text(f"VAULT_DIR={VAULT}\n", encoding="utf-8")
@@ -367,18 +246,23 @@ def run_post_install() -> dict:
     except Exception as e:
         result["errors"].append(f"vault pointer: {e}")
 
-    # 3. Generate adapters
-    sync_script = VAULT / "tools" / "sync_adapters.py"
-    if sync_script.exists():
+    # 3+4. Generate + install adapters. Use the SOURCE sync_adapters.py so the
+    # installed adapter files have the correct vault_root baked in. In
+    # production install (source == target), this is a no-op distinction.
+    sync_script = None
+    if source_vault and (source_vault / "tools" / "sync_adapters.py").exists():
+        sync_script = source_vault / "tools" / "sync_adapters.py"
+    elif (VAULT / "tools" / "sync_adapters.py").exists():
+        sync_script = VAULT / "tools" / "sync_adapters.py"
+
+    if sync_script:
         try:
             r = subprocess.run(
                 [sys.executable, str(sync_script)],
                 capture_output=True, text=True,
-                cwd=str(VAULT),
                 timeout=30,
             )
             if r.returncode == 0:
-                # Count files
                 for sub in ("adapters/opencode/agents", "adapters/claude/agents",
                             "adapters/cursor/commands"):
                     p = VAULT / sub
@@ -389,21 +273,18 @@ def run_post_install() -> dict:
         except Exception as e:
             result["errors"].append(f"sync generate: {e}")
 
-    # 4. Install adapters to all detected IDEs (opencode, Cursor, Claude Code)
-    if sync_script.exists():
         try:
             r = subprocess.run(
                 [sys.executable, str(sync_script), "--install"],
                 capture_output=True, text=True,
-                cwd=str(VAULT),
                 timeout=30,
             )
             if r.returncode == 0:
-                # Count installed files across all 3 IDEs
                 ide_dirs = [
                     (Path.home() / ".config" / "opencode", ["agents", "skill", "commands"]),
                     (Path.home() / ".cursor" / "skills", []),
                     (Path.home() / ".claude", ["agents", "skills"]),
+                    (Path.home() / ".codex", ["agents", "commands"]),
                 ]
                 for ide_dir, subs in ide_dirs:
                     if not ide_dir.exists():
@@ -458,6 +339,31 @@ def fetch_buffer_channels(token: str) -> list[dict]:
 WIZARD_DIR = Path(__file__).resolve().parent
 
 
+VAULT = None
+SOURCE_VAULT = None  # the canonical SpielOS repo (for sync_adapters invocation)
+
+
+def _detect_source_vault() -> Path:
+    """Best-effort detection of the canonical repo this wizard was launched from.
+
+    In production, the installer downloaded the repo and the wizard's target
+    IS the source (same directory). In dev / smoke-test mode the wizard is
+    launched against a temp target while the source remains the dev repo.
+    """
+    if SOURCE_VAULT is not None:
+        return SOURCE_VAULT
+    # Wizard lives at <repo>/install/wizard/serve.py
+    return WIZARD_DIR.parent.parent
+
+
+def _set_source_vault(path: Path | None) -> None:
+    global SOURCE_VAULT
+    if path:
+        SOURCE_VAULT = path.expanduser().resolve()
+    else:
+        SOURCE_VAULT = _detect_source_vault()
+
+
 class WizardHandler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
         sys.stderr.write(f"[wizard] {self.address_string()} - {fmt % args}\n")
@@ -504,7 +410,6 @@ class WizardHandler(BaseHTTPRequestHandler):
                 "existing": {"summary": {}},
             })
         if path == "/api/skeletons":
-            # List available skeleton file names
             skeletons = sorted(f.name for f in SKELETON_DIR.iterdir() if f.is_file())
             return self._send_json(200, {"skeletons": skeletons})
         if path.startswith("/api/skeleton/"):
@@ -541,29 +446,20 @@ class WizardHandler(BaseHTTPRequestHandler):
         if path == "/api/finish":
             try:
                 written: list[str] = []
-                # Structured writers (brand, archetypes, env)
+                # Brand (always)
                 written += write_brand(data)
-                written += write_archetypes(data)
-                written += write_text_area("strategy/icp.md", data.get("icp_content"))
-                written += write_text_area("strategy/positioning.md", data.get("positioning_content"))
+                # 4 strategy textareas
+                written += write_text_area("strategy/audience.md", data.get("audience_content"))
                 written += write_text_area("strategy/offer.md", data.get("offer_content"))
-                # Funnel: use textarea (JS already replaced markers with slider/toggle values)
-                written += write_text_area("strategy/funnel.md", data.get("funnel_content"))
-                # Voice + Corpus: use textarea content
                 written += write_text_area("strategy/voice.md", data.get("voice_content"))
-                written += write_text_area("strategy/corpus.md", data.get("corpus_content"))
-                # Methodology: use textarea (JS already replaced markers)
-                written += write_text_area("strategy/methodology.md", data.get("methodology_content"))
-                # Rules: merge strategy section from textarea
-                written += write_rules_update(data)
+                written += write_text_area("strategy/examples.md", data.get("examples_content"))
                 # .env
                 written += write_env(data)
                 # Install marker
                 written += write_install_marker()
                 # Auto-install: shim + IDE adapters
-                install_result = run_post_install()
-                # Schedule server shutdown in 3 seconds (so the JS can show the success)
-                import threading
+                install_result = run_post_install(source_vault=SOURCE_VAULT)
+                # Schedule server shutdown in 3 seconds
                 threading.Timer(3.0, lambda: os._exit(0)).start()
                 return self._send_json(200, {
                     "ok": True,
@@ -577,8 +473,6 @@ class WizardHandler(BaseHTTPRequestHandler):
                 return self._send_json(500, {"error": str(e)})
 
         if path == "/api/shutdown":
-            # Allow manual shutdown (used by the JS in some flows)
-            import threading
             def _do_shutdown():
                 self.server.shutdown()
             threading.Timer(0.5, _do_shutdown).start()
@@ -614,64 +508,67 @@ def open_browser(url: str) -> None:
 
 
 def bootstrap_vault(target: Path, source: Path | None = None) -> None:
-    """Copy the canonical source files into the target vault.
+    """Copy canonical source files into the target vault on first install.
 
-    This is the bridge between "user ran install.sh" and "the wizard
-    has a complete vault to write into". The wizard's `target` directory
-    might be empty (fresh install) or have old data (re-install).
-
-    The strategy: copy any of the 7 deterministic tool files + the
-    8 role files + the 4 system files + bin/spiel that are missing.
-    Don't touch user data (content/, .env, strategy/).
+    Bridge between "user ran install.sh" and "wizard has a complete vault
+    to write into". Does not overwrite user data (strategy/, content/, .env,
+    system/brand.*, team/).
     """
     import shutil
 
-    # If target is the source itself (e.g. local dev), no copy needed
     if source and source.resolve() == target.resolve():
         return
 
-    # Determine the source. Default: the repo this serve.py lives in.
-    # serve.py is at <repo>/install/wizard/serve.py, so source = <repo>.
     if source is None:
         source = WIZARD_DIR.parent.parent  # install/wizard → install → repo root
 
-    # Files/dirs that must exist in the vault
     must_exist = [
-        "team", "system", "system/prompts", "strategy", "templates", "templates/registry",
-        "tools", "tools/publisher", "assets", "assets/banners", "assets/icons",
-        "adapters", "skills", "tests", "bin", "logs",
-        "content", "content/sessions", "content/queue", "content/posted", "content/rejected",
+        "team", "system", "strategy", "templates",
+        "tools", "tools/publisher", "assets", "assets/icons",
+        "adapters", "skills", "tests", "bin",
+        "content", "content/inbox", "content/drafts", "content/ready",
+        "content/posted", "content/rejected",
+        "archive", "archive/roles", "archive/skills",
+        "install", "install/wizard", "install/wizard/skeletons",
     ]
     for sub in must_exist:
-        target_dir = target / sub
-        target_dir.mkdir(parents=True, exist_ok=True)
+        (target / sub).mkdir(parents=True, exist_ok=True)
 
-    # Files to copy (if missing in target)
     files_to_copy = [
-        # Role prompts
-        "team/md.md", "team/post.md",
-        "team/strategist.md", "team/researcher.md", "team/copywriter.md",
-        "team/editor.md", "team/designer.md", "team/publisher.md", "team/analyst.md",
-        "team/README.md",
+        # Roles
+        "team/director.md", "team/strategist.md", "team/writer.md",
+        "team/editor.md", "team/publisher.md", "team/post.md", "team/README.md",
         # System
-        "system/state-machine.md", "system/brief-schema.md", "system/pipeline.md",
-        "system/brand.json", "system/gates.md", "system/rules.yaml",
-        "system/prompts/identity.md", "system/prompts/compiler.md",
-        "system/prompts/leak-guard.md", "system/prompts/wizards.md",
+        "system/pipeline.md", "system/draft-schema.md", "system/rules.yaml",
+        "system/brand.md", "system/brand.json",
+        # Strategy skeletons (user will edit via wizard)
+        "strategy/audience.md", "strategy/offer.md",
+        "strategy/voice.md", "strategy/examples.md",
         # Templates
         "templates/x-post.md", "templates/linkedin-post.md", "templates/blog-post.md",
-        "templates/session-log.md", "templates/types.md",
-        "templates/registry/viral-templates.yaml",
         # Tools
-        "tools/editor.py", "tools/designer.py", "tools/researcher.py", "tools/analyst.py",
-        "tools/sync_adapters.py",
+        "tools/editor.py", "tools/designer.py", "tools/sync_adapters.py",
+        "tools/_vault.py",
         "tools/publisher/_common.py", "tools/publisher/buffer.py",
         "tools/publisher/twitter.py", "tools/publisher/linkedin.py",
         "tools/publisher/blog.sh",
-        # Bin
-        "bin/spiel",
+        "tools/banner-templates/default.html", "tools/banner-templates/notes.html",
+        # Skills
+        "skills/format_wizard/SKILL.md",
+        "skills/publish_wizard/SKILL.md",
+        "skills/voice_match/SKILL.md",
+        # Wizard
+        "install/wizard/index.html",
+        "install/wizard/design-system.css",
+        "install/wizard/steps.js",
+        "install/wizard/serve.py",
+        "install/install.sh",
+        "install/uninstall.sh",
+        "install/brew/spiel.rb",
+        # Archive (read-only references for the IDE adapters + restore later)
+        "archive/roles/README.md",
         # Tests
-        "tests/smoke.py", "tests/test_state_machine.py", "tests/conftest.py",
+        "tests/smoke.py",
         # Root
         "AGENTS.md", "README.md", "package.json", ".gitignore",
     ]
@@ -682,11 +579,10 @@ def bootstrap_vault(target: Path, source: Path | None = None) -> None:
         if not src.exists():
             continue
         if dst.exists():
-            continue  # don't overwrite user-edited files
+            continue
         try:
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, dst)
-            # Preserve executable bit for sh + bin scripts
             if rel.endswith(".sh") or rel == "bin/spiel":
                 dst.chmod(0o755)
         except Exception as e:
@@ -705,8 +601,9 @@ def main() -> int:
     global VAULT
     VAULT = resolve_vault(args.target)
     VAULT.mkdir(parents=True, exist_ok=True)
-    # Make sure key subdirs exist + copy the source files into the vault
-    bootstrap_vault(VAULT, source=Path(args.source) if args.source else None)
+    source = Path(args.source) if args.source else None
+    bootstrap_vault(VAULT, source=source)
+    _set_source_vault(source)
 
     port = args.port
     if not is_port_free(port):
@@ -725,7 +622,6 @@ def main() -> int:
     print(f"")
 
     if not args.no_open:
-        import threading
         threading.Timer(0.5, open_browser, args=[url]).start()
 
     try:

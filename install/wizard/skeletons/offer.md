@@ -1,28 +1,13 @@
----
-title: Offer — Your Offer
-type: concept
-tags: [strategy, offer, conversion]
-status: living
-audience: strategist
-created: --DATE--
-updated: --DATE--
-sources: [wizard]
----
+# Offer
 
-# Offer — Your Offer
+What you sell:
 
-**Price:** —
+Who it is for:
 
-## The stack
+What it helps them do:
 
-What the buyer receives.
+Why it is different:
 
-## The guarantee
+Proof:
 
-—
-
-## See also
-
-- [[positioning]]
-- [[icp]]
-- [[funnel]]
+Call to action:

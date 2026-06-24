@@ -1,11 +1,6 @@
-/* SpielOS Wizard — Alpine.js component.
-   File-based strategy editors + hybrid controls for funnel/voice/methodology.
+/* SpielOS Wizard — Alpine.js component (lean 6-step).
+   Welcome → Brand → Audience → Offer → Voice → Examples → Connect
 */
-
-const DEFAULT_ARCHETYPES = [
-  'System Build', 'Ship', 'Decision', 'Lesson', 'Failure',
-  'Client Work', 'Research', 'Tooling', 'Strategy', 'Meta'
-];
 
 const ICON_RULES = [
   { patterns: ['ai', 'agent', 'automation', 'machine', 'llm', 'gpt', 'model'], icon: 'sparkles' },
@@ -57,57 +52,24 @@ function wizard() {
     bufferLoading: false,
     bufferChannels: [],
     bufferError: '',
-    newArchetype: '',
-    customArchetypes: [],
-
-    DEFAULT_ARCHETYPES,
 
     form: {
       brand_name: 'YourBrand',
       handle: '@your_handle',
       tagline: '',
       creator_self: '',
-      role: '',
-      story: '',
       primary_bg: '#000000',
       primary_fg: '#ffffff',
       subtitle_color: '#8a8a8a',
       handle_color: '#505050',
       accent: '#ff6a00',
       title_gradient: false,
-      methodology_sources: ['Build sessions'],
 
-      // Textarea fields (file-based steps)
-      icp_content: '',
-      positioning_content: '',
+      audience_content: '',
       offer_content: '',
-      funnel_content: '',
       voice_content: '',
-      corpus_content: '',
-      methodology_content: '',
-      rules_content: '',
+      examples_content: '',
 
-      // Hybrid controls (funnel)
-      funnel_tofu: 40,
-      funnel_mofu: 40,
-      funnel_bofu: 15,
-      archetypes: ['System Build', 'Ship', 'Decision', 'Lesson'],
-
-      // Hybrid controls (voice)
-      voice_register: 'confessional-teaching',
-      voice_rules: [
-        'No em-dashes (use →, colons, commas)',
-        'Standard capitalization',
-        'Note: closer preferred'
-      ],
-      banned_openers: '^in this post\n^today i want to talk about',
-
-      // Hybrid controls (methodology)
-      methodology_name: 'Your Methodology',
-      methodology_desc: '',
-      platforms: ['x', 'linkedin'],
-
-      // Connect fields
       buffer_token: '',
       buffer_channels: [],
       x_api_key: '',
@@ -121,21 +83,18 @@ function wizard() {
     },
 
     steps: [
-      { key: 'welcome',     label: 'Welcome' },
-      { key: 'brand',       label: 'Brand' },
-      { key: 'icp',         label: 'ICP' },
-      { key: 'positioning', label: 'Positioning' },
-      { key: 'offer',       label: 'Offer' },
-      { key: 'funnel',      label: 'Funnel' },
-      { key: 'voice',       label: 'Voice' },
-      { key: 'methodology', label: 'Methodology' },
-      { key: 'rules',       label: 'Rules' },
-      { key: 'connect',     label: 'Connect' },
-      { key: 'done',        label: 'Done' },
+      { key: 'welcome',   label: 'Welcome' },
+      { key: 'brand',     label: 'Brand' },
+      { key: 'audience',  label: 'Audience' },
+      { key: 'offer',     label: 'Offer' },
+      { key: 'voice',     label: 'Voice' },
+      { key: 'examples',  label: 'Examples' },
+      { key: 'connect',   label: 'Connect' },
+      { key: 'done',      label: 'Done' },
     ],
 
     get iconKey() {
-      return pickIcon(this.form.brand_name, this.form.tagline, '');
+      return pickIcon(this.form.brand_name, this.form.tagline, this.form.audience_content);
     },
 
     get iconSvg() {
@@ -151,11 +110,7 @@ function wizard() {
         this.target = cfg.target || '';
         if (cfg.existing && cfg.existing.summary) {
           Object.assign(this.form, cfg.existing.summary);
-          if (Array.isArray(cfg.existing.summary.customArchetypes)) {
-            this.customArchetypes = cfg.existing.summary.customArchetypes;
-          }
         }
-        // Load all skeletons
         await this.loadSkeletons();
       } catch (e) {
         console.error('init failed', e);
@@ -172,14 +127,10 @@ function wizard() {
           const skel = await res.json();
           const content = skel.content || '';
           switch (name) {
-            case 'icp.md':            this.form.icp_content = content; break;
-            case 'positioning.md':    this.form.positioning_content = content; break;
-            case 'offer.md':          this.form.offer_content = content; break;
-            case 'funnel.md':         this.form.funnel_content = content; break;
-            case 'voice.md':          this.form.voice_content = content; break;
-            case 'corpus.md':         this.form.corpus_content = content; break;
-            case 'methodology.md':    this.form.methodology_content = content; break;
-            case 'rules-strategy.yaml': this.form.rules_content = content; break;
+            case 'audience.md': this.form.audience_content = content; break;
+            case 'offer.md':    this.form.offer_content = content; break;
+            case 'voice.md':    this.form.voice_content = content; break;
+            case 'examples.md': this.form.examples_content = content; break;
           }
         }
       } catch (e) {
@@ -194,7 +145,7 @@ function wizard() {
     },
 
     next() {
-      if (this.current < 9) {
+      if (this.current < 6) {
         this.current += 1;
         window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
@@ -220,24 +171,6 @@ function wizard() {
       } else {
         this.form[field] = this.form[field].filter(v => v !== value);
       }
-    },
-
-    addCustomArchetype() {
-      const v = this.newArchetype.trim();
-      if (!v) return;
-      if (this.DEFAULT_ARCHETYPES.includes(v) || this.customArchetypes.includes(v)) {
-        this.newArchetype = '';
-        return;
-      }
-      this.customArchetypes.push(v);
-      this.form.archetypes.push(v);
-      this.newArchetype = '';
-      this.showToast(`Added "${v}"`);
-    },
-
-    removeCustomArchetype(name) {
-      this.customArchetypes = this.customArchetypes.filter(a => a !== name);
-      this.form.archetypes = this.form.archetypes.filter(a => a !== name);
     },
 
     async fetchBufferChannels() {
@@ -268,16 +201,16 @@ function wizard() {
         const r = await fetch('/api/finish', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...this.form, customArchetypes: this.customArchetypes }),
+          body: JSON.stringify(this.form),
         });
         const data = await r.json();
         if (data.ok) {
           this.done = true;
-          this.current = 10;
+          this.current = 7;
           this.doneLines = (data.written || []).map(f => `${f}  written`);
           this.installResult = {
             closer_takeaway: 'You stay a builder. The team ships the post.',
-            closer_echo: 'From any IDE, type /post. The 8 roles take it from there.',
+            closer_echo: 'From any IDE, type /post. The 5 roles take it from there.',
           };
           if (data.install && data.install.errors && data.install.errors.length) {
             this.doneLines.push(`warnings: ${data.install.errors.join(', ')}`);

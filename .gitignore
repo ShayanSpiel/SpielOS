@@ -47,12 +47,11 @@ adapters/mcp/server.json
 skills/
 
 # Posts
-content/queue/*.md
+content/drafts/*.md
+content/ready/*.md
 content/posted/*.md
 content/rejected/*.md
-content/sessions/*.md
-content/ideas/*.md
-content/archive/
+content/inbox/*.md
 content/.install-state.json
 
 # Banners

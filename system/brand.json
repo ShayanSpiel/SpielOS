@@ -23,10 +23,6 @@
   },
   "banner": {
     "template": "default",
-    "icon_collection": {
-      "url": "https://github.com/la-moore/scarlab-icons",
-      "source": "github"
-    },
     "render": {
       "device_scale_factor": 2,
       "chrome_path": null

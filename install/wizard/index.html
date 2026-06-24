@@ -6,7 +6,7 @@
   <title>SpielOS — Setup</title>
   <link rel="stylesheet" href="design-system.css">
   <style>
-    .skeleton-textarea { font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace; font-size: 13px; line-height: 1.55; min-height: 320px; tab-size: 2; white-space: pre; word-wrap: normal; overflow-x: auto; width: 100%; padding: var(--s-4); border: 1px solid var(--bd); border-radius: 8px; background: var(--bg-code); color: var(--tx); resize: vertical; }
+    .skeleton-textarea { font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace; font-size: 13px; line-height: 1.55; min-height: 280px; tab-size: 2; white-space: pre; word-wrap: normal; overflow-x: auto; width: 100%; padding: var(--s-4); border: 1px solid var(--bd); border-radius: 8px; background: var(--bg-code); color: var(--tx); resize: vertical; }
     .skeleton-textarea:focus { outline: none; border-color: var(--ac); box-shadow: 0 0 0 2px color-mix(in srgb, var(--ac) 25%, transparent); }
     .field-target-sm { display: inline-block; font-size: 11px; font-family: 'JetBrains Mono', monospace; background: var(--bg-code); color: var(--tx-muted); padding: 2px 8px; border-radius: 4px; margin-bottom: var(--s-2); }
   </style>
@@ -15,7 +15,7 @@
 
   <nav class="stepper">
     <div class="stepper-inner">
-      <template x-for="(s, i) in steps.slice(0, 10)" :key="s.key">
+      <template x-for="(s, i) in steps.slice(0, 7)" :key="s.key">
         <span class="stepper-step-wrap">
           <button class="stepper-step"
                   :class="{ done: i < current, current: i === current, clickable: i <= current }"
@@ -26,7 +26,7 @@
             </span>
             <span class="stepper-label" x-text="s.label"></span>
           </button>
-          <span x-show="i < 9" class="stepper-connector" :class="{ done: i < current }"></span>
+          <span x-show="i < 6" class="stepper-connector" :class="{ done: i < current }"></span>
         </span>
       </template>
     </div>
@@ -41,30 +41,30 @@
       <div class="section-head hero">
         <div class="section-tag">SpielOS Setup</div>
         <h1 class="section-title">SpielOS</h1>
-        <p class="section-sub">A markdown-driven marketing team that turns your build sessions into posts for X, LinkedIn, and your blog.</p>
+        <p class="section-sub">A lean markdown-driven team that turns a real source into posts for X, LinkedIn, and your blog.</p>
         <div class="welcome-info">
           <div class="welcome-info-row">
             <span class="welcome-info-label">Target</span>
             <span class="welcome-info-value" x-text="target || '—'"></span>
           </div>
           <div class="welcome-info-row">
-            <span class="welcome-info-label">Steps</span>
-            <span class="welcome-info-value">10</span>
+            <span class="welcome-info-label">Live steps</span>
+            <span class="welcome-info-value">6</span>
           </div>
           <div class="welcome-info-row">
             <span class="welcome-info-label">Time</span>
-            <span class="welcome-info-value">~5 min</span>
+            <span class="welcome-info-value">~4 min</span>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- Step 1: Brand + Identity -->
+    <!-- Step 1: Brand -->
     <section class="step-panel" x-show="current === 1" x-transition.opacity>
       <div class="section-head">
-        <div class="section-tag">Step 1 of 10</div>
+        <div class="section-tag">Step 1 of 6</div>
         <h2 class="section-title">Brand</h2>
-        <p class="section-sub">Visual identity + your story.</p>
+        <p class="section-sub">Visual identity + the minimum setup the live loop needs.</p>
       </div>
 
       <div class="field">
@@ -78,11 +78,6 @@
           <label class="field-label">Handle (with @)</label>
           <input class="field-input mono" x-model="form.handle" placeholder="@your_handle">
           <span class="field-hint"><span class="field-target">system/brand.md</span></span>
-        </div>
-        <div class="field">
-          <label class="field-label">Your role / title</label>
-          <input class="field-input" x-model="form.role" placeholder="Founder, engineer, builder...">
-          <span class="field-hint"><span class="field-target">strategy/icp.md</span></span>
         </div>
       </div>
 
@@ -178,198 +173,56 @@
       </div>
     </section>
 
-    <!-- Step 2: ICP (textarea) -->
+    <!-- Step 2: Audience (textarea) -->
     <section class="step-panel" x-show="current === 2" x-transition.opacity>
       <div class="section-head">
-        <div class="section-tag">Step 2 of 10</div>
-        <h2 class="section-title">ICP</h2>
-        <p class="section-sub">Your ideal customer profile — who you serve.</p>
+        <div class="section-tag">Step 2 of 6</div>
+        <h2 class="section-title">Audience</h2>
+        <p class="section-sub">Who you write for, what hurts, and why they care now.</p>
       </div>
-      <span class="field-target-sm">strategy/icp.md</span>
-      <textarea class="skeleton-textarea" x-model="form.icp_content" spellcheck="false"></textarea>
+      <span class="field-target-sm">strategy/audience.md</span>
+      <textarea class="skeleton-textarea" x-model="form.audience_content" spellcheck="false"></textarea>
     </section>
 
-    <!-- Step 3: Positioning (textarea) -->
+    <!-- Step 3: Offer (textarea) -->
     <section class="step-panel" x-show="current === 3" x-transition.opacity>
       <div class="section-head">
-        <div class="section-tag">Step 3 of 10</div>
-        <h2 class="section-title">Positioning</h2>
-        <p class="section-sub">Your market position — category, one-liner, core insight.</p>
-      </div>
-      <span class="field-target-sm">strategy/positioning.md</span>
-      <textarea class="skeleton-textarea" x-model="form.positioning_content" spellcheck="false"></textarea>
-    </section>
-
-    <!-- Step 4: Offer (textarea) -->
-    <section class="step-panel" x-show="current === 4" x-transition.opacity>
-      <div class="section-head">
-        <div class="section-tag">Step 4 of 10</div>
+        <div class="section-tag">Step 3 of 6</div>
         <h2 class="section-title">Offer</h2>
-        <p class="section-sub">What you sell — price, stack, guarantee.</p>
+        <p class="section-sub">The offer behind the content, kept short and explicit.</p>
       </div>
       <span class="field-target-sm">strategy/offer.md</span>
       <textarea class="skeleton-textarea" x-model="form.offer_content" spellcheck="false"></textarea>
     </section>
 
-    <!-- Step 5: Funnel + Archetypes (hybrid) -->
+    <!-- Step 4: Voice (textarea) -->
+    <section class="step-panel" x-show="current === 4" x-transition.opacity>
+      <div class="section-head">
+        <div class="section-tag">Step 4 of 6</div>
+        <h2 class="section-title">Voice</h2>
+        <p class="section-sub">How the posts read. Keep it tight, direct, and readable.</p>
+      </div>
+      <span class="field-target-sm">strategy/voice.md</span>
+      <textarea class="skeleton-textarea" x-model="form.voice_content" spellcheck="false"></textarea>
+    </section>
+
+    <!-- Step 5: Examples (textarea) -->
     <section class="step-panel" x-show="current === 5" x-transition.opacity>
       <div class="section-head">
-        <div class="section-tag">Step 5 of 10</div>
-        <h2 class="section-title">Funnel + Archetypes</h2>
-        <p class="section-sub">Content distribution and session types. Edit the file below or use the quick controls.</p>
+        <div class="section-tag">Step 5 of 6</div>
+        <h2 class="section-title">Examples</h2>
+        <p class="section-sub">Paste your best posts. The Writer matches their rhythm, not their topic.</p>
       </div>
-
-      <div class="field">
-        <label class="field-label">Funnel distribution (% of content per stage)</label>
-        <div class="funnel-grid">
-          <div class="funnel-input">
-            <label class="funnel-label">Awareness</label>
-            <input class="field-input" type="number" min="0" max="100" x-model.number="form.funnel_tofu" placeholder="40">
-          </div>
-          <div class="funnel-input">
-            <label class="funnel-label">Consideration</label>
-            <input class="field-input" type="number" min="0" max="100" x-model.number="form.funnel_mofu" placeholder="40">
-          </div>
-          <div class="funnel-input">
-            <label class="funnel-label">Conversion</label>
-            <input class="field-input" type="number" min="0" max="100" x-model.number="form.funnel_bofu" placeholder="15">
-          </div>
-        </div>
-        <div class="funnel-bar">
-          <div class="funnel-segment tofu" :style="`flex: ${form.funnel_tofu || 0}`" x-text="form.funnel_tofu ? form.funnel_tofu + '%' : ''"></div>
-          <div class="funnel-segment mofu" :style="`flex: ${form.funnel_mofu || 0}`" x-text="form.funnel_mofu ? form.funnel_mofu + '%' : ''"></div>
-          <div class="funnel-segment bofu" :style="`flex: ${form.funnel_bofu || 0}`" x-text="form.funnel_bofu ? form.funnel_bofu + '%' : ''"></div>
-        </div>
-      </div>
-
-      <div class="field">
-        <label class="field-label">Archetypes (session types)</label>
-        <div class="toggle-group">
-          <template x-for="opt in DEFAULT_ARCHETYPES" :key="opt">
-            <span class="toggle" :class="{ selected: form.archetypes.includes(opt) }"
-                  @click="toggle('archetypes', opt)" x-text="opt"></span>
-          </template>
-        </div>
-        <div x-show="customArchetypes.length > 0" style="margin-top: var(--s-3);">
-          <div class="toggle-group">
-            <template x-for="opt in customArchetypes" :key="opt">
-              <span class="toggle selected" x-text="opt">
-                <span class="toggle-remove" @click.stop="removeCustomArchetype(opt)" title="Remove">×</span>
-              </span>
-            </template>
-          </div>
-        </div>
-        <div class="add-custom-input" style="margin-top: var(--s-3);">
-          <input x-model="newArchetype" @keydown.enter="addCustomArchetype()" placeholder="Add custom archetype…">
-          <button @click="addCustomArchetype()" :disabled="!newArchetype.trim()">Add</button>
-        </div>
-      </div>
-
-      <span class="field-target-sm" style="margin-top: var(--s-4); display: inline-block;">strategy/funnel.md + strategy/archetypes.md</span>
-      <textarea class="skeleton-textarea" x-model="form.funnel_content" spellcheck="false"></textarea>
+      <span class="field-target-sm">strategy/examples.md</span>
+      <textarea class="skeleton-textarea" x-model="form.examples_content" spellcheck="false" style="min-height: 200px;"></textarea>
     </section>
 
-    <!-- Step 6: Voice + Corpus (hybrid) -->
+    <!-- Step 6: Connect -->
     <section class="step-panel" x-show="current === 6" x-transition.opacity>
       <div class="section-head">
-        <div class="section-tag">Step 6 of 10</div>
-        <h2 class="section-title">Voice + Corpus</h2>
-        <p class="section-sub">How your posts read. Quick controls above, then edit the voice file below.</p>
-      </div>
-
-      <div class="field">
-        <label class="field-label">Default voice register</label>
-        <div class="toggle-group">
-          <template x-for="opt in ['confessional-teaching', 'story-with-lesson', 'listicle-counter-intuitive', 'velocity', 'long-form-blog', 'short-form-x', 'reader-problem-first', 'punchy-direct']">
-            <span class="toggle" :class="{ selected: form.voice_register === opt }"
-                  @click="form.voice_register = opt" x-text="opt"></span>
-          </template>
-        </div>
-      </div>
-
-      <div class="field">
-        <label class="field-label">Always-on style rules</label>
-        <div class="toggle-group">
-          <template x-for="opt in ['No em-dashes (use →, colons, commas)', 'Standard capitalization', 'No engagement bait', 'No corporate buzzwords', 'Note: closer preferred', 'Single line breaks between sentences']">
-            <span class="toggle" :class="{ selected: form.voice_rules.includes(opt) }"
-                  @click="toggle('voice_rules', opt)" x-text="opt"></span>
-          </template>
-        </div>
-      </div>
-
-      <div class="field">
-        <label class="field-label">Banned opener patterns (regex, one per line)</label>
-        <textarea class="field-textarea mono" x-model="form.banned_openers" rows="3"></textarea>
-      </div>
-
-      <div class="field" style="margin-top: var(--s-5);">
-        <label class="field-label">Voice file</label>
-        <span class="field-target-sm">strategy/voice.md</span>
-        <textarea class="skeleton-textarea" x-model="form.voice_content" spellcheck="false"></textarea>
-      </div>
-
-      <div class="field" style="margin-top: var(--s-5);">
-        <label class="field-label">Corpus — paste your best posts as examples</label>
-        <span class="field-target-sm">strategy/corpus.md</span>
-        <textarea class="skeleton-textarea" x-model="form.corpus_content" spellcheck="false" style="min-height: 200px;"></textarea>
-      </div>
-    </section>
-
-    <!-- Step 7: Methodology (hybrid) -->
-    <section class="step-panel" x-show="current === 7" x-transition.opacity>
-      <div class="section-head">
-        <div class="section-tag">Step 7 of 10</div>
-        <h2 class="section-title">Methodology</h2>
-        <p class="section-sub">Where your content comes from.</p>
-      </div>
-
-      <div class="field">
-        <label class="field-label">Methodology name</label>
-        <input class="field-input" x-model="form.methodology_name" placeholder="Session as Content">
-        <span class="field-hint"><span class="field-target">strategy/methodology.md</span></span>
-      </div>
-
-      <div class="field">
-        <label class="field-label">Where your content comes from</label>
-        <div class="toggle-group">
-          <template x-for="opt in ['Build sessions', 'Customer calls', 'Reading & research', 'Personal experience', 'Decisions / tradeoffs']">
-            <span class="toggle" :class="{ selected: form.methodology_sources.includes(opt) }"
-                  @click="toggle('methodology_sources', opt)" x-text="opt"></span>
-          </template>
-        </div>
-      </div>
-
-      <div class="field">
-        <label class="field-label">Platforms you publish to</label>
-        <div class="toggle-group">
-          <template x-for="opt in ['x', 'linkedin', 'blog']">
-            <span class="toggle toggle-platform" :class="{ selected: form.platforms.includes(opt) }"
-                  @click="toggle('platforms', opt)" x-text="opt"></span>
-          </template>
-        </div>
-      </div>
-
-      <span class="field-target-sm" style="margin-top: var(--s-4); display: inline-block;">strategy/methodology.md</span>
-      <textarea class="skeleton-textarea" x-model="form.methodology_content" spellcheck="false"></textarea>
-    </section>
-
-    <!-- Step 8: Rules (textarea) -->
-    <section class="step-panel" x-show="current === 8" x-transition.opacity>
-      <div class="section-head">
-        <div class="section-tag">Step 8 of 10</div>
-        <h2 class="section-title">Rules</h2>
-        <p class="section-sub">Mechanical defaults — strategy keys, content verticals, offer, ICP label.</p>
-      </div>
-      <span class="field-target-sm">system/rules.yaml (strategy section merge)</span>
-      <textarea class="skeleton-textarea" x-model="form.rules_content" spellcheck="false"></textarea>
-    </section>
-
-    <!-- Step 9: Connect -->
-    <section class="step-panel" x-show="current === 9" x-transition.opacity>
-      <div class="section-head">
-        <div class="section-tag">Step 9 of 10</div>
+        <div class="section-tag">Step 6 of 6</div>
         <h2 class="section-title">Connect</h2>
-        <p class="section-sub">API tokens. The Publisher needs these to actually post. <strong style="color: var(--tx);">You can skip everything here and add tokens later.</strong></p>
+        <p class="section-sub">API tokens. Add them now or later, the install still completes.</p>
       </div>
 
       <div class="connect-card">
@@ -450,10 +303,10 @@
       </details>
     </section>
 
-    <!-- Step 10: Done -->
-    <section class="step-panel" x-show="current === 10" x-transition.opacity>
+    <!-- Step 7: Done -->
+    <section class="step-panel" x-show="current === 7" x-transition.opacity>
       <div class="section-head">
-        <div class="section-tag">Step 10 of 10</div>
+        <div class="section-tag">Step 6 of 6</div>
         <h2 class="section-title">Filed.</h2>
         <p class="section-sub">SpielOS is installed. Here's what just got written.</p>
       </div>
@@ -475,7 +328,7 @@
           </svg>
         </div>
         <p class="closer-takeaway" x-text="installResult?.closer_takeaway || 'You stay a builder. The team ships the post.'"></p>
-        <p class="closer-echo" x-text="installResult?.closer_echo || 'From any IDE, type /post. The 8 roles take it from there.'"></p>
+        <p class="closer-echo" x-text="installResult?.closer_echo || 'From any IDE, type /post. The 5 roles take it from there.'"></p>
         <div class="closer-actions">
           <a class="btn btn-primary" href="#" @click.prevent="closeTab()">Close wizard</a>
           <a class="btn btn-ghost" href="#" @click.prevent="go(0)">Start over</a>
@@ -484,14 +337,14 @@
 
       <div class="cta-card" x-show="installResult">
         <h3>What's next</h3>
-        <p>From any IDE (opencode, Claude Code, Cursor, MCP), type:</p>
-        <div class="cmd-row">
-          <code class="cmd">/post</code>
-          <span class="cmd-desc">turn today's build session into content</span>
-        </div>
+          <p>From any IDE (opencode, Claude Code, Cursor, Codex, MCP), type:</p>
         <div class="cmd-row">
           <code class="cmd">/post "Just shipped v2"</code>
-          <span class="cmd-desc">topic mode — ship an announcement</span>
+          <span class="cmd-desc">topic mode, announcement or opinion</span>
+        </div>
+        <div class="cmd-row">
+          <code class="cmd">/post @file:./notes.md</code>
+          <span class="cmd-desc">topic mode from a file</span>
         </div>
         <div class="cmd-row">
           <code class="cmd">spiel init</code>
@@ -502,21 +355,21 @@
 
   </main>
 
-  <nav class="nav-sticky" x-show="current < 10">
+  <nav class="nav-sticky" x-show="current < 7">
     <div class="nav-sticky-inner">
       <div class="nav-sticky-left">
         <button class="btn btn-ghost" @click="back()" :disabled="current === 0 || saving">
           ← Back
         </button>
-        <span class="nav-sticky-meta" x-text="`Step ${Math.min(current + 1, 10)} of 10`"></span>
+        <span class="nav-sticky-meta" x-text="`Step ${Math.min(current + 1, 6)} of 6`"></span>
       </div>
       <div class="nav-sticky-right">
-        <button class="btn btn-ghost" @click="saveAndQuit()" x-show="current > 0 && current < 9">
+        <button class="btn btn-ghost" @click="saveAndQuit()" x-show="current > 0 && current < 6">
           Save & quit
         </button>
         <button class="btn btn-primary btn-arrow" @click="next()" :disabled="saving">
-          <span x-show="current < 9 && !saving">Continue</span>
-          <span x-show="current === 9 && !saving">Finish & install</span>
+          <span x-show="current < 6 && !saving">Continue</span>
+          <span x-show="current === 6 && !saving">Finish & install</span>
           <span x-show="saving"><span class="spinner"></span> Writing…</span>
           <span class="arrow-icon" aria-hidden="true">→</span>
         </button>

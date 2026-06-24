@@ -1,13 +1,14 @@
 # SpielOS
 
-**A markdown-driven marketing team that lives in your IDE.**
+**A lean markdown-driven marketing team that lives in your IDE.**
 
-SpielOS turns one `/post` command into platform-native content for X, LinkedIn, and your blog. The team — Managing Director, Strategist, Researcher, Copywriter, Editor, Designer, Publisher, Analyst — is just `.md` files. The deterministic parts (banner design, publishing, quality gates) are tiny Python tools. Everything else is LLM-orchestrated markdown.
+SpielOS turns one `/post` command into platform-native content for X, LinkedIn, and your blog. The team — Director, Strategist, Writer, Editor, Publisher — is just `.md` files. The deterministic parts (quality gates, publishing) are tiny Python tools. Everything else is LLM-orchestrated markdown.
 
 ```
-IDLE → [Researcher] → [Strategist] → [Copywriter] → [Designer] → [Editor] → [Publisher] → [Analyst] → COMPLETE
-                 ↘  ↙                  ↕ user             ↑           ↕ user
-               MD delegates        format wizard     gates check   publish/hold/reject
+IDLE → [Director] → [Strategist] → [Writer] → [Editor] → [Publisher] → IDLE
+                  ↕ user             ↕ user
+              source reject      format wizard
+                                publish/hold/reject
 ```
 
 ---
@@ -27,7 +28,7 @@ The installer:
 4. Waits for you to click **Finish** in the wizard
 5. Installs the `spiel` shim to `~/.local/bin/spiel`
 6. Writes `~/.config/spielos/config` — a **global config** that makes the vault resolvable from ANY working directory, not just inside the vault
-7. Syncs the 8 role agents + 5 skills to `~/.config/opencode/`, `~/.claude/`, `~/.cursor/`
+7. Syncs the 5 role agents + 3 skills to `~/.config/opencode/`, `~/.claude/`, `~/.cursor/`, `~/.codex/`
 8. Prints `DONE. From any IDE, type /post to ship a post.`
 
 Override the install path: `SPIELOS_INSTALL_DIR=/some/path bash <(curl ...)`. Override the wizard port: `SPIELOS_WIZARD_PORT=8080`. Override the timeout (default 30 min): `SPIELOS_WIZARD_TIMEOUT=300`.
@@ -62,12 +63,12 @@ brew install spielos/tap/spiel
 From any IDE (opencode, Claude Code, Cursor, MCP), type:
 
 ```bash
-/post                       # use today's session log (session mode)
+/post                       # topic mode — supply source after /post
 /post "Just shipped v2"     # topic mode — ship an announcement
 /post @file:./notes.md      # topic mode from a file
 ```
 
-The MD subagent picks the right next role, hands off via `.brief.md`, and chains the full pipeline: **Researcher → Strategist → Copywriter → Designer → Editor → Publisher → Analyst**. You get two human pauses — pick platforms, pick publish/hold/reject per draft.
+The Director subagent picks the right next role, hands off via `content/current.md`, and chains the full pipeline: **Director → Strategist → Writer → Editor → Publisher**. You get two human pauses — pick platforms, pick publish/hold/reject per draft.
 
 CLI shortcuts (work from any terminal — **not cwd-dependent**):
 
@@ -77,8 +78,7 @@ spiel --where               # print resolved vault path
 spiel set-vault <path>      # change which vault spiel resolves to
 spiel config                # show vault + tool paths
 spiel status                # show current pipeline state
-spiel check <draft.md>      # run the 15 mechanical gates
-spiel analyze               # pull engagement, re-rank templates
+spiel check <draft.md>      # run the 4 mechanical gates
 spiel sync                  # regenerate IDE adapter files (no pull)
 spiel init                  # re-open the setup wizard
 spiel update                # pull latest + sync to IDEs (preserves your data)
@@ -92,37 +92,31 @@ All CLI commands resolve the vault from `~/.config/spielos/config` (set once at 
 
 | Role | Type | Owns |
 |---|---|---|
-| **MD** | LLM agent | State machine, handoffs, human checkpoints |
-| **Strategist** | LLM agent | Compiler, axis selection, template ranking |
-| **Researcher** | LLM + tool | Session synthesis, archetype classification |
-| **Copywriter** | LLM agent | Drafts, voice register, soft-gate self-check |
-| **Editor** | LLM + tool | 15 mechanical gates + 14 soft gates |
-| **Designer** | LLM + tool | Banner tokens, render PNG via Playwright |
-| **Publisher** | LLM + tool | Buffer / X / LinkedIn / blog dispatch |
-| **Analyst** | LLM + tool | Engagement pull, perf re-rank |
+| **Director** | LLM agent | Source intake, handoffs, human checkpoints |
+| **Strategist** | LLM agent | Compiles reader, pain, point, proof, angle, formats |
+| **Writer** | LLM agent | Writes platform-native drafts |
+| **Editor** | LLM + tool | 4 mechanical gates + taste review |
+| **Publisher** | LLM + tool | Publish / hold / reject per draft, then dispatch |
 
-Each role is a single `.md` file in `team/`. The IDE invokes the MD subagent when you type `/post`. MD chains the other 7.
+Each role is a single `.md` file in `team/`. The IDE invokes the Director subagent when you type `/post`. Director chains the other 4.
 
 ---
 
 ## The setup wizard
 
-The 10-step wizard at `http://localhost:7331`:
+The 6-step wizard at `http://localhost:7331`:
 
 1. **Welcome** — overview, target, time
 2. **Brand** — name, handle, tagline, colors + live banner preview
-3. **ICP** — your audience profile (markdown editor with skeleton)
-4. **Positioning** — your one-liner, category, insight (markdown editor)
-5. **Offer** — what you sell (markdown editor)
-6. **Funnel + Archetypes** — distribution sliders + archetype toggles (hybrid)
-7. **Voice + Corpus** — register, style rules, voice examples (hybrid)
-8. **Methodology** — name, sources, platforms (markdown editor)
-9. **Rules** — mechanical config defaults (markdown editor)
-10. **Connect** — Buffer / X / LinkedIn / blog tokens (all skippable)
+3. **Audience** — who you write for (markdown editor with skeleton)
+4. **Offer** — what you sell (markdown editor with skeleton)
+5. **Voice** — how posts read (markdown editor with skeleton)
+6. **Examples** — your best posts (markdown editor with skeleton)
+7. **Connect** — Buffer / X / LinkedIn / blog tokens (all skippable)
 
-The wizard uses a minimal design system with live banner previews, color pickers, and toggle groups. Every input shows a `→ file/path` chip so you know where each value lands. The 10-step stepper at the top is clickable. The bottom nav is sticky.
+The wizard uses a minimal design system with a live banner preview and color pickers. Every input shows a `→ file/path` chip so you know where each value lands. The 6-step stepper at the top is clickable. The bottom nav is sticky.
 
-On Finish, the wizard auto-installs the `spiel` shim to `~/.local/bin/spiel`, syncs the IDE adapter files, and installs the 8 agent + 8 skill stubs to `~/.config/opencode/`. From then on, `/post` works from any IDE.
+On Finish, the wizard writes 4 strategy files (textarea-based editors) + brand + .env, then auto-shuts down. The installer then installs the `spiel` shim to `~/.local/bin/spiel`, syncs the IDE adapter files, and installs the 5 agent + 3 skill stubs to `~/.config/opencode/`. From then on, `/post` works from any IDE.
 
 ---
 
@@ -130,66 +124,54 @@ On Finish, the wizard auto-installs the `spiel` shim to `~/.local/bin/spiel`, sy
 
 ```
 spielos/
-├── team/                  # 8 role .md files (the marketing team)
-│   ├── md.md              # orchestrator
-│   ├── strategist.md      # compile + select
-│   ├── researcher.md      # capture + classify
-│   ├── copywriter.md      # drafting
-│   ├── editor.md          # gate instructions
-│   ├── designer.md        # banner instructions
-│   ├── publisher.md       # dispatch instructions
-│   └── analyst.md         # engagement + re-rank
+├── team/                  # 5 role .md files (the marketing team)
+│   ├── director.md        # orchestrator
+│   ├── strategist.md      # brief
+│   ├── writer.md          # drafts
+│   ├── editor.md          # mechanical + taste
+│   ├── publisher.md       # dispatch
+│   └── post.md            # /post slash command
 │
 ├── system/                # the playbook
-│   ├── state-machine.md   # the 10-state table (single source of truth)
-│   ├── brief-schema.md    # .brief.md template (handoff file)
-│   ├── pipeline.md        # role ↔ state map
+│   ├── pipeline.md        # the 5-step table (single source of truth)
+│   ├── draft-schema.md    # content/current.md + draft frontmatter
 │   ├── brand.md           # brand tokens (human-readable)
-│   ├── brand.json         # banner tokens (machine-readable)
-│   ├── gates.md           # 15 mechanical + 14 soft gates
-│   ├── rules.yaml         # mechanical config values
-│   └── prompts/           # LLM-facing text per role
-│       ├── identity.md    # LLM-facing runtime identity + hard constraints
+│   ├── brand.json         # brand tokens (machine-readable)
+│   └── rules.yaml         # mechanical config values
 │
-├── strategy/              # 8 knowledge files (filled by wizard)
-│   ├── icp.md             # Ideal Customer Profile
-│   ├── positioning.md     # your one-liner
+├── strategy/              # 4 knowledge files (filled by wizard)
+│   ├── audience.md        # who you write for
 │   ├── offer.md           # what you sell
-│   ├── funnel.md          # how readers move through
 │   ├── voice.md           # how posts read
-│   ├── methodology.md     # where content comes from
-│   ├── archetypes.md      # session types (S1–S10 + custom)
-│   └── corpus.md          # 8 canonical voice examples
+│   └── examples.md        # your best posts
 │
 ├── templates/             # post output shapes
 │   ├── x-post.md
 │   ├── linkedin-post.md
-│   ├── blog-post.md
-│   ├── session-log.md
-│   └── registry/
-│       ├── viral-templates.yaml
-│       ├── performance.json
-│       └── rank-history.jsonl
+│   └── blog-post.md
 │
-├── tools/                 # deterministic tools (one per role)
-│   ├── editor.py          # 15 mechanical gates (CLI)
-│   ├── designer.py        # banner gen (Playwright + system Chrome)
+├── tools/                 # deterministic tools
+│   ├── editor.py          # 4 mechanical gates (CLI)
 │   ├── publisher/         # Buffer / X direct / LinkedIn direct / blog.sh
-│   ├── analyst.py         # engagement pull + re-rank
-│   ├── capture-session.py # captures the CURRENT session → content/sessions/YYYY-MM-DD-session-current.md
-│   ├── researcher.py      # mechanical classify + opencode session-list (debug)
-│   └── sync_adapters.py   # generates IDE adapter files
+│   ├── designer.py        # banner PNG render (dormant — Designer archived)
+│   ├── sync_adapters.py   # generates IDE adapter files
+│   └── _vault.py          # shared vault resolver
 │
 ├── content/               # generated content
-│   ├── sessions/
-│   ├── queue/
-│   ├── posted/
-│   ├── rejected/
-│   └── .brief/            # archived briefs (gitignored)
+│   ├── inbox/             # source notes
+│   ├── drafts/            # writer output
+│   ├── ready/             # editor-approved
+│   ├── posted/            # published archive
+│   └── rejected/          # rejected archive
 │
-├── assets/                # design assets
-│   ├── icons/             # 17 SVG icons (sparkles, rocket, etc.)
+├── assets/                # design assets (dormant)
+│   ├── icons/             # 17 SVG icons
 │   └── banners/           # generated banner PNGs
+│
+├── skills/                # 3 active human-checkpoint skills
+│   ├── format_wizard/     # ask user for platforms
+│   ├── publish_wizard/    # ask user for p/h/r
+│   └── voice_match/       # match user voice register
 │
 ├── bin/spiel              # vault-resolver shim + CLI
 │                          # (~/.config/spielos/config is the global vault pointer)
@@ -199,21 +181,26 @@ spielos/
 │   ├── uninstall.sh
 │   ├── wizard/            # the localhost:7331 setup wizard
 │   │   ├── serve.py       # stdlib http.server
-│   │   ├── index.html     # 10-step form (Alpine + design system)
+│   │   ├── index.html     # 6-step form
 │   │   ├── design-system.css
-│   │   └── steps.js
+│   │   ├── steps.js
+│   │   └── skeletons/     # 4 skeleton files for textarea defaults
 │   └── brew/spiel.rb      # homebrew formula
 │
+├── archive/               # archived roles + skills (not in live path)
+│   ├── roles/             # analyst, designer, researcher
+│   └── skills/            # icp_simulation, template_picker
+│
 ├── adapters/              # auto-gen per-IDE agent files
-│   ├── opencode/agents/   # ~/.config/opencode/agents/
-│   ├── opencode/skill/    # ~/.config/opencode/skill/
-│   ├── claude/agents/
+│   ├── opencode/{agents,skill,commands}
+│   ├── claude/{agents,commands}
 │   ├── cursor/commands/
+│   ├── codex/agents/
 │   └── mcp/server.json
 │
-├── AGENTS.md              # role registry + state machine
+├── AGENTS.md              # role registry + pipeline
 ├── README.md              # you are here
-├── tests/                 # smoke + state machine tests
+├── tests/                 # smoke + adapter tests
 └── package.json
 ```
 
@@ -221,43 +208,36 @@ spielos/
 
 ## What stays deterministic
 
-These 4 tools the LLM can't replace:
+These tools the LLM can't replace:
 
 | Tool | Role | What |
 |---|---|---|
-| `tools/editor.py` | Editor | 15 mechanical gate checks (regex, length, structural) |
-| `tools/designer.py` | Designer | Banner PNG render (Playwright + system Chrome) |
+| `tools/editor.py` | Editor | 4 mechanical gates (em-dash, banned phrases, required frontmatter, char count) |
 | `tools/publisher/*.py` | Publisher | API dispatch + archive (Buffer primary, X/LinkedIn direct fallback, blog.sh) |
-| `tools/analyst.py` | Analyst | Buffer engagement pull + perf ledger + re-rank |
-| `tools/researcher.py` | Researcher | Mechanical classify + opencode session-list (debug) |
-| `tools/capture-session.py` | Researcher | Capture the current session → `content/sessions/YYYY-MM-DD-session-current.md` (overwrites). The canonical "current" log. |
+| `tools/designer.py` | (dormant) | Banner PNG render — Designer role is archived, kept for restore |
+| `tools/sync_adapters.py` | build | Generates IDE adapter files from `team/*.md` + `skills/*/SKILL.md` |
 
-Everything else is LLM-driven (the 8 role `.md` files).
+Everything else is LLM-driven (the 5 role `.md` files).
 
 ---
 
-## The state machine (10 states)
+## The pipeline (5 steps)
 
 ```
-IDLE → SESSION_CAPTURE → COMPILE → SELECT → DRAFTING → BANNER
-     → GATE_CHECK → PUBLISHING → ANALYZING_POST → COMPLETE_POST → IDLE
+IDLE → Director → Strategist → Writer → Editor → Publisher → IDLE
 ```
 
-The state table is the **single source of truth** at `system/state-machine.md`. No Python enforces it. MD reads the table; nobody else needs to.
+The pipeline table is the **single source of truth** at `system/pipeline.md`. No Python enforces it. Director reads the table; nobody else needs to.
 
 Human checkpoints are embedded in the role that owns the work:
 
-| # | State | Actor | Action |
+| # | Step | Role | Action |
 |---|---|---|---|
-| 1 | SESSION_CAPTURE | Researcher | Collect source + classify |
-| 2 | COMPILE | Strategist | 8-step session compiler / 6-question topic compiler |
-| 3 | SELECT | Strategist | Rank templates |
-| 4 | DRAFTING | Copywriter | Format wizard + write drafts |
-| 5 | BANNER | Designer | Render PNGs |
-| 6 | GATE_CHECK | Editor | Run 15 mechanical + 14 soft |
-| 7 | PUBLISHING | Publisher | Publish wizard + dispatch |
-| 8 | ANALYZING_POST | Analyst | Engagement + re-rank |
-| 9 | COMPLETE_POST | MD | Archive brief |
+| 1 | Director | Director | Accept source, write `content/current.md`, delegate |
+| 2 | Strategist | Strategist | Compile reader, pain, point, proof, angle, formats |
+| 3 | Writer | Writer | Format wizard (HUMAN) + write drafts |
+| 4 | Editor | Editor | Run 4 mechanical + taste review |
+| 5 | Publisher | Publisher | Publish wizard (HUMAN) + dispatch |
 
 ---
 
@@ -267,8 +247,9 @@ Human checkpoints are embedded in the role that owns the work:
 - **NEVER** use em-dashes. Use →, colons, or commas. The Editor will fail the draft.
 - **NEVER** leak internal labels (S1–S10, TOFU/MOFU/BOFU, L1–L4, "core_insight", "the engine", "the pipeline") in public posts.
 - **NEVER** pitch the offer outside the 1-in-5 rule.
-- **NEVER** publish a draft with `gates: fail` or no `banner:`.
-- **NEVER** advance the state without the previous role's section populated.
+- **NEVER** write a draft without the full 8-field frontmatter.
+- **NEVER** publish a draft that failed `tools/editor.py`.
+- **NEVER** advance the step without the previous role's section populated.
 
 ---
 
@@ -276,13 +257,7 @@ Human checkpoints are embedded in the role that owns the work:
 
 1. Drop `team/<name>.md` with the standard structure (see `team/README.md`).
 2. Run `python3 tools/sync_adapters.py --install`.
-3. The new role is now available in opencode, Claude Code, Cursor, MCP.
-
-## Add a new state
-
-1. Add one row to `system/state-machine.md`.
-2. Assign it a role (existing or new).
-3. Add the role's prompt to `team/`.
+3. The new role is now available in opencode, Claude Code, Cursor, Codex, MCP.
 
 ---
 
