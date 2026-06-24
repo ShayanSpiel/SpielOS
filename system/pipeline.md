@@ -11,14 +11,14 @@ IDLE → SESSION_CAPTURE → COMPILE → SELECT → DRAFTING → BANNER → GATE
 | # | State | Role | Type | Output |
 |---|---|---|---|---|
 | 0 | IDLE | **MD** | LLM | empty brief |
-| 1 | SESSION_CAPTURE | **Researcher** | LLM + tool | `## researcher` |
-| 2 | COMPILE | **Strategist** | LLM | `## strategist.core_insight` + 6 axes |
-| 3 | SELECT | **Strategist** | LLM | `## strategist.template_selection` |
-| 4 | DRAFTING | **Copywriter** | LLM + human | `## copywriter` + draft files + `formats` |
+| 1 | SESSION_CAPTURE | **MD (inline via researcher.md)** | LLM + tool | `## researcher` |
+| 2 | COMPILE | **MD (inline via strategist.md)** | LLM | `## strategist.core_insight` + 6 axes |
+| 3 | SELECT | **MD (inline via strategist.md)** | LLM | `## strategist.template_selection` |
+| 4 | DRAFTING | **MD (inline via copywriter.md)** | LLM + human | `## copywriter` + draft files + `formats` |
 | 5 | BANNER | **Designer** | LLM + `tools/designer.py` | `## designer` + PNG files |
 | 6 | GATE_CHECK | **Editor** | LLM + `tools/editor.py` | `## editor.verdict` |
 | 7 | PUBLISHING | **Publisher** | LLM + human + tools | `## publisher` + posted/rejected files |
-| 8 | ANALYZING_POST | **Analyst** | LLM + `tools/analyst.py` | `## analyst` |
+| 8 | ANALYZING_POST | **MD (inline via analyst.md)** | LLM + `tools/analyst.py` | `## analyst` |
 | 9 | COMPLETE_POST | **MD** | LLM | `.brief.md` archived |
 
 ---
@@ -26,47 +26,19 @@ IDLE → SESSION_CAPTURE → COMPILE → SELECT → DRAFTING → BANNER → GATE
 ## Hand-off graph
 
 ```
-MD ──starts──→ Researcher ──reads session log + ICP──→ Strategist
-                                                         │
-                                             reads templates + corpus
-                                                         │
-                                                         ▼
-                                                      Copywriter
-                                                         │
-                                                    asks user formats
-                                                         │
-                                                       writes drafts
-                                                         │
-                                                         ▼
-                                                      Designer
-                                                         │
-                                                    calls designer.py
-                                                         │
-                                                         ▼
-                                                       Editor
-                                                         │
-                                                    calls editor.py
-                                                         │
-                                                         ▼
-                                                     Publisher
-                                                         │
-                                                    asks user p/h/r
-                                                         │
-                                                    calls publisher
-                                                         │
-                                                         ▼
-                                                      Analyst
-                                                         │
-                                                    calls analyst
-                                                         │
-                                                         ▼
-                                                        MD
-                                                         │
-                                                   archives brief
-                                                         │
-                                                         ▼
-                                                       IDLE
+MD (inline flow — runs in one visible conversation)
+├── Step 2: researcher.md — DB synthesis + classification     [tools/researcher.py]
+├── Step 3: strategist.md — compiler (8-step / 6-question)    [LLM]
+├── Step 4: strategist.md — template ranking                   [LLM]
+├── Step 5: copywriter.md — format wizard + drafting           [LLM + question tool]
+├── Step 6: delegate to @designer via task()                   [tools/designer.py]
+├── Step 7: delegate to @editor via task()                     [tools/editor.py]
+├── Step 8: delegate to @publisher via task()                  [publisher tools]
+├── Step 9: analyst.md — engagement pull + re-rank             [tools/analyst.py]
+└── Step 10: archive brief                                     [bash mv]
 ```
+
+Only designer, editor, and publisher run as separate subagents (via `task()`). Everything else runs inline in MD's conversation — fixing both session capture (MD can read the opencode DB) and UX (user sees progress without clicking into nested panels).
 
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: researcher
-description: 'Collects the source for a /post run. In session mode: captures the current conversation as a session log, classifies it into archetype/funnel/icp_layer. In topic mode: classifies the topic text directly. The Researcher owns the SESSION_CAPTURE state.'
+description: 'Collects the source for a /post run. In session mode: captures the pre-/post session from opencode DB, classifies it into archetype/funnel/icp_layer. In topic mode: classifies the topic text directly. The Researcher owns the SESSION_CAPTURE state.'
 mode: subagent
 role_in_pipeline:
 - SESSION_CAPTURE
@@ -71,69 +71,25 @@ Plus append the next state to `## state_history` in the brief.
 
 ## Session mode (scenario = "session")
 
-### Phase 1 — Capture (LLM writes the session log directly)
+### Phase 1 — Capture (from opencode DB — captures the actual pre-/post session)
 
-Print: `Researcher — Phase 1/4: Capturing current conversation as session log`
+Print: `Researcher — Phase 1/4: Capturing session from opencode database`
 
-**You already have the conversation in your context.** Extract it directly — do not call an external tool for capture.
-
-1. Scan the conversation above you. Extract user messages and your own responses.
-2. Strip all tool results, system prompts, frontmatter, and internal noise.
-3. Build a clean session log markdown file and write it to disk:
+Call the opencode DB synthesis tool. This reads the SQLite DB at `~/.local/share/opencode/opencode.db` and finds the most recent parent session for the vault directory:
 
 ```bash
-cat > <vault_path>/content/sessions/YYYY-MM-DD-session-current.md << 'SESSIONEOF'
----
-title: <descriptive title>
-date: YYYY-MM-DD
-session_id: current
-tags: [captured, current]
-produces_pillar: no
-pillar_outline: none
-drafts: []
-status: in-progress
-summary: "<one-line summary>"
-captured_by: researcher-agent
-message_count: <N>
----
-
-# Current Session
-
-> Auto-captured by the Researcher from the live conversation.
-
-## Patterns recognized
-
-- <bullet: pattern extracted from conversation>
-
-## Decisions made
-
-- <bullet: decision extracted>
-
-## What we did
-
-- <bullet: what happened>
-
-## Shipped
-
-- <bullet: what was shipped>
-
-## Numbers
-
-- <bullet: any metrics/numbers>
-
-## Lesson
-
-- <bullet: lesson extracted>
-SESSIONEOF
+python3 <vault_path>/tools/researcher.py synthesize-session --out <vault_path>/content/sessions/YYYY-MM-DD-session-current.md --cwd <vault_path>
 ```
+
+Read the JSON output. If `ok: true`, the session was captured.
 
 Print: `Researcher — Session captured: <vault_path>/content/sessions/YYYY-MM-DD-session-current.md`
 
-**Fallback** — if you cannot access the conversation context (e.g., topic mode or an error), try the opencode DB synthesis:
+**Fallback** — if the opencode DB is unavailable (no DB file, no recent session, or error), try to extract the current conversation directly from your context:
 
-```bash
-python3 <vault_path>/tools/researcher.py synthesize-session --out <vault_path>/content/sessions/YYYY-MM-DD-session-synthesized.md
-```
+1. Scan the conversation above you. Extract user messages and your own responses.
+2. Strip all tool results, system prompts, frontmatter, and internal noise.
+3. Build a clean session log markdown file and write it to disk via `cat >`.
 
 If that also fails: print `Researcher — Could not capture session — no conversation found`, return `error: no session available. Run a work session first, or use /post <topic>.`
 
@@ -247,7 +203,7 @@ You are factual. You report what the session / topic IS, not what it MEANS. The 
 - **NEVER** invent session content. If the session log is a stub, refuse.
 - **NEVER** do research in topic mode. The topic is the topic.
 - **NEVER** leak internal labels (S1–S10, TOFU/MOFU/BOFU, L1–L4) into `key_facts`. They go in `classification` only.
-- **ALWAYS** capture the current conversation for session mode — do not look for existing logs first.
+- **ALWAYS** capture via DB synthesis for session mode — use the opencode database. Fall back to context extraction only if the DB is unavailable.
 - **ALWAYS** validate the session log schema before classifying.
 - **ALWAYS** populate all 4 classification fields. Empty classification = MD reverts to SESSION_CAPTURE.
 - **ALWAYS** extract at least 3 key facts. <3 facts = fail.
@@ -264,13 +220,13 @@ You are factual. You report what the session / topic IS, not what it MEANS. The 
 ## Tools
 
 ```bash
-# WRITE session log directly (preferred — you have the conversation in context)
+# PRIMARY — synthesize from opencode DB (captures the actual pre-/post session)
+python3 <vault_path>/tools/researcher.py synthesize-session --out <vault_path>/content/sessions/YYYY-MM-DD-session-current.md --cwd <vault_path>
+
+# FALLBACK — write session log directly from context (standalone use only)
 cat > <vault_path>/content/sessions/YYYY-MM-DD-session-current.md << 'EOF'
 ...full frontmatter + sections...
 EOF
-
-# FALLBACK — synthesize from opencode DB (if you cannot see the conversation)
-python3 <vault_path>/tools/researcher.py synthesize-session --out <vault_path>/content/sessions/YYYY-MM-DD-session-synthesized.md
 
 # Mechanical classification (fast, keyword-based — run this every time)
 python3 <vault_path>/tools/researcher.py classify --input <path-to-session-file> --kind session|topic
