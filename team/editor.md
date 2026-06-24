@@ -15,6 +15,8 @@ writes:
 - '`gates:` frontmatter field per draft'
 tools:
   bash: true
+permission:
+  bash: allow
 ---
 
 # Editor

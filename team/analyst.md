@@ -15,6 +15,8 @@ writes:
 - '{vault_root}/templates/registry/rank-history.jsonl'
 tools:
   bash: true
+permission:
+  bash: allow
 ---
 
 # Analyst

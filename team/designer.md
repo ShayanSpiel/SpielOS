@@ -16,6 +16,8 @@ writes:
 - '{vault_root}/assets/banners/*.png'
 tools:
   bash: true
+permission:
+  bash: allow
 ---
 
 # Designer

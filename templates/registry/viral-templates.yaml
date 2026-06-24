@@ -152,3 +152,45 @@ platforms:
       - id: blog-pillar-03
         name: The anatomy of a pattern
         hook: "The anatomy of {pattern}.\n\n{observation}.\n\nHere's how it works, why it matters, and what to do about it."
+
+recommendations:
+  run_id: 2026-06-24-001
+  scored_at: 2026-06-24T10:00:00Z
+  classification:
+    archetype: builder
+    archetype_s: S2
+    selected_axis: leverage
+    funnel_stage: TOFU
+    icp_layer: L1
+    vertical: content-automation-ai-agents
+  x:
+    - id: x-ship-01
+      score: 0.90
+      match: "archetype S2, axis leverage, funnel TOFU, icp L1 — full match via ship_log category"
+    - id: x-ship-04
+      score: 0.90
+      match: "archetype S2, axis leverage, funnel TOFU, icp L1 — full match via ship_log category"
+    - id: x-ship-02
+      score: 0.90
+      match: "archetype S2, axis leverage, funnel TOFU, icp L1 — full match via ship_log category"
+  linkedin:
+    - id: li-paradigm-01
+      score: 0.35
+      match: "no explicit best_for in category — selected for thematic fit: stop overcomplicating publishing aligns with leverage/contrarian axes"
+    - id: li-vuln-01
+      score: 0.30
+      match: "no explicit best_for in category — selected for thematic fit: identity tension of 'the post I've been avoiding' aligns with human/leverage axes"
+    - id: li-auth-02
+      score: 0.25
+      match: "no explicit best_for in category — selected for thematic fit: builder field lessons align with behavioral/leverage axes"
+  blog:
+    - id: blog-pillar-01
+      score: 0.30
+      match: "no explicit best_for in category — selected for thematic fit: concept framework aligns with systemic/leverage axes"
+    - id: blog-pillar-02
+      score: 0.25
+      match: "no explicit best_for in category — selected for thematic fit: belief articulation aligns with philosophical/human axes"
+  notes:
+    - "performance.json is empty — performance_score contribution was 0 for all templates"
+    - "LinkedIn and Blog categories lack explicit best_for archetype/axis/funnel/icp match lists — scores reflect thematic fit only"
+    - "Session log was a meta-trigger with 1 turn and no shipped work — compiler extrapolated from ICP world state"

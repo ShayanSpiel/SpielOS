@@ -229,7 +229,7 @@ def check_project_as_subject(fm, body, rules):
                    "stop", "forget", "nobody", "everyone", "anyone"}
     if cleaned.lower() in strong_safe:
         return True, f"OK: Safe opener '{first_word}'"
-    if cleaned.lower() in safe and len(cleaned) > 3:
+    if cleaned.lower() in safe:
         return True, f"OK: Safe opener '{first_word}'"
     if cleaned in ("I", "We"):
         return True, "OK: Operator-focused opening"

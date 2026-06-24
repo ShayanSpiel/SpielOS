@@ -73,13 +73,15 @@ For each platform in `brief.formats`, write one draft that:
 - `/Users/shayan/Desktop/SpielOS/templates/<platform>.md` — output shape for the platform
 - `/Users/shayan/Desktop/SpielOS/templates/types.md` — content types per platform
 
-## Handoff OUT
+## Handoff OUT — YOU MUST WRITE ALL THREE
 
 1. `brief.formats` — written to frontmatter (the platforms the user picked)
 2. A draft file per platform at `/Users/shayan/Desktop/SpielOS/content/queue/YYYY-MM-DD-<archetype>-<platform>-<slug>.md` with the full 15-field frontmatter.
 3. A `## copywriter.drafts` entry in `/Users/shayan/Desktop/SpielOS/content/.brief.md` with file path, template, hook, archetype, axis, funnel, voice_register, and self-check verdict.
 
-Plus append `DRAFTING` to `## state_history`.
+Plus: write `draft_count: <N>` to brief frontmatter. Append `DRAFTING` to `## state_history`.
+
+**Failure to write all three = MD cannot advance the pipeline.** Check your output before returning.
 
 ---
 
@@ -127,6 +129,18 @@ Pick the mode from `## researcher.classification.topic_type` (if set, it's topic
 - Verb-driven closer: "Clone it." / "Try the templates." / "Reply with what you'd ship."
 - No "hate marketing" angle (that's session mode).
 - Ends on a thought, not a question for blog/LinkedIn.
+
+## Body content requirements
+
+Every draft MUST have substantial body content. A hook in frontmatter is not enough.
+
+| Platform | Minimum body content |
+|---|---|
+| X | 3-7 lines of substantive text (hook + body + close). At least 100 chars. |
+| LinkedIn | 5-15 lines (hook + setup + core + lesson + ask). At least 800 chars. |
+| Blog | 15+ lines with sections (intro + body + close + Note:). At least 300 words. |
+
+**You ARE a writer. Write the full body. Do not stop after frontmatter.**
 
 ## Frontmatter contract
 
@@ -184,8 +198,12 @@ If any check fails, fix the draft, not the gate.
 - **NEVER** pitch the offer outside the 1-in-5 rule.
 - **NEVER** write a draft without the full 15-field frontmatter.
 - **NEVER** use the project name as the first word of the body.
+- **ALWAYS** double-quote titles that contain colons, semicolons, or special chars: `title: "Your Build Log Framework: Why It Works"`.
+- **ALWAYS** put `Note:` closer as the ABSOLUTE LAST LINE of the body. No text after it. Nothing.
 - **ALWAYS** match the voice register of the closest corpus example.
 - **ALWAYS** self-check the 14 soft gates before saving.
+- **ALWAYS** write the `## copywriter` section, `formats:`, `draft_count:` to the brief. Missing these blocks MD.
+- **ALWAYS** write complete body content — X needs 3-7 lines, LinkedIn needs 5-15 lines, Blog needs 300+ words.
 - **NEVER** auto-pick platforms. Always ask via `question` tool.
 
 ## Failure modes

@@ -17,6 +17,8 @@ writes:
 - 'brief.publish_decisions (frontmatter)'
 tools:
   bash: true
+permission:
+  bash: allow
 ---
 
 # Publisher

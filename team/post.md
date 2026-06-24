@@ -1,5 +1,6 @@
 ---
 name: post
+agent: md
 description: Run the /post content pipeline. A slash command that dispatches to the @md orchestrator subagent. Invoke @md immediately with the user's exact args. Do not interpret, do not ask, do not write anything yourself.
 ---
 
