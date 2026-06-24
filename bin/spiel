@@ -189,7 +189,7 @@ _resolve_vault() {
     fi
     echo "" >&2
     echo "  Fix: re-run the installer:" >&2
-    echo "    curl -fsSL https://spielos.xyz/spielos | bash" >&2
+    echo "    curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/Spiel-OS/main/install/install.sh | bash" >&2
     return 1
   fi
 

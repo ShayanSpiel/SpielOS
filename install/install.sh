@@ -3,7 +3,7 @@
 #
 # One command. Any Mac/Linux. Any IDE.
 #
-#   curl -fsSL https://spielos.xyz/spielos | bash
+#   curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/Spiel-OS/main/install/install.sh | bash
 #
 # What this does:
 #   1. Detects arch, python, git, curl/wget

@@ -18,7 +18,7 @@ IDLE → [Director] → [Strategist] → [Writer] → [Editor] → [Publisher] �
 One command. Any Mac/Linux. Any IDE.
 
 ```bash
-curl -fsSL https://spielos.xyz/spielos | bash
+curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/Spiel-OS/main/install/install.sh | bash
 ```
 
 The installer:
