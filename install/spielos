@@ -3,7 +3,10 @@
 #
 # One command. Any Mac/Linux. Any IDE.
 #
-#   curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/Spiel-OS/main/install/install.sh | bash
+#   curl -fsSL https://spielos.xyz/spielos | bash
+#
+# (Reading this in a browser? Visit https://spielos.xyz/SpielOS for the
+# landing page, then copy the command above into your terminal.)
 #
 # What this does:
 #   1. Detects arch, python, git, curl/wget
