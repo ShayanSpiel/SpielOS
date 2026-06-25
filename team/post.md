@@ -1,16 +1,15 @@
 ---
 name: post
-description: Route /post to the content pipeline. Write context, invoke @director.
+description: Dispatch a /post request. Parse mode, capture session, write execution context, invoke @director.
 ---
 
 # /post
 
 ## Parse mode
 
-| Input | Mode |
-|---|---|
-| `/post <text>` | **topic** — `input: "<text>"` |
-| `/post` (no args) | **session** — capture conversation |
+- `/post <text>` → **topic** — `input: "<text>"`
+- `/post` (no args) → **session** — capture conversation
+- If `<text>` contains `@file:./path` references → read each file, use contents as input
 
 ## Generate run_id
 
@@ -25,7 +24,7 @@ Same date as today → `n+1`. Else `n=1`. Write back.
 ```yaml
 ---
 mode: topic
-input: "<exact text after /post>"
+input: "<exact text after /post, or file contents if @file: used>"
 status: routing
 run_id: <from above>
 created_at: <ISO 8601>
@@ -34,7 +33,7 @@ created_at: <ISO 8601>
 
 ### Session mode
 
-1. Collect ALL user + assistant messages from conversation. Strip tool calls, tool results, system messages. Keep text only.
+1. Collect ALL user + assistant text from conversation. Strip tool calls, tool results, system messages.
 2. Write `{vault_root}/content/sessions/current.md`:
 ```yaml
 ---
@@ -48,12 +47,11 @@ tool_calls: <count>
 # Session Capture
 ## User Messages
 ### 1
-<message text>
-### 2
+<text>
 ...
 ## Assistant Messages
 ### 1
-<message text>
+<text>
 ...
 ```
 3. Write `{vault_root}/content/current.md`:
@@ -69,12 +67,12 @@ created_at: <ISO 8601>
 
 ## Delegate
 
-Invoke @director. No explanation. No output.
+Invoke @director. No explanation. No preamble.
 
 ## Hard rules
 
 - Use `{vault_root}` paths only. Never cwd.
-- Never explain actions, show thinking, or output preamble.
+- Never explain, show thinking, or output preamble.
 - Never ask the user anything.
 - No em-dashes in any file content.
-- `/post <text>` where `text` contains file references (e.g. `@file:./notes.md`) — open the file, read it, use its contents as the input. The prompt must treat `@file:` links as input to research and incorporate.
+- Files already exist from the hook? Skip writing, go straight to delegation.
