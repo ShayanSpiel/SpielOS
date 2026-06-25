@@ -1,15 +1,2 @@
 {
-  "hooks": {
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 ${CLAUDE_PROJECT_DIR}/tools/post-hook.py --vault $VAULT_DIR --ide claude",
-            "timeout": 30
-          }
-        ]
-      }
-    ]
-  }
 }

@@ -512,6 +512,8 @@ def install_claude_hooks(verbose: bool = False) -> int:
 
     Merges the canonical hooks from adapters/claude/hooks.json into the user's
     settings.json, preserving any existing settings (model, permissions, etc.).
+    Templates {vault_root} in hook commands to the absolute vault path.
+    Sets VAULT_DIR in the env section so the hook script can find the vault.
     """
     if not detect_ide(CLAUDE_CONFIG, "claude"):
         return 0
@@ -528,10 +530,19 @@ def install_claude_hooks(verbose: bool = False) -> int:
             existing = {}
     else:
         existing = {}
-    new_hooks = json.loads(src.read_text(encoding="utf-8"))
-    if "hooks" not in existing or not isinstance(existing.get("hooks"), dict):
-        existing["hooks"] = {}
-    existing["hooks"].update(new_hooks.get("hooks", {}))
+
+    # Read and template {vault_root} in hook commands
+    hooks_text = src.read_text(encoding="utf-8")
+    hooks_text = hooks_text.replace("{vault_root}", str(TEMPLATED_VAULT_ROOT))
+    new_hooks = json.loads(hooks_text)
+
+    existing["hooks"] = new_hooks.get("hooks", {})
+
+    # Set VAULT_DIR in env so the hook script can find the vault
+    if "env" not in existing or not isinstance(existing.get("env"), dict):
+        existing["env"] = {}
+    existing["env"]["VAULT_DIR"] = str(TEMPLATED_VAULT_ROOT)
+
     target.write_text(json.dumps(existing, indent=2) + "\n", encoding="utf-8")
     if verbose:
         print(f"  [claude] installed hooks to {target}")
@@ -539,7 +550,10 @@ def install_claude_hooks(verbose: bool = False) -> int:
 
 
 def install_cursor_hooks(verbose: bool = False) -> int:
-    """Install deterministic post hooks to ~/.cursor/hooks.json + post-hook.py script."""
+    """Install deterministic post hooks to ~/.cursor/hooks.json + post-hook.py script.
+
+    Templates {vault_root} in hook commands to the absolute vault path.
+    """
     if not detect_ide(CURSOR_CONFIG, "cursor"):
         return 0
     count = 0
@@ -548,38 +562,13 @@ def install_cursor_hooks(verbose: bool = False) -> int:
         return 0
     target = CURSOR_CONFIG / "hooks.json"
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+    # Template {vault_root} in hooks.json
+    hooks_text = src.read_text(encoding="utf-8")
+    hooks_text = hooks_text.replace("{vault_root}", str(TEMPLATED_VAULT_ROOT))
+    target.write_text(hooks_text, encoding="utf-8")
     count += 1
-    hooks_scripts_dir = CURSOR_CONFIG / "hooks"
-    hooks_scripts_dir.mkdir(parents=True, exist_ok=True)
-    script_src = VAULT / "tools" / "post-hook.py"
-    if script_src.is_file():
-        script_dst = hooks_scripts_dir / "post-hook.py"
-        script_dst.write_text(script_src.read_text(encoding="utf-8"), encoding="utf-8")
-        os.chmod(script_dst, 0o755)
-        count += 1
     if verbose:
         print(f"  [cursor] installed hooks ({count} files) to {CURSOR_CONFIG}")
-    return count
-
-
-def install_opencode_plugins(verbose: bool = False) -> int:
-    """Install deterministic post plugins to ~/.config/opencode/plugins/."""
-    if not OPENCODE_CONFIG.exists():
-        print(f"  {OPENCODE_CONFIG} does not exist — skipping install")
-        return 0
-    src_dir = ADAPTERS_DIR / "opencode" / "plugins"
-    if not src_dir.is_dir():
-        return 0
-    target = OPENCODE_CONFIG / "plugins"
-    target.mkdir(parents=True, exist_ok=True)
-    count = 0
-    for f in src_dir.glob("*.ts"):
-        dst = target / f.name
-        dst.write_text(f.read_text(encoding="utf-8"), encoding="utf-8")
-        count += 1
-    if verbose:
-        print(f"  [opencode] installed {count} plugins to {target}")
     return count
 
 
@@ -640,9 +629,6 @@ def install_opencode(verbose: bool = False) -> int:
         skill_dir.mkdir(parents=True, exist_ok=True)
         (skill_dir / "SKILL.md").write_text(templated_text(src.read_text(encoding="utf-8")), encoding="utf-8")
         count += 1
-    # Register the post-hook plugin so /post captures the session.
-    if _register_opencode_plugin(verbose=verbose):
-        count += 1
     if verbose:
         print(f"  installed {count} files (subagents + commands + skills) to {OPENCODE_CONFIG}")
     return count
@@ -695,64 +681,6 @@ def _collect_installed_paths() -> dict[Path, str]:
     # Codex: agents/
     _walk(CODEX_CONFIG, ["agents", "commands"], "codex")
     return out
-
-
-def _register_opencode_plugin(verbose: bool = False) -> bool:
-    """Register the post-hook plugin in ~/.config/opencode/opencode.jsonc.
-
-    The plugin is what captures the session transcript and writes
-    content/current.md + content/sessions/current.md to the vault
-    BEFORE the Director subagent runs. Without this registration, the
-    Director gets an empty session and halts.
-
-    Idempotent: safe to run multiple times. Preserves all other config.
-    """
-    config_path = OPENCODE_CONFIG / "opencode.jsonc"
-    if not config_path.exists():
-        return False
-
-    plugin_path = "~/.config/opencode/plugins/post-hook.ts"
-    expected_entry = str(Path(plugin_path).expanduser())
-
-    try:
-        text = config_path.read_text(encoding="utf-8")
-    except OSError:
-        return False
-
-    # Already registered? Check both absolute and ~ forms.
-    if (expected_entry in text or
-        plugin_path in text or
-        "post-hook.ts" in text):
-        return False
-
-    # Find the right place to insert. Prefer after "skills" if present,
-    # else after the opening "{".
-    import re
-    insertion = f'  "plugin": ["{plugin_path}"],\n'
-
-    if '"skills"' in text:
-        # Insert after the skills block's closing brace.
-        new_text = re.sub(
-            r'("skills"\s*:\s*\{[^}]*\}\s*,?)',
-            r'\1\n' + insertion.rstrip(",\n") + ",",
-            text,
-            count=1,
-        )
-        if new_text == text:
-            # Fallback: insert before "provider"
-            new_text = text.replace('  "provider"', insertion + '  "provider"', 1)
-    elif '"provider"' in text:
-        new_text = text.replace('  "provider"', insertion + '  "provider"', 1)
-    else:
-        return False
-
-    if new_text == text:
-        return False
-
-    config_path.write_text(new_text, encoding="utf-8")
-    if verbose:
-        print(f"  [plugin] registered {plugin_path} in {config_path}")
-    return True
 
 
 def _cleanup_stale_files(verbose: bool = False) -> int:
@@ -964,7 +892,7 @@ def main() -> int:
         do_cl = args.install or args.install_claude
         do_cx = args.install or args.install_codex
 
-        n_oc_inst = (install_opencode() + install_opencode_plugins()) if do_oc else 0
+        n_oc_inst = install_opencode() if do_oc else 0
         n_cu_inst = (install_cursor_skills() + install_cursor_commands() + install_cursor_hooks()) if do_cu else 0
         n_cl_inst = (install_claude_skills() + install_claude_agents() + install_claude_commands() + install_claude_hooks()) if do_cl else 0
         n_cx_inst = install_codex() if do_cx else 0
@@ -972,7 +900,7 @@ def main() -> int:
         print()
         print(f"Installed to live IDEs:")
         if do_oc:
-            print(f"  opencode:    {OPENCODE_CONFIG}  (agents + commands + skills + plugins)")
+            print(f"  opencode:    {OPENCODE_CONFIG}  (agents + commands + skills)")
         if do_cu:
             print(f"  cursor:      {CURSOR_CONFIG}  (skills + commands + hooks)")
         if do_cl:

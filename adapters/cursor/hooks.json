@@ -1,11 +1,5 @@
 {
   "version": 1,
   "hooks": {
-    "beforeSubmitPrompt": [
-      {
-        "command": "python3 .cursor/hooks/post-hook.py --vault $VAULT_DIR --ide cursor",
-        "timeout": 30
-      }
-    ]
   }
 }

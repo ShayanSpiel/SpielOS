@@ -302,9 +302,11 @@ _rewrite_vault_pointers() {
 
   printf 'VAULT_DIR=%s\n' "$VAULT" > "$VAULT/.spiel-vault"
 
-  # Global config — makes vault resolvable from ANY cwd
+  # Global config — merge VAULT_DIR with existing SOURCE_DIR
   mkdir -p "$HOME/.config/spielos"
+  existing_source=$(grep -E '^SOURCE_DIR=' "$HOME/.config/spielos/config" 2>/dev/null | head -1 || true)
   printf 'VAULT_DIR=%s\n' "$VAULT" > "$HOME/.config/spielos/config"
+  [[ -n "$existing_source" ]] && printf '%s\n' "$existing_source" >> "$HOME/.config/spielos/config"
 
   # Re-copy shim so next invocation uses the latest vault resolution logic
   if [[ -f "$VAULT/bin/spiel" ]]; then
@@ -426,15 +428,50 @@ case "${1:-}" in
         ;;
     esac
 
-    # Pull the latest tool sources, then sync to IDEs.
-    # Preserves your custom team/, skills/, strategy/, content/, archive/, .env, brand.*
+    # ── Detect local source repo ──
+    SOURCE_DIR=""
+    if [[ -f "$SPIELOS_GLOBAL_CONFIG" ]]; then
+      SOURCE_DIR=$(grep -E '^SOURCE_DIR=' "$SPIELOS_GLOBAL_CONFIG" 2>/dev/null | head -1 | cut -d= -f2- || true)
+      SOURCE_DIR="${SOURCE_DIR%\"}"; SOURCE_DIR="${SOURCE_DIR#\"}"
+      SOURCE_DIR="${SOURCE_DIR%\'}"; SOURCE_DIR="${SOURCE_DIR#\'}"
+    fi
 
     echo ""
     echo "  Updating SpielOS vault at $VAULT"
     echo "  (preserves: team/, skills/, strategy/, content/, archive/, .env, system/brand.*)"
     echo ""
 
-    if [[ -d "$VAULT/.git" ]] && command -v git >/dev/null 2>&1; then
+    if [[ -n "$SOURCE_DIR" && -f "$SOURCE_DIR/tools/sync_adapters.py" && -f "$SOURCE_DIR/team/director.md" ]]; then
+      # Local source repo overlay — fast, has local changes
+      echo "  → Source: $SOURCE_DIR (local repo)"
+      (cd "$VAULT" && python3 - "$SOURCE_DIR" "$VAULT" <<'PYEOF'
+import os, shutil, hashlib, sys
+src, dst = sys.argv[1], sys.argv[2]
+skip_dirs = set("team skills strategy content archive".split())
+skip_files = set([".env", "system/brand.md", "system/brand.json"])
+updated, added, skipped = [], [], 0
+for root, dirs, files in os.walk(src):
+    rel = os.path.relpath(root, src)
+    parts = rel.split(os.sep) if rel != "." else []
+    if any(p in skip_dirs for p in parts): continue
+    for f in files:
+        rf = os.path.relpath(os.path.join(root, f), src)
+        if rf in skip_files: continue
+        sp, dp = os.path.join(root, f), os.path.join(dst, rf)
+        def h(p):
+            try:
+                import hashlib as _h
+                with open(p, 'rb') as _f: return _h.sha256(_f.read()).hexdigest()
+            except OSError: return None
+        nh, oh = h(sp), h(dp)
+        if nh == oh: skipped += 1; continue
+        os.makedirs(os.path.dirname(dp), exist_ok=True)
+        shutil.copy2(sp, dp)
+        (added if oh is None else updated).append(rf)
+print(f"  {len(updated)} updated, {len(added)} added, {skipped} unchanged")
+PYEOF
+      )
+    elif [[ -d "$VAULT/.git" ]] && command -v git >/dev/null 2>&1; then
       echo "  → git pull origin main --ff-only"
       local pull_output
       if pull_output=$(cd "$VAULT" && git pull origin main --ff-only 2>&1); then
@@ -462,13 +499,8 @@ case "${1:-}" in
     _rewrite_vault_pointers
 
     echo ""
-    echo "  → sync_adapters --install (push to all IDEs, including Codex)"
-    if python3 "$VAULT/tools/sync_adapters.py" --install 2>&1 | sed 's/^/    /'; then
-      echo "  ✓ IDE adapters refreshed"
-    else
-      echo "  ⚠ sync failed; run 'spiel sync' to retry" >&2
-    fi
-
+    echo "  → sync_adapters --install (push to all IDEs)"
+    VAULT_ROOT="$VAULT" python3 "$VAULT/tools/sync_adapters.py" --install 2>&1 | sed 's/^/    /'
     echo ""
     echo "  ─────────────────────────────────────────"
     echo "  ✓ Update complete. Vault: $VAULT"
@@ -497,8 +529,28 @@ case "${1:-}" in
       cp "$target/bin/spiel" "$SHIM_PATH"
       chmod 0755 "$SHIM_PATH"
     fi
-    echo "  ✓ Vault set to $target"
-    echo "  → Run 'spiel update' to sync tools + IDEs"
+      echo "  ✓ Vault set to $target"
+      echo "  → Run 'spiel update' to sync tools + IDEs"
+      ;;
+
+  set-source)
+    if [[ -z "${2:-}" ]]; then
+      echo "ERROR: usage: spiel set-source <path-to-source-repo>" >&2
+      exit 1
+    fi
+    src_path=$(cd "$2" 2>/dev/null && pwd) || { echo "ERROR: cannot access $2" >&2; exit 1; }
+    if [[ ! -f "$src_path/tools/sync_adapters.py" ]]; then
+      echo "ERROR: $src_path is not a SpielOS source repo (no tools/sync_adapters.py)" >&2
+      exit 1
+    fi
+    mkdir -p "$HOME/.config/spielos"
+    if grep -q '^SOURCE_DIR=' "$HOME/.config/spielos/config" 2>/dev/null; then
+      sed -i '' "s|^SOURCE_DIR=.*|SOURCE_DIR=$src_path|" "$HOME/.config/spielos/config"
+    else
+      printf 'SOURCE_DIR=%s\n' "$src_path" >> "$HOME/.config/spielos/config"
+    fi
+    echo "  ✓ Source repo set to $src_path"
+    echo "  → Run 'spiel update' to sync"
     ;;
 
   test)

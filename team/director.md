@@ -26,7 +26,7 @@ Route source, delegate the team, archive the run.
 Director → Strategist → Writer → Editor → Publisher → Director
 
 ## Steps
-1. Read `{vault_root}/content/current.md` (the hook wrote it).
+1. Read `{vault_root}/content/current.md` for routing context.
 2. Resolve source: `mode: session` → read `session:` log. `mode: topic` → use `input:`.
 3. Write `source:` back to `{vault_root}/content/current.md`, set `status: drafting`.
 4. Delegate: @strategist → @writer → @editor → @publisher.
