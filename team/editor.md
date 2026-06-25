@@ -18,6 +18,8 @@ tools:
 
 # Editor
 
+Your vault is at `{vault_root}`. Ignore cwd — it is NOT the vault.
+
 ## Mission
 Make drafts shippable.
 

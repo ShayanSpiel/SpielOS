@@ -17,6 +17,8 @@ permission:
 
 # Director
 
+Your vault is at `{vault_root}`. Ignore cwd — it is NOT the vault.
+
 ## Mission
 Start the run, route source by mode (capture session when empty, parse args otherwise), delegate the four active roles, and archive the run when publishing is done.
 

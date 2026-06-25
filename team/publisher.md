@@ -17,6 +17,8 @@ tools:
 
 # Publisher
 
+Your vault is at `{vault_root}`. Ignore cwd — it is NOT the vault.
+
 ## Mission
 Ship only what the user approves.
 

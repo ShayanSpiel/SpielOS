@@ -9,4 +9,4 @@ The hook (tools/post-hook.py) already wrote:
 - content/current.md (routing context)
 - content/sessions/current.md (session artifact)
 
-Read `content/current.md`. Invoke @director.
+Read `{vault_root}/content/current.md`. Invoke @director.
