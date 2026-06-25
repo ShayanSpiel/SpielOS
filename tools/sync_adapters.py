@@ -640,6 +640,9 @@ def install_opencode(verbose: bool = False) -> int:
         skill_dir.mkdir(parents=True, exist_ok=True)
         (skill_dir / "SKILL.md").write_text(templated_text(src.read_text(encoding="utf-8")), encoding="utf-8")
         count += 1
+    # Register the post-hook plugin so /post captures the session.
+    if _register_opencode_plugin(verbose=verbose):
+        count += 1
     if verbose:
         print(f"  installed {count} files (subagents + commands + skills) to {OPENCODE_CONFIG}")
     return count
@@ -692,6 +695,64 @@ def _collect_installed_paths() -> dict[Path, str]:
     # Codex: agents/
     _walk(CODEX_CONFIG, ["agents", "commands"], "codex")
     return out
+
+
+def _register_opencode_plugin(verbose: bool = False) -> bool:
+    """Register the post-hook plugin in ~/.config/opencode/opencode.jsonc.
+
+    The plugin is what captures the session transcript and writes
+    content/current.md + content/sessions/current.md to the vault
+    BEFORE the Director subagent runs. Without this registration, the
+    Director gets an empty session and halts.
+
+    Idempotent: safe to run multiple times. Preserves all other config.
+    """
+    config_path = OPENCODE_CONFIG / "opencode.jsonc"
+    if not config_path.exists():
+        return False
+
+    plugin_path = "~/.config/opencode/plugins/post-hook.ts"
+    expected_entry = str(Path(plugin_path).expanduser())
+
+    try:
+        text = config_path.read_text(encoding="utf-8")
+    except OSError:
+        return False
+
+    # Already registered? Check both absolute and ~ forms.
+    if (expected_entry in text or
+        plugin_path in text or
+        "post-hook.ts" in text):
+        return False
+
+    # Find the right place to insert. Prefer after "skills" if present,
+    # else after the opening "{".
+    import re
+    insertion = f'  "plugin": ["{plugin_path}"],\n'
+
+    if '"skills"' in text:
+        # Insert after the skills block's closing brace.
+        new_text = re.sub(
+            r'("skills"\s*:\s*\{[^}]*\}\s*,?)',
+            r'\1\n' + insertion.rstrip(",\n") + ",",
+            text,
+            count=1,
+        )
+        if new_text == text:
+            # Fallback: insert before "provider"
+            new_text = text.replace('  "provider"', insertion + '  "provider"', 1)
+    elif '"provider"' in text:
+        new_text = text.replace('  "provider"', insertion + '  "provider"', 1)
+    else:
+        return False
+
+    if new_text == text:
+        return False
+
+    config_path.write_text(new_text, encoding="utf-8")
+    if verbose:
+        print(f"  [plugin] registered {plugin_path} in {config_path}")
+    return True
 
 
 def _cleanup_stale_files(verbose: bool = False) -> int:

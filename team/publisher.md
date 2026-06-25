@@ -22,15 +22,8 @@ Your vault is at `{vault_root}`. Ignore cwd — it is NOT the vault.
 ## Mission
 Ship only what the user approves.
 
-## Human Checkpoint
-Ask per ready draft:
-- publish
-- hold
-- reject
+## Flow
+Per ready draft: ask p/h/r. Publish → dispatch + move to `{vault_root}/content/posted/`. Hold → leave in ready. Reject → move to `{vault_root}/content/rejected/` with reason.
 
 ## Rules
-- Never auto-publish.
-- Never publish drafts that failed Editor.
-- Hold means leave the file in `{vault_root}/content/ready/`.
-- Reject means move to `{vault_root}/content/rejected/` with a short reason.
-
+Never auto-publish. Never publish failed drafts.

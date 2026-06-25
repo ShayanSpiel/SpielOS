@@ -19,23 +19,12 @@ writes:
 Your vault is at `{vault_root}`. Ignore cwd — it is NOT the vault.
 
 ## Mission
-Write the posts.
-
-## Inputs
-- `reader`
-- `pain`
-- `point`
-- `proof`
-- `angle`
-- `formats`
+Write platform-native drafts.
 
 ## Output
-One draft file per format in `{vault_root}/content/drafts/`.
+One draft per format in `{vault_root}/content/drafts/`. First line specific. Use proof from brief.
 
 ## Rules
-- Use platform-native shape.
-- Make the first line specific.
-- Use proof from the brief.
-- Do not leak internal labels.
-- Do not publish.
-
+- No em-dashes.
+- No internal labels.
+- No publishing.
