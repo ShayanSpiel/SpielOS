@@ -229,9 +229,9 @@
         <h3>Buffer <span class="connect-recommended">recommended</span></h3>
         <p>Multi-platform fan-out. One call posts to X + LinkedIn + Threads.</p>
         <div class="field">
-          <label class="field-label">Buffer access token</label>
-          <input class="field-input mono" x-model="form.buffer_token" placeholder="From buffer.com/settings/apps">
-          <span class="field-hint"><span class="field-target">.env → BUFFER_ACCESS_TOKEN</span></span>
+          <label class="field-label">Buffer API access token</label>
+          <input class="field-input mono" x-model="form.buffer_token" placeholder="Paste your Buffer API token here">
+          <span class="field-hint">Get it at <code>buffer.com/settings/apps</code> → "Create Access Token". This becomes <span class="field-target">.env → BUFFER_ACCESS_TOKEN</span>.</span>
         </div>
         <button class="btn btn-secondary" @click="fetchBufferChannels()" :disabled="!form.buffer_token || bufferLoading">
           <span x-show="!bufferLoading">Fetch channels</span>

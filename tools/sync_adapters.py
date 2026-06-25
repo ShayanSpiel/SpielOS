@@ -312,16 +312,16 @@ def _toml_agent(name: str, description: str, body: str) -> str:
 
 
 def emit_codex() -> int:
-    """Write per-role TOML agents + post command to adapters/codex/.
+    """Write per-role TOML agents + post dispatcher to adapters/codex/agents/.
 
-    Codex agents use TOML format with name, description, and developer_instructions.
-    The frontmatter fields (reads, writes, permission, etc.) are stripped —
-    only the markdown body is embedded in developer_instructions.
+    Codex uses a single `agents/` directory of TOML subagents; there is no
+    separate `commands/` convention. `/post` is exposed as the `post` agent
+    (TOML), invoked by typing `/post` in the Codex TUI. Earlier versions of
+    this script wrote a markdown-with-YAML-frontmatter `commands/post.toml`
+    which is invalid TOML and broke Codex adapter loading.
     """
     agents_target = ADAPTERS_DIR / "codex" / "agents"
-    commands_target = ADAPTERS_DIR / "codex" / "commands"
     agents_target.mkdir(parents=True, exist_ok=True)
-    commands_target.mkdir(parents=True, exist_ok=True)
     count = 0
     # Subagents from team/*.md (excludes post.md + README.md).
     for src in roles():
@@ -350,28 +350,23 @@ def emit_codex() -> int:
         ),
     )
     (agents_target / "post.toml").write_text(post_toml, encoding="utf-8")
-    (commands_target / "post.toml").write_text(
-        build_command_md(
-            "Dispatch a /post request. Delegates to @director with the user's args.",
-            "# /post\n\nInvoke `@director` with the exact args after `/post`.",
-            {"name": "post", "agent": "director"},
-        ),
-        encoding="utf-8",
-    )
     count += 1
     return count
 
 
 def install_codex(verbose: bool = False) -> int:
-    """Install to ~/.codex/{agents,commands}: active roles + post command."""
+    """Install to ~/.codex/agents/: active roles + post dispatcher.
+
+    Codex has no `commands/` directory convention — custom subagents live
+    only in `agents/`. `/post` is exposed as the `post` agent (TOML), and
+    the user invokes it from the Codex TUI by typing `/post`.
+    """
     if not CODEX_CONFIG.exists():
         if verbose:
             print(f"  [codex] {CODEX_CONFIG} not found — skipping")
         return 0
     agents_target = CODEX_CONFIG / "agents"
-    commands_target = CODEX_CONFIG / "commands"
     agents_target.mkdir(parents=True, exist_ok=True)
-    commands_target.mkdir(parents=True, exist_ok=True)
     count = 0
     for src in roles():
         role_name, description, fm, body = role_metadata(src)
@@ -388,17 +383,9 @@ def install_codex(verbose: bool = False) -> int:
         ),
     )
     (agents_target / "post.toml").write_text(post_agent, encoding="utf-8")
-    (commands_target / "post.toml").write_text(
-        build_command_md(
-            "Dispatch a /post request. Delegates to @director with the user's args.",
-            "# /post\n\nInvoke `@director` with the exact text after `/post`.",
-            {"name": "post", "agent": "director"},
-        ),
-        encoding="utf-8",
-    )
     count += 1
     if verbose:
-        print(f"  [codex] installed {count} files to {CODEX_CONFIG}")
+        print(f"  [codex] installed {count} files to {agents_target}")
     return count
 
 def detect_ide(config_dir: Path, name: str) -> bool:
@@ -702,7 +689,7 @@ def _expected_content() -> dict[Path, str]:
                 src.read_text(encoding="utf-8")
             )
 
-    # Codex agents (TOML format)
+    # Codex agents (TOML format, agents/ only — no commands/ dir)
     if CODEX_CONFIG.exists():
         for src in roles():
             role_name, description, _fm, body = role_metadata(src)
@@ -713,11 +700,6 @@ def _expected_content() -> dict[Path, str]:
             name="post",
             description="Dispatch a /post request. Delegates to @director with the user's args. See team/post.md for details.",
             body="# /post\n\nInvoke `@director` with the exact text after `/post`.\n",
-        )
-        expected[CODEX_CONFIG / "commands" / "post.toml"] = build_command_md(
-            "Dispatch a /post request. Delegates to @director with the user's args.",
-            "# /post\n\nInvoke `@director` with the exact text after `/post`.",
-            {"name": "post", "agent": "director"},
         )
 
     return expected
@@ -731,7 +713,7 @@ def main() -> int:
                         help="Install to all detected IDE configs "
                              "(opencode: agents + commands + skills, "
                              "Cursor: skills + commands, Claude Code: skills + agents + commands, "
-                             "Codex: agents + commands)")
+                             "Codex: agents)")
     parser.add_argument("--install-opencode", action="store_true",
                         help="Install to opencode only (agents + commands + skills)")
     parser.add_argument("--install-cursor", action="store_true",
@@ -739,7 +721,7 @@ def main() -> int:
     parser.add_argument("--install-claude", action="store_true",
                         help="Install to Claude Code only (skills + agents + commands)")
     parser.add_argument("--install-codex", action="store_true",
-                        help="Install to Codex only (agents + commands)")
+                        help="Install to Codex only (agents)")
     parser.add_argument("--check", action="store_true",
                         help="Compare installed adapters against canonical "
                              "team/*.md + skills/*.md. Exit 0 if in sync, "
@@ -830,7 +812,7 @@ def main() -> int:
         if do_cl:
             print(f"  claude:      {CLAUDE_CONFIG}  (agents + skills + commands)")
         if do_cx:
-            print(f"  codex:       {CODEX_CONFIG}  (agents + commands)")
+            print(f"  codex:       {CODEX_CONFIG}  (agents)")
     else:
         print()
         print(f"To install to all detected IDEs, re-run with --install")

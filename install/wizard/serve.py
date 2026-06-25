@@ -291,7 +291,7 @@ def run_post_install(source_vault: Path | None = None) -> dict:
                     (Path.home() / ".config" / "opencode", ["agents", "skill", "commands"]),
                     (Path.home() / ".cursor" / "skills", []),
                     (Path.home() / ".claude", ["agents", "skills"]),
-                    (Path.home() / ".codex", ["agents", "commands"]),
+                    (Path.home() / ".codex", ["agents"]),
                 ]
                 for ide_dir, subs in ide_dirs:
                     if not ide_dir.exists():
@@ -311,21 +311,36 @@ def run_post_install(source_vault: Path | None = None) -> dict:
         except Exception as e:
             result["errors"].append(f"sync install: {e}")
 
+    # 5. Migration: delete stale codex `commands/post.toml` from older installs.
+    # Earlier versions of sync_adapters wrote a markdown-with-YAML-frontmatter
+    # file at ~/.codex/commands/post.toml, which is not valid TOML and breaks
+    # Codex's adapter loader. Codex now uses agents/ only (no commands/), so
+    # this file is fully stale. Remove it and the empty commands/ dir if both
+    # are present. Silent on success; reported in `errors` if it fails.
+    try:
+        stale_post = Path.home() / ".codex" / "commands" / "post.toml"
+        if stale_post.exists():
+            stale_post.unlink()
+        stale_cmds_dir = Path.home() / ".codex" / "commands"
+        if stale_cmds_dir.exists() and not any(stale_cmds_dir.iterdir()):
+            stale_cmds_dir.rmdir()
+    except Exception as e:
+        result["errors"].append(f"codex migration: {e}")
+
     return result
 
 
 def fetch_buffer_channels(token: str) -> list[dict]:
-    """Fetch Buffer channels for the wizard's channel picker."""
-    query = """
-    query { account { organizations { id name channels { id service name } } } }
+    """Fetch Buffer channels for the wizard's channel picker.
+
+    Uses the legacy REST endpoint (api.bufferapp.com/1/profiles.json) which
+    accepts the personal access tokens issued at buffer.com/settings/apps.
+    The newer GraphQL endpoint (api.buffer.com) requires OAuth tokens and
+    silently returns empty for personal access tokens, which is what made
+    the wizard's "Fetch channels" button look broken.
     """
-    payload = json.dumps({"query": query, "variables": {}}).encode("utf-8")
-    req = urllib.request.Request(
-        "https://api.buffer.com",
-        data=payload,
-        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-        method="POST",
-    )
+    url = f"https://api.bufferapp.com/1/profiles.json?access_token={urllib.parse.quote(token)}"
+    req = urllib.request.Request(url, method="GET")
     try:
         with urllib.request.urlopen(req, timeout=20) as resp:
             data = json.loads(resp.read().decode("utf-8"))
@@ -335,9 +350,20 @@ def fetch_buffer_channels(token: str) -> list[dict]:
     except Exception as e:
         raise RuntimeError(f"Buffer API error: {e}") from e
     out = []
-    for org in ((data.get("data") or {}).get("account") or {}).get("organizations", []) or []:
-        for ch in org.get("channels", []) or []:
-            out.append({"id": ch.get("id"), "service": ch.get("service"), "name": ch.get("name")})
+    for prof in data or []:
+        if not isinstance(prof, dict):
+            continue
+        out.append({
+            "id": prof.get("id"),
+            "service": prof.get("service"),
+            "name": (
+                prof.get("formatted_username")
+                or prof.get("service_username")
+                or prof.get("default_avatar_name")
+                or prof.get("name")
+                or f"profile-{prof.get('id')}"
+            ),
+        })
     return out
 
 

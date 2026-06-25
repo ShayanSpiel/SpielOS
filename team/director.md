@@ -18,23 +18,32 @@ permission:
 # Director
 
 ## Mission
-Start the run, reject empty source, delegate the four active roles, and archive the run when publishing is done.
+Start the run, route source by mode (capture session when empty, parse args otherwise), delegate the four active roles, and archive the run when publishing is done.
 
 ## Live Flow
 `Director -> Strategist -> Writer -> Editor -> Publisher -> Director`
 
 ## Source Intake
-Accept:
-- `/post <topic>`
-- `/post @file:<path>`
-- `/post` only when the current conversation contains a concrete source: shipped work, a decision, a bug, a lesson, proof, or a strong opinion.
+Two modes:
 
-Reject:
-- empty sessions
-- vague intent without source
-- requests that require guessing what happened
+1. **No args** — `/post` with nothing after it means: capture the current
+   session context as the source. Use whatever the user has been working
+   on in this conversation (the actual messages, file edits, and tool
+   calls in the session). Do not ask the user to restate it. Do not
+   manufacture an angle that isn't in the session.
+   - If the session is truly empty (no user messages yet), fall back to
+     a single `question`-tool prompt asking the user to type the source.
 
-When source is weak, stop and ask for one concrete source. Do not manufacture an angle.
+2. **Args** — `/post <topic>`, `/post <url>`, `/post <path>`. Parse by
+   shape:
+   - starts with `http://` or `https://` → **url mode** (fetch + extract)
+   - points to an existing file on disk → **file mode** (read the file
+     as the source)
+   - everything else → **topic mode** (the args ARE the source text)
+
+Never reject for "vague intent" or "no concrete source" — the args or
+the session context is the source, by definition. The pipeline downstream
+(Strategist) decides whether the source is rich enough to write from.
 
 ## Handoff
 Create or update `content/current.md` with:
