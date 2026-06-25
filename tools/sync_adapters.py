@@ -507,6 +507,82 @@ def install_claude_commands(verbose: bool = False) -> int:
     return count
 
 
+def install_claude_hooks(verbose: bool = False) -> int:
+    """Install deterministic post hooks into ~/.claude/settings.json.
+
+    Merges the canonical hooks from adapters/claude/hooks.json into the user's
+    settings.json, preserving any existing settings (model, permissions, etc.).
+    """
+    if not detect_ide(CLAUDE_CONFIG, "claude"):
+        return 0
+    src = ADAPTERS_DIR / "claude" / "hooks.json"
+    if not src.is_file():
+        return 0
+    target = CLAUDE_CONFIG / "settings.json"
+    if target.is_file():
+        try:
+            existing = json.loads(target.read_text(encoding="utf-8"))
+            if not isinstance(existing, dict):
+                existing = {}
+        except (json.JSONDecodeError, OSError):
+            existing = {}
+    else:
+        existing = {}
+    new_hooks = json.loads(src.read_text(encoding="utf-8"))
+    if "hooks" not in existing or not isinstance(existing.get("hooks"), dict):
+        existing["hooks"] = {}
+    existing["hooks"].update(new_hooks.get("hooks", {}))
+    target.write_text(json.dumps(existing, indent=2) + "\n", encoding="utf-8")
+    if verbose:
+        print(f"  [claude] installed hooks to {target}")
+    return 1
+
+
+def install_cursor_hooks(verbose: bool = False) -> int:
+    """Install deterministic post hooks to ~/.cursor/hooks.json + post-hook.py script."""
+    if not detect_ide(CURSOR_CONFIG, "cursor"):
+        return 0
+    count = 0
+    src = ADAPTERS_DIR / "cursor" / "hooks.json"
+    if not src.is_file():
+        return 0
+    target = CURSOR_CONFIG / "hooks.json"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+    count += 1
+    hooks_scripts_dir = CURSOR_CONFIG / "hooks"
+    hooks_scripts_dir.mkdir(parents=True, exist_ok=True)
+    script_src = VAULT / "tools" / "post-hook.py"
+    if script_src.is_file():
+        script_dst = hooks_scripts_dir / "post-hook.py"
+        script_dst.write_text(script_src.read_text(encoding="utf-8"), encoding="utf-8")
+        os.chmod(script_dst, 0o755)
+        count += 1
+    if verbose:
+        print(f"  [cursor] installed hooks ({count} files) to {CURSOR_CONFIG}")
+    return count
+
+
+def install_opencode_plugins(verbose: bool = False) -> int:
+    """Install deterministic post plugins to ~/.config/opencode/plugins/."""
+    if not OPENCODE_CONFIG.exists():
+        print(f"  {OPENCODE_CONFIG} does not exist — skipping install")
+        return 0
+    src_dir = ADAPTERS_DIR / "opencode" / "plugins"
+    if not src_dir.is_dir():
+        return 0
+    target = OPENCODE_CONFIG / "plugins"
+    target.mkdir(parents=True, exist_ok=True)
+    count = 0
+    for f in src_dir.glob("*.ts"):
+        dst = target / f.name
+        dst.write_text(f.read_text(encoding="utf-8"), encoding="utf-8")
+        count += 1
+    if verbose:
+        print(f"  [opencode] installed {count} plugins to {target}")
+    return count
+
+
 def install_cursor_commands(verbose: bool = False) -> int:
     """Install slash commands at ~/.cursor/commands/<name>.md.
 
@@ -797,19 +873,19 @@ def main() -> int:
         do_cl = args.install or args.install_claude
         do_cx = args.install or args.install_codex
 
-        n_oc_inst = install_opencode() if do_oc else 0
-        n_cu_inst = (install_cursor_skills() + install_cursor_commands()) if do_cu else 0
-        n_cl_inst = (install_claude_skills() + install_claude_agents() + install_claude_commands()) if do_cl else 0
+        n_oc_inst = (install_opencode() + install_opencode_plugins()) if do_oc else 0
+        n_cu_inst = (install_cursor_skills() + install_cursor_commands() + install_cursor_hooks()) if do_cu else 0
+        n_cl_inst = (install_claude_skills() + install_claude_agents() + install_claude_commands() + install_claude_hooks()) if do_cl else 0
         n_cx_inst = install_codex() if do_cx else 0
 
         print()
         print(f"Installed to live IDEs:")
         if do_oc:
-            print(f"  opencode:    {OPENCODE_CONFIG}  (agents + commands + skills)")
+            print(f"  opencode:    {OPENCODE_CONFIG}  (agents + commands + skills + plugins)")
         if do_cu:
-            print(f"  cursor:      {CURSOR_CONFIG}  (skills + commands)")
+            print(f"  cursor:      {CURSOR_CONFIG}  (skills + commands + hooks)")
         if do_cl:
-            print(f"  claude:      {CLAUDE_CONFIG}  (agents + skills + commands)")
+            print(f"  claude:      {CLAUDE_CONFIG}  (agents + skills + commands + hooks)")
         if do_cx:
             print(f"  codex:       {CODEX_CONFIG}  (agents)")
     else:
