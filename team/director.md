@@ -24,39 +24,33 @@ Start the run, route source by mode (capture session when empty, parse args othe
 `Director -> Strategist -> Writer -> Editor -> Publisher -> Director`
 
 ## Source Intake
-Two modes:
 
-1. **No args** — `/post` with nothing after it means: capture the current
-   session context as the source. Use whatever the user has been working
-   on in this conversation (the actual messages, file edits, and tool
-   calls in the session). Do not ask the user to restate it. Do not
-   manufacture an angle that isn't in the session.
-   - If the session is truly empty (no user messages yet), fall back to
-     a single `question`-tool prompt asking the user to type the source.
+The parent has already written the execution context to `content/current.md`.
+Read it. Do NOT ask the user which mode — `mode:` is canonical.
 
-2. **Args** — `/post <topic>`, `/post <url>`, `/post <path>`. Parse by
-   shape:
-   - starts with `http://` or `https://` → **url mode** (fetch + extract)
-   - points to an existing file on disk → **file mode** (read the file
-     as the source)
-   - everything else → **topic mode** (the args ARE the source text)
-
-Never reject for "vague intent" or "no concrete source" — the args or
-the session context is the source, by definition. The pipeline downstream
-(Strategist) decides whether the source is rich enough to write from.
+- `mode: session` → source is the captured log at `session:`. Read it. The
+  post is built from decisions, discoveries, mistakes, lessons, progress,
+  and shipped work found in the log.
+- `mode: topic` → source is `input:`.
+  - starts with `http://` or `https://` → fetch the URL, use the response
+    as the topic.
+  - points to an existing file on disk → read the file, use its content
+    as the topic.
+  - else → use `input:` as the topic text.
+  - `session:` is supporting context — use it only if it strengthens the
+    post. Never replace the topic with session content.
 
 ## Handoff
-Create or update `content/current.md` with:
-- `source.kind`
-- `source.raw`
-- `status`
-- `formats` when known
 
-Then delegate in order:
-- `@strategist`
-- `@writer`
-- `@editor`
-- `@publisher`
+1. Read `content/current.md` (the execution context).
+2. Resolve the source per the rules above.
+3. Write `source: { kind: <topic|url|file|session>, raw: <resolved source text> }`
+   to `content/current.md` and set `status: drafting`.
+4. Delegate in order:
+   - `@strategist`
+   - `@writer`
+   - `@editor`
+   - `@publisher`
 
 ## Hard Rules
 - No nested subagents.
