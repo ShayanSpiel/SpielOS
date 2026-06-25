@@ -694,6 +694,36 @@ def _collect_installed_paths() -> dict[Path, str]:
     return out
 
 
+def _cleanup_stale_files(verbose: bool = False) -> int:
+    """Remove installed files that no longer exist in the canonical source.
+
+    Prevents stale role files (e.g., old `md.md` from the 8-role system) from
+    being left behind in `~/.config/opencode/agents/`, `~/.claude/agents/`, etc.
+    after a refactor or role rename.
+
+    Only removes files that are managed by SpielOS (i.e., files we would have
+    written). User-added files in those directories are preserved.
+
+    Returns count of stale files removed.
+    """
+    expected = set(_expected_content().keys())
+    installed = set(_collect_installed_paths().keys())
+    stale = installed - expected
+    removed = 0
+    for path in stale:
+        try:
+            path.unlink()
+            removed += 1
+            if verbose:
+                print(f"  [cleanup] removed stale: {path}")
+        except OSError as e:
+            if verbose:
+                print(f"  [cleanup] could not remove {path}: {e}", file=sys.stderr)
+    if verbose and removed:
+        print(f"  [cleanup] removed {removed} stale file(s)")
+    return removed
+
+
 def _expected_content() -> dict[Path, str]:
     """Compute what every installed IDE file SHOULD be, based on the canonical
     team/*.md + skills/*/SKILL.md. Returns {installed_path: expected_content}.
@@ -888,6 +918,12 @@ def main() -> int:
             print(f"  claude:      {CLAUDE_CONFIG}  (agents + skills + commands + hooks)")
         if do_cx:
             print(f"  codex:       {CODEX_CONFIG}  (agents)")
+
+        # Remove stale files (e.g., old role files from a refactor that are
+        # no longer in the canonical source).
+        n_stale = _cleanup_stale_files(verbose=True)
+        if n_stale:
+            print(f"  ✓ removed {n_stale} stale file(s) from previous install")
     else:
         print()
         print(f"To install to all detected IDEs, re-run with --install")
