@@ -202,7 +202,7 @@ VAULT=$(_resolve_vault) || exit 1
 
 # Directories and files that update must NEVER overwrite (user data).
 # These match what install.sh preserves during re-install.
-_SPielos_SKIP_DIRS="team skills strategy content archive"
+_SPielos_SKIP_DIRS="skills strategy content archive"
 _SPielos_SKIP_FILES=".env system/brand.md system/brand.json"
 
 _update_via_tarball() {
@@ -438,7 +438,7 @@ case "${1:-}" in
 
     echo ""
     echo "  Updating SpielOS vault at $VAULT"
-    echo "  (preserves: team/, skills/, strategy/, content/, archive/, .env, system/brand.*)"
+    echo "  (preserves: skills/, strategy/, content/, archive/, .env, system/brand.*)"
     echo ""
 
     if [[ -n "$SOURCE_DIR" && -f "$SOURCE_DIR/tools/sync_adapters.py" && -f "$SOURCE_DIR/team/director.md" ]]; then
@@ -447,7 +447,7 @@ case "${1:-}" in
       (cd "$VAULT" && python3 - "$SOURCE_DIR" "$VAULT" <<'PYEOF'
 import os, shutil, hashlib, sys
 src, dst = sys.argv[1], sys.argv[2]
-skip_dirs = set("team skills strategy content archive".split())
+skip_dirs = set("skills strategy content archive".split())
 skip_files = set([".env", "system/brand.md", "system/brand.json"])
 updated, added, skipped = [], [], 0
 for root, dirs, files in os.walk(src):
@@ -473,7 +473,6 @@ PYEOF
       )
     elif [[ -d "$VAULT/.git" ]] && command -v git >/dev/null 2>&1; then
       echo "  → git pull origin main --ff-only"
-      local pull_output
       if pull_output=$(cd "$VAULT" && git pull origin main --ff-only 2>&1); then
         if echo "$pull_output" | grep -q "Already up to date"; then
           echo "  Already up to date."
