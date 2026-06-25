@@ -26,7 +26,7 @@ python3 tools/capture-session.py \
   --status complete
 ```
 
-Capture the `path` field from the JSON output (e.g. `content/sessions/2026-06-25-session-current.md`).
+Capture the `path` field from the JSON output (e.g. `{vault_root}/content/sessions/2026-06-25-session-current.md`).
 
 If the conversation is genuinely empty, pass a single line like "empty session" as the digest — the tool will still write a log so the Director knows there was nothing to capture.
 
@@ -37,13 +37,13 @@ Parse the args after `/post`:
 - **No args** → `mode: session`, `input: ""`
 - **Args present** → `mode: topic`, `input: "<args>"`
 
-Write `content/current.md`:
+Write `{vault_root}/content/current.md`:
 
 ```yaml
 ---
 mode: session | topic
 input: "<args or empty>"
-session: content/sessions/YYYY-MM-DD-session-current.md
+session: {vault_root}/content/sessions/YYYY-MM-DD-session-current.md
 status: routing
 run_id: YYYY-MM-DD-NNN
 ---
@@ -53,7 +53,7 @@ run_id: YYYY-MM-DD-NNN
 
 Invoke `@director` with:
 
-> "Read `content/current.md` and run the pipeline."
+> "Read `{vault_root}/content/current.md` and run the pipeline."
 
 ## Hard rules
 

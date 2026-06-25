@@ -216,7 +216,7 @@ def emit_opencode() -> int:
         skill_name, description, _fm, _body = skill_metadata(src)
         skill_dir = target / "skill" / skill_name
         skill_dir.mkdir(parents=True, exist_ok=True)
-        (skill_dir / "SKILL.md").write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+        (skill_dir / "SKILL.md").write_text(templated_text(src.read_text(encoding="utf-8")), encoding="utf-8")
         count += 1
     return count
 
@@ -426,9 +426,8 @@ def install_cursor_skills(verbose: bool = False) -> int:
         skill_name, _d, _fm, _body = skill_metadata(src)
         skill_dir = target / skill_name
         skill_dir.mkdir(parents=True, exist_ok=True)
-        # Write the canonical SKILL.md verbatim — the parser reads
-        # `name:` + `description:` from frontmatter, the rest is body.
-        (skill_dir / "SKILL.md").write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+        # Write the canonical SKILL.md with {vault_root} templated to absolute path.
+        (skill_dir / "SKILL.md").write_text(templated_text(src.read_text(encoding="utf-8")), encoding="utf-8")
         count += 1
     if verbose:
         print(f"  [cursor] installed {count} skills to {target}")
@@ -449,8 +448,8 @@ def install_claude_skills(verbose: bool = False) -> int:
         skill_name, _d, _fm, _body = skill_metadata(src)
         skill_dir = target / skill_name
         skill_dir.mkdir(parents=True, exist_ok=True)
-        # Write the canonical SKILL.md verbatim.
-        (skill_dir / "SKILL.md").write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+        # Write the canonical SKILL.md with {vault_root} templated to absolute path.
+        (skill_dir / "SKILL.md").write_text(templated_text(src.read_text(encoding="utf-8")), encoding="utf-8")
         count += 1
     if verbose:
         print(f"  [claude] installed {count} skills to {target}")
@@ -563,7 +562,7 @@ def install_opencode(verbose: bool = False) -> int:
         skill_name, _desc, _fm, _body = skill_metadata(src)
         skill_dir = OPENCODE_CONFIG / "skill" / skill_name
         skill_dir.mkdir(parents=True, exist_ok=True)
-        (skill_dir / "SKILL.md").write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+        (skill_dir / "SKILL.md").write_text(templated_text(src.read_text(encoding="utf-8")), encoding="utf-8")
         count += 1
     if verbose:
         print(f"  installed {count} files (subagents + commands + skills) to {OPENCODE_CONFIG}")
@@ -581,7 +580,7 @@ def install_opencode_skills(verbose: bool = False) -> int:
         skill_name, _desc, _fm, _body = skill_metadata(src)
         skill_dir = target / skill_name
         skill_dir.mkdir(parents=True, exist_ok=True)
-        (skill_dir / "SKILL.md").write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+        (skill_dir / "SKILL.md").write_text(templated_text(src.read_text(encoding="utf-8")), encoding="utf-8")
         count += 1
     return count
 

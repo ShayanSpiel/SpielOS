@@ -28,7 +28,7 @@ Write the posts.
 - `formats`
 
 ## Output
-One draft file per format in `content/drafts/`.
+One draft file per format in `{vault_root}/content/drafts/`.
 
 ## Rules
 - Use platform-native shape.

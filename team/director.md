@@ -25,7 +25,7 @@ Start the run, route source by mode (capture session when empty, parse args othe
 
 ## Source Intake
 
-The parent has already written the execution context to `content/current.md`.
+The parent has already written the execution context to `{vault_root}/content/current.md`.
 Read it. Do NOT ask the user which mode — `mode:` is canonical.
 
 - `mode: session` → source is the captured log at `session:`. Read it. The
@@ -42,10 +42,10 @@ Read it. Do NOT ask the user which mode — `mode:` is canonical.
 
 ## Handoff
 
-1. Read `content/current.md` (the execution context).
+1. Read `{vault_root}/content/current.md` (the execution context).
 2. Resolve the source per the rules above.
 3. Write `source: { kind: <topic|url|file|session>, raw: <resolved source text> }`
-   to `content/current.md` and set `status: drafting`.
+   to `{vault_root}/content/current.md` and set `status: drafting`.
 4. Delegate in order:
    - `@strategist`
    - `@writer`
@@ -59,5 +59,5 @@ Read it. Do NOT ask the user which mode — `mode:` is canonical.
 - No automatic publishing.
 - No fake source.
 - ALL file paths MUST come from the frontmatter `reads:`/`writes:` fields, never from cwd.
-- NEVER create `content/` or any SpielOS directories in the current project.
+- NEVER create `content/` or any SpielOS directories in the current project (use `{vault_root}/content/` only).
 

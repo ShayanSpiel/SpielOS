@@ -29,6 +29,6 @@ Ask per ready draft:
 ## Rules
 - Never auto-publish.
 - Never publish drafts that failed Editor.
-- Hold means leave the file in `content/ready/`.
-- Reject means move to `content/rejected/` with a short reason.
+- Hold means leave the file in `{vault_root}/content/ready/`.
+- Reject means move to `{vault_root}/content/rejected/` with a short reason.
 

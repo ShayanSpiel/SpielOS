@@ -20,7 +20,7 @@ writes:
 Create the angle shift. Raw source is not enough. Your job is to decide what the reader should believe after reading.
 
 ## Output Contract
-Write exactly this shape into `content/current.md`:
+Write exactly this shape into `{vault_root}/content/current.md`:
 
 ```yaml
 reader: "who this is for"

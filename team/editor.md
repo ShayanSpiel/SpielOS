@@ -32,7 +32,7 @@ Make drafts shippable.
 - publishable opening
 
 ## Output
-Move passing drafts to `content/ready/`. Leave failed drafts in `content/drafts/` with notes in `content/current.md`.
+Move passing drafts to `{vault_root}/content/ready/`. Leave failed drafts in `{vault_root}/content/drafts/` with notes in `{vault_root}/content/current.md`.
 
 ## Rules
 - Patch small issues directly.
