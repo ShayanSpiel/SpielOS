@@ -207,7 +207,7 @@ def emit_opencode() -> int:
     for src in commands():
         role_name, description, _fm, body = role_metadata(src)
         (target / "commands" / src.name).write_text(
-            build_command_md(description, body, _fm),
+            build_command_md(description, templated_text(body), _fm),
             encoding="utf-8",
         )
         count += 1
@@ -242,7 +242,7 @@ def emit_claude() -> int:
     for src in commands():
         role_name, description, _fm, body = role_metadata(src)
         (commands_target / src.name).write_text(
-            build_command_md(description, body, _fm),
+            build_command_md(description, templated_text(body), _fm),
             encoding="utf-8",
         )
         count += 1
@@ -270,7 +270,7 @@ def emit_cursor() -> int:
     # Plus post.md as /post (one-line dispatcher to @md).
     for src in commands():
         role_name, description, _fm, body = role_metadata(src)
-        out = build_command_md(description, body, _fm)
+        out = build_command_md(description, templated_text(body), _fm)
         (target / src.name).write_text(out, encoding="utf-8")
         count += 1
     return count
@@ -500,7 +500,7 @@ def install_claude_commands(verbose: bool = False) -> int:
     count = 0
     for src in commands():
         role_name, description, _fm, body = role_metadata(src)
-        (target / src.name).write_text(build_command_md(description, body, _fm), encoding="utf-8")
+        (target / src.name).write_text(build_command_md(description, templated_text(body), _fm), encoding="utf-8")
         count += 1
     if verbose:
         print(f"  [claude] installed {count} commands to {target}")
@@ -602,7 +602,7 @@ def install_cursor_commands(verbose: bool = False) -> int:
         count += 1
     for src in commands():
         role_name, description, _fm, body = role_metadata(src)
-        (target / src.name).write_text(build_command_md(description, body, _fm), encoding="utf-8")
+        (target / src.name).write_text(build_command_md(description, templated_text(body), _fm), encoding="utf-8")
         count += 1
     if verbose:
         print(f"  [cursor] installed {count} commands to {target}")
@@ -631,7 +631,7 @@ def install_opencode(verbose: bool = False) -> int:
         role_name, description, _fm, body = role_metadata(src)
         dst_cmd = OPENCODE_CONFIG / "commands" / src.name
         dst_cmd.parent.mkdir(parents=True, exist_ok=True)
-        dst_cmd.write_text(build_command_md(description, body, _fm), encoding="utf-8")
+        dst_cmd.write_text(build_command_md(description, templated_text(body), _fm), encoding="utf-8")
         count += 1
     # Skills: skills/*/SKILL.md
     for src in skills():
@@ -710,7 +710,7 @@ def _expected_content() -> dict[Path, str]:
         for src in commands():
             role_name, description, _fm, body = role_metadata(src)
             expected[OPENCODE_CONFIG / "commands" / src.name] = (
-                build_command_md(description, body, _fm)
+                build_command_md(description, templated_text(body), _fm)
             )
         # opencode skills (skills/*/SKILL.md) → skill/<name>/SKILL.md
         for src in skills():
@@ -729,7 +729,7 @@ def _expected_content() -> dict[Path, str]:
         for src in commands():
             role_name, description, _fm, body = role_metadata(src)
             expected[CURSOR_CONFIG / "commands" / src.name] = (
-                build_command_md(description, body, _fm)
+                build_command_md(description, templated_text(body), _fm)
             )
         for src in skills():
             skill_name, _d, _fm, _body = skill_metadata(src)
@@ -756,7 +756,7 @@ def _expected_content() -> dict[Path, str]:
         for src in commands():
             role_name, description, _fm, body = role_metadata(src)
             expected[CLAUDE_CONFIG / "commands" / src.name] = (
-                build_command_md(description, body, _fm)
+                build_command_md(description, templated_text(body), _fm)
             )
         for src in skills():
             skill_name, _d, _fm, _body = skill_metadata(src)
