@@ -201,9 +201,29 @@ VAULT=$(_resolve_vault) || exit 1
 # ── Tarball overlay (fallback for `update` when git pull fails) ────────
 
 # Directories and files that update must NEVER overwrite (user data).
-# These match what install.sh preserves during re-install.
-_SPielos_SKIP_DIRS="skills strategy content archive"
-_SPielos_SKIP_FILES=".env system/brand.md system/brand.json"
+# Only personal-level files are protected. Project-level files (team/,
+# system/playbook, tools/, install/, etc.) are always updated.
+#
+# PERSONAL:    strategy/  (audience/offer/voice/examples - filled by wizard)
+#              content/    (user drafts, sessions, ready, posted, rejected)
+#              .env        (credentials)
+#              system/brand.md, system/brand.json  (brand tokens)
+#              system/rules.yaml  (mechanical gate config - user may tune)
+#
+# PROJECT:     team/       (role prompts - canonical, updated on every update)
+#              system/*    (playbook - pipeline, run-state, draft-schema, etc.)
+#              tools/      (deterministic tools)
+#              install/    (installer)
+#              bin/        (shim)
+#              templates/  (post output shapes)
+#              tests/      (test suite)
+#              adapters/   (auto-regenerated on sync)
+#              archive/    (reference - canonical, updated on every update)
+#              skills/     (auto-generated)
+#              assets/     (icons, dormant banners)
+#              AGENTS.md, README.md, package.json
+_SPielos_SKIP_DIRS="strategy content"
+_SPielos_SKIP_FILES=".env system/brand.md system/brand.json system/rules.yaml"
 
 _update_via_tarball() {
   SPIELOS_REPO="${SPIELOS_REPO:-ShayanSpiel/Spiel-OS}"
@@ -354,20 +374,42 @@ cd "$VAULT"
 
 case "${1:-}" in
   status)
+    # Read the state machine (content/.state.json) and the handoff (content/current.md)
+    state_file="$VAULT/content/.state.json"
+    current_file="$VAULT/content/current.md"
     if [[ "${2:-}" == "--json" ]]; then
-      current="$VAULT/content/current.md"
-      if [[ -f "$current" ]]; then
-        echo "{ \"current\": \"$current\", \"state\": \"active\" }"
+      if [[ -f "$state_file" ]]; then
+        cat "$state_file"
       else
-        echo "{ \"current\": null, \"state\": \"idle\" }"
+        echo '{"status": "idle", "step": "idle", "run_id": null, "drafts": [], "ready": [], "error": null}'
       fi
     else
       echo "SpielOS vault: $VAULT"
-      current="$VAULT/content/current.md"
-      if [[ -f "$current" ]]; then
-        echo "Current run: $current"
+      if [[ -f "$state_file" ]]; then
+        # Pretty-print the key fields from .state.json
+        run_id=$(python3 -c "import json,sys; d=json.load(open('$state_file')); print(d.get('run_id','?'))" 2>/dev/null || echo "?")
+        step=$(python3 -c "import json,sys; d=json.load(open('$state_file')); print(d.get('step','?'))" 2>/dev/null || echo "?")
+        run_status=$(python3 -c "import json,sys; d=json.load(open('$state_file')); print(d.get('status','?'))" 2>/dev/null || echo "?")
+        mode=$(python3 -c "import json,sys; d=json.load(open('$state_file')); print(d.get('mode','?'))" 2>/dev/null || echo "?")
+        drafts=$(python3 -c "import json,sys; d=json.load(open('$state_file')); print(len(d.get('drafts',[])))" 2>/dev/null || echo "?")
+        ready=$(python3 -c "import json,sys; d=json.load(open('$state_file')); print(len(d.get('ready',[])))" 2>/dev/null || echo "?")
+        err=$(python3 -c "import json,sys; d=json.load(open('$state_file')); e=d.get('error'); print(e if e else '-')" 2>/dev/null || echo "-")
+        updated=$(python3 -c "import json,sys; d=json.load(open('$state_file')); print(d.get('updated_at','?'))" 2>/dev/null || echo "?")
+        echo "  run_id:     $run_id"
+        echo "  status:     $run_status"
+        echo "  step:       $step"
+        echo "  mode:       $mode"
+        echo "  drafts:     $drafts"
+        echo "  ready:      $ready"
+        if [[ "$err" != "-" && "$err" != "None" ]]; then
+          echo "  error:      $err"
+        fi
+        echo "  updated_at: $updated"
       else
-        echo "Current run: idle"
+        echo "  no active run (idle)"
+      fi
+      if [[ -f "$current_file" ]]; then
+        echo "  handoff:    $current_file"
       fi
     fi
     ;;
@@ -438,7 +480,8 @@ case "${1:-}" in
 
     echo ""
     echo "  Updating SpielOS vault at $VAULT"
-    echo "  (preserves: skills/, strategy/, content/, archive/, .env, system/brand.*)"
+    echo "  (preserves ONLY personal data: strategy/, content/, .env, system/brand.*, system/rules.yaml)"
+    echo "  (refreshes project files: team/, system/playbook, tools/, install/, bin/, tests/, archive/, skills/, docs)"
     echo ""
 
     if [[ -n "$SOURCE_DIR" && -f "$SOURCE_DIR/tools/sync_adapters.py" && -f "$SOURCE_DIR/team/director.md" ]]; then
@@ -447,28 +490,48 @@ case "${1:-}" in
       (cd "$VAULT" && python3 - "$SOURCE_DIR" "$VAULT" <<'PYEOF'
 import os, shutil, hashlib, sys
 src, dst = sys.argv[1], sys.argv[2]
-skip_dirs = set("skills strategy content archive".split())
-skip_files = set([".env", "system/brand.md", "system/brand.json"])
+# ONLY personal data is skipped. Role prompts, system playbook, tools, etc. are project-level and always updated.
+skip_dirs  = set("strategy content".split())
+skip_files = set([".env", "system/brand.md", "system/brand.json", "system/rules.yaml"])
+def file_hash(path):
+    h = hashlib.sha256()
+    try:
+        with open(path, "rb") as f:
+            for chunk in iter(lambda: f.read(8192), b""):
+                h.update(chunk)
+        return h.hexdigest()
+    except OSError:
+        return None
 updated, added, skipped = [], [], 0
 for root, dirs, files in os.walk(src):
     rel = os.path.relpath(root, src)
     parts = rel.split(os.sep) if rel != "." else []
-    if any(p in skip_dirs for p in parts): continue
+    if any(p in skip_dirs for p in parts):
+        continue
     for f in files:
         rf = os.path.relpath(os.path.join(root, f), src)
-        if rf in skip_files: continue
+        if rf in skip_files:
+            continue
         sp, dp = os.path.join(root, f), os.path.join(dst, rf)
-        def h(p):
-            try:
-                import hashlib as _h
-                with open(p, 'rb') as _f: return _h.sha256(_f.read()).hexdigest()
-            except OSError: return None
-        nh, oh = h(sp), h(dp)
-        if nh == oh: skipped += 1; continue
+        nh, oh = file_hash(sp), file_hash(dp)
+        if nh == oh:
+            skipped += 1
+            continue
         os.makedirs(os.path.dirname(dp), exist_ok=True)
         shutil.copy2(sp, dp)
         (added if oh is None else updated).append(rf)
-print(f"  {len(updated)} updated, {len(added)} added, {skipped} unchanged")
+if updated:
+    print(f"  Updated ({len(updated)}):")
+    for f in sorted(updated):
+        print(f"    ~ {f}")
+if added:
+    print(f"  Added ({len(added)}):")
+    for f in sorted(added):
+        print(f"    + {f}")
+if updated or added:
+    print(f"\n  {len(updated)} updated, {len(added)} added, {skipped} unchanged (personal data preserved)")
+else:
+    print("  Already up to date.")
 PYEOF
       )
     elif [[ -d "$VAULT/.git" ]] && command -v git >/dev/null 2>&1; then

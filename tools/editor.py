@@ -10,6 +10,7 @@ CLI:
     python3 tools/editor.py check <draft.md> --quiet     # exit code only
     python3 tools/editor.py check <draft.md> --json      # pure JSON, no summary
     python3 tools/editor.py check <draft.md> --gates a,b # run only these gates
+    python3 tools/editor.py stamp <draft.md>             # run gates + write verdict to FM
 
 Exit codes:
     0 = pass
@@ -19,6 +20,11 @@ Exit codes:
 The 4 mechanical gates are the deterministic half of the Editor role.
 The taste review (clear hook, specific reader, concrete proof, not generic,
 sounds like the user) is LLM-judged by the Editor subagent itself.
+
+The `stamp` subcommand is the deterministic record: it runs the 4 gates
+and writes `gates_verdict: pass|fail` + `gates_report: <json>` to the
+draft's frontmatter atomically. Publishers refuse to ship a draft whose
+frontmatter has `gates_verdict: fail`.
 """
 
 from __future__ import annotations
@@ -27,6 +33,7 @@ import argparse
 import json
 import re
 import sys
+from datetime import datetime
 from pathlib import Path
 
 import sys as _sys
@@ -182,6 +189,69 @@ def find_vault() -> Path:
     return v
 
 
+# ─── Stamp (persist verdict to frontmatter) ─────────────────────────────
+
+def cmd_stamp(args, vault: Path) -> int:
+    """Run all 4 gates, then write gates_verdict + gates_report to frontmatter.
+
+    Atomic: write to tmp, fsync, rename. Survives crashes mid-write.
+    """
+    import tempfile
+    import os as _os
+
+    draft_path = Path(args.draft)
+    if not draft_path.is_absolute():
+        draft_path = vault / draft_path
+    if not draft_path.exists():
+        print(f"ERROR: draft not found: {draft_path}", file=sys.stderr)
+        return 3
+    try:
+        text = draft_path.read_text(encoding="utf-8")
+    except OSError as e:
+        print(f"ERROR: cannot read draft: {e}", file=sys.stderr)
+        return 3
+
+    fm, body = parse_frontmatter(text)
+    rules = load_rules(vault)
+    selected = None
+    if args.gates:
+        selected = {g.strip() for g in args.gates.split(",") if g.strip()}
+    results = validate_draft(fm, body, rules, selected_checks=selected)
+    passed = sum(1 for r in results.values() if r["pass"])
+    failed = sum(1 for r in results.values() if not r["pass"])
+    verdict = "pass" if failed == 0 else "fail"
+
+    # Persist verdict + report to frontmatter
+    fm["gates_verdict"] = verdict
+    fm["gates_stamped_at"] = datetime.now().isoformat(timespec="seconds")
+    fm["gates_report"] = results
+
+    import yaml
+    new_text = "---\n" + yaml.safe_dump(fm, sort_keys=False, allow_unicode=True) + "---\n" + body
+
+    # Atomic write
+    draft_path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(
+        "w", dir=draft_path.parent, prefix=".stamp-", suffix=".tmp", delete=False, encoding="utf-8"
+    ) as f:
+        tmp = Path(f.name)
+        f.write(new_text)
+        f.flush()
+        _os.fsync(f.fileno())
+    tmp.replace(draft_path)
+
+    if args.quiet:
+        return 0 if verdict == "pass" else 1
+    out = {
+        "draft": str(draft_path.relative_to(vault)) if draft_path.is_relative_to(vault) else str(draft_path),
+        "verdict": verdict,
+        "summary": {"passed": passed, "failed": failed, "total": len(results)},
+    }
+    print(json.dumps(out, indent=2))
+    print(f"  stamped: verdict={verdict} ({passed} pass, {failed} fail)", file=sys.stderr)
+    return 0 if verdict == "pass" else 1
+
+
 # ─── CLI ─────────────────────────────────────────────────────────────────
 
 def main() -> int:
@@ -194,6 +264,12 @@ def main() -> int:
     check.add_argument("--quiet", action="store_true", help="No stdout, exit code only")
     check.add_argument("--gates", help="Comma-separated gate ids to run (default: all)")
     check.add_argument("--vault", help="Path to vault root (default: auto-detect)")
+
+    stamp = sub.add_parser("stamp", help="Run gates + write verdict to frontmatter (atomic)")
+    stamp.add_argument("draft", help="Path to draft .md file")
+    stamp.add_argument("--quiet", action="store_true", help="No stdout, exit code only")
+    stamp.add_argument("--gates", help="Comma-separated gate ids to run (default: all)")
+    stamp.add_argument("--vault", help="Path to vault root (default: auto-detect)")
 
     args = parser.parse_args()
 
@@ -239,6 +315,10 @@ def main() -> int:
             print(json.dumps(report, indent=2))
             print(f"\nverdict: {verdict}  ({passed} pass, {failed} fail)", file=sys.stderr)
         return exit_code
+
+    if args.cmd == "stamp":
+        vault = Path(args.vault) if args.vault else find_vault()
+        return cmd_stamp(args, vault)
 
     return 0
 

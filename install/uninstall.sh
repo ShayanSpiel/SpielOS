@@ -77,8 +77,8 @@ if [[ -d "$HOME/.config/opencode" ]]; then
   fi
 fi
 
+INSTALL_URL="${INSTALL_URL:-https://spiel.xyz/install}"
 SPIELOS_REPO="${SPIELOS_REPO:-ShayanSpiel/Spiel-OS}"
-INSTALL_URL="${INSTALL_URL:-https://raw.githubusercontent.com/$SPIELOS_REPO/main/install/install.sh}"
 
 echo ""
 echo "  Done. Re-install any time:"

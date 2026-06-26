@@ -39,10 +39,11 @@ else
   HAS_TTY=0
 fi
 
+INSTALL_URL="${INSTALL_URL:-https://spiel.xyz/install}"
 SPIELOS_REPO="${SPIELOS_REPO:-ShayanSpiel/Spiel-OS}"
 GITHUB_REPO="${GITHUB_REPO:-https://github.com/$SPIELOS_REPO.git}"
 TARBALL_URL="${TARBALL_URL:-https://github.com/$SPIELOS_REPO/archive/refs/heads/main.tar.gz}"
-RAW_INSTALL_URL="${RAW_INSTALL_URL:-https://raw.githubusercontent.com/$SPIELOS_REPO/main/install/install.sh}"
+RAW_INSTALL_URL="${RAW_INSTALL_URL:-$INSTALL_URL}"
 VERSION="${SPIELOS_VERSION:-main}"
 DEFAULT_INSTALL_DIR="${SPIELOS_INSTALL_DIR:-$PWD}"
 SHIM_PATH="$HOME/.local/bin/spiel"
@@ -223,9 +224,9 @@ else
   # To overwrite these, run `spiel init` (re-runs the wizard).
   IS_REINSTALL=1
   note "Existing install detected at $INSTALL_DIR"
-  note "Re-install mode: refreshing tool sources only."
-  note "  → PRESERVED (your data, not touched): team/, skills/, strategy/, content/, archive/, .env, system/brand.*"
-  note "  → REFRESHED (from upstream): tools/, install/, system/, templates/, bin/spiel, package.json"
+  note "Re-install mode: refreshing project sources only."
+  note "  → PRESERVED (your data, not touched): strategy/, content/, .env, system/brand.*, system/rules.yaml"
+  note "  → REFRESHED (from upstream): team/, skills/, archive/, tools/, install/, system/, templates/, bin/spiel, tests/, docs"
   note "  → IDE adapters: re-synced (your local team/ pushed to all 4 IDEs)"
 
   # Always use tarball overlay (NEVER `git pull`, which would clobber user data).
@@ -236,12 +237,14 @@ else
 import os, shutil
 src = "$TMPDIR_OVERLAY"
 dst = "$INSTALL_DIR"
-# Directories: never overlay (user's custom data)
-skip_dirs = {"team", "skills", "strategy", "content", "archive"}
-# Individual files: never overlay
-skip_files = {".env", "system/brand.md", "system/brand.json"}
+# ONLY personal data is protected. Role prompts (team/), system playbook,
+# tools, install, bin, tests, archive, skills, docs are all project-level
+# and refreshed on every re-install.
+skip_dirs = {"strategy", "content"}
+skip_files = {".env", "system/brand.md", "system/brand.json", "system/rules.yaml"}
 copied = 0
 skipped = 0
+updated_paths = []
 for root, dirs, files in os.walk(src):
     rel = os.path.relpath(root, src)
     parts = rel.split(os.sep) if rel != "." else []
@@ -258,7 +261,12 @@ for root, dirs, files in os.walk(src):
         os.makedirs(os.path.dirname(dp), exist_ok=True)
         shutil.copy2(sp, dp)
         copied += 1
-print(f"  overlaid {copied} tool source files (skipped {skipped} user-data files)")
+        updated_paths.append(rel_file)
+print(f"  Refreshed {copied} project file(s), preserved {skipped} personal-data file(s).")
+if updated_paths:
+    # Show the first ~20 changed files so the user can see scope
+    sample = sorted(updated_paths)[:20]
+    print(f"  Sample changes: {', '.join(sample)}{' ...' if len(updated_paths) > 20 else ''}")
 PYEOF
 )
     else

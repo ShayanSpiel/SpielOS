@@ -166,3 +166,32 @@ def archive(post_file: Path, channel_results: list[dict], body: str, mode: str,
     write_frontmatter(posted_file, fm, body)
     post_file.unlink()
     return posted_file
+
+
+# ─── Gate enforcement ────────────────────────────────────────────────────
+
+def check_gates_verdict(post_file: Path) -> tuple[bool, str]:
+    """Refuse to publish a draft whose frontmatter says gates_verdict: fail.
+
+    Returns (ok, message). ok=True means safe to publish.
+    ok=False means the publisher should exit 1 with the message.
+
+    The AGENTS.md hard rule "NEVER publish a draft that failed tools/editor.py"
+    is now a script check, not an LLM wish.
+    """
+    try:
+        text = post_file.read_text(encoding="utf-8")
+    except OSError as e:
+        return False, f"cannot read post file: {e}"
+    fm, _ = parse_frontmatter(text)
+    verdict = (fm.get("gates_verdict") or "").strip().lower()
+    if verdict == "":
+        return False, (
+            "no gates_verdict in frontmatter. Run `python3 tools/editor.py stamp <draft>` first."
+        )
+    if verdict == "fail":
+        return False, (
+            f"gates_verdict=fail in frontmatter. Refusing to publish. "
+            f"Run `python3 tools/editor.py check <draft>` to see which gate failed."
+        )
+    return True, f"gates_verdict={verdict}"

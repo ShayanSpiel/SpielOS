@@ -18,7 +18,7 @@ IDLE → [Director] → [Strategist] → [Writer] → [Editor] → [Publisher] �
 One command. Any Mac/Linux. Any IDE.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/Spiel-OS/main/install/install.sh | bash
+curl -fsSL https://spiel.xyz/install | bash
 ```
 
 The installer:
@@ -47,14 +47,15 @@ brew install spielos/tap/spiel
 
 | Command | What | When |
 |---|---|---|
-| `curl ... \| bash` | Fresh install: clone vault → run wizard → write global config → sync to IDEs | First time only |
+| `curl https://spiel.xyz/install \| bash` | Fresh install: clone vault → run wizard → write global config → sync to IDEs | First time only |
 | `spiel set-vault <path>` | Change which vault `spiel` resolves to (rewrites `~/.config/spielos/config`) | Moved vault or installed to wrong dir |
+| `spiel set-source <path>` | Point updates at a local source repo (faster, no GitHub roundtrip) | You have the SpielOS repo checked out locally |
 | `spiel init` | Re-run the wizard (rewrites `.env`, `strategy/`, `system/brand.*`) | Want to redo setup |
-| `spiel update` | Pull latest tools/install/wizards → sync to IDEs. **Preserves `team/`, `skills/`, `strategy/`, `content/`, `.env`, `system/brand.*`** | When a new version ships |
+| `spiel update` | Pull latest tools/install/wizards + role prompts + system playbook → sync to IDEs. **Preserves ONLY personal data: `strategy/`, `content/`, `.env`, `system/brand.*`, `system/rules.yaml`** | When a new version ships |
 
 `spiel set-vault /path/to/vault` changes the global config. After running it, every `spiel` invocation and every `/post` resolves to the new vault — regardless of your current directory or which project your IDE is open to.
 
-`spiel update` is the one to use after we push a new tool, gate, or wizard. It does NOT touch your prompts, strategies, drafts, or brand — only the tool sources, install scripts, and IDE adapters.
+`spiel update` is the one to use after we push a new tool, gate, role prompt, or wizard. It preserves your personal data (strategy, content, brand, gates config, .env) and refreshes everything else (role prompts, system playbook, tools, install scripts, IDE adapters). Local customizations to role prompts in `team/*.md` will be overwritten — move personal voice/rules to `strategy/voice.md` instead.
 
 ---
 

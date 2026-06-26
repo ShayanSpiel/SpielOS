@@ -194,9 +194,37 @@ def run_post_install(source_vault: Path | None = None) -> dict:
     would compute its own path as VAULT (which is the new install) and bake the
     wrong vault_root into the installed adapters. In production the source and
     target are the same directory, so this matters only in dev / smoke-test mode.
+
+    Safety: refuses to install adapters if VAULT looks like a temp directory,
+    or if VAULT is not a valid SpielOS vault. This prevents the smoke test
+    (and accidental production runs against /tmp paths) from contaminating
+    the user's live IDE configs.
     """
     import shutil
     import subprocess
+
+    # Safety: refuse to install adapters if VAULT is in /tmp or not a valid vault
+    vault_str = str(VAULT)
+    if vault_str.startswith("/tmp/") or vault_str.startswith("/private/var/folders/") or vault_str.startswith("/var/folders/"):
+        return {
+            "shim_installed": None,
+            "shim_path": None,
+            "shim_already_present": False,
+            "adapters_generated": 0,
+            "adapters_installed": 0,
+            "adapters_targets": [],
+            "errors": [f"refused: VAULT ({VAULT}) looks like a temp directory; not installing to live IDEs"],
+        }
+    if not (VAULT / "team" / "director.md").is_file():
+        return {
+            "shim_installed": None,
+            "shim_path": None,
+            "shim_already_present": False,
+            "adapters_generated": 0,
+            "adapters_installed": 0,
+            "adapters_targets": [],
+            "errors": [f"refused: VAULT ({VAULT}) is not a valid SpielOS vault (no team/director.md)"],
+        }
 
     result = {
         "shim_installed": None,
@@ -228,21 +256,26 @@ def run_post_install(source_vault: Path | None = None) -> dict:
     # 2. Write vault pointer file + global config
     try:
         (VAULT / ".spiel-vault").write_text(f"VAULT_DIR={VAULT}\n", encoding="utf-8")
-        spielos_cfg = Path.home() / ".config" / "spielos" / "config"
-        spielos_cfg.parent.mkdir(parents=True, exist_ok=True)
-        spielos_cfg.write_text(f"VAULT_DIR={VAULT}\n", encoding="utf-8")
-        env_file = VAULT / ".env"
-        if env_file.exists():
-            text = env_file.read_text(encoding="utf-8")
-            lines = text.splitlines()
-            found = False
-            for i, line in enumerate(lines):
-                if line.startswith("VAULT_DIR="):
-                    lines[i] = f"VAULT_DIR={VAULT}"
-                    found = True
-                    break
-            if found:
-                env_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        # Only write global config + .env if VAULT is not a temp directory
+        vault_str = str(VAULT)
+        if not (vault_str.startswith("/tmp/") or vault_str.startswith("/private/var/folders/") or vault_str.startswith("/var/folders/")):
+            spielos_cfg = Path.home() / ".config" / "spielos" / "config"
+            spielos_cfg.parent.mkdir(parents=True, exist_ok=True)
+            spielos_cfg.write_text(f"VAULT_DIR={VAULT}\n", encoding="utf-8")
+            env_file = VAULT / ".env"
+            if env_file.exists():
+                text = env_file.read_text(encoding="utf-8")
+                lines = text.splitlines()
+                found = False
+                for i, line in enumerate(lines):
+                    if line.startswith("VAULT_DIR="):
+                        lines[i] = f"VAULT_DIR={VAULT}"
+                        found = True
+                        break
+                if found:
+                    env_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        else:
+            result["errors"].append(f"vault pointer: skipped global config write (VAULT is a temp dir: {VAULT})")
     except Exception as e:
         result["errors"].append(f"vault pointer: {e}")
 

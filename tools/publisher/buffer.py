@@ -25,7 +25,7 @@ from pathlib import Path
 
 from _common import (
     BANNERS_ROOT, ICONS_ROOT, VAULT, READY_DIR,
-    load_creds, extract_body, sanitize, archive,
+    load_creds, extract_body, sanitize, archive, check_gates_verdict,
 )
 
 
@@ -246,6 +246,11 @@ def main() -> int:
         post_file = READY_DIR / post_file.name if not post_file.exists() else post_file
     if not post_file.exists():
         print(f"ERROR: not found: {post_file}")
+        return 1
+    # Gate enforcement: refuse to publish a draft that failed tools/editor.py
+    ok, gate_msg = check_gates_verdict(post_file)
+    if not ok:
+        print(f"ERROR: refusing to publish: {gate_msg}", file=sys.stderr)
         return 1
     if not args.yes and not args.dry_run:
         try:

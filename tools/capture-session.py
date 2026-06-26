@@ -115,10 +115,11 @@ def _yaml_quote(s: str) -> str:
     return '"' + s.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
-def _render_frontmatter(args: argparse.Namespace, date_str: str, message_count: int) -> str:
+def _render_frontmatter(args: argparse.Namespace, date_str: str, message_count: int,
+                       structured: dict | None) -> str:
     status = args.status or "in-progress"
     if status not in ("complete", "in-progress"):
-        raise ValueError(f"--status must be 'complete' or 'in-progress', got: {status!r}")
+        raise ValueError(f"--status must be 'complete' or 'in-progress', got: {args.status!r}")
     title = (args.title or "Current session").strip()[:120]
     tags = [t.strip() for t in (args.tags or "").split(",") if t.strip()]
     if not tags:
@@ -126,6 +127,16 @@ def _render_frontmatter(args: argparse.Namespace, date_str: str, message_count: 
     tags_yaml = "[" + ", ".join(_yaml_quote(t) for t in tags) + "]"
     summary = (args.summary or "").strip().replace('"', '\\"')
     summary_line = f"summary: \"{summary}\"" if summary else "summary: \"\""
+
+    # 5 signal fields from structured input (the strategist's quick-read).
+    # Per system/session-schema.md: decision, number, lesson, pattern, ship.
+    def _signal(key: str) -> str:
+        v = (structured or {}).get(key)
+        if isinstance(v, list):
+            v = "; ".join(str(x).strip() for x in v if str(x).strip())
+        v = (str(v).strip() if v is not None else "").replace('"', '\\"')
+        return f"{key}: \"{v}\""
+
     parts = [
         "---",
         f"title: {_yaml_quote(title)}",
@@ -136,6 +147,11 @@ def _render_frontmatter(args: argparse.Namespace, date_str: str, message_count: 
         "pillar_outline: none",
         "drafts: []",
         f"status: {status}",
+        _signal("decision"),
+        _signal("number"),
+        _signal("lesson"),
+        _signal("pattern"),
+        _signal("ship"),
         summary_line,
         f"captured_by: capture-session.py",
         f"captured_at: {datetime.now().isoformat(timespec='seconds')}",
@@ -303,7 +319,7 @@ def main() -> int:
 
     # Render
     try:
-        frontmatter = _render_frontmatter(args, date_str, msg_count)
+        frontmatter = _render_frontmatter(args, date_str, msg_count, structured)
     except ValueError as e:
         sys.stderr.write(f"ERROR: {e}\n")
         return 2
