@@ -18,7 +18,7 @@ IDLE → [Director] → [Strategist] → [Writer] → [Editor] → [Publisher] �
 One command. Any Mac/Linux. Any IDE.
 
 ```bash
-curl -fsSL https://spiel.xyz/install | bash
+curl -fsSL https://spielos.xyz/install | bash
 ```
 
 The installer:
@@ -47,7 +47,7 @@ brew install spielos/tap/spiel
 
 | Command | What | When |
 |---|---|---|
-| `curl https://spiel.xyz/install \| bash` | Fresh install: clone vault → run wizard → write global config → sync to IDEs | First time only |
+| `curl https://spielos.xyz/install \| bash` | Fresh install: clone vault → run wizard → write global config → sync to IDEs | First time only |
 | `spiel set-vault <path>` | Change which vault `spiel` resolves to (rewrites `~/.config/spielos/config`) | Moved vault or installed to wrong dir |
 | `spiel set-source <path>` | Point updates at a local source repo (faster, no GitHub roundtrip) | You have the SpielOS repo checked out locally |
 | `spiel init` | Re-run the wizard (rewrites `.env`, `strategy/`, `system/brand.*`) | Want to redo setup |

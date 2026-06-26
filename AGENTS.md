@@ -310,7 +310,7 @@ Adding a new role is **one file + one sync**:
 ## The install flow
 
 ```bash
-curl -fsSL https://spiel.xyz/install | bash
+curl -fsSL https://spielos.xyz/install | bash
 ```
 
 1. Installer downloads the repo into the **current directory** (your project root becomes the vault, marked by `.spiel-vault`).

@@ -39,7 +39,7 @@ else
   HAS_TTY=0
 fi
 
-INSTALL_URL="${INSTALL_URL:-https://spiel.xyz/install}"
+INSTALL_URL="${INSTALL_URL:-https://spielos.xyz/install}"
 SPIELOS_REPO="${SPIELOS_REPO:-ShayanSpiel/Spiel-OS}"
 GITHUB_REPO="${GITHUB_REPO:-https://github.com/$SPIELOS_REPO.git}"
 TARBALL_URL="${TARBALL_URL:-https://github.com/$SPIELOS_REPO/archive/refs/heads/main.tar.gz}"
