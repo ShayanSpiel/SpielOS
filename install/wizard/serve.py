@@ -43,6 +43,22 @@ def resolve_vault(arg: str | None) -> Path:
 VAULT = None  # set in main()
 SKELETON_DIR = Path(__file__).resolve().parent / "skeletons"
 
+EDITABLE_FILES = {
+    "strategy/audience.md",
+    "strategy/offer.md",
+    "strategy/voice.md",
+    "strategy/examples.md",
+    "system/brand.md",
+    "system/brand.json",
+    "system/rules.yaml",
+    ".env",
+    "team/strategist.md",
+    "team/writer.md",
+    "team/editor.md",
+    "team/publisher.md",
+    "team/post.md",
+}
+
 # ─── Helpers ────────────────────────────────────────────────────────────
 
 def write_text_area(rel_path: str, content: str | None) -> list[str]:
@@ -59,6 +75,133 @@ def load_skeleton(name: str) -> str:
     if path.exists():
         return path.read_text(encoding="utf-8")
     return ""
+
+
+def safe_edit_path(rel_path: str) -> Path:
+    rel = rel_path.strip().lstrip("/")
+    if rel not in EDITABLE_FILES:
+        raise ValueError(f"file is not editable from dashboard: {rel_path}")
+    path = (VAULT / rel).resolve()
+    if not str(path).startswith(str(VAULT.resolve())):
+        raise ValueError("path escapes vault")
+    return path
+
+
+def read_editable_file(rel_path: str) -> dict:
+    """Read a file that's in EDITABLE_FILES, returning its content and metadata."""
+    path = safe_edit_path(rel_path)
+    return {
+        "path": rel_path,
+        "exists": path.exists(),
+        "content": path.read_text(encoding="utf-8") if path.exists() else "",
+        "updated_at": datetime.fromtimestamp(path.stat().st_mtime).isoformat(timespec="seconds") if path.exists() else None,
+    }
+
+
+def read_env_vars() -> dict[str, str]:
+    """Parse .env into a dict of key-value pairs. Returns {} if file missing."""
+    env_path = VAULT / ".env"
+    if not env_path.exists():
+        return {}
+    result: dict[str, str] = {}
+    for line in env_path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "=" not in line:
+            continue
+        key, _, val = line.partition("=")
+        key = key.strip()
+        val = val.strip().strip("'\"")
+        if key:
+            result[key] = val
+    return result
+
+
+def write_env_var(key: str, value: str) -> None:
+    """Add or update a single env var in .env, preserving comments and order."""
+    env_path = VAULT / ".env"
+    existing = read_env_vars()
+    existing[key] = value
+    lines: list[str] = []
+    if env_path.exists():
+        seen_key = False
+        for line in env_path.read_text(encoding="utf-8").splitlines():
+            stripped = line.strip()
+            if stripped.startswith("#") or "=" not in stripped:
+                lines.append(line)
+                continue
+            k = stripped.partition("=")[0].strip()
+            if k == key:
+                lines.append(f"{key}={value}")
+                seen_key = True
+            else:
+                lines.append(line)
+        if not seen_key:
+            lines.append(f"{key}={value}")
+    else:
+        lines.append(f"{key}={value}")
+    env_path.parent.mkdir(parents=True, exist_ok=True)
+    env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def remove_env_var(key: str) -> None:
+    """Remove a single env var from .env."""
+    env_path = VAULT / ".env"
+    if not env_path.exists():
+        return
+    lines = [
+        line for line in env_path.read_text(encoding="utf-8").splitlines()
+        if not (line.strip() and "=" in line.strip() and line.strip().partition("=")[0].strip() == key)
+    ]
+    env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def list_runs(limit: int = 20) -> list[dict]:
+    runs_dir = VAULT / "content" / "runs"
+    if not runs_dir.is_dir():
+        return []
+    runs = []
+    for run in sorted((p for p in runs_dir.iterdir() if p.is_dir()), reverse=True)[:limit]:
+        events_path = run / "events.jsonl"
+        events = []
+        if events_path.is_file():
+            for line in events_path.read_text(encoding="utf-8").splitlines():
+                try:
+                    events.append(json.loads(line))
+                except json.JSONDecodeError:
+                    pass
+        runs.append({
+            "run_id": run.name,
+            "events": events,
+            "event_count": len(events),
+            "updated_at": datetime.fromtimestamp(run.stat().st_mtime).isoformat(timespec="seconds"),
+        })
+    return runs
+
+
+def runtime_snapshot() -> dict:
+    state_path = VAULT / "content" / ".state.json"
+    current_path = VAULT / "content" / "current.md"
+    state = None
+    if state_path.is_file():
+        try:
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            state = {"error": "invalid content/.state.json"}
+    guard = {"ok": True, "issues": []}
+    try:
+        sys.path.insert(0, str(VAULT / "tools"))
+        from guard import check as guard_check  # type: ignore
+        guard = guard_check(VAULT)
+    except Exception as e:
+        guard = {"ok": False, "issues": [{"code": "guard_error", "message": str(e), "severity": "warning"}]}
+    return {
+        "state": state,
+        "current": current_path.read_text(encoding="utf-8") if current_path.is_file() else "",
+        "runs": list_runs(),
+        "guard": guard,
+    }
 
 
 def write_brand(form: dict) -> list[str]:
@@ -147,31 +290,58 @@ brand:
 
 
 def write_env(form: dict) -> list[str]:
-    """Write .env with the API tokens."""
-    lines = [f"VAULT_DIR={VAULT}", ""]
-    if form.get("buffer_token"):
-        lines.append(f"BUFFER_ACCESS_TOKEN={form['buffer_token']}")
-    if form.get("buffer_channels"):
-        lines.append(f"BUFFER_CHANNEL_IDS={','.join(form['buffer_channels'])}")
-    if form.get("x_api_key"):
-        lines.append(f"X_API_KEY={form['x_api_key']}")
-    if form.get("x_api_secret"):
-        lines.append(f"X_API_SECRET={form['x_api_secret']}")
-    if form.get("x_access_token"):
-        lines.append(f"X_ACCESS_TOKEN={form['x_access_token']}")
-    if form.get("x_access_secret"):
-        lines.append(f"X_ACCESS_SECRET={form['x_access_secret']}")
-    if form.get("linkedin_access_token"):
-        lines.append(f"LINKEDIN_ACCESS_TOKEN={form['linkedin_access_token']}")
-    if form.get("linkedin_person_urn"):
-        lines.append(f"LINKEDIN_PERSON_URN={form['linkedin_person_urn']}")
-    if form.get("blog_repo"):
-        lines.append(f"BLOG_REPO={form['blog_repo']}")
-    if form.get("blog_token"):
-        lines.append(f"BLOG_TOKEN={form['blog_token']}")
-    if not lines[-1]:
-        lines.pop()
-    (VAULT / ".env").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    """Write .env with the API tokens, preserving existing vars not in the form."""
+
+    env_path = VAULT / ".env"
+    existing_lines: list[str] = []
+    existing_vars: dict[str, int] = {}
+    if env_path.exists():
+        for i, line in enumerate(env_path.read_text(encoding="utf-8").splitlines()):
+            existing_lines.append(line)
+            stripped = line.strip()
+            if stripped and "=" in stripped and not stripped.startswith("#"):
+                k = stripped.partition("=")[0].strip()
+                existing_vars[k] = i
+
+    form_to_env = {
+        "buffer_token": "BUFFER_ACCESS_TOKEN",
+        "x_api_key": "X_API_KEY",
+        "x_api_secret": "X_API_SECRET",
+        "x_access_token": "X_ACCESS_TOKEN",
+        "x_access_secret": "X_ACCESS_SECRET",
+        "linkedin_access_token": "LINKEDIN_ACCESS_TOKEN",
+        "linkedin_person_urn": "LINKEDIN_PERSON_URN",
+        "wp_url": "WP_URL",
+        "wp_username": "WP_USERNAME",
+        "wp_app_password": "WP_APP_PASSWORD",
+        "devto_api_key": "DEVTO_API_KEY",
+        "hashnode_api_key": "HASHNODE_API_KEY",
+        "hashnode_publication_id": "HASHNODE_PUBLICATION_ID",
+        "custom_blog_api_url": "CUSTOM_BLOG_API_URL",
+        "custom_blog_api_method": "CUSTOM_BLOG_API_METHOD",
+        "custom_blog_api_auth_header": "CUSTOM_BLOG_API_AUTH_HEADER",
+        "custom_blog_api_body_template": "CUSTOM_BLOG_API_BODY_TEMPLATE",
+        "custom_blog_mcp_server": "CUSTOM_BLOG_MCP_SERVER",
+        "blog_repo": "BLOG_REPO",
+        "blog_token": "BLOG_TOKEN",
+    }
+
+    overrides: dict[str, str] = {env_key: form[form_key] for form_key, env_key in form_to_env.items() if form.get(form_key)}
+    overrides["VAULT_DIR"] = str(VAULT)
+
+    for env_key, value in overrides.items():
+        if env_key in existing_vars:
+            idx = existing_vars[env_key]
+            existing_lines[idx] = f"{env_key}={value}"
+        else:
+            existing_lines.append(f"{env_key}={value}")
+            existing_vars[env_key] = len(existing_lines) - 1
+
+    if not existing_lines:
+        existing_lines.append("")
+
+    env_path.parent.mkdir(parents=True, exist_ok=True)
+    env_path.write_text("\n".join(existing_lines) + "\n", encoding="utf-8")
     return [".env"]
 
 
@@ -215,7 +385,7 @@ def run_post_install(source_vault: Path | None = None) -> dict:
             "adapters_targets": [],
             "errors": [f"refused: VAULT ({VAULT}) looks like a temp directory; not installing to live IDEs"],
         }
-    if not (VAULT / "team" / "director.md").is_file():
+    if not (VAULT / "team" / "strategist.md").is_file():
         return {
             "shim_installed": None,
             "shim_path": None,
@@ -223,7 +393,7 @@ def run_post_install(source_vault: Path | None = None) -> dict:
             "adapters_generated": 0,
             "adapters_installed": 0,
             "adapters_targets": [],
-            "errors": [f"refused: VAULT ({VAULT}) is not a valid SpielOS vault (no team/director.md)"],
+            "errors": [f"refused: VAULT ({VAULT}) is not a valid SpielOS vault (no team/strategist.md)"],
         }
 
     result = {
@@ -363,43 +533,6 @@ def run_post_install(source_vault: Path | None = None) -> dict:
     return result
 
 
-def fetch_buffer_channels(token: str) -> list[dict]:
-    """Fetch Buffer channels for the wizard's channel picker.
-
-    Uses the legacy REST endpoint (api.bufferapp.com/1/profiles.json) which
-    accepts the personal access tokens issued at buffer.com/settings/apps.
-    The newer GraphQL endpoint (api.buffer.com) requires OAuth tokens and
-    silently returns empty for personal access tokens, which is what made
-    the wizard's "Fetch channels" button look broken.
-    """
-    url = f"https://api.bufferapp.com/1/profiles.json?access_token={urllib.parse.quote(token)}"
-    req = urllib.request.Request(url, method="GET")
-    try:
-        with urllib.request.urlopen(req, timeout=20) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-    except urllib.error.HTTPError as e:
-        err = e.read().decode("utf-8")[:300] if hasattr(e, 'read') else ""
-        raise RuntimeError(f"Buffer API HTTP {e.code}: {err}") from e
-    except Exception as e:
-        raise RuntimeError(f"Buffer API error: {e}") from e
-    out = []
-    for prof in data or []:
-        if not isinstance(prof, dict):
-            continue
-        out.append({
-            "id": prof.get("id"),
-            "service": prof.get("service"),
-            "name": (
-                prof.get("formatted_username")
-                or prof.get("service_username")
-                or prof.get("default_avatar_name")
-                or prof.get("name")
-                or f"profile-{prof.get('id')}"
-            ),
-        })
-    return out
-
-
 # ─── HTTP handler ────────────────────────────────────────────────────────
 
 WIZARD_DIR = Path(__file__).resolve().parent
@@ -407,6 +540,7 @@ WIZARD_DIR = Path(__file__).resolve().parent
 
 VAULT = None
 SOURCE_VAULT = None  # the canonical SpielOS repo (for sync_adapters invocation)
+EXIT_ON_FINISH = False
 
 
 def _detect_source_vault() -> Path:
@@ -474,7 +608,29 @@ class WizardHandler(BaseHTTPRequestHandler):
             return self._send_json(200, {
                 "target": str(VAULT),
                 "existing": {"summary": {}},
+                "installed": (VAULT / ".install-state.json").is_file(),
             })
+        if path == "/api/dashboard":
+            return self._send_json(200, {
+                "target": str(VAULT),
+                "installed": (VAULT / ".install-state.json").is_file(),
+                "editable": sorted(EDITABLE_FILES),
+                "runtime": runtime_snapshot(),
+            })
+        if path == "/api/runtime":
+            return self._send_json(200, runtime_snapshot())
+        if path == "/api/file":
+            query = urllib.parse.parse_qs(parsed.query)
+            rel_path = (query.get("path") or [""])[0]
+            try:
+                return self._send_json(200, read_editable_file(rel_path))
+            except Exception as e:
+                return self._send_json(400, {"error": str(e)})
+        if path == "/api/env":
+            try:
+                return self._send_json(200, {"vars": read_env_vars()})
+            except Exception as e:
+                return self._send_json(500, {"error": str(e)})
         if path == "/api/skeletons":
             skeletons = sorted(f.name for f in SKELETON_DIR.iterdir() if f.is_file())
             return self._send_json(200, {"skeletons": skeletons})
@@ -499,15 +655,39 @@ class WizardHandler(BaseHTTPRequestHandler):
         except Exception as e:
             return self._send_json(400, {"error": f"bad json: {e}"})
 
-        if path == "/api/buffer-channels":
-            token = (data.get("token") or "").strip()
-            if not token:
-                return self._send_json(400, {"error": "token required"})
+        if path == "/api/env/set":
+            key = (data.get("key") or "").strip()
+            value = (data.get("value") or "").strip()
+            if not key:
+                return self._send_json(400, {"error": "key required"})
             try:
-                channels = fetch_buffer_channels(token)
+                write_env_var(key, value)
+                return self._send_json(200, {"ok": True, "key": key})
             except Exception as e:
                 return self._send_json(500, {"error": str(e)})
-            return self._send_json(200, {"channels": channels})
+
+        if path == "/api/env/unset":
+            key = (data.get("key") or "").strip()
+            if not key:
+                return self._send_json(400, {"error": "key required"})
+            try:
+                remove_env_var(key)
+                return self._send_json(200, {"ok": True, "key": key})
+            except Exception as e:
+                return self._send_json(500, {"error": str(e)})
+
+        if path == "/api/file":
+            rel_path = data.get("path") or ""
+            content = data.get("content")
+            if not isinstance(content, str):
+                return self._send_json(400, {"error": "content must be a string"})
+            try:
+                file_path = safe_edit_path(rel_path)
+                file_path.parent.mkdir(parents=True, exist_ok=True)
+                file_path.write_text(content, encoding="utf-8")
+                return self._send_json(200, {"ok": True, "path": rel_path, "bytes": len(content.encode("utf-8"))})
+            except Exception as e:
+                return self._send_json(400, {"error": str(e)})
 
         if path == "/api/finish":
             try:
@@ -525,8 +705,10 @@ class WizardHandler(BaseHTTPRequestHandler):
                 written += write_install_marker()
                 # Auto-install: shim + IDE adapters
                 install_result = run_post_install(source_vault=SOURCE_VAULT)
-                # Schedule server shutdown in 3 seconds
-                threading.Timer(3.0, lambda: os._exit(0)).start()
+                if EXIT_ON_FINISH:
+                    # Installer mode waits for .install-state.json and should continue.
+                    # Dashboard mode stays alive so runtime logs remain visible.
+                    threading.Timer(3.0, lambda: os._exit(0)).start()
                 return self._send_json(200, {
                     "ok": True,
                     "vault": str(VAULT),
@@ -591,9 +773,10 @@ def bootstrap_vault(target: Path, source: Path | None = None) -> None:
     must_exist = [
         "team", "system", "strategy", "templates",
         "tools", "tools/publisher", "assets", "assets/icons",
-        "adapters", "skills", "tests", "bin",
-        "content", "content/inbox", "content/drafts", "content/ready",
+        "adapters", "tests", "bin",
+        "content", "content/sessions", "content/drafts", "content/ready",
         "content/posted", "content/rejected",
+        "content/runs",
         "archive", "archive/roles", "archive/skills",
         "install", "install/wizard", "install/wizard/skeletons",
     ]
@@ -602,27 +785,26 @@ def bootstrap_vault(target: Path, source: Path | None = None) -> None:
 
     files_to_copy = [
         # Roles
-        "team/director.md", "team/strategist.md", "team/writer.md",
+        "team/strategist.md", "team/strategist.md", "team/writer.md",
         "team/editor.md", "team/publisher.md", "team/post.md", "team/README.md",
         # System
-        "system/pipeline.md", "system/draft-schema.md", "system/rules.yaml",
+        "system/pipeline.md", "system/draft-schema.md", "system/run-state.md", "system/session-schema.md", "system/rules.yaml",
         "system/brand.md", "system/brand.json",
         # Strategy skeletons (user will edit via wizard)
         "strategy/audience.md", "strategy/offer.md",
         "strategy/voice.md", "strategy/examples.md",
         # Templates
         "templates/x-post.md", "templates/linkedin-post.md", "templates/blog-post.md",
-        # Tools
+        # Tools (full set — must be present for `spiel` shim and the Codex hook to work)
         "tools/editor.py", "tools/designer.py", "tools/sync_adapters.py",
+        "tools/post.py", "tools/advance.py", "tools/capture-session.py", "tools/doctor.py",
+        "tools/codex_hook.py", "tools/next.py",
+        "tools/guard.py", "tools/hook_log.py",
         "tools/_vault.py",
         "tools/publisher/_common.py", "tools/publisher/buffer.py",
         "tools/publisher/twitter.py", "tools/publisher/linkedin.py",
         "tools/publisher/blog.sh",
         "tools/banner-templates/default.html", "tools/banner-templates/notes.html",
-        # Skills
-        "skills/format_wizard/SKILL.md",
-        "skills/publish_wizard/SKILL.md",
-        "skills/voice_match/SKILL.md",
         # Wizard
         "install/wizard/index.html",
         "install/wizard/design-system.css",
@@ -631,8 +813,16 @@ def bootstrap_vault(target: Path, source: Path | None = None) -> None:
         "install/install.sh",
         "install/uninstall.sh",
         "install/brew/spiel.rb",
-        # Archive (read-only references for the IDE adapters + restore later)
-        "archive/roles/README.md",
+        # Codex plugin (mirrored to the plugin cache by `spiel sync` / `--install`)
+        "plugins/spielos/.codex-plugin/plugin.json",
+        "plugins/spielos/hooks.json",
+        "plugins/spielos/scripts/post-hook.sh",
+        "plugins/spielos/skills/spiel-post/SKILL.md",
+        "plugins/spielos/assets/icon.png",
+        "plugins/spielos/assets/logo.png",
+        "plugins/spielos/assets/logo-dark.png",
+        # Marketplace (Codex)
+        ".agents/plugins/marketplace.json",
         # Tests
         "tests/smoke.py",
         # Root
@@ -662,10 +852,12 @@ def main() -> int:
     parser.add_argument("--no-open", action="store_true", help="Don't auto-open browser")
     parser.add_argument("--host", default="127.0.0.1", help="Host to bind (default 127.0.0.1)")
     parser.add_argument("--source", help="Source repo to copy from (default: this serve.py's repo)")
+    parser.add_argument("--exit-on-finish", action="store_true", help="Exit after /api/finish for curl installer mode")
     args = parser.parse_args()
 
-    global VAULT
+    global VAULT, EXIT_ON_FINISH
     VAULT = resolve_vault(args.target)
+    EXIT_ON_FINISH = bool(args.exit_on_finish)
     VAULT.mkdir(parents=True, exist_ok=True)
     source = Path(args.source) if args.source else None
     bootstrap_vault(VAULT, source=source)
