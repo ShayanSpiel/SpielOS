@@ -1,25 +1,30 @@
 /* ═══════════════════════════════════════════════════════
    SpielOS Wizard — minimal design system for the setup wizard
-   Exact tokens. Exact component patterns. Medium radius.
-   No --r-full for chips. No sidebar. Sticky nav.
+   Tokens match the Mintlify dashboard palette.
+   Dark green accent, near-black surfaces, soft borders.
    ═══════════════════════════════════════════════════════ */
 
 :root {
-  --bg: #000000;
-  --bg-1: #0a0a0a;
-  --bg-2: #111111;
-  --bg-3: #161616;
-  --bg-4: #1a1a1a;
-  --tx: #ffffff;
-  --tx-1: #e5e5e5;
-  --tx-2: #b0b0b0;
-  --tx-3: #888888;
-  --tx-4: #555555;
-  --tx-5: #333333;
-  --bd: #1a1a1a;
-  --bd-1: #252525;
-  --bd-2: #333333;
-  --bd-focus: #555555;
+  --bg: rgb(10 13 13);
+  --bg-1: rgb(15 19 19);
+  --bg-2: rgb(20 25 24);
+  --bg-3: rgb(26 32 31);
+  --bg-4: rgb(33 40 38);
+  --tx: rgb(238 241 239);
+  --tx-1: rgb(220 224 222);
+  --tx-2: rgb(170 178 175);
+  --tx-3: rgb(120 128 125);
+  --tx-4: rgb(80 88 85);
+  --tx-5: rgb(50 56 54);
+  --bd: rgb(38 40 39);
+  --bd-1: rgb(48 52 50);
+  --bd-2: rgb(60 65 62);
+  --bd-focus: rgb(120 128 125);
+  --ac: rgb(38 189 108);
+  --ac-dim: rgb(38 189 108 / 0.12);
+  --ac-1: rgb(120 220 160);
+  --warning: rgb(245 158 11);
+  --warning-dim: rgb(245 158 11 / 0.18);
 
   --f-h: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --f-b: 'Merriweather', Georgia, serif;
@@ -93,7 +98,7 @@ html, body {
 .nav-sticky {
   position: fixed;
   bottom: 0; left: 0; right: 0;
-  background: rgba(10, 10, 10, 0.85);
+  background: rgb(10 13 13 / 0.85);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-top: 1px solid var(--bd);
@@ -133,7 +138,7 @@ html, body {
 .stepper {
   position: sticky;
   top: 0;
-  background: rgba(10, 10, 10, 0.92);
+  background: rgb(10 13 13 / 0.92);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-bottom: 1px solid var(--bd);
@@ -199,24 +204,25 @@ html, body {
 }
 
 .stepper-step.done .stepper-num {
-  background: var(--tx);
+  background: var(--ac);
   color: var(--bg);
-  border-color: var(--tx);
+  border-color: var(--ac);
 }
 
 .stepper-step.done .stepper-num::after {
-  content: '✓';
-  font-family: var(--f-h);
-  font-weight: 700;
+  content: '\f00c';
+  font-family: 'Font Awesome 6 Free';
+  font-weight: 900;
+  font-size: 11px;
 }
 
 .stepper-step.done .stepper-num-text { display: none; }
 
 .stepper-step.current .stepper-num {
   background: var(--bg);
-  color: var(--tx);
-  border-color: var(--tx-1);
-  box-shadow: 0 0 0 3px rgba(255,255,255,0.08);
+  color: var(--ac);
+  border-color: var(--ac);
+  box-shadow: 0 0 0 3px var(--ac-dim);
 }
 
 .stepper-step.current { color: var(--tx); }
@@ -931,7 +937,7 @@ input, textarea, select {
   margin-bottom: var(--s-5);
 }
 
-.closer-icon { color: var(--tx-1); }
+.closer-icon { color: var(--ac-1); font-size: 28px; line-height: 1; }
 
 .closer-takeaway {
   font-family: var(--f-h);
@@ -974,7 +980,7 @@ input, textarea, select {
 }
 .done-row:last-child { border-bottom: none; }
 
-.done-check { color: var(--tx-1); font-weight: 700; font-family: var(--f-m); }
+.done-check { color: var(--ac-1); font-weight: 700; font-family: var(--f-m); }
 
 .done-file {
   font-family: var(--f-m);
@@ -1101,7 +1107,7 @@ input, textarea, select {
 
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-.btn-primary { background: var(--tx); color: var(--bg); }
+.btn-primary { background: var(--ac); color: var(--bg); }
 .btn-primary:hover:not(:disabled) { opacity: 0.85; transform: translateY(-1px); }
 
 .btn-ghost { background: transparent; color: var(--tx-2); border: 1px solid var(--bd-1); }

@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>SpielOS — Setup</title>
   <link rel="stylesheet" href="design-system.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
   <style>
     .skeleton-textarea { font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace; font-size: 13px; line-height: 1.55; min-height: 280px; tab-size: 2; white-space: pre; word-wrap: normal; overflow-x: auto; width: 100%; padding: var(--s-4); border: 1px solid var(--bd); border-radius: 8px; background: var(--bg-code); color: var(--tx); resize: vertical; }
     .skeleton-textarea:focus { outline: none; border-color: var(--ac); box-shadow: 0 0 0 2px color-mix(in srgb, var(--ac) 25%, transparent); }
@@ -323,9 +324,7 @@
 
       <aside class="closer" x-show="done">
         <div class="closer-icon-wrap">
-          <svg class="closer-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="28" height="28" aria-hidden="true">
-            <path d="M5 13l4 4L19 7"></path>
-          </svg>
+          <i class="fa-solid fa-circle-check closer-icon" aria-hidden="true"></i>
         </div>
         <p class="closer-takeaway" x-text="installResult?.closer_takeaway || 'You stay a builder. The team ships the post.'"></p>
         <p class="closer-echo" x-text="installResult?.closer_echo || 'From any IDE, type /post. The 5 roles take it from there.'"></p>

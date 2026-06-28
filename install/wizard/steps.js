@@ -1,6 +1,7 @@
 /* ═══════════════════════════════════════════════════════
-   SpielOS Wizard + Dashboard — Alpine.js component
-   Merges step-by-step wizard with post-install dashboard.
+   SpielOS Wizard — Alpine.js component
+   8-step setup: welcome → brand → audience → offer → voice
+   → examples → connect → done.
    State saved to localStorage for crash recovery.
    ═══════════════════════════════════════════════════════ */
 
@@ -52,13 +53,10 @@ function pickIcon(brandName, tagline) {
 
 const STORAGE_KEY = 'spielos_wizard_state';
 
-function app() {
+function wizard() {
   return {
     // ── Mode ──
-    installed: false,
-    wizardStep: 0,
-    dashView: 'runtime',
-    sidebarCollapsed: false,
+    current: 0,
     saving: false,
     done: false,
     toast: '',
@@ -69,43 +67,10 @@ function app() {
     doneLines: [],
     installResult: null,
 
-    // ── Dashboard data ──
-    runtime: { state: null, current: '', runs: [] },
-    selectedRun: '',
-    activeFile: 'team/strategist.md',
-    activeContent: '',
-    envVars: {},
-    newEnvKey: '',
-    newEnvValue: '',
-    showAllRuns: false,
-    showAllEvents: false,
-
-    // ── Nav ──
-    nav: [
-      { key: 'runtime', label: 'Runtime', icon: 'terminal' },
-      { key: 'prompts', label: 'Prompts', icon: 'code' },
-      { key: 'config', label: 'Config', icon: 'cog' },
-      { key: 'setup', label: 'Setup', icon: 'sparkles' },
-    ],
-
-    promptFiles: [
-      'team/strategist.md',
-      'team/writer.md',
-      'team/editor.md',
-      'team/publisher.md',
-      'team/post.md',
-      'strategy/audience.md',
-      'strategy/offer.md',
-      'strategy/voice.md',
-      'strategy/examples.md',
-    ],
-
-    configFiles: [
-      'system/brand.md',
-      'system/brand.json',
-      'system/rules.yaml',
-      '.env',
-    ],
+    // ── Wizard state ──
+    bufferLoading: false,
+    bufferError: '',
+    bufferChannels: [],
 
     steps: [
       { key: 'welcome',  label: 'Welcome' },
@@ -135,6 +100,7 @@ function app() {
       voice_content: '',
       examples_content: '',
       buffer_token: '',
+      buffer_channels: [],
       x_api_key: '',
       x_api_secret: '',
       x_access_token: '',
@@ -168,56 +134,11 @@ function app() {
       return `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${path}</svg>`;
     },
 
-    navIconSvg(iconKey) {
-      const path = ICON_SVG[iconKey] || ICON_SVG['arrow-up-right'];
-      return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${path}</svg>`;
-    },
-
-    get currentTitle() {
-      return {
-        runtime: 'Runtime logs',
-        prompts: 'Prompt editor',
-        config: 'Brand, config & environment',
-        setup: 'Setup & onboarding',
-      }[this.dashView] || 'SpielOS';
-    },
-
-    get currentEyebrow() {
-      return 'Local dashboard';
-    },
-
-    get selectedRunEvents() {
-      const run = (this.runtime.runs || []).find(r => r.run_id === this.selectedRun);
-      return run ? run.events : [];
-    },
-
-    get visibleRuns() {
-      const runs = this.runtime.runs || [];
-      return this.showAllRuns ? runs : runs.slice(0, 5);
-    },
-
-    get hasMoreRuns() {
-      return (this.runtime.runs || []).length > 5;
-    },
-
-    get visibleEvents() {
-      const events = this.selectedRunEvents;
-      return this.showAllEvents ? events : events.slice(0, 5);
-    },
-
-    get hasMoreEvents() {
-      return this.selectedRunEvents.length > 5;
-    },
-
     // ── Init ──
 
     async init() {
       this.loadState();
-      await this.refresh();
-      if (!this.installed) {
-        await this.loadSkeletons();
-      }
-      await this.loadFile(this.activeFile);
+      await this.loadSkeletons();
     },
 
     // ── State persistence ──
@@ -225,8 +146,7 @@ function app() {
     saveState() {
       try {
         const state = {
-          wizardStep: this.wizardStep,
-          installed: this.installed,
+          current: this.current,
           form: { ...this.form },
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -238,11 +158,8 @@ function app() {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (!raw) return;
         const state = JSON.parse(raw);
-        if (state.installed) {
-          this.installed = true;
-          this.dashView = 'runtime';
-        } else if (typeof state.wizardStep === 'number') {
-          this.wizardStep = state.wizardStep;
+        if (typeof state.current === 'number') {
+          this.current = state.current;
         }
         if (state.form) {
           Object.assign(this.form, state.form);
@@ -252,9 +169,9 @@ function app() {
 
     // ── Wizard navigation ──
 
-    nextStep() {
-      if (this.wizardStep < this.steps.length - 1) {
-        this.wizardStep++;
+    next() {
+      if (this.current < this.steps.length - 1) {
+        this.current++;
         this.saveState();
         window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
@@ -262,59 +179,25 @@ function app() {
       this.finish();
     },
 
-    backStep() {
-      if (this.wizardStep > 0) {
-        this.wizardStep--;
+    back() {
+      if (this.current > 0) {
+        this.current--;
         this.saveState();
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     },
 
-    goStep(i) {
-      this.wizardStep = i;
+    go(i) {
+      this.current = i;
       this.saveState();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     },
 
-    // ── Dashboard navigation ──
-
-    setDashView(key) {
-      this.dashView = key;
-      if (key === 'runtime') this.refresh();
-      if (key === 'prompts' && !this.promptFiles.includes(this.activeFile)) this.loadFile(this.promptFiles[0]);
-      if (key === 'config' && !this.configFiles.includes(this.activeFile)) this.loadFile(this.configFiles[0]);
-    },
-
-    enterDashboard() {
-      this.installed = true;
-      this.dashView = 'runtime';
-      this.saveState();
-      this.refresh();
-    },
-
-    reOpenWizard() {
-      this.installed = false;
-      this.wizardStep = 0;
-      this.done = false;
-      this.saveState();
-      this.loadSkeletons();
+    closeTab() {
+      window.close();
     },
 
     // ── API calls ──
-
-    async refresh() {
-      try {
-        const r = await fetch('/api/dashboard');
-        const data = await r.json();
-        this.target = data.target || '';
-        this.installed = !!data.installed;
-        this.runtime = data.runtime || { state: null, runs: [] };
-        if (!this.selectedRun && this.runtime.runs && this.runtime.runs.length) {
-          this.selectedRun = this.runtime.runs[0].run_id;
-        }
-        await this.loadEnvVars();
-      } catch {}
-    },
 
     async loadSkeletons() {
       try {
@@ -357,103 +240,33 @@ function app() {
       }
     },
 
-    async loadFile(path) {
-      this.activeFile = path;
-      if (path === '.env') {
-        await this.loadEnvVars();
+    async fetchBufferChannels() {
+      if (!this.form.buffer_token) {
+        this.bufferError = 'Paste your Buffer access token first.';
         return;
       }
+      this.bufferLoading = true;
+      this.bufferError = '';
+      this.bufferChannels = [];
       try {
-        const r = await fetch(`/api/file?path=${encodeURIComponent(path)}`);
-        const data = await r.json();
-        if (data.error) {
-          this.flash(data.error);
-          return;
-        }
-        this.activeContent = data.content || '';
-      } catch {}
-    },
-
-    async saveActive() {
-      if (!this.activeFile) return;
-      this.saving = true;
-      try {
-        if (this.activeFile === '.env') {
-          this.flash('Use Add/Remove to change env vars');
-          this.saving = false;
-          return;
-        }
-        const r = await fetch('/api/file', {
+        const r = await fetch('/api/buffer/channels', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ path: this.activeFile, content: this.activeContent }),
+          body: JSON.stringify({ token: this.form.buffer_token }),
         });
         const data = await r.json();
-        this.flash(data.ok ? `Saved ${this.activeFile}` : (data.error || 'Save failed'));
-      } catch {
-        this.flash('Save failed');
-      }
-      this.saving = false;
-    },
-
-    async loadEnvVars() {
-      try {
-        const r = await fetch('/api/env');
-        if (!r.ok) {
-          const err = await r.json().catch(() => ({}));
-          this.flash(err.error || `Failed to load env vars (${r.status})`);
+        if (!data.ok) {
+          this.bufferError = data.error || 'Buffer rejected the token.';
+          this.flash(this.bufferError);
           return;
         }
-        const data = await r.json();
-        this.envVars = data.vars || {};
-      } catch {
-        this.flash('Failed to load env vars');
-      }
-    },
-
-    async addEnvVar() {
-      const key = this.newEnvKey.trim();
-      const value = this.newEnvValue.trim();
-      if (!key) return;
-      this.saving = true;
-      try {
-        const r = await fetch('/api/env/set', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ key, value }),
-        });
-        const data = await r.json();
-        if (data.ok) {
-          this.envVars[key] = value;
-          this.newEnvKey = '';
-          this.newEnvValue = '';
-          this.flash(`Set ${key}`);
-        } else {
-          this.flash(data.error || 'Failed to set env var');
-        }
-      } catch {
-        this.flash('Failed to set env var');
-      }
-      this.saving = false;
-    },
-
-    async removeEnvVar(key) {
-      if (!confirm(`Remove ${key}?`)) return;
-      try {
-        const r = await fetch('/api/env/unset', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ key }),
-        });
-        const data = await r.json();
-        if (data.ok) {
-          delete this.envVars[key];
-          this.flash(`Removed ${key}`);
-        } else {
-          this.flash(data.error || 'Failed to remove env var');
-        }
-      } catch {
-        this.flash('Failed to remove env var');
+        this.bufferChannels = data.channels || [];
+        this.flash(`Loaded ${this.bufferChannels.length} channels from Buffer.`);
+      } catch (e) {
+        this.bufferError = 'Could not reach Buffer. Check your network and try again.';
+        this.flash(this.bufferError);
+      } finally {
+        this.bufferLoading = false;
       }
     },
 
@@ -477,11 +290,9 @@ function app() {
         if (data.install && data.install.errors && data.install.errors.length) {
           this.doneLines.push(`warnings: ${data.install.errors.join(', ')}`);
         }
-        this.wizardStep = this.steps.length;
-        this.installed = true;
+        this.current = this.steps.length;
         this.saveState();
-        await this.refresh();
-        this.flash('Installed. Dashboard is live.');
+        this.flash('Installed. Vault is live.');
       } catch (e) {
         this.flash('Install failed: ' + e.message);
       }
@@ -496,6 +307,7 @@ function app() {
     // ── Helpers ──
 
     toggle(field, value) {
+      if (!Array.isArray(this.form[field])) this.form[field] = [];
       if (!this.form[field].includes(value)) {
         this.form[field].push(value);
       } else {

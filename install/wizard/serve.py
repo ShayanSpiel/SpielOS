@@ -21,6 +21,7 @@ import re
 import socket
 import sys
 import threading
+import urllib.error
 import urllib.parse
 import urllib.request
 import webbrowser
@@ -157,6 +158,30 @@ def remove_env_var(key: str) -> None:
     env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def fetch_buffer_profiles(token: str) -> list[dict]:
+    """Fetch the user's Buffer profiles (channels) using their access token.
+
+    Uses the legacy REST endpoint at api.bufferapp.com which still works with
+    a Bearer token. Returns a list of {"id", "service", "name"} dicts.
+    """
+    if not token or not token.strip():
+        raise ValueError("Buffer token is empty")
+    req = urllib.request.Request(
+        "https://api.bufferapp.com/1/profiles.json?access_token=" + urllib.parse.quote(token.strip()),
+        headers={"Accept": "application/json", "User-Agent": "SpielOS-Installer/1.0"},
+    )
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+    profiles: list[dict] = []
+    for p in data if isinstance(data, list) else []:
+        profiles.append({
+            "id": p.get("id") or "",
+            "service": (p.get("service") or "").strip().title() or "Channel",
+            "name": (p.get("formatted_username") or p.get("service_username") or p.get("default_text") or p.get("id") or "Channel").strip(),
+        })
+    return [p for p in profiles if p["id"]]
+
+
 def list_runs(limit: int = 20) -> list[dict]:
     runs_dir = VAULT / "content" / "runs"
     if not runs_dir.is_dir():
@@ -202,6 +227,113 @@ def runtime_snapshot() -> dict:
         "runs": list_runs(),
         "guard": guard,
     }
+
+
+def load_brand_config() -> dict:
+    """Read the brand fields from system/brand.json or system/brand.md.
+
+    Returns a dict of UI-friendly keys (primary_bg, primary_fg, accent, etc.)
+    that the dashboard can bind to its color pickers.
+    """
+    defaults = {
+        "brand_name": "YourBrand",
+        "handle": "@your_handle",
+        "role": "Founder, builder",
+        "tagline": "",
+        "primary_bg": "#000000",
+        "primary_fg": "#ffffff",
+        "subtitle_color": "#8a8a8a",
+        "handle_color": "#505050",
+        "accent": "#5f8b4c",
+        "title_gradient": False,
+    }
+    brand_json = VAULT / "system" / "brand.json"
+    if brand_json.is_file():
+        try:
+            data = json.loads(brand_json.read_text(encoding="utf-8"))
+            colors = data.get("colors", {})
+            return {
+                **defaults,
+                "brand_name": data.get("name", defaults["brand_name"]),
+                "handle": data.get("handle", defaults["handle"]),
+                "tagline": data.get("tagline", defaults["tagline"]),
+                "primary_bg": colors.get("background", defaults["primary_bg"]),
+                "primary_fg": colors.get("title", defaults["primary_fg"]),
+                "subtitle_color": colors.get("subtitle", defaults["subtitle_color"]),
+                "handle_color": colors.get("handle", defaults["handle_color"]),
+                "accent": colors.get("accent", defaults["accent"]),
+            }
+        except (json.JSONDecodeError, OSError):
+            pass
+    brand_md = VAULT / "system" / "brand.md"
+    if brand_md.is_file():
+        try:
+            text = brand_md.read_text(encoding="utf-8")
+            for line in text.splitlines():
+                m = re.match(r"\s*-\s*\*\*(.+?)\*\*:\s*(.+?)\s*$", line)
+                if not m:
+                    continue
+                key, value = m.group(1).strip().lower(), m.group(2).strip()
+                if key == "name":
+                    defaults["brand_name"] = value
+                elif key == "handle":
+                    defaults["handle"] = value
+                elif key == "tagline":
+                    defaults["tagline"] = value
+                elif key == "background":
+                    defaults["primary_bg"] = value
+                elif key == "title":
+                    defaults["primary_fg"] = value
+                elif key == "subtitle":
+                    defaults["subtitle_color"] = value
+                elif key == "handle color":
+                    defaults["handle_color"] = value
+                elif key == "accent":
+                    defaults["accent"] = value
+        except OSError:
+            pass
+    return defaults
+
+
+def save_brand_config(payload: dict) -> None:
+    """Persist dashboard edits back to system/brand.json + system/brand.md."""
+    brand_json = VAULT / "system" / "brand.json"
+    data = {}
+    if brand_json.is_file():
+        try:
+            data = json.loads(brand_json.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            data = {}
+    data["name"] = payload.get("brand_name", data.get("name", "YourBrand"))
+    data["handle"] = payload.get("handle", data.get("handle", "@your_handle"))
+    data["tagline"] = payload.get("tagline", data.get("tagline", ""))
+    data["colors"] = {
+        "background": payload.get("primary_bg", data.get("colors", {}).get("background", "#000000")),
+        "title": payload.get("primary_fg", data.get("colors", {}).get("title", "#ffffff")),
+        "subtitle": payload.get("subtitle_color", data.get("colors", {}).get("subtitle", "#8a8a8a")),
+        "handle": payload.get("handle_color", data.get("colors", {}).get("handle", "#505050")),
+        "accent": payload.get("accent", data.get("colors", {}).get("accent", "#5f8b4c")),
+    }
+    brand_json.parent.mkdir(parents=True, exist_ok=True)
+    brand_json.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+
+def trigger_post_run(payload: dict) -> dict:
+    """Run a /post in the vault. Returns ok + run_id or an error."""
+    source = (payload.get("source") or "").strip()
+    cmd = [sys.executable, str(VAULT / "bin" / "spiel"), "post", "--mode", "topic"]
+    if source:
+        cmd.append(source)
+    try:
+        import subprocess
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60, cwd=str(VAULT))
+        if result.returncode == 0:
+            return {"ok": True, "stdout": result.stdout[-500:]}
+        return {"ok": False, "error": result.stderr.strip() or result.stdout.strip() or f"exit {result.returncode}"}
+    except FileNotFoundError:
+        return {"ok": False, "error": "spiel binary not found. Run `spiel init` first."}
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "error": "Post run timed out (>60s)"}
 
 
 def write_brand(form: dict) -> list[str]:
@@ -600,6 +732,8 @@ class WizardHandler(BaseHTTPRequestHandler):
         path = parsed.path or "/"
         if path == "/" or path == "/index.html":
             return self._send_file(WIZARD_DIR / "index.html", "text/html; charset=utf-8")
+        if path == "/dashboard" or path == "/dashboard.html":
+            return self._send_file(WIZARD_DIR / "dashboard.html", "text/html; charset=utf-8")
         if path == "/design-system.css":
             return self._send_file(WIZARD_DIR / "design-system.css", "text/css; charset=utf-8")
         if path == "/steps.js":
@@ -616,6 +750,7 @@ class WizardHandler(BaseHTTPRequestHandler):
                 "installed": (VAULT / ".install-state.json").is_file(),
                 "editable": sorted(EDITABLE_FILES),
                 "runtime": runtime_snapshot(),
+                "config": load_brand_config(),
             })
         if path == "/api/runtime":
             return self._send_json(200, runtime_snapshot())
@@ -654,6 +789,35 @@ class WizardHandler(BaseHTTPRequestHandler):
             data = json.loads(body_raw) if body_raw else {}
         except Exception as e:
             return self._send_json(400, {"error": f"bad json: {e}"})
+
+        if path == "/api/config":
+            try:
+                save_brand_config(data)
+                return self._send_json(200, {"ok": True, "config": load_brand_config()})
+            except Exception as e:
+                return self._send_json(500, {"ok": False, "error": str(e)})
+
+        if path == "/api/post":
+            try:
+                result = trigger_post_run(data)
+                return self._send_json(200 if result.get("ok") else 500, result)
+            except Exception as e:
+                return self._send_json(500, {"ok": False, "error": str(e)})
+
+        if path == "/api/buffer/channels":
+            token = (data.get("token") or "").strip()
+            if not token:
+                return self._send_json(400, {"ok": False, "error": "token required"})
+            try:
+                channels = fetch_buffer_profiles(token)
+                return self._send_json(200, {"ok": True, "channels": channels})
+            except urllib.error.HTTPError as e:
+                body = e.read().decode("utf-8", errors="replace")[:200]
+                return self._send_json(e.code, {"ok": False, "error": f"Buffer returned {e.code}: {body or e.reason}"})
+            except urllib.error.URLError as e:
+                return self._send_json(502, {"ok": False, "error": f"Could not reach Buffer: {e.reason}"})
+            except Exception as e:
+                return self._send_json(500, {"ok": False, "error": f"Buffer lookup failed: {e}"})
 
         if path == "/api/env/set":
             key = (data.get("key") or "").strip()
