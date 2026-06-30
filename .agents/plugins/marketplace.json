@@ -1,0 +1,20 @@
+{
+  "name": "spielos-local",
+  "interface": {
+    "displayName": "SpielOS Local"
+  },
+  "plugins": [
+    {
+      "name": "spielos",
+      "source": {
+        "source": "local",
+        "path": "./plugins/spielos"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

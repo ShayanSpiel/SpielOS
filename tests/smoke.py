@@ -7,7 +7,7 @@ Verifies:
   2. 5 active role files in team/ with valid frontmatter
   3. Editor tool runs 4 gates on a sample draft
   4. Wizard server starts, serves 6 steps, /api/finish writes expected files
-  5. sync_adapters generates all 4 IDE outputs
+  5. sync_adapters generates IDE outputs + Codex plugin package
   6. shim resolves the vault
   7. adapter --check is clean
 
@@ -53,15 +53,15 @@ def check(name: str, cond: bool, detail: str = "") -> None:
 def test_pipeline_table() -> None:
     print("\n[1] Pipeline table (system/pipeline.md)")
     pm = (ROOT / "system" / "pipeline.md").read_text()
-    # The pipeline text mentions all 5 roles
-    for role in ["Director", "Strategist", "Writer", "Editor", "Publisher"]:
+    # The pipeline text mentions all active roles
+    for role in ["Strategist", "Writer", "Editor", "Publisher"]:
         check(f"role {role} present", role in pm)
 
 
 def test_team_files() -> None:
     print("\n[2] Team files present + valid frontmatter")
     team = ROOT / "team"
-    expected_roles = ["director", "strategist", "writer", "editor", "publisher"]
+    expected_roles = ["strategist", "writer", "editor", "publisher"]
     for r in expected_roles:
         f = team / f"{r}.md"
         check(f"team/{r}.md exists", f.exists())
@@ -70,7 +70,7 @@ def test_team_files() -> None:
             check(f"team/{r}.md has frontmatter", text.startswith("---"))
             check(f"team/{r}.md has description", "description:" in text[:500])
             check(f"team/{r}.md reads: content/current.md",
-                  "content/current.md" in text or "{vault_root}/content/current.md" in text or "current.md" in text)
+                      "content/current.md" in text or "{vault_root}/content/current.md" in text or "current.md" in text)
     # Archived roles stay in archive/roles/
     archive = ROOT / "archive" / "roles"
     for archived in ["analyst", "designer", "researcher"]:
@@ -85,7 +85,7 @@ def test_editor_runs() -> None:
         tmp_vault = Path(tmp) / "vault"
         tmp_vault.mkdir()
         (tmp_vault / "team").mkdir()
-        (tmp_vault / "team" / "director.md").write_text("# director\n")
+        (tmp_vault / "team" / "strategist.md").write_text("# strategist\n")
         (tmp_vault / "system").mkdir()
         import shutil
         shutil.copy(ROOT / "system" / "rules.yaml", tmp_vault / "system" / "rules.yaml")
@@ -186,6 +186,27 @@ def test_wizard_server() -> None:
             # JS
             with urllib.request.urlopen(f"http://127.0.0.1:{port}/steps.js", timeout=3) as r:
                 check("wizard /steps.js responds 200", r.status == 200)
+            # Dashboard API
+            with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/dashboard", timeout=3) as r:
+                data = json.loads(r.read())
+                check("dashboard /api/dashboard responds 200", r.status == 200)
+                check("dashboard exposes editable files", "team/strategist.md" in data.get("editable", []))
+                check("dashboard exposes runtime", "runtime" in data)
+            # Safe file read/write API
+            req_file = urllib.request.Request(
+                f"http://127.0.0.1:{port}/api/file",
+                data=json.dumps({"path": "strategy/audience.md", "content": "# Audience\n\nDashboard smoke"}).encode(),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req_file, timeout=3) as r:
+                data = json.loads(r.read())
+                check("dashboard /api/file write returns 200", r.status == 200)
+                check("dashboard /api/file write ok", data.get("ok") is True)
+            with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/file?path=strategy/audience.md", timeout=3) as r:
+                data = json.loads(r.read())
+                check("dashboard /api/file read returns 200", r.status == 200)
+                check("dashboard /api/file read content", "Dashboard smoke" in data.get("content", ""))
             # Finish (sends minimal lean form, expects 8 written files)
             req = urllib.request.Request(
                 f"http://127.0.0.1:{port}/api/finish",
@@ -224,33 +245,53 @@ def test_sync_adapters() -> None:
     )
     check("sync_adapters.py exits 0", r.returncode == 0, f"stderr: {r.stderr}")
     for path in [
-        "adapters/opencode/agents/director.md",
         "adapters/opencode/agents/writer.md",
         "adapters/opencode/agents/strategist.md",
         "adapters/opencode/agents/editor.md",
         "adapters/opencode/agents/publisher.md",
         "adapters/opencode/commands/post.md",
-        "adapters/opencode/skill/format_wizard/SKILL.md",
-        "adapters/opencode/skill/publish_wizard/SKILL.md",
-        "adapters/opencode/skill/voice_match/SKILL.md",
-        "adapters/claude/agents/director.md",
         "adapters/claude/agents/writer.md",
-        "adapters/cursor/commands/director.md",
         "adapters/cursor/commands/writer.md",
-        "adapters/codex/agents/director.toml",
         "adapters/codex/agents/writer.toml",
         "adapters/mcp/server.json",
+        "plugins/spielos/.codex-plugin/plugin.json",
+        ".agents/plugins/marketplace.json",
     ]:
         check(f"  {path} exists", (ROOT / path).exists())
-    # Archived skills must NOT be in adapters
+    check("  Codex plugin skill is NOT packaged",
+          not (ROOT / "plugins" / "spielos" / "skills" / "spiel-post" / "SKILL.md").exists())
+    # Legacy/archived skills must NOT be in generated adapters
+    check("  legacy skill format_wizard NOT generated",
+          not (ROOT / "adapters" / "opencode" / "skill" / "format_wizard" / "SKILL.md").exists())
+    check("  legacy skill publish_wizard NOT generated",
+          not (ROOT / "adapters" / "opencode" / "skill" / "publish_wizard" / "SKILL.md").exists())
+    check("  legacy skill voice_match NOT generated",
+          not (ROOT / "adapters" / "opencode" / "skill" / "voice_match" / "SKILL.md").exists())
     check("  archived skill icp_simulation NOT generated",
           not (ROOT / "adapters" / "opencode" / "skill" / "icp_simulation").exists())
     check("  archived skill template_picker NOT generated",
           not (ROOT / "adapters" / "opencode" / "skill" / "template_picker").exists())
 
 
+def test_post_runtime() -> None:
+    print("\n[6] post runtime (tools/post.py)")
+    env = os.environ.copy()
+    env["VAULT_DIR"] = str(ROOT)
+    r = subprocess.run(
+        [sys.executable, str(ROOT / "tools" / "post.py"), "--help"],
+        capture_output=True, text=True, env=env,
+    )
+    check("post.py --help exits 0", r.returncode == 0, f"stderr: {r.stderr}")
+    try:
+        plugin = json.loads((ROOT / "plugins" / "spielos" / ".codex-plugin" / "plugin.json").read_text())
+        check("Codex plugin manifest name", plugin.get("name") == "spielos")
+        check("Codex plugin does not expose duplicated skills", "skills" not in plugin)
+    except Exception as e:
+        check("Codex plugin manifest readable", False, str(e))
+
+
 def test_sync_check() -> None:
-    print("\n[6] sync_adapters.py --check")
+    print("\n[7] sync_adapters.py --check")
     r = subprocess.run(
         [sys.executable, str(ROOT / "tools" / "sync_adapters.py"), "--check"],
         capture_output=True, text=True,
@@ -259,7 +300,7 @@ def test_sync_check() -> None:
 
 
 def test_shim() -> None:
-    print("\n[7] bin/spiel shim")
+    print("\n[8] bin/spiel shim")
     env = os.environ.copy()
     env["VAULT_DIR"] = str(ROOT)
     shim = ROOT / "bin" / "spiel"
@@ -272,6 +313,10 @@ def test_shim() -> None:
               f"got {r.stdout.strip()!r}")
     r2 = subprocess.run([str(shim), "status"], capture_output=True, text=True, env=env)
     check("bin/spiel status exits 0", r2.returncode == 0, f"stderr: {r2.stderr}")
+    r3 = subprocess.run([str(shim), "doctor", "--json"], capture_output=True, text=True, env=env)
+    check("bin/spiel doctor exits 0", r3.returncode == 0, f"stderr: {r3.stderr} stdout: {r3.stdout}")
+    r4 = subprocess.run([str(shim), "guard", "--json"], capture_output=True, text=True, env=env)
+    check("bin/spiel guard is callable", r4.returncode in (0, 1), f"stderr: {r4.stderr} stdout: {r4.stdout}")
 
 
 # ─── Runner ─────────────────────────────────────────────────────────────
@@ -283,6 +328,7 @@ def main() -> int:
     test_editor_runs()
     test_wizard_server()
     test_sync_adapters()
+    test_post_runtime()
     test_sync_check()
     test_shim()
     print(f"\n{PASS} passed, {FAIL} failed")

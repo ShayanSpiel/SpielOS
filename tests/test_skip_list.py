@@ -114,17 +114,17 @@ print("SKIPPED_UNCHANGED=" + str(skipped))
 def test_team_files_are_refreshed() -> None:
     print("\n[1] team/*.md is refreshed (project-level)")
     source, vault = fresh_pair()
-    # Source has new director.md
+    # Source has new strategist.md
     (source / "team").mkdir()
-    (source / "team" / "director.md").write_text("NEW DIRECTOR with state machine")
-    # Vault has old director.md
+    (source / "team" / "strategist.md").write_text("NEW STRATEGIST with state machine")
+    # Vault has old strategist.md
     (vault / "team").mkdir()
-    (vault / "team" / "director.md").write_text("OLD DIRECTOR")
+    (vault / "team" / "strategist.md").write_text("OLD STRATEGIST")
     out = run_overlay(source, vault)
-    check("team/director.md is in updated list", "team/director.md" in out["updated"],
+    check("team/strategist.md is in updated list", "team/strategist.md" in out["updated"],
           f"updated={out['updated']}")
-    check("vault director.md has new content",
-          (vault / "team" / "director.md").read_text() == "NEW DIRECTOR with state machine")
+    check("vault strategist.md has new content",
+          (vault / "team" / "strategist.md").read_text() == "NEW STRATEGIST with state machine")
 
 
 def test_strategy_files_are_preserved() -> None:
@@ -247,7 +247,7 @@ def test_full_skip_list_table() -> None:
     check("bin/spiel does NOT have skills in skip list (refreshed)",
           '"skills strategy"' not in bin_spiel)
     check("bin/spiel does NOT have team in skip list (refreshed)",
-          '"team skills"' not in bin_spiel and 'skip_dirs.*team' not in bin_spiel.lower().replace("team/director.md", ""))
+          '"team skills"' not in bin_spiel and 'skip_dirs.*team' not in bin_spiel.lower().replace("team/strategist.md", ""))
     # install.sh
     install_sh = (ROOT / "install" / "install.sh").read_text()
     check("install.sh has skip_dirs = {\"strategy\", \"content\"}",

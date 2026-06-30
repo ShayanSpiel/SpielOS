@@ -11,7 +11,6 @@ from __future__ import annotations
 import json
 import os
 import re
-import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -35,6 +34,17 @@ READY_DIR = VAULT / "content" / "ready"
 POSTED_DIR = VAULT / "content" / "posted"
 BANNERS_ROOT = (VAULT / "assets" / "banners").resolve()
 ICONS_ROOT = (VAULT / "assets" / "icons").resolve()
+
+
+def set_vault(vault: Path) -> None:
+    """Update module-level vault paths used by all publisher helpers."""
+    global VAULT, ENV_FILE, READY_DIR, POSTED_DIR, BANNERS_ROOT, ICONS_ROOT
+    VAULT = vault
+    ENV_FILE = VAULT / ".env"
+    READY_DIR = VAULT / "content" / "ready"
+    POSTED_DIR = VAULT / "content" / "posted"
+    BANNERS_ROOT = (VAULT / "assets" / "banners").resolve()
+    ICONS_ROOT = (VAULT / "assets" / "icons").resolve()
 
 
 # ─── Frontmatter parser (standalone) ─────────────────────────────────────
@@ -67,7 +77,9 @@ def write_frontmatter(out_path: Path, fm: dict, body: str) -> None:
     import yaml
     out_path.parent.mkdir(parents=True, exist_ok=True)
     text = "---\n" + yaml.safe_dump(fm, sort_keys=False, allow_unicode=True) + "---\n\n" + body
-    out_path.write_text(text, encoding="utf-8")
+    tmp = out_path.with_name(f".{out_path.name}.tmp.{os.getpid()}")
+    tmp.write_text(text, encoding="utf-8")
+    tmp.replace(out_path)
 
 
 # ─── Creds ───────────────────────────────────────────────────────────────
@@ -90,7 +102,7 @@ def load_creds(required: list[str]) -> dict:
 
 # ─── Body extraction / sanitization ──────────────────────────────────────
 
-LEAKED_MARKDOWN = re.compile(r"\*\*|\[\[|]]")
+LEAKED_MARKDOWN = re.compile(r"\*\*|\[\[|]]|\]\(|^#{1,6}\s+", re.MULTILINE)
 EMDASH = "\u2014"
 
 
@@ -121,8 +133,10 @@ def sanitize(body: str) -> str:
     out = re.sub(r"(^|[\s(>])_([^_\s][^_]*?)_([\s.,)!?>]|$)", r"\1\2\3", out)
     out = re.sub(r"(^|[\s(>])\*([^*\s][^*]*?)\*([\s.,)!?>]|$)", r"\1\2\3", out)
     out = re.sub(r"\[\[([^\]|]+)(?:\|[^\]]+)?\]\]", r"\1", out)
+    out = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", out)
     out = re.sub(r"`([^`]+)`", r"\1", out)
     out = re.sub(r"^>\s+", "", out, flags=re.MULTILINE)
+    out = re.sub(r"^#{1,6}\s+", "", out, flags=re.MULTILINE)
     return out
 
 
@@ -164,7 +178,7 @@ def archive(post_file: Path, channel_results: list[dict], body: str, mode: str,
             fm["threads_post_id"] = pid
     fm["body"] = body
     write_frontmatter(posted_file, fm, body)
-    post_file.unlink()
+    post_file.unlink(missing_ok=True)
     return posted_file
 
 
@@ -194,4 +208,6 @@ def check_gates_verdict(post_file: Path) -> tuple[bool, str]:
             f"gates_verdict=fail in frontmatter. Refusing to publish. "
             f"Run `python3 tools/editor.py check <draft>` to see which gate failed."
         )
+    if verdict != "pass":
+        return False, f"gates_verdict={verdict!r}; refusing to publish unless verdict is exactly 'pass'."
     return True, f"gates_verdict={verdict}"

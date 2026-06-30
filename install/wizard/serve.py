@@ -43,6 +43,7 @@ def resolve_vault(arg: str | None) -> Path:
 
 VAULT = None  # set in main()
 SKELETON_DIR = Path(__file__).resolve().parent / "skeletons"
+FINISH_LOCK = threading.Lock()
 
 EDITABLE_FILES = {
     "strategy/audience.md",
@@ -62,17 +63,30 @@ EDITABLE_FILES = {
 
 # ─── Helpers ────────────────────────────────────────────────────────────
 
+def atomic_write_text(path: Path, text: str) -> None:
+    """Write text with a same-directory temp file + atomic rename."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f".{path.name}.tmp.{os.getpid()}.{threading.get_ident()}")
+    tmp.write_text(text, encoding="utf-8")
+    tmp.replace(path)
+
+
 def write_text_area(rel_path: str, content: str | None) -> list[str]:
     """Write a file from textarea content. Skip if content is empty."""
     if not content or not content.strip():
         return []
-    (VAULT / rel_path).write_text(content, encoding="utf-8")
+    atomic_write_text(VAULT / rel_path, content)
     return [rel_path]
 
 
 def load_skeleton(name: str) -> str:
     """Load a skeleton file, or return empty string."""
-    path = SKELETON_DIR / name
+    decoded = urllib.parse.unquote(name)
+    if decoded != Path(decoded).name or "/" in decoded or "\\" in decoded:
+        return ""
+    path = (SKELETON_DIR / decoded).resolve()
+    if not str(path).startswith(str(SKELETON_DIR.resolve())):
+        return ""
     if path.exists():
         return path.read_text(encoding="utf-8")
     return ""
@@ -143,7 +157,7 @@ def write_env_var(key: str, value: str) -> None:
     else:
         lines.append(f"{key}={value}")
     env_path.parent.mkdir(parents=True, exist_ok=True)
-    env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    atomic_write_text(env_path, "\n".join(lines) + "\n")
 
 
 def remove_env_var(key: str) -> None:
@@ -155,7 +169,7 @@ def remove_env_var(key: str) -> None:
         line for line in env_path.read_text(encoding="utf-8").splitlines()
         if not (line.strip() and "=" in line.strip() and line.strip().partition("=")[0].strip() == key)
     ]
-    env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    atomic_write_text(env_path, "\n".join(lines) + "\n")
 
 
 def fetch_buffer_profiles(token: str) -> list[dict]:
@@ -214,6 +228,7 @@ def runtime_snapshot() -> dict:
             state = json.loads(state_path.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
             state = {"error": "invalid content/.state.json"}
+
     guard = {"ok": True, "issues": []}
     try:
         sys.path.insert(0, str(VAULT / "tools"))
@@ -221,11 +236,44 @@ def runtime_snapshot() -> dict:
         guard = guard_check(VAULT)
     except Exception as e:
         guard = {"ok": False, "issues": [{"code": "guard_error", "message": str(e), "severity": "warning"}]}
+
+    def count_files(d: Path) -> list[str]:
+        if not d.is_dir():
+            return []
+        return sorted(str(p.relative_to(VAULT)) for p in d.iterdir()
+                       if p.is_file() and p.name != ".gitkeep" and not p.name.startswith("."))
+
+    drafts_files = count_files(VAULT / "content" / "drafts")
+    ready_files = count_files(VAULT / "content" / "ready")
+    posted_files = count_files(VAULT / "content" / "posted")
+    rejected_files = count_files(VAULT / "content" / "rejected")
+
+    state_drafts = state.get("drafts", []) if isinstance(state, dict) else []
+    state_ready = state.get("ready", []) if isinstance(state, dict) else []
+    merged_drafts = sorted(set(drafts_files) | set(f for f in state_drafts if (VAULT / f).is_file()))
+    merged_ready = sorted(set(ready_files) | set(f for f in state_ready if (VAULT / f).is_file()))
+
     return {
-        "state": state,
+        "state": {
+            **(state if isinstance(state, dict) else {}),
+            "drafts": merged_drafts,
+            "ready": merged_ready,
+        } if state else None,
         "current": current_path.read_text(encoding="utf-8") if current_path.is_file() else "",
         "runs": list_runs(),
         "guard": guard,
+        "counts": {
+            "drafts": len(merged_drafts),
+            "ready": len(merged_ready),
+            "posted": len(posted_files),
+            "rejected": len(rejected_files),
+            "errors": sum(1 for i in (guard.get("issues") or []) if i.get("severity") == "error"),
+            "warnings": sum(1 for i in (guard.get("issues") or []) if i.get("severity") == "warning"),
+        },
+        "drafts_files": merged_drafts,
+        "ready_files": merged_ready,
+        "posted_files": posted_files,
+        "rejected_files": rejected_files,
     }
 
 
@@ -251,17 +299,22 @@ def load_brand_config() -> dict:
     if brand_json.is_file():
         try:
             data = json.loads(brand_json.read_text(encoding="utf-8"))
-            colors = data.get("colors", {})
+            brand = data.get("brand", {}) if isinstance(data.get("brand"), dict) else {}
+            colors = data.get("colors", {}) if isinstance(data.get("colors"), dict) else {}
+            banner = data.get("banner", {}) if isinstance(data.get("banner"), dict) else {}
+            tokens = banner.get("tokens", {}) if isinstance(banner.get("tokens"), dict) else {}
             return {
                 **defaults,
-                "brand_name": data.get("name", defaults["brand_name"]),
-                "handle": data.get("handle", defaults["handle"]),
-                "tagline": data.get("tagline", defaults["tagline"]),
-                "primary_bg": colors.get("background", defaults["primary_bg"]),
-                "primary_fg": colors.get("title", defaults["primary_fg"]),
-                "subtitle_color": colors.get("subtitle", defaults["subtitle_color"]),
-                "handle_color": colors.get("handle", defaults["handle_color"]),
-                "accent": colors.get("accent", defaults["accent"]),
+                "brand_name": data.get("name") or brand.get("name") or defaults["brand_name"],
+                "handle": data.get("handle") or brand.get("handle") or defaults["handle"],
+                "role": data.get("role") or brand.get("creator_self") or defaults["role"],
+                "tagline": data.get("tagline") or brand.get("tagline") or defaults["tagline"],
+                "primary_bg": colors.get("background") or brand.get("primary_bg") or tokens.get("bg") or defaults["primary_bg"],
+                "primary_fg": colors.get("title") or brand.get("primary_fg") or tokens.get("text_title_color") or defaults["primary_fg"],
+                "subtitle_color": colors.get("subtitle") or brand.get("subtitle_color") or tokens.get("text_subtitle_color") or defaults["subtitle_color"],
+                "handle_color": colors.get("handle") or brand.get("handle_color") or tokens.get("text_handle_color") or defaults["handle_color"],
+                "accent": colors.get("accent") or brand.get("accent") or defaults["accent"],
+                "title_gradient": bool(banner.get("title_gradient", defaults["title_gradient"])),
             }
         except (json.JSONDecodeError, OSError):
             pass
@@ -306,6 +359,7 @@ def save_brand_config(payload: dict) -> None:
             data = {}
     data["name"] = payload.get("brand_name", data.get("name", "YourBrand"))
     data["handle"] = payload.get("handle", data.get("handle", "@your_handle"))
+    data["role"] = payload.get("role", data.get("role", "Founder, builder"))
     data["tagline"] = payload.get("tagline", data.get("tagline", ""))
     data["colors"] = {
         "background": payload.get("primary_bg", data.get("colors", {}).get("background", "#000000")),
@@ -314,14 +368,26 @@ def save_brand_config(payload: dict) -> None:
         "handle": payload.get("handle_color", data.get("colors", {}).get("handle", "#505050")),
         "accent": payload.get("accent", data.get("colors", {}).get("accent", "#5f8b4c")),
     }
+    data["brand"] = {
+        "name": data["name"],
+        "handle": data["handle"],
+        "primary_bg": data["colors"]["background"],
+        "primary_fg": data["colors"]["title"],
+        "subtitle_color": data["colors"]["subtitle"],
+        "handle_color": data["colors"]["handle"],
+        "accent": data["colors"]["accent"],
+        "tagline": data["tagline"],
+        "creator_self": data["role"],
+    }
+    data.setdefault("banner", {})["title_gradient"] = bool(payload.get("title_gradient", data.get("banner", {}).get("title_gradient", False)))
     brand_json.parent.mkdir(parents=True, exist_ok=True)
-    brand_json.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    atomic_write_text(brand_json, json.dumps(data, indent=2) + "\n")
 
 
 def trigger_post_run(payload: dict) -> dict:
     """Run a /post in the vault. Returns ok + run_id or an error."""
     source = (payload.get("source") or "").strip()
-    cmd = [sys.executable, str(VAULT / "bin" / "spiel"), "post", "--mode", "topic"]
+    cmd = ["bash", str(VAULT / "bin" / "spiel"), "post", "--mode", "topic"]
     if source:
         cmd.append(source)
     try:
@@ -384,7 +450,7 @@ brand:
 - Banner template: `default`. Dimensions: 1200x630.
 - Fonts: Inter (heading), Merriweather (subtitle), JetBrains Mono (handle).
 """
-    (VAULT / "system" / "brand.md").write_text(md, encoding="utf-8")
+    atomic_write_text(VAULT / "system" / "brand.md", md)
     brand_json = {
         "brand": {
             "name": form.get("brand_name", "YourBrand"),
@@ -417,7 +483,7 @@ brand:
             },
         },
     }
-    (VAULT / "system" / "brand.json").write_text(json.dumps(brand_json, indent=2), encoding="utf-8")
+    atomic_write_text(VAULT / "system" / "brand.json", json.dumps(brand_json, indent=2) + "\n")
     return ["system/brand.md", "system/brand.json"]
 
 
@@ -459,6 +525,13 @@ def write_env(form: dict) -> list[str]:
     }
 
     overrides: dict[str, str] = {env_key: form[form_key] for form_key, env_key in form_to_env.items() if form.get(form_key)}
+    buffer_channels = form.get("buffer_channels")
+    if isinstance(buffer_channels, list):
+        selected = [str(v).strip() for v in buffer_channels if str(v).strip()]
+        if selected:
+            overrides["BUFFER_CHANNEL_IDS"] = ",".join(selected)
+    elif isinstance(buffer_channels, str) and buffer_channels.strip():
+        overrides["BUFFER_CHANNEL_IDS"] = buffer_channels.strip()
     overrides["VAULT_DIR"] = str(VAULT)
 
     for env_key, value in overrides.items():
@@ -473,7 +546,7 @@ def write_env(form: dict) -> list[str]:
         existing_lines.append("")
 
     env_path.parent.mkdir(parents=True, exist_ok=True)
-    env_path.write_text("\n".join(existing_lines) + "\n", encoding="utf-8")
+    atomic_write_text(env_path, "\n".join(existing_lines) + "\n")
     return [".env"]
 
 
@@ -484,7 +557,7 @@ def write_install_marker() -> list[str]:
         "vault": str(VAULT),
         "version": "2.0.0",
     }
-    (VAULT / ".install-state.json").write_text(json.dumps(state, indent=2), encoding="utf-8")
+    atomic_write_text(VAULT / ".install-state.json", json.dumps(state, indent=2) + "\n")
     return [".install-state.json"]
 
 
@@ -557,13 +630,13 @@ def run_post_install(source_vault: Path | None = None) -> dict:
 
     # 2. Write vault pointer file + global config
     try:
-        (VAULT / ".spiel-vault").write_text(f"VAULT_DIR={VAULT}\n", encoding="utf-8")
+        atomic_write_text(VAULT / ".spiel-vault", f"VAULT_DIR={VAULT}\n")
         # Only write global config + .env if VAULT is not a temp directory
         vault_str = str(VAULT)
         if not (vault_str.startswith("/tmp/") or vault_str.startswith("/private/var/folders/") or vault_str.startswith("/var/folders/")):
             spielos_cfg = Path.home() / ".config" / "spielos" / "config"
             spielos_cfg.parent.mkdir(parents=True, exist_ok=True)
-            spielos_cfg.write_text(f"VAULT_DIR={VAULT}\n", encoding="utf-8")
+            atomic_write_text(spielos_cfg, f"VAULT_DIR={VAULT}\n")
             env_file = VAULT / ".env"
             if env_file.exists():
                 text = env_file.read_text(encoding="utf-8")
@@ -575,7 +648,7 @@ def run_post_install(source_vault: Path | None = None) -> dict:
                         found = True
                         break
                 if found:
-                    env_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
+                    atomic_write_text(env_file, "\n".join(lines) + "\n")
         else:
             result["errors"].append(f"vault pointer: skipped global config write (VAULT is a temp dir: {VAULT})")
     except Exception as e:
@@ -700,12 +773,32 @@ class WizardHandler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
         sys.stderr.write(f"[wizard] {self.address_string()} - {fmt % args}\n")
 
+    def _origin_allowed(self) -> bool:
+        origin = self.headers.get("Origin")
+        if not origin:
+            return True
+        host = self.headers.get("Host", "")
+        try:
+            parsed = urllib.parse.urlparse(origin)
+        except Exception:
+            return False
+        if parsed.scheme not in ("http", "https"):
+            return False
+        return parsed.netloc == host and parsed.hostname in ("localhost", "127.0.0.1", "::1")
+
+    def _cors_origin(self) -> str | None:
+        origin = self.headers.get("Origin")
+        return origin if origin and self._origin_allowed() else None
+
     def _send_json(self, status: int, payload: dict) -> None:
         body = json.dumps(payload).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Access-Control-Allow-Origin", "*")
+        cors_origin = self._cors_origin()
+        if cors_origin:
+            self.send_header("Access-Control-Allow-Origin", cors_origin)
+            self.send_header("Vary", "Origin")
         self.end_headers()
         self.wfile.write(body)
 
@@ -738,6 +831,8 @@ class WizardHandler(BaseHTTPRequestHandler):
             return self._send_file(WIZARD_DIR / "design-system.css", "text/css; charset=utf-8")
         if path == "/steps.js":
             return self._send_file(WIZARD_DIR / "steps.js", "application/javascript; charset=utf-8")
+        if path == "/icons.js":
+            return self._send_file(WIZARD_DIR / "icons.js", "application/javascript; charset=utf-8")
         if path == "/api/config":
             return self._send_json(200, {
                 "target": str(VAULT),
@@ -781,6 +876,8 @@ class WizardHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_POST(self) -> None:
+        if not self._origin_allowed():
+            return self._send_json(403, {"ok": False, "error": "cross-origin POST rejected"})
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
         try:
@@ -848,12 +945,14 @@ class WizardHandler(BaseHTTPRequestHandler):
             try:
                 file_path = safe_edit_path(rel_path)
                 file_path.parent.mkdir(parents=True, exist_ok=True)
-                file_path.write_text(content, encoding="utf-8")
+                atomic_write_text(file_path, content)
                 return self._send_json(200, {"ok": True, "path": rel_path, "bytes": len(content.encode("utf-8"))})
             except Exception as e:
                 return self._send_json(400, {"error": str(e)})
 
         if path == "/api/finish":
+            if not FINISH_LOCK.acquire(blocking=False):
+                return self._send_json(409, {"ok": False, "error": "finish already in progress"})
             try:
                 written: list[str] = []
                 # Brand (always)
@@ -883,6 +982,8 @@ class WizardHandler(BaseHTTPRequestHandler):
                 import traceback
                 traceback.print_exc()
                 return self._send_json(500, {"error": str(e)})
+            finally:
+                FINISH_LOCK.release()
 
         if path == "/api/shutdown":
             def _do_shutdown():
@@ -894,8 +995,15 @@ class WizardHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_OPTIONS(self) -> None:
+        if not self._origin_allowed():
+            self.send_response(403)
+            self.end_headers()
+            return
         self.send_response(204)
-        self.send_header("Access-Control-Allow-Origin", "*")
+        cors_origin = self._cors_origin()
+        if cors_origin:
+            self.send_header("Access-Control-Allow-Origin", cors_origin)
+            self.send_header("Vary", "Origin")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.end_headers()
@@ -949,7 +1057,7 @@ def bootstrap_vault(target: Path, source: Path | None = None) -> None:
 
     files_to_copy = [
         # Roles
-        "team/strategist.md", "team/strategist.md", "team/writer.md",
+        "team/strategist.md", "team/writer.md",
         "team/editor.md", "team/publisher.md", "team/post.md", "team/README.md",
         # System
         "system/pipeline.md", "system/draft-schema.md", "system/run-state.md", "system/session-schema.md", "system/rules.yaml",
@@ -973,6 +1081,7 @@ def bootstrap_vault(target: Path, source: Path | None = None) -> None:
         "install/wizard/index.html",
         "install/wizard/design-system.css",
         "install/wizard/steps.js",
+        "install/wizard/icons.js",
         "install/wizard/serve.py",
         "install/install.sh",
         "install/uninstall.sh",
@@ -981,7 +1090,6 @@ def bootstrap_vault(target: Path, source: Path | None = None) -> None:
         "plugins/spielos/.codex-plugin/plugin.json",
         "plugins/spielos/hooks.json",
         "plugins/spielos/scripts/post-hook.sh",
-        "plugins/spielos/skills/spiel-post/SKILL.md",
         "plugins/spielos/assets/icon.png",
         "plugins/spielos/assets/logo.png",
         "plugins/spielos/assets/logo-dark.png",

@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
-"""capture-session.py — Capture the CURRENT session and save it as the canonical log.
+"""capture-session.py - Capture the CURRENT session and save it as the canonical log.
 
-The Researcher subagent runs this on every /post (no args). The LLM is the only
-thing that has the live transcript of the conversation it is in, so it builds a
-clean transcript (drop tool noise, keep user/assistant text) and hands it to
-this tool. The tool writes it to a single canonical file:
+The /post adapter runs this for session mode. The LLM adapter is the only thing
+that has the live transcript of its conversation, so it builds a clean
+transcript (drop tool noise, keep user/assistant text) and hands it to this
+tool. The tool writes it to a single canonical file:
 
     <vault>/content/sessions/YYYY-MM-DD-session-current.md
 
 Always overwrites. There is exactly one "current" session log per day. No NN
 numbering, no per-message subdirs, no fallback to older logs.
 
-The Researcher must NEVER scan content/sessions/ for any existing log, NEVER
-call tools/researcher.py synthesize-session, and NEVER read a log other than
-the one this tool just wrote. That is by design (see team/researcher.md).
+The adapter must NEVER scan content/sessions/ for an existing log and must
+NEVER read a log other than the one this tool just wrote. That is by design:
+session capture is a fresh input to the current /post run.
 
 CLI:
     python3 tools/capture-session.py \
@@ -88,8 +88,8 @@ def read_transcript(args: argparse.Namespace) -> str:
 def read_structured(args: argparse.Namespace) -> dict | None:
     """Optional. LLM can pass a JSON file with the 6 canonical sections
     pre-extracted. If present, we render those into the body. If absent,
-    the body holds only the raw transcript (status: in-progress) and the
-    Researcher fills the sections itself in markdown after."""
+    the body holds only the raw transcript (status: in-progress) for manual
+    completion."""
     if not args.structured_json:
         return None
     p = Path(args.structured_json).expanduser()
@@ -167,7 +167,7 @@ def _render_body(transcript: str, structured: dict | None, status: str) -> str:
     lines.append("# Current Session")
     lines.append("")
     lines.append(
-        "> Auto-captured by the Researcher from the live conversation. "
+        "> Auto-captured by /post from the live conversation. "
         "Edits are fine; the file is overwritten on the next `/post`."
     )
     lines.append("")
@@ -179,10 +179,12 @@ def _render_body(transcript: str, structured: dict | None, status: str) -> str:
             ("what_we_did", "What we did"),
             ("shipped", "Shipped"),
             ("numbers", "Numbers"),
-            ("lesson", "Lesson"),
+            ("lesson_section", "Lesson"),
         ]
         for key, title in section_titles:
             items = structured.get(key)
+            if key == "lesson_section" and items is None:
+                items = structured.get("lesson")
             lines.append(f"## {title}")
             lines.append("")
             if isinstance(items, list) and items:
@@ -203,11 +205,11 @@ def _render_body(transcript: str, structured: dict | None, status: str) -> str:
             lines.append(str(structured["summary"]).strip())
             lines.append("")
     else:
-        # No structured input — body is a stub; Researcher fills it after.
+        # No structured input. Body is a visible manual-completion stub.
         for title in ("Patterns recognized", "Decisions made", "What we did", "Shipped", "Numbers", "Lesson"):
             lines.append(f"## {title}")
             lines.append("")
-            lines.append("- (to be filled in by the Researcher)")
+            lines.append("- (not captured)")
             lines.append("")
     # Transcript appendix (always)
     lines.append("## Transcript")
@@ -220,10 +222,9 @@ def _render_body(transcript: str, structured: dict | None, status: str) -> str:
         lines.append("---")
         lines.append("")
         lines.append(
-            "**Status: in-progress.** The Researcher captures mid-flight and "
-            "fills the structured sections in this same file before handing off "
-            "to the Strategist. If you ran this manually, edit the sections "
-            "above and set `status: complete` in the frontmatter."
+            "**Status: in-progress.** Structured fields were not provided. "
+            "If you ran this manually, edit the sections above and set "
+            "`status: complete` in the frontmatter."
         )
         lines.append("")
     return "\n".join(lines)
@@ -249,16 +250,34 @@ def atomic_write(path: Path, content: str) -> None:
 def count_messages(transcript: str) -> int:
     """Best-effort message count. The LLM may pass a clean transcript with
     'User:' / 'Assistant:' / '## User' markers, or a raw JSON array, or just
-    prose. We count separator lines if present, else count paragraphs."""
+    prose. We count role-marker lines if present, else fall back to
+    paragraph blocks, else non-empty lines.
+    """
     if not transcript.strip():
         return 0
-    # Try structured markers first.
-    for marker in (r"(?m)^#+\s*User\b", r"(?m)^#+\s*Assistant\b", r"(?m)^#+\s*Human\b",
-                   r"(?m)^User:", r"(?m)^Assistant:", r"(?m)^Human:"):
-        pass  # not a count, just check format
-    # Heuristic: count non-empty paragraph blocks.
+    # Try structured role markers first. These are the canonical formats the
+    # Codex/opencode adapters emit after stripping tool noise.
+    role_markers = (
+        r"(?m)^#+\s*User\b",
+        r"(?m)^#+\s*Assistant\b",
+        r"(?m)^#+\s*Human\b",
+        r"(?m)^User:",
+        r"(?m)^Assistant:",
+        r"(?m)^Human:",
+        r"(?m)^##\s*User",
+        r"(?m)^##\s*Assistant",
+    )
+    for marker in role_markers:
+        matches = re.findall(marker, transcript)
+        if matches:
+            return len(matches)
+    # Fallback: count non-empty paragraph blocks.
     blocks = [b for b in re.split(r"\n\s*\n", transcript.strip()) if b.strip()]
-    return max(1, len(blocks))
+    if len(blocks) > 1:
+        return len(blocks)
+    # Last resort: count non-empty lines.
+    lines = [l for l in transcript.splitlines() if l.strip()]
+    return max(1, len(lines))
 
 
 # ─── CLI ──────────────────────────────────────────────────────────────────

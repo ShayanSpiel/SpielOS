@@ -1,382 +1,466 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>SpielOS — Setup</title>
-  <link rel="stylesheet" href="design-system.css">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="icons.js"></script>
+  <noscript><div style="position:fixed;inset:0;background:#0a0d0d;color:#eef1ef;display:flex;align-items:center;justify-content:center;font-family:system-ui,sans-serif;font-size:16px;z-index:99999;">SpielOS requires JavaScript. Please enable it in your browser settings.</div></noscript>
   <style>
-    .skeleton-textarea { font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace; font-size: 13px; line-height: 1.55; min-height: 280px; tab-size: 2; white-space: pre; word-wrap: normal; overflow-x: auto; width: 100%; padding: var(--s-4); border: 1px solid var(--bd); border-radius: 8px; background: var(--bg-code); color: var(--tx); resize: vertical; }
-    .skeleton-textarea:focus { outline: none; border-color: var(--ac); box-shadow: 0 0 0 2px color-mix(in srgb, var(--ac) 25%, transparent); }
-    .field-target-sm { display: inline-block; font-size: 11px; font-family: 'JetBrains Mono', monospace; background: var(--bg-code); color: var(--tx-muted); padding: 2px 8px; border-radius: 4px; margin-bottom: var(--s-2); }
+    :root {
+      --bg: #0a0d0d; --bg-raised: #121514; --bg-overlay: #171a18;
+      --border: #262827; --border-subtle: #1e201f;
+      --fg: #eef1ef; --fg-muted: #9fa1a0; --fg-faint: #707371;
+      --accent: #26bd6c; --accent-dim: rgba(38,189,108,0.12);
+      --warning: #f59e0b; --danger: #ef4444;
+      --warning-bg: rgba(245,158,11,0.15); --warning-fg: #fbbf24;
+      --success-bg: rgba(38,189,108,0.15); --success-fg: #6ee77a;
+      --danger-bg: rgba(239,68,68,0.15); --danger-fg: #fca5a5;
+      --font: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      --mono: 'SF Mono', 'Cascadia Code', 'Fira Code', Consolas, monospace;
+      --ease: cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    [x-cloak] { display: none !important; }
+    html { background: var(--bg); }
+    body { font-family: var(--font); font-size: 14px; line-height: 1.5; color: var(--fg); background: var(--bg); -webkit-font-smoothing: antialiased; min-height: 100vh; }
+    button, input, textarea { font: inherit; color: inherit; }
+
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+    .label-sm { font-size:13px; font-weight:500; color:var(--fg-faint); }
+    .label-xs { font-size:11px; font-weight:500; color:var(--fg-faint); }
+    .hint-sm { font-size:12px; color:var(--fg-muted); }
+    .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .flex-col { display:flex; flex-direction:column; gap:16px; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 20px; font-size: 14px; font-weight: 500; border-radius: 8px; border: 1px solid transparent; cursor: pointer; transition: all 150ms var(--ease); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-primary { background: var(--fg); color: var(--bg); }
+    .btn-primary:hover:not(:disabled) { opacity: 0.9; }
+    .btn-ghost { background: transparent; color: var(--fg-muted); border-color: var(--border); }
+    .btn-ghost:hover:not(:disabled) { background: var(--bg-overlay); color: var(--fg); }
+    .btn-full { width: 100%; }
+    .btn-lg { padding: 12px 24px; font-size: 15px; }
+
+    .input { width: 100%; padding: 10px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--fg); font-size: 14px; transition: border-color 150ms var(--ease); }
+    .input::placeholder { color: var(--fg-faint); }
+    .input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+    .mono { font-family: var(--mono); }
+
+    .card { background: var(--bg-raised); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+
+    /* ── Wizard ── */
+    .wizard-view { display: none; min-height: 100vh; flex-direction: column; align-items: center; justify-content: center; padding: 32px 16px; }
+    .wizard-view.active { display: flex; }
+    .wizard-step { display: none; width: 100%; max-width: 540px; margin: 0 auto; }
+    .wizard-step.active { display: block; }
+
+    .wizard-header { text-align: center; margin-bottom: 32px; }
+    .wizard-logo { width: 48px; height: 48px; border-radius: 12px; background: var(--bg-raised); border: 1px solid var(--border); display: inline-flex; align-items: center; justify-content: center; color: var(--accent); margin-bottom: 20px; }
+    .wizard-title { font-size: 24px; font-weight: 600; text-align: center; margin-bottom: 8px; letter-spacing: -0.02em; line-height: 1.3; }
+    .wizard-subtitle { font-size: 15px; color: var(--fg-muted); text-align: center; max-width: 440px; margin: 0 auto; line-height: 1.5; }
+
+    .step-badge { display: inline-flex; align-items: center; gap: 8px; padding: 4px 12px 4px 4px; background: var(--bg-overlay); border: 1px solid var(--border); border-radius: 999px; font-size: 13px; font-weight: 500; color: var(--fg-muted); cursor: pointer; transition: all 120ms var(--ease); }
+    .step-badge:hover { border-color: var(--fg-faint); color: var(--fg); }
+    .step-badge .back-circle { width: 24px; height: 24px; border-radius: 50%; background: var(--fg); color: var(--bg); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .step-badge .back-circle svg { width:10px; height:10px; }
+
+    .wizard-content { margin-bottom: 32px; }
+
+    .wizard-options { display: flex; flex-direction: column; gap: 12px; }
+    .option-card { display: flex; align-items: center; gap: 16px; padding: 16px 20px; background: var(--bg-raised); border: 1px solid var(--border); border-radius: 12px; cursor: pointer; transition: all 150ms var(--ease); }
+    .option-card:hover { border-color: var(--fg-faint); background: var(--bg-overlay); }
+    .option-card.selected { border-color: var(--accent); background: var(--bg-overlay); }
+    .option-icon { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: var(--bg-overlay); border: 1px solid var(--border); border-radius: 8px; flex-shrink: 0; color: var(--fg-muted); }
+    .option-icon svg { width:16px; height:16px; }
+    .option-body { flex: 1; text-align: left; }
+    .option-label { font-size: 14px; font-weight: 500; margin-bottom: 2px; }
+    .option-desc { font-size: 13px; color: var(--fg-muted); }
+    .option-radio { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--border); flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all 150ms var(--ease); }
+    .option-card.selected .option-radio { border-color: var(--accent); background: var(--accent); }
+    .option-card.selected .option-radio::after { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--bg); }
+
+    .wizard-footer { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+    .wizard-skip { font-size: 14px; color: var(--fg-muted); cursor: pointer; background: none; border: none; }
+    .wizard-skip:hover { color: var(--fg); }
+
+    /* Expandable */
+    .expand-section { margin-bottom: 12px; }
+    .expand-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: var(--bg-raised); border: 1px solid var(--border); border-radius: 10px; cursor: pointer; transition: all 150ms var(--ease); }
+    .expand-header:hover { border-color: var(--fg-faint); }
+    .expand-header.open { border-radius: 10px 10px 0 0; border-bottom-color: transparent; }
+    .expand-header-left { display: flex; align-items: center; gap: 10px; }
+    .expand-header-left svg { width:14px; height:14px; color: var(--fg-muted); }
+    .expand-header-left span { font-size: 14px; font-weight: 500; }
+    .expand-header-left .tag { font-size: 11px; color: var(--fg-faint); margin-left: 2px; }
+    .expand-chevron { width: 10px; height: 10px; color: var(--fg-faint); transition: transform 150ms var(--ease); }
+    .expand-header.open .expand-chevron { transform: rotate(180deg); }
+    .expand-body { display: none; padding: 16px; background: var(--bg-raised); border: 1px solid var(--border); border-top: none; border-radius: 0 0 10px 10px; }
+    .expand-body.open { display: block; }
+
+    /* Colors grid */
+    .colors-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    .color-chip { display: flex; flex-direction: column; gap: 6px; }
+    .color-chip label { font-size: 11px; font-weight: 500; color: var(--fg-faint); }
+    .color-chip-row { display: flex; align-items: center; gap: 8px; }
+    .color-swatch { width: 28px; height: 28px; border-radius: 6px; border: 1px solid var(--border); cursor: pointer; position: relative; overflow: hidden; flex-shrink: 0; }
+    .color-swatch input[type="color"] { position: absolute; inset: -4px; width: calc(100% + 8px); height: calc(100% + 8px); border: none; cursor: pointer; padding: 0; }
+    .color-hex { width: 100%; padding: 6px 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--fg); font-family: var(--mono); font-size: 11px; }
+    .color-hex:focus { outline: none; border-color: var(--accent); }
+
+    .banner-canvas { position: relative; aspect-ratio: 1200/630; border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; padding: 32px; border: 1px solid var(--border); }
+    .banner-canvas .bg-icon { position: absolute; top: 50%; right: 10%; transform: translateY(-50%); opacity: 0.15; }
+    .banner-canvas .bg-icon svg { width: 160px; height: 160px; }
+    .banner-canvas .content { position: relative; z-index: 1; }
+    .banner-canvas .title-line { font-size: 2.2rem; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 8px; }
+    .banner-canvas .subtitle-highlight { font-size: 14px; }
+    .banner-canvas .handle { font-family: var(--mono); font-size: 12px; position: relative; z-index: 1; }
+
+    .skeleton-textarea { width: 100%; min-height: 200px; padding: 16px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--fg); font-family: var(--mono); font-size: 13px; line-height: 1.6; resize: vertical; }
+    .skeleton-textarea:focus { outline: none; border-color: var(--accent); }
+
+    .connect-card { background: var(--bg-raised); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 12px; text-align: left; }
+    .connect-card h4 { font-size: 14px; font-weight: 600; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+    .connect-card p { font-size: 13px; color: var(--fg-muted); margin-bottom: 12px; }
+    .channel-pick-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+    .channel-pill { padding: 5px 12px; background: var(--bg-overlay); border: 1px solid var(--border); border-radius: 999px; font-size: 12px; color: var(--fg-muted); cursor: pointer; transition: all 150ms var(--ease); }
+    .channel-pill:hover { border-color: var(--fg-faint); color: var(--fg); }
+    .channel-pill.selected { background: var(--accent-dim); color: var(--accent); border-color: var(--accent); }
+
+    .done-check { width: 56px; height: 56px; border-radius: 50%; background: var(--accent); display: inline-flex; align-items: center; justify-content: center; color: var(--bg); margin-bottom: 24px; }
+    .done-check svg { width: 28px; height: 28px; }
+    .done-list { background: var(--bg-raised); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; text-align: left; margin-bottom: 24px; }
+    .done-row { display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--border-subtle); }
+    .done-row:last-child { border-bottom: none; }
+    .done-row svg { color: var(--accent); width: 14px; height: 14px; flex-shrink: 0; }
+    .done-row code { font-family: var(--mono); font-size: 13px; color: var(--fg); }
+    .done-row .done-desc { color: var(--fg-muted); font-size: 14px; }
+    .cmd-card { background: var(--bg-raised); border: 1px solid var(--border); border-radius: 10px; padding: 20px; text-align: left; }
+    .cmd-card-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+    .cmd-row { display: flex; align-items: center; gap: 16px; padding: 8px 0; }
+    .cmd-row code { font-family: var(--mono); font-size: 13px; background: var(--bg-overlay); padding: 4px 10px; border-radius: 6px; color: var(--accent); border: 1px solid var(--border); }
+    .cmd-row span { font-size: 13px; color: var(--fg-faint); }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spin { animation: spin 1s linear infinite; }
+    .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--bg-raised); border: 1px solid var(--border); border-radius: 8px; padding: 12px 20px; color: var(--fg); font-size: 14px; z-index: 200; box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
   </style>
 </head>
 <body x-data="wizard()" x-init="init()" x-cloak>
 
-  <nav class="stepper">
-    <div class="stepper-inner">
-      <template x-for="(s, i) in steps.slice(0, 7)" :key="s.key">
-        <span class="stepper-step-wrap">
-          <button class="stepper-step"
-                  :class="{ done: i < current, current: i === current, clickable: i <= current }"
-                  @click="i <= current && go(i)"
-                  :aria-current="i === current ? 'step' : null">
-            <span class="stepper-num">
-              <span class="stepper-num-text" x-text="i + 1"></span>
-            </span>
-            <span class="stepper-label" x-text="s.label"></span>
-          </button>
-          <span x-show="i < 6" class="stepper-connector" :class="{ done: i < current }"></span>
-        </span>
-      </template>
-    </div>
-  </nav>
-
-  <div class="toast ok" x-show="toast" x-transition x-text="toast"></div>
-
-  <main class="main">
+  <div class="wizard-view active">
 
     <!-- Step 0: Welcome -->
-    <section class="step-panel" x-show="current === 0" x-transition.opacity>
-      <div class="section-head hero">
-        <div class="section-tag">SpielOS Setup</div>
-        <h1 class="section-title">SpielOS</h1>
-        <p class="section-sub">A lean markdown-driven team that turns a real source into posts for X, LinkedIn, and your blog.</p>
-        <div class="welcome-info">
-          <div class="welcome-info-row">
-            <span class="welcome-info-label">Target</span>
-            <span class="welcome-info-value" x-text="target || '—'"></span>
-          </div>
-          <div class="welcome-info-row">
-            <span class="welcome-info-label">Live steps</span>
-            <span class="welcome-info-value">6</span>
-          </div>
-          <div class="welcome-info-row">
-            <span class="welcome-info-label">Time</span>
-            <span class="welcome-info-value">~4 min</span>
-          </div>
+    <div class="wizard-step" :class="{ active: current === 0 }">
+      <div class="wizard-header">
+        <div class="wizard-logo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1em;height:1em;vertical-align:middle"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"/><line x1="12" y1="6" x2="12" y2="18"/><line x1="4.5" y1="9.5" x2="19.5" y2="9.5"/><line x1="4.5" y1="14.5" x2="19.5" y2="14.5"/></svg>
         </div>
+        <h1 class="wizard-title">Welcome to SpielOS</h1>
+        <p class="wizard-subtitle">A markdown-driven marketing team that turns your build sessions into posts for X, LinkedIn, and your blog.</p>
       </div>
-    </section>
+      <div class="wizard-footer">
+        <button class="btn btn-primary btn-full btn-lg" @click="next()">Get started</button>
+      </div>
+    </div>
 
     <!-- Step 1: Brand -->
-    <section class="step-panel" x-show="current === 1" x-transition.opacity>
-      <div class="section-head">
-        <div class="section-tag">Step 1 of 6</div>
-        <h2 class="section-title">Brand</h2>
-        <p class="section-sub">Visual identity + the minimum setup the live loop needs.</p>
+    <div class="wizard-step" :class="{ active: current === 1 }">
+      <div class="wizard-header">
+        <button class="step-badge" @click="back()"><span class="back-circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1em;height:1em;vertical-align:middle"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg></span> Step 1 of 7</button>
       </div>
-
-      <div class="field">
-        <label class="field-label">Project / company name</label>
-        <input class="field-input" x-model="form.brand_name" placeholder="YourBrand">
-        <span class="field-hint"><span class="field-target">system/brand.md</span></span>
+      <div class="wizard-header">
+        <h1 class="wizard-title">What's your project called?</h1>
+        <p class="wizard-subtitle">This is how the team refers to you. We'll use it in posts and banners.</p>
       </div>
-
-      <div class="field-grid">
-        <div class="field">
-          <label class="field-label">Handle (with @)</label>
-          <input class="field-input mono" x-model="form.handle" placeholder="@your_handle">
-          <span class="field-hint"><span class="field-target">system/brand.md</span></span>
-        </div>
-      </div>
-
-      <div class="field">
-        <label class="field-label">Tagline <span class="field-counter" x-text="`${form.tagline.length}/80`"></span></label>
-        <input class="field-input" x-model="form.tagline" maxlength="80" placeholder="Your mission in one line.">
-        <span class="field-hint"><span class="field-target">system/brand.md</span></span>
-      </div>
-
-      <div class="field">
-        <label class="field-label">Who you are (one line)</label>
-        <input class="field-input" x-model="form.creator_self" placeholder="I am a builder.">
-        <span class="field-hint"><span class="field-target">system/brand.md</span></span>
-      </div>
-
-      <div class="field">
-        <label class="field-label">Banner colors</label>
-        <div class="color-grid-5">
-          <div class="color-group">
-            <label class="color-label">Background</label>
-            <div class="color-picker">
-              <label class="color-swatch" :style="`background: ${form.primary_bg}`">
-                <input type="color" x-model="form.primary_bg">
-              </label>
-              <input class="color-input" x-model="form.primary_bg" placeholder="#000000">
+      <div class="wizard-content">
+        <div class="card" style="text-align: left;">
+          <div class="flex-col">
+            <div style="display:flex; flex-direction:column; gap:4px;">
+              <label class="label-sm">Project / company name</label>
+              <input class="input" x-model="form.brand_name" placeholder="My project">
             </div>
-          </div>
-          <div class="color-group">
-            <label class="color-label">Title</label>
-            <div class="color-picker">
-              <label class="color-swatch" :style="`background: ${form.primary_fg}`">
-                <input type="color" x-model="form.primary_fg">
-              </label>
-              <input class="color-input" x-model="form.primary_fg" placeholder="#ffffff">
+            <div class="grid-2">
+              <div style="display:flex; flex-direction:column; gap:4px;"><label class="label-sm">Handle (with @)</label><input class="input mono" x-model="form.handle" placeholder="@handle"></div>
+              <div style="display:flex; flex-direction:column; gap:4px;"><label class="label-sm">Your role / title</label><input class="input" x-model="form.creator_self" placeholder="Founder, builder"></div>
             </div>
-          </div>
-          <div class="color-group">
-            <label class="color-label">Subtitle</label>
-            <div class="color-picker">
-              <label class="color-swatch" :style="`background: ${form.subtitle_color}`">
-                <input type="color" x-model="form.subtitle_color">
-              </label>
-              <input class="color-input" x-model="form.subtitle_color" placeholder="#8a8a8a">
-            </div>
-          </div>
-          <div class="color-group">
-            <label class="color-label">Handle</label>
-            <div class="color-picker">
-              <label class="color-swatch" :style="`background: ${form.handle_color}`">
-                <input type="color" x-model="form.handle_color">
-              </label>
-              <input class="color-input" x-model="form.handle_color" placeholder="#505050">
-            </div>
-          </div>
-          <div class="color-group">
-            <label class="color-label">Accent</label>
-            <div class="color-picker">
-              <label class="color-swatch" :style="`background: ${form.accent}`">
-                <input type="color" x-model="form.accent">
-              </label>
-              <input class="color-input" x-model="form.accent" placeholder="#ff6a00">
-            </div>
+            <div style="display:flex; flex-direction:column; gap:4px;"><label class="label-sm">Tagline</label><input class="input" x-model="form.tagline" placeholder="A short description"></div>
           </div>
         </div>
-        <span class="field-hint"><span class="field-target">system/brand.md + system/brand.json</span></span>
       </div>
 
-      <div class="field">
-        <label class="field-label">Title style</label>
-        <div class="toggle-group">
-          <span class="toggle" :class="{ selected: !form.title_gradient }" @click="form.title_gradient = false">Solid color</span>
-          <span class="toggle" :class="{ selected: form.title_gradient }" @click="form.title_gradient = true">Silver gradient</span>
+      <!-- Banner colors -->
+      <div class="expand-section">
+        <div class="expand-header" :class="{ open: expanded.banner }" @click="expanded.banner = !expanded.banner">
+          <div class="expand-header-left"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1em;height:1em;vertical-align:middle"><circle cx="13.5" cy="6.5" r="1.5"/><circle cx="17.5" cy="10.5" r="1.5"/><circle cx="8.5" cy="7.5" r="1.5"/><circle cx="6.5" cy="12.5" r="1.5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.93 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-1 0-.83.67-1.5 1.5-1.5H16c3.31 0 6-2.69 6-6 0-5.5-4.5-10-10-10z"/></svg><span>Banner colors</span></div>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1em;height:1em;vertical-align:middle"><polyline points="6 9 12 15 18 9"/></svg>
         </div>
-      </div>
-
-      <div class="banner-preview">
-        <div class="banner-preview-head">
-          <div class="banner-preview-label">Live preview</div>
-          <div class="banner-preview-tag" x-text="iconKey"></div>
-        </div>
-        <div class="banner-canvas" :style="`background: ${form.primary_bg};`">
-          <div class="bg-icon" x-html="iconSvg"></div>
-          <div class="content">
-            <div class="title-line"
-                 :style="form.title_gradient
-                   ? `background: linear-gradient(180deg, ${form.primary_fg} 0%, #888 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; color: ${form.primary_fg};`
-                   : `color: ${form.primary_fg};`"
-                 x-text="form.brand_name || 'Your title'"></div>
-            <div class="subtitle-highlight" :style="`color: ${form.subtitle_color};`" x-text="form.tagline || 'Your tagline'"></div>
-          </div>
-          <div class="handle" :style="`color: ${form.handle_color};`" x-text="form.handle || '@your_handle'"></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Step 2: Audience (textarea) -->
-    <section class="step-panel" x-show="current === 2" x-transition.opacity>
-      <div class="section-head">
-        <div class="section-tag">Step 2 of 6</div>
-        <h2 class="section-title">Audience</h2>
-        <p class="section-sub">Who you write for, what hurts, and why they care now.</p>
-      </div>
-      <span class="field-target-sm">strategy/audience.md</span>
-      <textarea class="skeleton-textarea" x-model="form.audience_content" spellcheck="false"></textarea>
-    </section>
-
-    <!-- Step 3: Offer (textarea) -->
-    <section class="step-panel" x-show="current === 3" x-transition.opacity>
-      <div class="section-head">
-        <div class="section-tag">Step 3 of 6</div>
-        <h2 class="section-title">Offer</h2>
-        <p class="section-sub">The offer behind the content, kept short and explicit.</p>
-      </div>
-      <span class="field-target-sm">strategy/offer.md</span>
-      <textarea class="skeleton-textarea" x-model="form.offer_content" spellcheck="false"></textarea>
-    </section>
-
-    <!-- Step 4: Voice (textarea) -->
-    <section class="step-panel" x-show="current === 4" x-transition.opacity>
-      <div class="section-head">
-        <div class="section-tag">Step 4 of 6</div>
-        <h2 class="section-title">Voice</h2>
-        <p class="section-sub">How the posts read. Keep it tight, direct, and readable.</p>
-      </div>
-      <span class="field-target-sm">strategy/voice.md</span>
-      <textarea class="skeleton-textarea" x-model="form.voice_content" spellcheck="false"></textarea>
-    </section>
-
-    <!-- Step 5: Examples (textarea) -->
-    <section class="step-panel" x-show="current === 5" x-transition.opacity>
-      <div class="section-head">
-        <div class="section-tag">Step 5 of 6</div>
-        <h2 class="section-title">Examples</h2>
-        <p class="section-sub">Paste your best posts. The Writer matches their rhythm, not their topic.</p>
-      </div>
-      <span class="field-target-sm">strategy/examples.md</span>
-      <textarea class="skeleton-textarea" x-model="form.examples_content" spellcheck="false" style="min-height: 200px;"></textarea>
-    </section>
-
-    <!-- Step 6: Connect -->
-    <section class="step-panel" x-show="current === 6" x-transition.opacity>
-      <div class="section-head">
-        <div class="section-tag">Step 6 of 6</div>
-        <h2 class="section-title">Connect</h2>
-        <p class="section-sub">API tokens. Add them now or later, the install still completes.</p>
-      </div>
-
-      <div class="connect-card">
-        <h3>Buffer <span class="connect-recommended">recommended</span></h3>
-        <p>Multi-platform fan-out. One call posts to X + LinkedIn + Threads.</p>
-        <div class="field">
-          <label class="field-label">Buffer API access token</label>
-          <input class="field-input mono" x-model="form.buffer_token" placeholder="Paste your Buffer API token here">
-          <span class="field-hint">Get it at <code>buffer.com/settings/apps</code> → "Create Access Token". This becomes <span class="field-target">.env → BUFFER_ACCESS_TOKEN</span>.</span>
-        </div>
-        <button class="btn btn-secondary" @click="fetchBufferChannels()" :disabled="!form.buffer_token || bufferLoading">
-          <span x-show="!bufferLoading">Fetch channels</span>
-          <span x-show="bufferLoading"><span class="spinner"></span> Loading…</span>
-        </button>
-        <div x-show="bufferError" class="log" style="margin-top: var(--s-3);">
-          <span class="log-line err" x-text="bufferError"></span>
-        </div>
-        <div x-show="bufferChannels.length > 0" style="margin-top: var(--s-4);">
-          <label class="field-label" style="font-size: var(--fs-xs);">Pick 3 channels (Buffer free tier cap):</label>
-          <div class="toggle-group" style="margin-top: var(--s-2);">
-            <template x-for="ch in bufferChannels" :key="ch.id">
-              <span class="toggle" :class="{ selected: form.buffer_channels.includes(ch.id) }"
-                    @click="toggle('buffer_channels', ch.id)" x-text="`${ch.service} — ${ch.name}`"></span>
+        <div class="expand-body" :class="{ open: expanded.banner }">
+          <div class="colors-grid">
+            <template x-for="field in colorFields" :key="field.key">
+              <div class="color-chip">
+                <label x-text="field.label"></label>
+                <div class="color-chip-row">
+                  <label class="color-swatch" :style="`background: ${form[field.key]};`"><input type="color" x-model="form[field.key]"></label>
+                  <input class="color-hex" x-model="form[field.key]">
+                </div>
+              </div>
             </template>
           </div>
-          <span class="field-hint"><span class="field-target">.env → BUFFER_CHANNEL_IDS</span></span>
         </div>
       </div>
 
-      <details class="connect-details">
-        <summary>X direct (fallback — skip if you use Buffer)</summary>
-        <div class="field-grid" style="margin-top: var(--s-3);">
-          <div class="field">
-            <label class="field-label">X_API_KEY</label>
-            <input class="field-input mono" x-model="form.x_api_key">
-          </div>
-          <div class="field">
-            <label class="field-label">X_API_SECRET</label>
-            <input class="field-input mono" x-model="form.x_api_secret">
-          </div>
-          <div class="field">
-            <label class="field-label">X_ACCESS_TOKEN</label>
-            <input class="field-input mono" x-model="form.x_access_token">
-          </div>
-          <div class="field">
-            <label class="field-label">X_ACCESS_SECRET</label>
-            <input class="field-input mono" x-model="form.x_access_secret">
-          </div>
+      <!-- Banner preview -->
+      <div class="expand-section">
+        <div class="expand-header" :class="{ open: expanded.preview }" @click="expanded.preview = !expanded.preview">
+          <div class="expand-header-left"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1em;height:1em;vertical-align:middle"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><span>Live preview</span></div>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1em;height:1em;vertical-align:middle"><polyline points="6 9 12 15 18 9"/></svg>
         </div>
-      </details>
-
-      <details class="connect-details">
-        <summary>LinkedIn direct (fallback — skip if you use Buffer)</summary>
-        <div class="field-grid" style="margin-top: var(--s-3);">
-          <div class="field">
-            <label class="field-label">LINKEDIN_ACCESS_TOKEN</label>
-            <input class="field-input mono" x-model="form.linkedin_access_token">
+        <div class="expand-body" :class="{ open: expanded.preview }">
+          <div class="banner-canvas" :style="`background: ${form.primary_bg};`">
+            <div class="bg-icon" :style="`color: ${form.primary_bg === '#000000' ? '#1a1a1a' : form.primary_bg};`" x-html="iconSvg"></div>
+            <div class="content">
+              <div class="title-line" :style="`color: ${form.primary_fg};`" x-text="form.brand_name || 'Your title'"></div>
+              <div class="subtitle-highlight" :style="`color: ${form.subtitle_color};`" x-text="form.tagline || 'Your tagline'"></div>
+            </div>
+            <div class="handle" :style="`color: ${form.handle_color};`" x-text="form.handle || '@your_handle'"></div>
           </div>
-          <div class="field">
-            <label class="field-label">LINKEDIN_PERSON_URN</label>
-            <input class="field-input mono" x-model="form.linkedin_person_urn" placeholder="urn:li:person:...">
-          </div>
-        </div>
-      </details>
-
-      <details class="connect-details">
-        <summary>Blog (GH Pages)</summary>
-        <div class="field-grid" style="margin-top: var(--s-3);">
-          <div class="field">
-            <label class="field-label">BLOG_REPO</label>
-            <input class="field-input mono" x-model="form.blog_repo" placeholder="yourname/yourname.github.io">
-          </div>
-          <div class="field">
-            <label class="field-label">BLOG_TOKEN</label>
-            <input class="field-input mono" x-model="form.blog_token" placeholder="GitHub PAT with repo scope">
-          </div>
-        </div>
-      </details>
-    </section>
-
-    <!-- Step 7: Done -->
-    <section class="step-panel" x-show="current === 7" x-transition.opacity>
-      <div class="section-head">
-        <div class="section-tag">Step 6 of 6</div>
-        <h2 class="section-title">Filed.</h2>
-        <p class="section-sub">SpielOS is installed. Here's what just got written.</p>
-      </div>
-
-      <div class="done-summary" x-show="done">
-        <template x-for="line in doneLines" :key="line">
-          <div class="done-row">
-            <span class="done-check">✓</span>
-            <code class="done-file" x-text="line.split(' ')[0]"></code>
-            <span class="done-desc" x-text="line.substring(line.indexOf(' ') + 1)"></span>
-          </div>
-        </template>
-      </div>
-
-      <aside class="closer" x-show="done">
-        <div class="closer-icon-wrap">
-          <i class="fa-solid fa-circle-check closer-icon" aria-hidden="true"></i>
-        </div>
-        <p class="closer-takeaway" x-text="installResult?.closer_takeaway || 'You stay a builder. The team ships the post.'"></p>
-        <p class="closer-echo" x-text="installResult?.closer_echo || 'From any IDE, type /post. The 5 roles take it from there.'"></p>
-        <div class="closer-actions">
-          <a class="btn btn-primary" href="#" @click.prevent="closeTab()">Close wizard</a>
-          <a class="btn btn-ghost" href="#" @click.prevent="go(0)">Start over</a>
-        </div>
-      </aside>
-
-      <div class="cta-card" x-show="installResult">
-        <h3>What's next</h3>
-          <p>From any IDE (opencode, Claude Code, Cursor, Codex, MCP), type:</p>
-        <div class="cmd-row">
-          <code class="cmd">/post "Just shipped v2"</code>
-          <span class="cmd-desc">topic mode, announcement or opinion</span>
-        </div>
-        <div class="cmd-row">
-          <code class="cmd">/post @file:./notes.md</code>
-          <span class="cmd-desc">topic mode from a file</span>
-        </div>
-        <div class="cmd-row">
-          <code class="cmd">spiel init</code>
-          <span class="cmd-desc">re-open this wizard any time</span>
         </div>
       </div>
-    </section>
 
-  </main>
-
-  <nav class="nav-sticky" x-show="current < 7">
-    <div class="nav-sticky-inner">
-      <div class="nav-sticky-left">
-        <button class="btn btn-ghost" @click="back()" :disabled="current === 0 || saving">
-          ← Back
-        </button>
-        <span class="nav-sticky-meta" x-text="`Step ${Math.min(current + 1, 6)} of 6`"></span>
+      <div class="wizard-footer">
+        <button class="btn btn-primary btn-full btn-lg" @click="next()">Continue</button>
+        <button class="wizard-skip" @click="next()">Skip for now</button>
       </div>
-      <div class="nav-sticky-right">
-        <button class="btn btn-ghost" @click="saveAndQuit()" x-show="current > 0 && current < 6">
-          Save & quit
-        </button>
-        <button class="btn btn-primary btn-arrow" @click="next()" :disabled="saving">
-          <span x-show="current < 6 && !saving">Continue</span>
-          <span x-show="current === 6 && !saving">Finish & install</span>
-          <span x-show="saving"><span class="spinner"></span> Writing…</span>
-          <span class="arrow-icon" aria-hidden="true">→</span>
+    </div>
+
+    <!-- Step 2: Audience -->
+    <div class="wizard-step" :class="{ active: current === 2 }">
+      <div class="wizard-header">
+        <button class="step-badge" @click="back()"><span class="back-circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1em;height:1em;vertical-align:middle"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg></span> Step 2 of 7</button>
+      </div>
+      <div class="wizard-header">
+        <h1 class="wizard-title">Who is your audience?</h1>
+        <p class="wizard-subtitle">Describe the people you build for. This shapes every post the team writes.</p>
+      </div>
+      <div class="wizard-content">
+        <textarea class="skeleton-textarea" x-model="form.audience_content" spellcheck="false" placeholder="Who you write for..."></textarea>
+      </div>
+      <div class="wizard-footer">
+        <button class="btn btn-primary btn-full btn-lg" @click="next()">Continue</button>
+        <button class="wizard-skip" @click="next()">Skip for now</button>
+      </div>
+    </div>
+
+    <!-- Step 3: Offer -->
+    <div class="wizard-step" :class="{ active: current === 3 }">
+      <div class="wizard-header">
+        <button class="step-badge" @click="back()"><span class="back-circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1em;height:1em;vertical-align:middle"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg></span> Step 3 of 7</button>
+      </div>
+      <div class="wizard-header">
+        <h1 class="wizard-title">What do you sell?</h1>
+        <p class="wizard-subtitle">Describe your product or service. What problem does it solve? Why is it different?</p>
+      </div>
+      <div class="wizard-content">
+        <textarea class="skeleton-textarea" x-model="form.offer_content" spellcheck="false" placeholder="Your offer..."></textarea>
+      </div>
+      <div class="wizard-footer">
+        <button class="btn btn-primary btn-full btn-lg" @click="next()">Continue</button>
+        <button class="wizard-skip" @click="next()">Skip for now</button>
+      </div>
+    </div>
+
+    <!-- Step 4: Voice -->
+    <div class="wizard-step" :class="{ active: current === 4 }">
+      <div class="wizard-header">
+        <button class="step-badge" @click="back()"><span class="back-circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1em;height:1em;vertical-align:middle"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg></span> Step 4 of 7</button>
+      </div>
+      <div class="wizard-header">
+        <h1 class="wizard-title">How do you sound?</h1>
+        <p class="wizard-subtitle">Pick the voice that best matches how you write. The team will match this tone.</p>
+      </div>
+      <div class="wizard-content">
+        <div class="wizard-options">
+          <div class="option-card" :class="{ selected: form.voice_preset === 'direct' }" @click="form.voice_preset = 'direct'">
+            <div class="option-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1em;height:1em;vertical-align:middle"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg></div>
+            <div class="option-body"><div class="option-label">Direct & technical</div><div class="option-desc">Straight to the point, code-heavy, no fluff</div></div>
+            <div class="option-radio"></div>
+          </div>
+          <div class="option-card" :class="{ selected: form.voice_preset === 'warm' }" @click="form.voice_preset = 'warm'">
+            <div class="option-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1em;height:1em;vertical-align:middle"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></div>
+            <div class="option-body"><div class="option-label">Warm & storytelling</div><div class="option-desc">Personal, relatable, share the journey</div></div>
+            <div class="option-radio"></div>
+          </div>
+          <div class="option-card" :class="{ selected: form.voice_preset === 'playful' }" @click="form.voice_preset = 'playful'">
+            <div class="option-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1em;height:1em;vertical-align:middle"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg></div>
+            <div class="option-body"><div class="option-label">Playful & witty</div><div class="option-desc">Fun, clever, personality-driven</div></div>
+            <div class="option-radio"></div>
+          </div>
+        </div>
+      </div>
+      <div class="wizard-footer">
+        <button class="btn btn-primary btn-full btn-lg" @click="next()">Continue</button>
+        <button class="wizard-skip" @click="next()">Skip for now</button>
+      </div>
+    </div>
+
+    <!-- Step 5: Examples -->
+    <div class="wizard-step" :class="{ active: current === 5 }">
+      <div class="wizard-header">
+        <button class="step-badge" @click="back()"><span class="back-circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1em;height:1em;vertical-align:middle"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg></span> Step 5 of 7</button>
+      </div>
+      <div class="wizard-header">
+        <h1 class="wizard-title">Show us how you write</h1>
+        <p class="wizard-subtitle">Paste 2-3 examples of posts you've written. The team will learn your style from these.</p>
+      </div>
+      <div class="wizard-content">
+        <textarea class="skeleton-textarea" x-model="form.examples_content" spellcheck="false" placeholder="Paste a post you've written..." style="min-height: 180px;"></textarea>
+      </div>
+      <div class="wizard-footer">
+        <button class="btn btn-primary btn-full btn-lg" @click="next()">Continue</button>
+        <button class="wizard-skip" @click="next()">Skip for now</button>
+      </div>
+    </div>
+
+    <!-- Step 6: Connect -->
+    <div class="wizard-step" :class="{ active: current === 6 }">
+      <div class="wizard-header">
+        <button class="step-badge" @click="back()"><span class="back-circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1em;height:1em;vertical-align:middle"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg></span> Step 6 of 7</button>
+      </div>
+      <div class="wizard-header">
+        <h1 class="wizard-title">Connect your platforms</h1>
+        <p class="wizard-subtitle">Add API tokens to publish directly. You can skip everything here and add tokens later.</p>
+      </div>
+      <div class="wizard-content">
+        <!-- Buffer -->
+        <div class="expand-section">
+          <div class="expand-header" :class="{ open: expanded.buffer }" @click="expanded.buffer = !expanded.buffer">
+            <div class="expand-header-left"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1em;height:1em;vertical-align:middle"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg><span>Buffer</span><span class="tag">Recommended</span></div>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1em;height:1em;vertical-align:middle"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+          <div class="expand-body" :class="{ open: expanded.buffer }">
+            <p style="font-size:13px; color:var(--fg-muted); margin-bottom:12px;">Multi-platform fan-out. One call posts to X + LinkedIn + Threads.</p>
+            <label style="font-size:12px; font-weight:500; color:var(--fg-faint); display:block; margin-bottom:6px;">Buffer MCP Bearer Auth Token</label>
+            <input class="input mono" x-model="form.buffer_token" placeholder="From buffer.com/settings/apps" style="font-size:13px;">
+            <div style="margin-top:10px; display:flex; gap:8px; align-items:center;">
+              <button class="btn btn-ghost" style="font-size:13px; padding:6px 12px;" @click="fetchBufferChannels()" :disabled="!form.buffer_token || bufferLoading">
+                <span x-show="!bufferLoading"><span class="icon-wrap" style="font-size:12px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1em;height:1em;vertical-align:middle"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></span> Fetch channels</span>
+                <span x-show="bufferLoading"><span class="icon-wrap" style="font-size:12px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1em;height:1em;vertical-align:middle"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></span> Loading...</span>
+              </button>
+              <span style="font-size:12px; color:var(--warning);" x-show="bufferError" x-text="bufferError"></span>
+            </div>
+            <div x-show="bufferChannels.length > 0" style="margin-top:12px;">
+              <div style="font-size:12px; color:var(--fg-muted); margin-bottom:6px;">Pick up to 3 channels:</div>
+              <div class="channel-pick-list">
+                <template x-for="ch in bufferChannels" :key="ch.id">
+                  <span class="channel-pill" :class="{ selected: form.buffer_channels.includes(ch.id) }" @click="toggle('buffer_channels', ch.id)" x-text="`${ch.service} — ${ch.name}`"></span>
+                </template>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- X -->
+        <div class="expand-section">
+          <div class="expand-header" :class="{ open: expanded.x }" @click="expanded.x = !expanded.x">
+            <div class="expand-header-left"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1em;height:1em;vertical-align:middle"><path d="M4 4l6.5 7.5L4 20h2l5-5.5 4 5.5h5l-7-8.5L20 4h-2l-4.5 5L11 4H4z"/></svg><span>X (Twitter)</span><span class="tag">Fallback</span></div>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1em;height:1em;vertical-align:middle"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+          <div class="expand-body" :class="{ open: expanded.x }">
+            <p style="font-size:13px; color:var(--fg-muted); margin-bottom:12px;">Direct posting fallback. Skip if you use Buffer.</p>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+              <div><label style="font-size:11px; font-weight:500; color:var(--fg-faint); display:block; margin-bottom:4px;">X_API_KEY</label><input class="input mono" x-model="form.x_api_key" style="font-size:12px;"></div>
+              <div><label style="font-size:11px; font-weight:500; color:var(--fg-faint); display:block; margin-bottom:4px;">X_API_SECRET</label><input class="input mono" x-model="form.x_api_secret" style="font-size:12px;"></div>
+              <div><label style="font-size:11px; font-weight:500; color:var(--fg-faint); display:block; margin-bottom:4px;">X_ACCESS_TOKEN</label><input class="input mono" x-model="form.x_access_token" style="font-size:12px;"></div>
+              <div><label style="font-size:11px; font-weight:500; color:var(--fg-faint); display:block; margin-bottom:4px;">X_ACCESS_SECRET</label><input class="input mono" x-model="form.x_access_secret" style="font-size:12px;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- LinkedIn -->
+        <div class="expand-section">
+          <div class="expand-header" :class="{ open: expanded.linkedin }" @click="expanded.linkedin = !expanded.linkedin">
+            <div class="expand-header-left"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1em;height:1em;vertical-align:middle"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"/><line x1="8" y1="12" x2="16" y2="12"/></svg><span>LinkedIn</span><span class="tag">Fallback</span></div>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1em;height:1em;vertical-align:middle"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+          <div class="expand-body" :class="{ open: expanded.linkedin }">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+              <div><label style="font-size:11px; font-weight:500; color:var(--fg-faint); display:block; margin-bottom:4px;">LINKEDIN_ACCESS_TOKEN</label><input class="input mono" x-model="form.linkedin_access_token" style="font-size:12px;"></div>
+              <div><label style="font-size:11px; font-weight:500; color:var(--fg-faint); display:block; margin-bottom:4px;">LINKEDIN_PERSON_URN</label><input class="input mono" x-model="form.linkedin_person_urn" placeholder="urn:li:person:..." style="font-size:12px;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Blog -->
+        <div class="expand-section">
+          <div class="expand-header" :class="{ open: expanded.blog }" @click="expanded.blog = !expanded.blog">
+            <div class="expand-header-left"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1em;height:1em;vertical-align:middle"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg><span>Blog</span></div>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1em;height:1em;vertical-align:middle"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+          <div class="expand-body" :class="{ open: expanded.blog }">
+            <p style="font-size:13px; color:var(--fg-muted); margin-bottom:12px;">GitHub Pages (recommended) or WordPress for hosting the long-form post.</p>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+              <div><label style="font-size:11px; font-weight:500; color:var(--fg-faint); display:block; margin-bottom:4px;">BLOG_REPO</label><input class="input mono" x-model="form.blog_repo" placeholder="yourname/yourname.github.io" style="font-size:12px;"></div>
+              <div><label style="font-size:11px; font-weight:500; color:var(--fg-faint); display:block; margin-bottom:4px;">BLOG_TOKEN</label><input class="input mono" x-model="form.blog_token" placeholder="ghp_..." style="font-size:12px;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="wizard-footer">
+        <button class="btn btn-primary btn-full btn-lg" @click="next()" :disabled="saving">
+          <span x-show="!saving">Finish & install</span>
+          <span x-show="saving"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1em;height:1em;vertical-align:middle"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Writing...</span>
         </button>
       </div>
     </div>
-  </nav>
 
-  <script src="steps.js"></script>
+    <!-- Step 7: Done -->
+    <div class="wizard-step" :class="{ active: current === 7 }">
+      <template x-if="!done">
+        <div class="wizard-header">
+          <div class="wizard-logo" style="border-radius:50%; width:56px; height:56px; margin-bottom:24px;">
+            <span class="icon-wrap" style="font-size: 24px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1em;height:1em;vertical-align:middle"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></span>
+          </div>
+          <h1 class="wizard-title">Ready when you are.</h1>
+          <p class="wizard-subtitle">Click Finish & install below to write the strategy files + brand + .env into the vault.</p>
+        </div>
+      </template>
+      <template x-if="done">
+        <div style="text-align:center;">
+          <div class="done-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1em;height:1em;vertical-align:middle"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <h1 class="wizard-title" x-text="installResult?.closer_takeaway || 'You stay a builder. The team ships the post.'"></h1>
+          <p class="wizard-subtitle" x-text="installResult?.closer_echo || 'From any IDE, type /post. The 5 roles take it from there.'" style="margin-bottom:32px;"></p>
+          <div class="done-list" style="text-align: left; margin-bottom:24px;">
+            <template x-for="line in doneLines" :key="line">
+              <div class="done-row">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:1em;height:1em;vertical-align:middle"><polyline points="20 6 9 17 4 12"/></svg>
+                <code x-text="line.split(' ')[0]"></code>
+                <span class="done-desc" x-text="line.substring(line.indexOf(' ') + 1)"></span>
+              </div>
+            </template>
+          </div>
+          <div class="cmd-card" style="text-align: left; margin-bottom:24px;">
+            <div class="cmd-card-title">What's next</div>
+            <div class="cmd-row"><code>/post "Just shipped v2"</code><span>topic mode, announcement or opinion</span></div>
+            <div class="cmd-row"><code>/post @file:./notes.md</code><span>topic mode from a file</span></div>
+            <div class="cmd-row"><code>spiel init</code><span>re-open this wizard any time</span></div>
+          </div>
+          <div style="display: flex; gap: 12px; justify-content: center;">
+            <a class="btn btn-primary btn-lg" href="/dashboard">Open dashboard</a>
+            <button class="btn btn-ghost btn-lg" @click="go(0)">Start over</button>
+          </div>
+        </div>
+      </template>
+    </div>
+
+  </div>
+
+  <div class="toast" x-show="toast" x-transition x-text="toast"></div>
+
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.5/dist/cdn.min.js" defer></script>
+  <script src="steps.js"></script>
 </body>
 </html>

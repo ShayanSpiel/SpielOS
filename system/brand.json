@@ -3,58 +3,36 @@
     "name": "YourBrand",
     "handle": "@your_handle",
     "primary_bg": "#000000",
+    "primary_fg": "#ffffff",
+    "subtitle_color": "#8a8a8a",
+    "handle_color": "#505050",
     "accent": "#ff6a00",
-    "text_dark": "#202020",
-    "text_mid": "#5a5959",
-    "background": {
-      "type": "solid",
-      "value": "#000000"
-    },
-    "tagline": "Your tagline here.",
-    "creator_self": "I build things."
+    "tagline": "",
+    "creator_self": ""
   },
   "fonts": {
     "heading": "Inter",
-    "heading_weights": [600, 700, 900],
     "subtitle": "Merriweather",
-    "subtitle_weights": [300, 400, 700],
-    "google_fonts": "https://fonts.googleapis.com/css2?family=Inter:wght@600;700;900&family=Merriweather:wght@300;400;700&display=swap",
+    "mono": "JetBrains Mono",
     "use_google_fonts": true
   },
   "banner": {
     "template": "default",
-    "render": {
-      "device_scale_factor": 2,
-      "chrome_path": null
-    },
+    "title_gradient": false,
     "dimensions": {
       "width": 1200,
       "height": 630
     },
+    "render": {
+      "device_scale_factor": 2,
+      "chrome_path": null
+    },
     "tokens": {
-      "bg": "#000000",
-      "font_heading": "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-      "font_subtitle": "'Merriweather', Georgia, 'Times New Roman', serif",
       "text_title_color": "#ffffff",
-      "text_title_size": "120px",
-      "text_title_size_min": 56,
-      "text_title_weight": 900,
-      "text_title_shadow": "none",
-      "text_title_lh": 1.02,
-      "text_title_letterspacing": "-0.05em",
       "text_subtitle_color": "#8a8a8a",
-      "text_subtitle_size": "30px",
-      "text_subtitle_weight": 400,
-      "text_subtitle_lh": 1.6,
-      "text_subtitle_max_chars": 180,
       "text_handle_color": "#505050",
-      "text_handle_size": "16px",
-      "text_handle_bottom": "40px",
-      "icon_color": "#2a2a2a",
-      "icon_opacity": 0.55,
-      "icon_size": "660px",
-      "content_padding": "60px 80px 100px",
-      "text_align": "center"
+      "text_subtitle_max_chars": 180,
+      "bg": "#000000"
     }
   }
 }

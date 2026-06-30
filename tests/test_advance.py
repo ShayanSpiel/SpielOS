@@ -3,16 +3,16 @@
 Runs as `python3 tests/test_advance.py` or `python3 -m pytest tests/`.
 
 Verifies:
-  1. --init creates a fresh state file
-  2. The full happy-path chain: idle → capture → director → strategy → draft → edit → publish → complete → idle
-  3. Invalid transitions are rejected (exit code 2)
-  4. --set-error sets the error state with a message
-  5. --recover-from can jump back from error
-  6. --reset deletes the state file
-  7. --add-draft and --add-ready append to the state
-  8. --show displays the current state
-  9. History is appended on every transition
-  10. The full content pipeline flow: capture session → init state → advance through all 5 roles
+   1. --init creates a fresh state file
+   2. The full happy-path chain: idle → capture → strategy → draft → edit → publish → complete → idle
+   3. Invalid transitions are rejected (exit code 2)
+   4. --set-error sets the error state with a message
+   5. --recover-from can jump back from error
+   6. --reset deletes the state file
+   7. --add-draft and --add-ready append to the state
+   8. --show displays the current state
+   9. History is appended on every transition
+   10. The full content pipeline flow: capture session → init state → advance through all 5 roles
 
 Exit 0 on all-pass, non-zero on any failure.
 """
@@ -53,7 +53,7 @@ def fresh_vault() -> tuple[Path, str]:
     vault = tmp / "vault"
     vault.mkdir()
     (vault / "team").mkdir()
-    (vault / "team" / "director.md").write_text("# director\n")
+    (vault / "team" / "strategist.md").write_text("# strategist\n")
     (vault / "content").mkdir()
     (vault / "content" / "sessions").mkdir()
     (vault / "content" / "drafts").mkdir()
@@ -102,13 +102,12 @@ def test_init_creates_state_file() -> None:
 
 
 def test_full_happy_path() -> None:
-    print("\n[2] Full happy-path chain (8 transitions)")
+    print("\n[2] Full happy-path chain (6 transitions)")
     vault, _ = fresh_vault()
     run(["--init", "--run-id", "2026-06-26-001", "--mode", "session"], vault)
     chain = [
         ("capture", "post"),
-        ("director", "post"),
-        ("strategy", "director"),
+        ("strategy", "post"),
         ("draft", "strategist"),
         ("edit", "writer"),
         ("publish", "editor"),
@@ -122,7 +121,7 @@ def test_full_happy_path() -> None:
     if state:
         check("final step is complete", state.get("step") == "complete")
         check("final status is shipped", state.get("status") == "shipped")
-        check("history has 7 entries", len(state.get("history", [])) == 7,
+        check("history has 6 entries", len(state.get("history", [])) == 6,
               f"got {len(state.get('history', []))}")
     # back to idle
     r = run(["--to", "idle", "--by", "agent"], vault, expect=0)
@@ -136,13 +135,10 @@ def test_invalid_transitions() -> None:
     # idle -> publish is NOT allowed
     r = run(["--to", "publish", "--by", "agent"], vault, expect=2)
     check("idle -> publish rejected (rc=2)", r.returncode == 2)
-    # idle -> director is NOT allowed (must go via capture)
-    r = run(["--to", "director", "--by", "agent"], vault, expect=2)
-    check("idle -> director rejected (rc=2)", r.returncode == 2)
-    # advance to capture, then try strategy (must go via director)
+    # capture -> draft is NOT allowed (must go via strategy)
     run(["--to", "capture", "--by", "post"], vault, expect=0)
-    r = run(["--to", "strategy", "--by", "agent"], vault, expect=2)
-    check("capture -> strategy rejected (rc=2)", r.returncode == 2)
+    r = run(["--to", "draft", "--by", "agent"], vault, expect=2)
+    check("capture -> draft rejected (rc=2)", r.returncode == 2)
 
 
 def test_set_error() -> None:
@@ -150,8 +146,8 @@ def test_set_error() -> None:
     vault, _ = fresh_vault()
     run(["--init", "--run-id", "2026-06-26-001", "--mode", "session"], vault)
     run(["--to", "capture", "--by", "post"], vault)
-    run(["--to", "director", "--by", "post"], vault)
-    r = run(["--set-error", "test error message", "--by", "director"], vault, expect=0)
+    run(["--to", "strategy", "--by", "post"], vault)
+    r = run(["--set-error", "test error message", "--by", "strategist"], vault, expect=0)
     check("--set-error exit 0", r.returncode == 0)
     state = read_state(vault)
     if state:
@@ -165,13 +161,13 @@ def test_recover_from_error() -> None:
     vault, _ = fresh_vault()
     run(["--init", "--run-id", "2026-06-26-001", "--mode", "session"], vault)
     run(["--to", "capture", "--by", "post"], vault)
-    run(["--to", "director", "--by", "post"], vault)
-    run(["--set-error", "boom", "--by", "director"], vault)
-    r = run(["--recover-from", "director", "--by", "user"], vault, expect=0)
-    check("--recover-from director (rc=0)", r.returncode == 0)
+    run(["--to", "strategy", "--by", "post"], vault)
+    run(["--set-error", "boom", "--by", "strategist"], vault)
+    r = run(["--recover-from", "strategy", "--by", "user"], vault, expect=0)
+    check("--recover-from strategy (rc=0)", r.returncode == 0)
     state = read_state(vault)
     if state:
-        check("step recovered to director", state.get("step") == "director")
+        check("step recovered to strategy", state.get("step") == "strategy")
         check("error cleared", state.get("error") is None)
         check("status is active", state.get("status") == "active")
 
@@ -191,8 +187,7 @@ def test_add_draft_and_ready() -> None:
     vault, _ = fresh_vault()
     run(["--init", "--run-id", "2026-06-26-001", "--mode", "topic"], vault)
     run(["--to", "capture", "--by", "post"], vault)
-    run(["--to", "director", "--by", "post"], vault)
-    run(["--to", "strategy", "--by", "director"], vault)
+    run(["--to", "strategy", "--by", "post"], vault)
     run(["--to", "draft", "--by", "strategist", "--add-draft", "content/drafts/2026-06-26-x-foo.md"], vault, expect=0)
     state = read_state(vault)
     if state:
@@ -231,15 +226,15 @@ def test_history_appended() -> None:
     vault, _ = fresh_vault()
     run(["--init", "--run-id", "2026-06-26-001", "--mode", "session"], vault)
     run(["--to", "capture", "--by", "post"], vault)
-    run(["--to", "director", "--by", "post"], vault)
-    run(["--set-error", "oops", "--by", "director"], vault)
+    run(["--to", "strategy", "--by", "post"], vault)
+    run(["--set-error", "oops", "--by", "strategist"], vault)
     state = read_state(vault)
     history = state.get("history", []) if state else []
     check("history has 3 entries", len(history) == 3, f"got {len(history)}")
     if len(history) >= 3:
         check("history[0]: idle -> capture", history[0].get("from") == "idle" and history[0].get("to") == "capture")
-        check("history[1]: capture -> director", history[1].get("from") == "capture" and history[1].get("to") == "director")
-        check("history[2]: director -> error", history[2].get("from") == "director" and history[2].get("to") == "error")
+        check("history[1]: capture -> strategy", history[1].get("from") == "capture" and history[1].get("to") == "strategy")
+        check("history[2]: strategy -> error", history[2].get("from") == "strategy" and history[2].get("to") == "error")
         check("history has timestamps", all("at" in h for h in history))
         check("history has by-agents", all("by" in h for h in history))
 
@@ -247,14 +242,12 @@ def test_history_appended() -> None:
 def test_full_pipeline_simulation() -> None:
     print("\n[10] End-to-end pipeline simulation (capture -> complete)")
     vault, _ = fresh_vault()
-    # Simulate /post: init state, advance through capture + director
+    # Simulate /post: init state, advance through capture -> strategy
     run(["--init", "--run-id", "2026-06-26-001", "--mode", "session",
          "--session", "content/sessions/2026-06-26-session-current.md"], vault)
     check("/post init (rc=0)", read_state(vault) is not None)
     run(["--to", "capture", "--by", "post"], vault)
-    run(["--to", "director", "--by", "post"], vault)
-    # Director's turn
-    run(["--to", "strategy", "--by", "director"], vault)
+    run(["--to", "strategy", "--by", "post"], vault)
     # Strategist's turn
     r = run(["--to", "draft", "--by", "strategist",
              "--add-draft", "content/drafts/2026-06-26-x-foo.md",
@@ -273,7 +266,7 @@ def test_full_pipeline_simulation() -> None:
         check("final state is shipped", state.get("status") == "shipped")
         check("drafts list has 2", len(state.get("drafts", [])) == 2)
         check("ready list has 1", len(state.get("ready", [])) == 1)
-        check("history has 7 entries", len(state.get("history", [])) == 7)
+        check("history has 6 entries", len(state.get("history", [])) == 6)
     # Reset
     r = run(["--reset"], vault, expect=0)
     check("post-pipeline reset (rc=0)", r.returncode == 0)

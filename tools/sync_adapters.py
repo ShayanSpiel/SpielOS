@@ -46,6 +46,25 @@ TEMPLATED_VAULT_ROOT = (
 )
 
 
+def _deep_merge_hooks(existing: dict, incoming: dict) -> dict:
+    """Merge generated hook config into user hook config without dropping user hooks."""
+    merged = dict(existing) if isinstance(existing, dict) else {}
+    for event, value in incoming.items():
+        if event not in merged or not isinstance(merged.get(event), dict) or not isinstance(value, dict):
+            merged[event] = value
+            continue
+        event_cfg = dict(merged[event])
+        for key, hook_value in value.items():
+            if isinstance(event_cfg.get(key), list) and isinstance(hook_value, list):
+                event_cfg[key] = event_cfg[key] + [h for h in hook_value if h not in event_cfg[key]]
+            elif isinstance(event_cfg.get(key), dict) and isinstance(hook_value, dict):
+                event_cfg[key] = {**event_cfg[key], **hook_value}
+            else:
+                event_cfg[key] = hook_value
+        merged[event] = event_cfg
+    return merged
+
+
 def parse_frontmatter(text: str) -> tuple[dict, str]:
     """Parse YAML frontmatter. Returns (frontmatter_dict, body)."""
     m = re.match(r"^---\n(.*?)\n---\n(.*)$", text, re.DOTALL)
@@ -100,8 +119,10 @@ def make_frontmatter(d: dict) -> str:
 def build_command_md(description: str, body: str, frontmatter: dict | None = None) -> str:
     """Build a slash-command markdown file from a description + body.
 
-    Preserves command-relevant frontmatter fields (agent, model, subtask)
-    so that IDEs like opencode can dispatch commands to the right subagent.
+    Preserves command-relevant frontmatter fields (agent, model, subtask, vault_root)
+    so that IDEs like opencode can dispatch commands to the right subagent and
+    know the absolute vault path. Frontmatter values are run through templated_text
+    so {vault_root} placeholders resolve to the absolute path.
 
     Single source of truth for how a slash command is rendered. Used by
     both the emit_*() and install_*() paths so the adapter/ folder and
@@ -110,9 +131,12 @@ def build_command_md(description: str, body: str, frontmatter: dict | None = Non
     import yaml
     clean = {"description": description}
     if frontmatter:
-        for key in ("agent", "model", "subtask", "name"):
+        for key in ("agent", "model", "subtask", "name", "vault_root"):
             if key in frontmatter:
-                clean[key] = frontmatter[key]
+                value = frontmatter[key]
+                if isinstance(value, str):
+                    value = templated_text(value)
+                clean[key] = value
     return "---\n" + yaml.safe_dump(clean, sort_keys=False, allow_unicode=True).rstrip() + "\n---\n\n" + body.lstrip() + "\n"
 
 
@@ -311,6 +335,43 @@ def _toml_agent(name: str, description: str, body: str) -> str:
     )
 
 
+CODEX_POST_DESCRIPTION = (
+    "Start a content run. The deterministic UserPromptSubmit hook "
+    "(plugins/spielos/hooks.json) runs first for topic/@file: invocations. "
+    "This agent handles session mode (compile transcript, run spiel post "
+    "--mode session) and advances the pipeline via spiel next for both modes. "
+    "See team/post.md for details."
+)
+
+
+def _build_codex_post_toml_template() -> str:
+    """Read the canonical Codex `post` subagent TOML template.
+
+    The canonical source `adapters/codex/agents/post.toml` is already in
+    Codex-compatible TOML form. Keep its `{vault_root}` placeholders intact
+    in the source tree. Installed copies are templated separately. If the
+    file is missing for any reason, fall back to a
+    minimal safe body.
+    """
+    canonical = ADAPTERS_DIR / "codex" / "agents" / "post.toml"
+    if canonical.is_file():
+        return canonical.read_text(encoding="utf-8")
+    return _toml_agent(
+        name="post",
+        description=CODEX_POST_DESCRIPTION,
+        body=(
+            "# /post\n\n"
+            "Deterministic runtime already initialized. Read content/.state.json, "
+            "run `spiel next`, and invoke the role it returns.\n"
+        ),
+    )
+
+
+CODEX_POST_BODY = ""  # retained for back-compat; not used by install paths
+CODEX_POST_TOML_TEMPLATE = _build_codex_post_toml_template()
+CODEX_POST_TOML = templated_text(CODEX_POST_TOML_TEMPLATE)
+
+
 def emit_codex() -> int:
     """Write per-role TOML agents + post dispatcher to adapters/codex/agents/.
 
@@ -330,25 +391,9 @@ def emit_codex() -> int:
         toml = _toml_agent(src.stem, description, body_with_vault)
         (agents_target / f"{src.stem}.toml").write_text(toml, encoding="utf-8")
         count += 1
-    # Post dispatcher: a minimal agent that delegates to @director.
-    post_toml = _toml_agent(
-        name="post",
-        description="Dispatch a /post request. Delegates to @director with the user's args. See team/post.md for details.",
-        body=(
-            "# /post - Dispatch to @director\n\n"
-            "You are a dispatch agent, not a pipeline runner. Your ONLY action:\n\n"
-            "1. Read the user's message after `/post`.\n"
-            "2. Invoke @director with the exact text the user typed after /post.\n"
-            "3. If the user typed just `/post` with no args, invoke @director with no args.\n"
-            "4. Return @director's response. Do nothing else.\n\n"
-            "Hard rules:\n"
-            "- No preamble, menu, or clarification.\n"
-            "- No running tools (bash, read, write, grep, glob).\n"
-            "- No deciding mode (topic/file/session) - @director parses the args.\n"
-            "- No writing files.\n"
-            "- No explaining the pipeline.\n"
-        ),
-    )
+    # Post dispatcher template. Keep placeholders in adapters/ so this file
+    # can be copied to a different vault without baking this machine's path.
+    post_toml = CODEX_POST_TOML_TEMPLATE
     (agents_target / "post.toml").write_text(post_toml, encoding="utf-8")
     count += 1
     return count
@@ -375,17 +420,132 @@ def install_codex(verbose: bool = False) -> int:
         (agents_target / f"{src.stem}.toml").write_text(toml, encoding="utf-8")
         count += 1
     # Post dispatcher
-    post_agent = _toml_agent(
-        name="post",
-        description="Dispatch a /post request. Delegates to @director with the user's args. See team/post.md for details.",
-        body=(
-            "# /post\n\nInvoke `@director` with the exact text after `/post`.\n"
-        ),
-    )
+    post_agent = CODEX_POST_TOML
     (agents_target / "post.toml").write_text(post_agent, encoding="utf-8")
     count += 1
+    count += install_codex_plugin_hooks(verbose=verbose)
     if verbose:
         print(f"  [codex] installed {count} files to {agents_target}")
+    return count
+
+
+def install_codex_plugin_hooks(verbose: bool = False) -> int:
+    """Mirror the deterministic hook files into the live Codex plugin cache.
+
+    The Codex plugin manager copies plugins from the marketplace source to
+    `~/.codex/plugins/cache/<marketplace>/<plugin>/<version>/`. Codex
+    auto-discovers `hooks.json` at the plugin root and a `scripts/` sibling.
+    The marketplace path resolution is a one-time setup; for in-development
+    iterations we copy directly to the cache so the next Codex session picks
+    up hook changes without forcing a marketplace reinstall.
+
+    Discovers the marketplace name from `<vault>/.agents/plugins/marketplace.json`
+    if present, then walks `~/.codex/plugins/cache/` for any matching
+    `<marketplace>/spielos/<version>/` and copies:
+      - hooks.json
+      - scripts/post-hook.sh  (chmod +x)
+      - plugin.json and assets
+
+    If the source plugin no longer declares skills, any stale cached skills/
+    directory is removed. The Codex plugin should package the real product
+    hook and agents, not a duplicated skill-level pipeline.
+    """
+    import shutil
+
+    if not CODEX_CONFIG.exists():
+        return 0
+    plugin_root = VAULT / "plugins" / "spielos"
+    hooks_src = plugin_root / "hooks.json"
+    script_src = plugin_root / "scripts" / "post-hook.sh"
+    if not hooks_src.is_file() or not script_src.is_file():
+        if verbose:
+            print(f"  [codex-hooks] canonical source missing in {plugin_root} — skipping")
+        return 0
+
+    # Discover marketplace name(s) we may be installed under.
+    marketplace_names: list[str] = []
+    mp_json = VAULT / ".agents" / "plugins" / "marketplace.json"
+    if mp_json.is_file():
+        try:
+            mp = json.loads(mp_json.read_text(encoding="utf-8"))
+            if isinstance(mp, dict) and isinstance(mp.get("name"), str):
+                marketplace_names.append(mp["name"])
+        except (OSError, json.JSONDecodeError):
+            pass
+    # If we couldn't read the marketplace name, walk the cache and try
+    # every <marketplace>/spielos/<version>/ directory that exists.
+    cache_root = CODEX_CONFIG / "plugins" / "cache"
+    if not cache_root.is_dir():
+        return 0
+
+    targets: list[Path] = []
+    for mp_name in marketplace_names:
+        plugin_cache = cache_root / mp_name / "spielos"
+        if plugin_cache.is_dir():
+            for ver in plugin_cache.iterdir():
+                if ver.is_dir():
+                    targets.append(ver)
+    if not targets:
+        # Fallback: scan every cache dir for a spielos subdir.
+        for plugin_cache in cache_root.glob("*/spielos"):
+            for ver in plugin_cache.iterdir():
+                if ver.is_dir():
+                    targets.append(ver)
+
+    count = 0
+    for target in targets:
+        try:
+            (target / "hooks.json").write_text(hooks_src.read_text(encoding="utf-8"), encoding="utf-8")
+            scripts_dir = target / "scripts"
+            scripts_dir.mkdir(exist_ok=True)
+            shutil.copy2(script_src, scripts_dir / "post-hook.sh")
+            (scripts_dir / "post-hook.sh").chmod(0o755)
+            skills_src = plugin_root / "skills"
+            skills_dst = target / "skills"
+            skill_files = list(skills_src.rglob("SKILL.md")) if skills_src.is_dir() else []
+            if skill_files:
+                if skills_dst.exists():
+                    shutil.rmtree(skills_dst)
+                # Copy skills with {vault_root} templated to the absolute path.
+                # Skills are referenced from the LLM as part of the plugin,
+                # and a literal {vault_root} placeholder is not a valid path.
+                skills_dst.mkdir(parents=True, exist_ok=True)
+                for skill_md in skill_files:
+                    rel = skill_md.relative_to(skills_src)
+                    dst_skill = skills_dst / rel
+                    dst_skill.parent.mkdir(parents=True, exist_ok=True)
+                    dst_skill.write_text(templated_text(skill_md.read_text(encoding="utf-8")), encoding="utf-8")
+                # Copy any non-SKILL.md files (assets, etc.) verbatim.
+                for f in skills_src.rglob("*"):
+                    if f.is_dir():
+                        continue
+                    rel = f.relative_to(skills_src)
+                    if rel.name == "SKILL.md":
+                        continue
+                    dst = skills_dst / rel
+                    dst.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(f, dst)
+            elif skills_dst.exists():
+                shutil.rmtree(skills_dst)
+            # Copy plugin assets (logo, etc.) referenced by plugin.json.
+            assets_src = plugin_root / "assets"
+            assets_dst = target / "assets"
+            if assets_src.is_dir():
+                if assets_dst.exists():
+                    shutil.rmtree(assets_dst)
+                shutil.copytree(assets_src, assets_dst)
+            # Mirror plugin.json too so the version bump propagates.
+            plugin_json_src = plugin_root / ".codex-plugin" / "plugin.json"
+            plugin_json_dst = target / ".codex-plugin" / "plugin.json"
+            if plugin_json_src.is_file():
+                plugin_json_dst.parent.mkdir(parents=True, exist_ok=True)
+                plugin_json_dst.write_text(plugin_json_src.read_text(encoding="utf-8"), encoding="utf-8")
+            count += 1
+            if verbose:
+                print(f"  [codex-hooks] refreshed {target}")
+        except OSError as e:
+            if verbose:
+                print(f"  [codex-hooks] could not refresh {target}: {e}", file=sys.stderr)
     return count
 
 def detect_ide(config_dir: Path, name: str) -> bool:
@@ -535,8 +695,10 @@ def install_claude_hooks(verbose: bool = False) -> int:
     hooks_text = src.read_text(encoding="utf-8")
     hooks_text = hooks_text.replace("{vault_root}", str(TEMPLATED_VAULT_ROOT))
     new_hooks = json.loads(hooks_text)
+    incoming_hooks = new_hooks.get("hooks", {})
 
-    existing["hooks"] = new_hooks.get("hooks", {})
+    if incoming_hooks:
+        existing["hooks"] = _deep_merge_hooks(existing.get("hooks", {}), incoming_hooks)
 
     # Set VAULT_DIR in env so the hook script can find the vault
     if "env" not in existing or not isinstance(existing.get("env"), dict):
@@ -545,8 +707,9 @@ def install_claude_hooks(verbose: bool = False) -> int:
 
     target.write_text(json.dumps(existing, indent=2) + "\n", encoding="utf-8")
     if verbose:
-        print(f"  [claude] installed hooks to {target}")
-    return 1
+        action = "merged hooks into" if incoming_hooks else "preserved hooks in"
+        print(f"  [claude] {action} {target}")
+    return 1 if incoming_hooks else 0
 
 
 def install_cursor_hooks(verbose: bool = False) -> int:
@@ -565,7 +728,24 @@ def install_cursor_hooks(verbose: bool = False) -> int:
     # Template {vault_root} in hooks.json
     hooks_text = src.read_text(encoding="utf-8")
     hooks_text = hooks_text.replace("{vault_root}", str(TEMPLATED_VAULT_ROOT))
-    target.write_text(hooks_text, encoding="utf-8")
+    incoming = json.loads(hooks_text)
+    incoming_hooks = incoming.get("hooks", {})
+    if not incoming_hooks:
+        if verbose:
+            print(f"  [cursor] canonical hooks are empty; preserved {target}")
+        return 0
+    if target.is_file():
+        try:
+            existing = json.loads(target.read_text(encoding="utf-8"))
+            if not isinstance(existing, dict):
+                existing = {}
+        except (json.JSONDecodeError, OSError):
+            existing = {}
+    else:
+        existing = {}
+    existing["version"] = incoming.get("version", existing.get("version", 1))
+    existing["hooks"] = _deep_merge_hooks(existing.get("hooks", {}), incoming_hooks)
+    target.write_text(json.dumps(existing, indent=2) + "\n", encoding="utf-8")
     count += 1
     if verbose:
         print(f"  [cursor] installed hooks ({count} files) to {CURSOR_CONFIG}")
@@ -678,8 +858,22 @@ def _collect_installed_paths() -> dict[Path, str]:
     _walk(CURSOR_CONFIG, ["skills", "commands"], "cursor")
     # Claude Code: agents/, skills/, commands/
     _walk(CLAUDE_CONFIG, ["agents", "skills", "commands"], "claude")
-    # Codex: agents/
+    # Codex: agents/ + plugin cache hooks/scripts
     _walk(CODEX_CONFIG, ["agents", "commands"], "codex")
+    # Codex plugin cache: hooks.json + scripts/post-hook.sh inside each
+    # <marketplace>/<plugin>/<version>/.
+    codex_cache = CODEX_CONFIG / "plugins" / "cache"
+    if codex_cache.is_dir():
+        for plugin_dir in codex_cache.glob("*/spielos/*"):
+            if not plugin_dir.is_dir():
+                continue
+            for hook_file in ("hooks.json", "scripts/post-hook.sh"):
+                p = plugin_dir / hook_file
+                if p.is_file():
+                    try:
+                        out[p] = p.read_text(encoding="utf-8")
+                    except OSError:
+                        pass
     return out
 
 
@@ -696,10 +890,16 @@ def _cleanup_stale_files(verbose: bool = False) -> int:
     Returns count of stale files removed.
     """
     expected = set(_expected_content().keys())
-    installed = set(_collect_installed_paths().keys())
+    installed_content = _collect_installed_paths()
+    installed = set(installed_content.keys())
     stale = installed - expected
     removed = 0
     for path in stale:
+        text = installed_content.get(path, "")
+        if "SpielOS" not in text and "spiel" not in text.lower() and "content/.state.json" not in text:
+            if verbose:
+                print(f"  [cleanup] preserved unmarked file: {path}")
+            continue
         try:
             path.unlink()
             removed += 1
@@ -790,13 +990,170 @@ def _expected_content() -> dict[Path, str]:
             expected[CODEX_CONFIG / "agents" / f"{src.stem}.toml"] = (
                 _toml_agent(src.stem, description, templated_text(body))
             )
-        expected[CODEX_CONFIG / "agents" / "post.toml"] = _toml_agent(
-            name="post",
-            description="Dispatch a /post request. Delegates to @director with the user's args. See team/post.md for details.",
-            body="# /post\n\nInvoke `@director` with the exact text after `/post`.\n",
-        )
+        expected[CODEX_CONFIG / "agents" / "post.toml"] = CODEX_POST_TOML
+
+    # Codex plugin cache: hooks.json + scripts/post-hook.sh mirror.
+    # We register both files against the canonical bytes. The install
+    # step copies the canonical content directly (chmod +x for the
+    # script), so the on-disk bytes match the canonical bytes modulo
+    # the chmod bit. Treat both as content-matched.
+    codex_cache = CODEX_CONFIG / "plugins" / "cache"
+    if codex_cache.is_dir():
+        canonical_hooks = VAULT / "plugins" / "spielos" / "hooks.json"
+        canonical_script = VAULT / "plugins" / "spielos" / "scripts" / "post-hook.sh"
+        hooks_text = canonical_hooks.read_text(encoding="utf-8") if canonical_hooks.is_file() else None
+        script_text = canonical_script.read_text(encoding="utf-8") if canonical_script.is_file() else None
+        for plugin_dir in codex_cache.glob("*/spielos/*"):
+            if not plugin_dir.is_dir():
+                continue
+            if hooks_text is not None:
+                expected[plugin_dir / "hooks.json"] = hooks_text
+            if script_text is not None:
+                expected[plugin_dir / "scripts" / "post-hook.sh"] = script_text
 
     return expected
+
+
+# ─── MCP Server Installation ──────────────────────────────────────────────
+
+def _read_env(key: str, default: str = "") -> str:
+    env_file = VAULT / ".env"
+    if env_file.exists():
+        for line in env_file.read_text().splitlines():
+            line = line.strip()
+            if line.startswith(key + "="):
+                return line.split("=", 1)[1].strip().strip('"').strip("'")
+    return os.environ.get(key, default)
+
+
+def _mcp_servers_from_env() -> dict:
+    servers = {}
+    buffer_token = _read_env("BUFFER_ACCESS_TOKEN")
+    if buffer_token:
+        servers["buffer"] = {
+            "command": "npx",
+            "args": ["-y", "@damusix/buffer-mcp"],
+            "env": {"BUFFER_ACCESS_TOKEN": buffer_token},
+        }
+    wp_url = _read_env("WP_URL")
+    wp_user = _read_env("WP_USERNAME")
+    wp_pass = _read_env("WP_APP_PASSWORD")
+    if wp_url and wp_user and wp_pass:
+        servers["wordpress"] = {
+            "command": "npx",
+            "args": ["-y", "@wpgaurav/wp-mcp"],
+            "env": {
+                "WP_URL": wp_url,
+                "WP_USERNAME": wp_user,
+                "WP_APP_PASSWORD": wp_pass,
+            },
+        }
+    devto_key = _read_env("DEVTO_API_KEY")
+    if devto_key:
+        servers["devto"] = {
+            "command": "npx",
+            "args": ["-y", "@furkankoykiran/devto-mcp"],
+            "env": {"DEVTO_API_KEY": devto_key},
+        }
+    return servers
+
+
+def install_mcp_servers(verbose: bool = False) -> int:
+    servers = _mcp_servers_from_env()
+    if not servers:
+        print("  No MCP servers configured. Set BUFFER_ACCESS_TOKEN, WP_URL, "
+              "or DEVTO_API_KEY in .env")
+        return 0
+
+    count = 0
+
+    # opencode — mcp in opencode.jsonc (McpLocalConfig format)
+    oc_config = OPENCODE_CONFIG / "opencode.jsonc"
+    if oc_config.exists():
+        try:
+            text = oc_config.read_text(encoding="utf-8")
+            has_mcp = '"mcp"' in text
+            if has_mcp:
+                if verbose:
+                    print(f"  opencode: mcp config already in {oc_config}")
+            else:
+                oc_servers = {}
+                for name, cfg in servers.items():
+                    oc_servers[name] = {
+                        "type": "local",
+                        "command": [cfg["command"]] + cfg.get("args", []),
+                        "environment": cfg.get("env", {}),
+                    }
+                mcp_json = json.dumps({"mcp": oc_servers}, indent=2)
+                new_text = text.rstrip()
+                if new_text.endswith("}"):
+                    new_text = new_text[:-1].rstrip() + ",\n" + mcp_json[1:] + "\n"
+                oc_config.write_text(new_text, encoding="utf-8")
+                count += 1
+                if verbose:
+                    print(f"  opencode: added mcp to {oc_config}")
+        except OSError as e:
+            if verbose:
+                print(f"  opencode: could not write MCP config: {e}")
+
+    # Cursor — ~/.cursor/mcp.json
+    cursor_mcp = CURSOR_CONFIG / "mcp.json"
+    if CURSOR_CONFIG.exists():
+        existing = {}
+        if cursor_mcp.exists():
+            try:
+                existing = json.loads(cursor_mcp.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                pass
+        existing_servers = existing.get("mcpServers", {})
+        for name, cfg in servers.items():
+            existing_servers[name] = cfg
+        existing["mcpServers"] = existing_servers
+        cursor_mcp.parent.mkdir(parents=True, exist_ok=True)
+        cursor_mcp.write_text(json.dumps(existing, indent=2) + "\n", encoding="utf-8")
+        count += 1
+        if verbose:
+            print(f"  cursor: wrote {cursor_mcp} ({len(servers)} server(s))")
+
+    # Claude — ~/.claude/claude_desktop_config.json
+    claude_config = CLAUDE_CONFIG / "claude_desktop_config.json"
+    if CLAUDE_CONFIG.exists():
+        existing = {}
+        if claude_config.exists():
+            try:
+                existing = json.loads(claude_config.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                pass
+        existing_servers = existing.get("mcpServers", {})
+        for name, cfg in servers.items():
+            existing_servers[name] = cfg
+        existing["mcpServers"] = existing_servers
+        claude_config.parent.mkdir(parents=True, exist_ok=True)
+        claude_config.write_text(json.dumps(existing, indent=2) + "\n", encoding="utf-8")
+        count += 1
+        if verbose:
+            print(f"  claude: wrote {claude_config} ({len(servers)} server(s))")
+
+    # Codex — ~/.codex/config.json (MCP servers section)
+    codex_config = CODEX_CONFIG / "config.json"
+    if CODEX_CONFIG.exists():
+        existing = {}
+        if codex_config.exists():
+            try:
+                existing = json.loads(codex_config.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                pass
+        existing_servers = existing.get("mcpServers", {})
+        for name, cfg in servers.items():
+            existing_servers[name] = cfg
+        existing["mcpServers"] = existing_servers
+        codex_config.parent.mkdir(parents=True, exist_ok=True)
+        codex_config.write_text(json.dumps(existing, indent=2) + "\n", encoding="utf-8")
+        count += 1
+        if verbose:
+            print(f"  codex: wrote {codex_config} ({len(servers)} server(s))")
+
+    return count
 
 
 # ─── CLI ─────────────────────────────────────────────────────────────────
@@ -816,6 +1173,9 @@ def main() -> int:
                         help="Install to Claude Code only (skills + agents + commands)")
     parser.add_argument("--install-codex", action="store_true",
                         help="Install to Codex only (agents)")
+    parser.add_argument("--mcp", action="store_true",
+                        help="Install MCP server configs to all detected IDEs "
+                             "(reads credentials from .env)")
     parser.add_argument("--check", action="store_true",
                         help="Compare installed adapters against canonical "
                              "team/*.md + skills/*.md. Exit 0 if in sync, "
@@ -855,12 +1215,12 @@ def main() -> int:
                 ok += 1
         # Also report stale files (installed but no longer expected).
         expected_paths = set(expected.keys())
-        stale = [p for p in installed if p in (
-            OPENCODE_CONFIG.rglob("*") if OPENCODE_CONFIG.exists() else [],
-            CURSOR_CONFIG.rglob("*") if CURSOR_CONFIG.exists() else [],
-            CLAUDE_CONFIG.rglob("*") if CLAUDE_CONFIG.exists() else [],
-        ) and isinstance(p, Path) and p.is_file()
-            and p.suffix in (".md",) and not any(p.match(str(ep)) for ep in expected_paths)]
+        stale = []
+        for p, text in installed.items():
+            if p in expected_paths or not p.is_file() or p.suffix != ".md":
+                continue
+            if "SpielOS" in text or "spiel" in text.lower() or "content/.state.json" in text:
+                stale.append(p)
         if ok and not mismatched and not missing and not stale:
             print(f"  ✓ {ok} installed adapter file(s) match canonical. nothing to do.")
             return 0
@@ -885,6 +1245,12 @@ def main() -> int:
     total = n_oc + n_cl + n_cu + n_mc + n_cx
     print(f"Generated {total} adapter files in adapters/  "
           f"(opencode={n_oc}, claude={n_cl}, cursor={n_cu}, mcp={n_mc}, codex={n_cx})")
+
+    # --mcp: standalone MCP server installation
+    if args.mcp and not (args.install or args.install_opencode or args.install_cursor or args.install_claude or args.install_codex):
+        n_mcp = install_mcp_servers(verbose=True)
+        print(f"\nMCP servers installed: {n_mcp} IDE config(s) updated")
+        return 0
 
     if args.install or args.install_opencode or args.install_cursor or args.install_claude or args.install_codex:
         do_oc = args.install or args.install_opencode
@@ -913,7 +1279,14 @@ def main() -> int:
         n_stale = _cleanup_stale_files(verbose=True)
         if n_stale:
             print(f"  ✓ removed {n_stale} stale file(s) from previous install")
-    else:
+
+    # MCP servers can also be installed as part of --install
+    if args.install or args.mcp:
+        n_mcp = install_mcp_servers(verbose=True)
+        if n_mcp:
+            print(f"  ✓ MCP server config(s) written to {n_mcp} IDE(s)")
+
+    if not (args.install or args.install_opencode or args.install_cursor or args.install_claude or args.install_codex or args.mcp):
         print()
         print(f"To install to all detected IDEs, re-run with --install")
         print(f"  opencode:    {OPENCODE_CONFIG}")

@@ -40,7 +40,7 @@ else
 fi
 
 INSTALL_URL="${INSTALL_URL:-https://spielos.xyz/install}"
-SPIELOS_REPO="${SPIELOS_REPO:-ShayanSpiel/Spiel-OS}"
+SPIELOS_REPO="${SPIELOS_REPO:-ShayanSpiel/SpielOS}"
 GITHUB_REPO="${GITHUB_REPO:-https://github.com/$SPIELOS_REPO.git}"
 TARBALL_URL="${TARBALL_URL:-https://github.com/$SPIELOS_REPO/archive/refs/heads/main.tar.gz}"
 RAW_INSTALL_URL="${RAW_INSTALL_URL:-$INSTALL_URL}"
@@ -146,8 +146,8 @@ INSTALL_DIR=$(resolve_path "$DEFAULT_INSTALL_DIR")
 # Validate the target path. There are 4 cases:
 #   1. Nothing exists                                 → fresh install
 #   2. Symlink (broken OR points to non-SpielOS)      → auto-replace, then fresh install
-#   3. Regular directory, has team/director.md        → re-install
-#   4. Regular directory, no team/director.md         → error (real user data, ask first)
+#   3. Regular directory, has team/strategist.md        → re-install
+#   4. Regular directory, no team/strategist.md         → error (real user data, ask first)
 #   5. Regular file                                   → error
 
 if [[ -L "$INSTALL_DIR" ]]; then
@@ -155,7 +155,7 @@ if [[ -L "$INSTALL_DIR" ]]; then
   # from a previous install that got partially cleaned up. Auto-replace it
   # and proceed with a fresh install at the same path.
   TARGET=$(readlink "$INSTALL_DIR" 2>/dev/null || echo "(unreadable)")
-  if [[ -d "$INSTALL_DIR" && -f "$INSTALL_DIR/team/director.md" ]]; then
+  if [[ -d "$INSTALL_DIR" && -f "$INSTALL_DIR/team/strategist.md" ]]; then
     # Symlink resolves to a valid SpielOS install → re-install mode
     note "Existing SpielOS install detected at $INSTALL_DIR (via symlink)"
   else
@@ -167,7 +167,7 @@ if [[ -L "$INSTALL_DIR" ]]; then
   fi
 elif [[ -d "$INSTALL_DIR" ]]; then
   # Regular directory
-  if [[ -f "$INSTALL_DIR/team/director.md" ]]; then
+  if [[ -f "$INSTALL_DIR/team/strategist.md" ]]; then
     note "Existing SpielOS install detected at $INSTALL_DIR"
   else
     note "Installing into existing directory: $INSTALL_DIR"
@@ -188,7 +188,7 @@ fi
 
 cd "$INSTALL_DIR"
 IS_REINSTALL=0
-if [[ ! -f "team/director.md" ]]; then
+if [[ ! -f "team/strategist.md" ]]; then
   if [[ $HAS_GIT -eq 1 ]]; then
     note "Cloning $GITHUB_REPO ..."
     if ! git clone --depth 1 --branch "$VERSION" "$GITHUB_REPO" "$INSTALL_DIR.tmp" 2>/dev/null; then
@@ -212,22 +212,21 @@ if [[ ! -f "team/director.md" ]]; then
     fi
   fi
 else
-  # Re-install: vault already has team/director.md. Refresh the tool sources
-  # (tools/, install/, system/, bin/spiel, package.json, etc.)
+  # Re-install: vault already has team/strategist.md. Refresh the tool sources
+  # (tools/, install/, system/, bin/spiel, package.json, plugins/, etc.)
   # WITHOUT touching user data:
-  #   - team/         (your prompt files)
-  #   - skills/       (your skill overrides)
   #   - strategy/     (your audience/offer/voice/examples)
-  #   - content/      (your drafts/briefs/ready/posted/rejected)
+  #   - content/      (your sessions/drafts/ready/posted/rejected)
   #   - .env          (your secrets)
   #   - system/brand.* (your brand tokens)
+  #   - system/rules.yaml (your gate config)
   # To overwrite these, run `spiel init` (re-runs the wizard).
   IS_REINSTALL=1
   note "Existing install detected at $INSTALL_DIR"
   note "Re-install mode: refreshing project sources only."
-  note "  → PRESERVED (your data, not touched): strategy/, content/, .env, system/brand.*, system/rules.yaml"
-  note "  → REFRESHED (from upstream): team/, skills/, archive/, tools/, install/, system/, templates/, bin/spiel, tests/, docs"
-  note "  → IDE adapters: re-synced (your local team/ pushed to all 4 IDEs)"
+  note "  → PRESERVED (your data, not touched): strategy/, content/, .env, system/brand.md, system/brand.json, system/rules.yaml"
+  note "  → REFRESHED (from upstream): team/, archive/, tools/, install/, system/, templates/, plugins/, .agents/, bin/spiel, tests/, AGENTS.md, README.md"
+  note "  → IDE adapters: re-synced (your canonical team/ pushed to all 4 IDEs)"
 
   # Always use tarball overlay (NEVER `git pull`, which would clobber user data).
   if [[ $HAS_CURL -eq 1 ]]; then
@@ -258,6 +257,13 @@ for root, dirs, files in os.walk(src):
             continue
         sp = os.path.join(root, f)
         dp = os.path.join(dst, rel_file)
+        # Same file (src == dst, or symlink to itself) — skip cleanly
+        try:
+            if os.path.samefile(sp, dp):
+                skipped += 1
+                continue
+        except OSError:
+            pass
         os.makedirs(os.path.dirname(dp), exist_ok=True)
         shutil.copy2(sp, dp)
         copied += 1
@@ -307,7 +313,8 @@ else
     cd "$INSTALL_DIR"
     python3 "$INSTALL_DIR/install/wizard/serve.py" \
       --port "$WIZARD_PORT" \
-      --target "$INSTALL_DIR" </dev/null &
+      --target "$INSTALL_DIR" \
+      --exit-on-finish </dev/null &
     WIZARD_PID=$!
   else
     err "curl is required to run the wizard."
@@ -369,10 +376,13 @@ if [[ $WIZARD_EXIT -eq 0 && -f "$INSTALL_DIR/.env" ]]; then
   printf 'VAULT_DIR=%s\n' "$INSTALL_DIR" > "$HOME/.config/spielos/config"
   ok "Global config: $HOME/.config/spielos/config -> $INSTALL_DIR"
 
-  # Rewrite VAULT_DIR= line in .env (add if missing, preserves all other lines)
+  # Rewrite VAULT_DIR= line in .env (add if missing, preserves all other lines).
+  # Use a temp file for portability — `sed -i ''` is BSD-only, `sed -i` is GNU-only.
   if [[ -f "$INSTALL_DIR/.env" ]]; then
     if grep -q '^VAULT_DIR=' "$INSTALL_DIR/.env" 2>/dev/null; then
-      sed -i '' "s|^VAULT_DIR=.*|VAULT_DIR=$INSTALL_DIR|" "$INSTALL_DIR/.env"
+      _tmp_env=$(mktemp)
+      sed "s|^VAULT_DIR=.*|VAULT_DIR=$INSTALL_DIR|" "$INSTALL_DIR/.env" > "$_tmp_env"
+      mv "$_tmp_env" "$INSTALL_DIR/.env"
       ok "Updated VAULT_DIR in .env → $INSTALL_DIR"
     else
       printf '\nVAULT_DIR=%s\n' "$INSTALL_DIR" >> "$INSTALL_DIR/.env"
@@ -380,7 +390,7 @@ if [[ $WIZARD_EXIT -eq 0 && -f "$INSTALL_DIR/.env" ]]; then
     fi
   fi
 
-  # Sync IDE adapters (opencode + Cursor + Claude Code, whichever is installed)
+  # Sync IDE adapters (opencode + Cursor + Claude Code + Codex, whichever is installed)
   if python3 "$INSTALL_DIR/tools/sync_adapters.py" --install </dev/null >/dev/null 2>&1; then
     IDE_TARGETS=""
     [[ -d "$HOME/.config/opencode" ]]  && IDE_TARGETS+="opencode  "
@@ -391,6 +401,12 @@ if [[ $WIZARD_EXIT -eq 0 && -f "$INSTALL_DIR/.env" ]]; then
       ok "Slash commands installed: $IDE_TARGETS"
     else
       ok "Adapters generated (no IDEs detected on this machine)"
+    fi
+    # If Codex is installed, remind the user to trust the new hook once.
+    if [[ -d "$HOME/.codex" ]] && [[ -f "$INSTALL_DIR/plugins/spielos/hooks.json" ]]; then
+      note "Codex /post is now a deterministic hook. First invocation:"
+      note "  • Codex will ask you to trust the new hook (use /hooks in Codex CLI)."
+      note "  • Or: codex --dangerously-bypass-hook-trust (one-time bypass)."
     fi
   fi
 
@@ -406,23 +422,38 @@ if [[ $WIZARD_EXIT -eq 0 && -f "$INSTALL_DIR/.env" ]]; then
   # Sanity-check the new tools. Catches missing-file bugs on first install
   # (e.g., broken tarball, partial clone, etc.) so the user finds out at
   # install time, not the first time they type /post.
-  if [[ -x "$INSTALL_DIR/tools/editor.py" ]] && \
-     python3 "$INSTALL_DIR/tools/editor.py" check --help >/dev/null 2>&1; then
-    ok "tools/editor.py is callable"
+  _check_tool() {
+    local name="$1" path="$2" cli_arg="$3" fail_msg="$4"
+    if [[ -x "$path" ]] && python3 "$path" "$cli_arg" --help >/dev/null 2>&1; then
+      ok "$name is callable"
+    else
+      err "$name is missing or broken — $fail_msg"
+    fi
+  }
+  _check_tool "tools/editor.py"        "$INSTALL_DIR/tools/editor.py"        "check"   "/post editor step will fail"
+  _check_tool "tools/post.py"          "$INSTALL_DIR/tools/post.py"          "post"    "/post will fail"
+  _check_tool "tools/advance.py"       "$INSTALL_DIR/tools/advance.py"       "--show"  "state machine will fail"
+  _check_tool "tools/capture-session.py" "$INSTALL_DIR/tools/capture-session.py" "--help" "session capture will fail"
+  _check_tool "tools/doctor.py"        "$INSTALL_DIR/tools/doctor.py"        "--help"  "diagnostics will fail"
+  _check_tool "tools/guard.py"         "$INSTALL_DIR/tools/guard.py"         "--help"  "pipeline guard will fail"
+  _check_tool "tools/next.py"          "$INSTALL_DIR/tools/next.py"          "--help"  "spiel next / continue will fail"
+  _check_tool "tools/sync_adapters.py" "$INSTALL_DIR/tools/sync_adapters.py" "--help"  "adapter sync will fail"
+  # codex_hook.py has no --help; just check it exists and runs
+  if [[ -x "$INSTALL_DIR/tools/codex_hook.py" ]]; then
+    ok "tools/codex_hook.py is callable"
   else
-    err "tools/editor.py is missing or not executable — /post will fail"
-    err "  re-run: curl ... | bash  (full install)"
-  fi
-  if [[ -x "$INSTALL_DIR/tools/sync_adapters.py" ]] && \
-     python3 "$INSTALL_DIR/tools/sync_adapters.py" --help >/dev/null 2>&1; then
-    ok "tools/sync_adapters.py is callable"
-  else
-    err "tools/sync_adapters.py is missing or broken — adapter sync will fail"
+    err "tools/codex_hook.py is missing or not executable — Codex /post hook will fail"
   fi
   if [[ -x "$INSTALL_DIR/bin/spiel" ]]; then
     ok "bin/spiel shim is executable"
   else
     err "bin/spiel is missing or not executable — /post will fail"
+  fi
+  if [[ -f "$INSTALL_DIR/plugins/spielos/hooks.json" ]] && \
+     [[ -f "$INSTALL_DIR/plugins/spielos/scripts/post-hook.sh" ]]; then
+    ok "Codex plugin package present (hooks.json, post-hook.sh)"
+  else
+    err "Codex plugin files missing — Codex /post will not work as a hook"
   fi
 
   note "DONE. From any IDE, type /post to ship a post."

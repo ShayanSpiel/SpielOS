@@ -1,0 +1,44 @@
+{
+  "name": "spielos",
+  "version": "1.0.0",
+  "description": "Turn coding sessions into publishable posts, threads, and blog drafts without leaving your agent workflow.",
+  "author": {
+    "name": "SpielOS",
+    "url": "https://github.com/ShayanSpiel/SpielOS"
+  },
+  "homepage": "https://spielos.xyz",
+  "repository": "https://github.com/ShayanSpiel/SpielOS",
+  "license": "MIT",
+  "keywords": [
+    "content",
+    "marketing",
+    "developer-productivity",
+    "productivity",
+    "build-in-public",
+    "automation",
+    "content-automation",
+    "publishing",
+    "agent-workflow",
+    "content-workflow",
+    "founder-productivity"
+  ],
+  "interface": {
+    "displayName": "SpielOS",
+    "shortDescription": "Build sessions → Publishable content.",
+    "longDescription": "SpielOS is a session-as-content infrastructure for founders and builders. It captures your actual build sessions—coding, debugging, shipping—and extracts publish-ready posts for X, LinkedIn, and your blog. No context switching. No content creation. You stay in builder mode; the pipeline handles distribution.",
+    "developerName": "SpielOS",
+    "category": "Productivity",
+    "capabilities": ["Interactive", "Write"],
+    "websiteURL": "https://github.com/ShayanSpiel/SpielOS",
+    "brandColor": "#FF6A00",
+    "composerIcon": "./assets/icon.png",
+    "logo": "./assets/logo.png",
+    "logoDark": "./assets/logo-dark.png",
+    "screenshots": [],
+    "defaultPrompt": [
+      "Write v2 announcement post.",
+      "Read this PDF and turn it into an X thread.",
+      "@post {no args}, turns session into posts."
+    ]
+  }
+}

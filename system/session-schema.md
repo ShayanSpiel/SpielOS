@@ -61,27 +61,12 @@ The Transcript section is the appendix. The 6 body sections above it are the str
 
 ## Capture flow
 
-`/post` (no args) follows this sequence:
+`/post` (no args) follows this sequence, defined in `team/post.md`:
 
-1. The LLM (running as the Director subagent) collects clean user + assistant text from the live conversation. Strips tool calls, tool results, system messages.
-2. The LLM extracts the 5 signal fields and the 6 body sections from the conversation.
-3. The LLM writes a temporary `--structured-json` file with the 5 fields.
-4. The LLM runs:
-
-```bash
-python3 tools/capture-session.py \
-  --vault <resolved_vault> \
-  --transcript-stdin \
-  --structured-json <tmpfile> \
-  --status complete \
-  --title "<one-line>" \
-  --tags "<comma,separated>"
-```
-
-5. The tool writes `content/sessions/YYYY-MM-DD-session-current.md` atomically.
-6. The LLM writes `content/current.md` pointing to that path, and writes `content/.state.json` with `step: capture`.
-7. The LLM calls `tools/advance.py --to director` to mark capture complete.
-8. The Director takes over.
+1. The LLM extracts signals from the conversation, writes temp files.
+2. `spiel post --mode session` calls `tools/capture-session.py` which writes `content/sessions/YYYY-MM-DD-session-current.md` atomically.
+3. `tools/post.py` writes `content/current.md` pointing to that path, initializes `content/.state.json`, and advances to `strategy`.
+4. The pipeline continues to the Strategist.
 
 ## Topic mode
 

@@ -1,0 +1,64 @@
+{
+  "run_id": "2026-06-30-003",
+  "status": "active",
+  "step": "publish",
+  "mode": "topic",
+  "current": "content/current.md",
+  "session": "",
+  "drafts": [
+    "content/drafts/2026-06-30-x-placement-not-content.md",
+    "content/drafts/2026-06-30-linkedin-placement-not-content.md",
+    "content/drafts/2026-06-30-blog-deepseek-v4-distribution.md"
+  ],
+  "ready": [
+    "content/drafts/2026-06-30-x-placement-not-content.md",
+    "content/drafts/2026-06-30-linkedin-placement-not-content.md",
+    "content/drafts/2026-06-30-blog-deepseek-v4-distribution.md"
+  ],
+  "updated_at": "2026-06-30T05:32:36",
+  "error": null,
+  "history": [
+    {
+      "from": "idle",
+      "to": "capture",
+      "at": "2026-06-30T05:17:46",
+      "by": "post"
+    },
+    {
+      "from": "capture",
+      "to": "strategy",
+      "at": "2026-06-30T05:17:46",
+      "by": "post"
+    },
+    {
+      "from": "strategy",
+      "to": "draft",
+      "at": "2026-06-30T05:20:39",
+      "by": "strategist"
+    },
+    {
+      "from": "draft",
+      "to": "edit",
+      "at": "2026-06-30T05:27:23",
+      "by": "writer"
+    },
+    {
+      "from": "edit",
+      "to": "error",
+      "at": "2026-06-30T05:30:28",
+      "by": "editor"
+    },
+    {
+      "from": "error",
+      "to": "edit",
+      "at": "2026-06-30T05:32:31",
+      "by": "editor"
+    },
+    {
+      "from": "edit",
+      "to": "publish",
+      "at": "2026-06-30T05:32:36",
+      "by": "editor"
+    }
+  ]
+}

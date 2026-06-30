@@ -12,10 +12,12 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import urllib.error
 import urllib.request
 from pathlib import Path
 
-from _common import VAULT, READY_DIR, load_creds, extract_body, sanitize, archive, check_gates_verdict
+import _common as common
+from _common import VAULT, READY_DIR, load_creds, extract_body, sanitize, archive, check_gates_verdict, set_vault
 
 
 REQUIRED_CREDS = ("LINKEDIN_ACCESS_TOKEN", "LINKEDIN_PERSON_URN")
@@ -54,8 +56,12 @@ def publish(post_file: Path, *, dry_run: bool = False) -> dict:
         },
         method="POST",
     )
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        result = json.loads(resp.read().decode("utf-8"))
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            result = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")[:500]
+        raise RuntimeError(f"LinkedIn API HTTP {e.code}: {body or e.reason}") from e
     share_urn = result.get("id", "")
     return {"channel_id": "linkedin-direct", "service": "linkedin", "post_id": share_urn}
 
@@ -65,7 +71,18 @@ def main() -> int:
     parser.add_argument("post_file", help="Path to queue file")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--yes", action="store_true")
+    parser.add_argument("--vault", help="SpielOS vault root (overrides $VAULT_DIR and global config)")
     args = parser.parse_args()
+    global VAULT, READY_DIR, POSTED_DIR, ENV_FILE
+    if args.vault:
+        v = Path(args.vault).expanduser().resolve()
+        if (v / "team" / "strategist.md").is_file():
+            set_vault(v)
+            VAULT = common.VAULT
+            READY_DIR = common.READY_DIR
+        else:
+            print(f"ERROR: {v} is not a SpielOS vault (no team/strategist.md)", file=sys.stderr)
+            return 3
     post_file = Path(args.post_file)
     if not post_file.is_absolute():
         post_file = READY_DIR / post_file.name if not post_file.exists() else post_file
@@ -91,9 +108,9 @@ def main() -> int:
         print(f"ERROR: {e}", file=sys.stderr)
         return 1
     if result and result.get("post_id"):
+        print(f"  posted: share_urn={result['post_id']}")
         try:
             archived = archive(post_file, [result], extract_body(post_file), "now")
-            print(f"  posted: share_urn={result['post_id']}")
             print(f"  archived: {archived.relative_to(VAULT)}")
         except Exception as e:
             print(f"WARN: archive failed: {e}", file=sys.stderr)

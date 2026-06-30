@@ -22,7 +22,7 @@ One state file per vault. Atomic writes. Vault-resolved.
   "error": null,
   "history": [
     {"from": "idle", "to": "capture", "at": "2026-06-26T12:00:00", "by": "post"},
-    {"from": "capture", "to": "director", "at": "2026-06-26T12:00:05", "by": "post"}
+    {"from": "capture", "to": "strategy", "at": "2026-06-26T12:00:05", "by": "post"}
   ]
 }
 ```
@@ -43,13 +43,12 @@ One state file per vault. Atomic writes. Vault-resolved.
 
 ## Steps
 
-The pipeline has 9 steps. They map 1:1 to the 5 roles + capture + complete + error.
+The pipeline has 7 steps. They map 1:1 to the 4 roles + capture + complete + error.
 
 | Step | Owner | What happens here |
 |---|---|---|
 | `idle` | (none) | No active run. `content/.state.json` does not exist, or its `status` is `shipped`/`failed`. |
-| `capture` | `/post` | Session capture in progress. Calls `tools/capture-session.py` then advances to `director`. |
-| `director` | `@director` | Reads `content/current.md`, resolves the source (session or topic), writes `source:` back, sets `status: drafting`, advances to `strategy`. |
+| `capture` | `spiel post` | Runtime input capture in progress. `tools/post.py` normalizes topic/file/session input, calls `tools/capture-session.py` for session mode, then advances to `strategy`. |
 | `strategy` | `@strategist` | Writes `## Strategy` to `content/current.md` (reader, pain, point, proof, angle, formats). Advances to `draft`. |
 | `draft` | `@writer` | Writes one draft per format to `content/drafts/`. Appends paths to `state.drafts`. Advances to `edit`. |
 | `edit` | `@editor` | Runs `tools/editor.py stamp` on each draft. Moves passing drafts to `content/ready/`. Appends paths to `state.ready`. Advances to `publish`. |
@@ -61,8 +60,7 @@ The pipeline has 9 steps. They map 1:1 to the 5 roles + capture + complete + err
 
 ```
 idle       -> capture
-capture    -> director
-director   -> strategy
+capture    -> strategy
 strategy   -> draft
 draft      -> edit
 edit       -> publish
@@ -79,15 +77,13 @@ error      -> <previous> (via --recover-from <step>)
 ## What "status" means vs "step"
 
 - `status` is the run-level lifecycle: `routing` (not started), `active` (in progress), `paused` (waiting human), `shipped` (done), `failed` (errored).
-- `step` is the pipeline step: `idle`, `capture`, `director`, `strategy`, `draft`, `edit`, `publish`, `complete`, `error`.
+- `step` is the pipeline step: `idle`, `capture`, `strategy`, `draft`, `edit`, `publish`, `complete`, `error`.
 
 A paused run is still on a step (e.g. `step: edit, status: paused` means Editor is waiting for human approval before stamping).
 
 ## Crash recovery
 
-On `/post` start, if `content/.state.json` exists and `status` is `active` or `paused`, read the `history` array to find the last successful step. Ask the user: "continue from `<step>` or restart?" If continue, jump to that step. If restart, run `tools/advance.py --reset` and start fresh.
-
-The old promise in `AGENTS.md:98` ("read the `## state_history` lines, ask the user") is now real because the state is real.
+On `/post` start, `tools/post.py` **auto-resets and starts fresh.** At the top of `main()` it deletes `content/.state.json` and `content/current.md` if they exist, then begins the new run. The LLM never has to reason about a stuck prior state. Bare `/post` and any `/post <topic>` invocation discards the prior run, if any, and starts a new one. There is no resume; to continue a paused run the user must use the per-role commands (`@strategist`, `@writer`, `@editor`, `@publisher`) or `spiel continue` from outside the `/post` adapter.
 
 ## `bin/spiel status` (display)
 

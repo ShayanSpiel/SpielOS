@@ -15,7 +15,7 @@
   "engines": {
     "python": ">=3.10"
   },
-  "keywords": ["content", "marketing", "agents", "ai", "llm", "obsidian"],
+  "keywords": ["content-pipeline", "founder-content", "session-to-post", "build-in-public", "markdown-pipeline"],
   "author": "SpielOS Contributors",
   "license": "MIT"
 }

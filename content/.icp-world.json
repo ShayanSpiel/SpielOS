@@ -1,0 +1,16 @@
+{
+  "reader": "A technical founder who builds AI tools but can't get traction on their content. They open the analytics before standup every Tuesday, see flat numbers, and wonder if their hooks are wrong. They want to be seen as the technical expert, not the content guy. They think marketing is manipulative, but they need distribution that respects their work.",
+  "belief": "If I write a comprehensive blog post about a hot AI topic, attention will come.",
+  "pain": "You see a new AI model launch. You spend hours researching, writing a detailed blog post. You publish. The post reads well. The metrics stay flat. You refine the visible parts. The bottleneck moves. You never quite catch it.",
+  "point": "Distribution is a placement problem, not a content problem. Same post, different placement, the numbers change.",
+  "proof": [
+    "6-7 min average session duration when content was placed inside active attention cycles",
+    "~300 visitors from a single post, organic social, 6m 58s avg duration",
+    "Real-time iteration on placement mechanics, not content volume"
+  ],
+  "meaning": "I was not failing at writing. I was failing at placing.",
+  "example_pattern": "Example 5 (contrarian: not X but Y)",
+  "axis": "contrarian",
+  "created_at": "2026-06-30T05:19:38",
+  "source": "\"Make a comprehensive research and report and search all the top 20 articles and news on the release of the new deepseek v4 model launch on july. And make a premium blog post about everything we know about it, top X posts, top reddit posts, top news articles, top sources, technical aspects, what will be launched, why should we care, if comparisons are there against frontier models, pricing, make a really viral and cool content.\""
+}

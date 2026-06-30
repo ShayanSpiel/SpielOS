@@ -46,10 +46,16 @@ def fresh_vault() -> Path:
     vault = tmp / "vault"
     vault.mkdir()
     (vault / "team").mkdir()
-    (vault / "team" / "director.md").write_text("# director\n")
+    (vault / "team" / "strategist.md").write_text("# strategist\n")
     (vault / "system").mkdir()
     import shutil
     shutil.copy(ROOT / "system" / "rules.yaml", vault / "system" / "rules.yaml")
+    (vault / "strategy").mkdir()
+    (vault / "strategy" / "offer.md").write_text(
+        "# Offer\n\n"
+        "## Why it is different\n\n"
+        "Distribution is engineered before launch. Placement beats more output.\n"
+    )
     (vault / "content" / "drafts").mkdir(parents=True)
     return vault
 
@@ -173,6 +179,167 @@ def test_check_gates_verdict_missing() -> None:
     check("missing verdict message mentions stamp", "stamp" in msg.lower())
 
 
+def test_check_gates_verdict_pending() -> None:
+    print("\n[7] check_gates_verdict: non-pass verdict is refused")
+    vault = fresh_vault()
+    draft = write_draft(vault, em_dash=False)
+    text = draft.read_text(encoding="utf-8")
+    draft.write_text(text.replace("status: draft", "status: draft\ngates_verdict: pending"), encoding="utf-8")
+    sys.path.insert(0, str(ROOT / "tools" / "publisher"))
+    from _common import check_gates_verdict
+    ok, msg = check_gates_verdict(draft)
+    check("pending verdict returns ok=False", ok is False, f"msg: {msg}")
+    check("pending verdict message requires pass", "pass" in msg.lower())
+
+
+# ─── grounding_check tests (5th gate, on the brief) ─────────────────────
+
+def write_brief(vault: Path, *, mode: str = "session", pain: str = "default", point: str = "default",
+                meaning: str = "Builders learn that placement beats more output.",
+                proof: str = '["sample proof with 6-7 min sessions"]',
+                trace_axis: str = "systemic") -> Path:
+    brief = vault / "content" / "current.md"
+    brief.parent.mkdir(parents=True, exist_ok=True)
+    brief.write_text(f"""---
+mode: {mode}
+run_id: 2026-06-28-001
+created_at: 2026-06-28T00:00:00
+source: test
+---
+
+## Source
+
+Test source.
+
+## Strategy
+
+reader: Test reader
+pain: {pain}
+point: {point}
+proof: {proof}
+meaning: {meaning}
+angle: Test angle
+formats: ["x", "linkedin", "blog"]
+
+## Trace
+
+selected_axis: {trace_axis}
+example_pattern: launch placement pattern
+offer_lift: Placement beats more output
+worldview_brief: Test worldview
+failure_mode_brief: Distribution stays flat because attention is treated as effort-output.
+meaning_synthesis: systemic and leverage
+""")
+    return brief
+
+
+def write_icp_world(vault: Path, *, consequence: str = "default consequence", mapping: str = "default mapping") -> Path:
+    p = vault / "content" / ".icp-world.json"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps({
+        "worldview": "Test worldview",
+        "failure_mode": {
+            "belief": "Test belief",
+            "consequence": consequence,
+            "mapping": mapping,
+        },
+        "meaning": "Test meaning",
+        "evidence": "session, 6-7 min, traffic",
+    }))
+    return p
+
+
+def run_editor_brief(args: list[str], vault: Path) -> subprocess.CompletedProcess:
+    env = os.environ.copy()
+    env.pop("VAULT_DIR", None)
+    env["VAULT_DIR"] = str(vault)
+    cmd = [sys.executable, str(EDITOR)] + args + ["--vault", str(vault)]
+    return subprocess.run(cmd, capture_output=True, text=True, env=env)
+
+
+def test_grounding_pass_session() -> None:
+    print("\n[7] grounding_check: pass case (session mode, brief traces to simulator)")
+    vault = fresh_vault()
+    write_icp_world(
+        vault,
+        consequence="Distribution stays flat despite consistent shipping because attention is treated as effort-output.",
+        mapping="Distribution is engineered before launch. Placement beats more output.",
+    )
+    write_brief(
+        vault,
+        mode="session",
+        pain="Distribution stays flat despite consistent shipping because attention is treated as effort-output.",
+        point="Distribution is engineered before launch. Placement beats more output.",
+        meaning="Test meaning",
+    )
+    r = run_editor_brief(["check-brief"], vault)
+    check("grounding_check exits 0 on pass", r.returncode == 0, f"stderr: {r.stderr[:300]}")
+    report = json.loads(r.stdout)
+    check("verdict is pass", report.get("verdict") == "pass", f"got {report.get('verdict')}")
+
+
+def test_grounding_fail_no_simulator() -> None:
+    print("\n[8] grounding_check: fail case (no simulator output in session mode)")
+    vault = fresh_vault()
+    # No .icp-world.json, no session
+    write_brief(vault, mode="session",
+                pain="Distribution stays flat",
+                point="Distribution is engineered before launch. Placement beats more output.",
+                meaning="Test meaning")
+    r = run_editor_brief(["check-brief"], vault)
+    check("grounding_check exits 1 on missing simulator", r.returncode == 1, f"stderr: {r.stderr[:300]}")
+
+
+def test_grounding_fail_pain_no_trace() -> None:
+    print("\n[9] grounding_check: fail case (brief's pain doesn't trace to consequence)")
+    vault = fresh_vault()
+    write_icp_world(
+        vault,
+        consequence="Distribution stays flat because attention is treated as effort-output not a system.",
+        mapping="Distribution is engineered before launch. Placement beats more output.",
+    )
+    write_brief(
+        vault,
+        mode="session",
+        pain="Something completely unrelated to the simulator's consequence",
+        point="Distribution is engineered before launch. Placement beats more output.",
+        meaning="Test meaning",
+    )
+    r = run_editor_brief(["check-brief"], vault)
+    check("grounding_check exits 1 on pain-trace failure", r.returncode == 1, f"stderr: {r.stderr[:300]}")
+
+
+def test_grounding_fail_proof_has_build_log() -> None:
+    print("\n[10] grounding_check: fail case (proof has build-log words, no ICP marker)")
+    vault = fresh_vault()
+    write_icp_world(vault)
+    write_brief(
+        vault,
+        mode="session",
+        pain="Distribution stays flat because attention is treated as effort-output not a system.",
+        point="Distribution is engineered before launch. Placement beats more output.",
+        meaning="Test meaning",
+        proof='["6 source files edited, 73 tests pass, 22/22 doctor clean"]',
+    )
+    r = run_editor_brief(["check-brief"], vault)
+    check("grounding_check exits 1 on build-log proof", r.returncode == 1, f"stderr: {r.stderr[:300]}")
+
+
+def test_grounding_pass_topic_mode() -> None:
+    print("\n[11] grounding_check: pass case (topic mode, no simulator, proof has ICP marker)")
+    vault = fresh_vault()
+    write_brief(
+        vault,
+        mode="topic",
+        pain="Founders keep posting more but distribution stays flat",
+        point="Distribution is engineered before launch. Placement beats more output.",
+        meaning="Builders learn that placement beats more output.",
+        proof='["6-7 min average sessions, 300 visitors from a single placed post"]',
+    )
+    r = run_editor_brief(["check-brief"], vault)
+    check("grounding_check exits 0 in topic mode", r.returncode == 0, f"stderr: {r.stderr[:300]}")
+
+
 # ─── Runner ─────────────────────────────────────────────────────────────
 
 def main() -> int:
@@ -183,6 +350,12 @@ def main() -> int:
     test_check_gates_verdict_pass()
     test_check_gates_verdict_fail()
     test_check_gates_verdict_missing()
+    test_check_gates_verdict_pending()
+    test_grounding_pass_session()
+    test_grounding_fail_no_simulator()
+    test_grounding_fail_pain_no_trace()
+    test_grounding_fail_proof_has_build_log()
+    test_grounding_pass_topic_mode()
     print(f"\n{PASS} passed, {FAIL} failed")
     return 0 if FAIL == 0 else 1
 

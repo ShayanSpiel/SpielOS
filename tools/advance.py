@@ -6,7 +6,7 @@ action is to call this tool. The tool validates the transition against the
 state machine table, appends to the history, and writes atomically.
 
 The state machine:
-  idle -> capture -> director -> strategy -> draft -> edit -> publish -> complete -> idle
+  idle -> capture -> strategy -> draft -> edit -> publish -> complete -> idle
   any step -> error
   error -> idle (via --reset) or error -> <previous> (via --recover-from <step>)
 
@@ -44,7 +44,7 @@ from _vault import resolve_vault  # noqa: E402
 # ─── State machine table ────────────────────────────────────────────────
 
 VALID_STEPS = (
-    "idle", "capture", "director", "strategy",
+    "idle", "capture", "strategy",
     "draft", "edit", "publish", "complete", "error",
 )
 
@@ -53,21 +53,19 @@ VALID_STATUSES = ("routing", "active", "paused", "shipped", "failed")
 # allowed_transitions[from] = {to, ...}
 ALLOWED_TRANSITIONS: dict[str, set[str]] = {
     "idle":     {"capture", "error"},
-    "capture":  {"director", "error", "idle"},
-    "director": {"strategy", "error", "idle"},
+    "capture":  {"strategy", "error", "idle"},
     "strategy": {"draft", "error", "idle"},
     "draft":    {"edit", "error", "idle"},
     "edit":     {"publish", "error", "idle"},
     "publish":  {"complete", "error", "idle"},
     "complete": {"idle"},
-    "error":    {"idle", "capture", "director", "strategy", "draft", "edit", "publish"},
+    "error":    {"idle", "capture", "strategy", "draft", "edit", "publish"},
 }
 
 # Map step -> run status (set automatically on transition)
 STEP_TO_STATUS: dict[str, str] = {
     "idle":     "routing",
     "capture":  "active",
-    "director": "active",
     "strategy": "active",
     "draft":    "active",
     "edit":     "active",
@@ -155,6 +153,7 @@ def cmd_init(args, vault: Path) -> int:
     return 0
 
 
+
 def cmd_advance(args, vault: Path) -> int:
     """Validate and apply a step transition."""
     state = read_state(vault)
@@ -182,6 +181,10 @@ def cmd_advance(args, vault: Path) -> int:
     state["updated_at"] = now_iso()
     if to_step == "idle" and from_step == "complete":
         state["status"] = "shipped"  # stays shipped briefly until next --init
+        # Clear transient lists on a clean run completion so a fresh run
+        # never inherits stale drafts/ready pointers from a prior run.
+        state["drafts"] = []
+        state["ready"] = []
     state["error"] = None  # clear error on successful advance
     state["history"] = history
     # Also accept --add-draft / --add-ready / --set-session flags for the role convenience
@@ -249,12 +252,16 @@ def cmd_set_error(args, vault: Path) -> int:
 
 
 def cmd_reset(args, vault: Path) -> int:
-    """Delete the state file. Run is fully reset."""
+    """Delete active run state and handoff. User drafts/content are preserved."""
     p = state_path(vault)
     if p.exists():
         p.unlink()
+    current = vault / "content" / "current.md"
+    if current.exists():
+        current.unlink()
     if not args.quiet:
         print(f"  ✓ state reset: {p.relative_to(vault)} deleted")
+        print("  ✓ handoff reset: content/current.md deleted")
     return 0
 
 
@@ -321,7 +328,7 @@ def cmd_show(args, vault: Path) -> int:
 def main() -> int:
     ap = argparse.ArgumentParser(description="SpielOS pipeline state machine")
     ap.add_argument("--vault", help="Path to vault root (default: auto-detect)")
-    ap.add_argument("--by", help="Who is making this transition (e.g. 'director', 'writer')")
+    ap.add_argument("--by", help="Who is making this transition (e.g. 'post', 'writer')")
     ap.add_argument("--quiet", action="store_true", help="No stdout, exit code only")
     ap.add_argument("--json", action="store_true", help="JSON output (for --show)")
 
@@ -349,7 +356,7 @@ def main() -> int:
     args = ap.parse_args()
 
     vault = find_vault(args.vault)
-    if not vault or not (vault / "team" / "director.md").is_file():
+    if not vault or not (vault / "team" / "strategist.md").is_file():
         sys.stderr.write("ERROR: could not locate SpielOS vault.\n")
         return 3
 

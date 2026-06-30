@@ -189,8 +189,11 @@ SOURCE="$_SOURCE_PATH"   # restore after frontmatter may have overwritten it
 if [[ "$STATUS" != "ready" ]] && ! $FORCE_FLAG; then
   die "Status is '$STATUS', not 'ready'. Set status: ready in the frontmatter, or use --force."
 fi
+if [[ "${gates_verdict:-}" != "pass" ]] && ! $FORCE_FLAG; then
+  die "gates_verdict is '${gates_verdict:-missing}', not 'pass'. Run tools/editor.py stamp before publishing, or use --force."
+fi
 
-ok "Gates passed: status=$STATUS"
+ok "Gates passed: status=$STATUS gates_verdict=${gates_verdict:-force}"
 
 # ─── Compute target ────────────────────────────────────────────────────────
 # Extract YYYY-MM-DD from source filename (the first 10 chars of basename)
@@ -441,13 +444,6 @@ def strip_leading_h1(body_text, fm_title):
         del lines[idx]
         if idx < len(lines) and lines[idx].strip() == '':
             del lines[idx]
-    def norm(s):
-        return re.sub(r'[^a-z0-9]+', '', s.lower())
-    if norm(h1_text) == norm(fm_title):
-        # Remove this line + one optional blank line after
-        del lines[0]
-        if lines and lines[0].strip() == '':
-            del lines[0]
     return '\n'.join(lines)
 
 new_body = strip_leading_h1(new_body, title)
@@ -549,7 +545,7 @@ if $DRY_RUN; then
 fi
 
 # Commit
-COMMIT_MSG="post: $(basename "$TARGET_REL" .md) — pillar blog"
+COMMIT_MSG="post: $(basename "$TARGET_REL" .md) - pillar blog"
 if ! $YES_FLAG; then
   read -p "Commit with message '$COMMIT_MSG'? [y/N] " -n 1 -r
   echo

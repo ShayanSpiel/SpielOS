@@ -1,4 +1,4 @@
-version: 2
+version: 3
 
 drafts:
   platforms:
@@ -29,12 +29,110 @@ required_frontmatter:
   - platform
   - status
   - source
+  # 6 brief fields (the full brief, in the draft frontmatter)
   - reader
+  - pain
+  - belief
   - point
-  - angle
+  - meaning
+  - proof
+
+# Volume dial — per-mode defaults (0-5 for each brief element).
+# The Strategist lifts these into ## Strategy.volume in the brief.
+# The user can override per-run in ## Strategy.volume before invoking
+# the Writer. The Writer applies them as soft influence on the draft.
+volume_defaults:
+  session:
+    reader: 4
+    pain: 1
+    belief: 4
+    point: 5
+    proof: 4
+    meaning: 5
+  topic:
+    reader: 3
+    pain: 2
+    belief: 2
+    point: 5
+    proof: 4
+    meaning: 4
 
 checks:
   proof_required: true
   one_point: true
   clear_reader: true
+
+# Grounding (Editor → `editor.py check-brief` → grounding_check gate).
+# Soft ban: proof must contain at least one ICP-language marker, and no
+# build-log words. Reads the simulator's output from content/.icp-world.json
+# and validates that the brief in content/current.md traces to it.
+grounding:
+  # Build-log words that MUST NOT appear in the brief's `proof` field.
+  # Catches the failure mode where the LLM writes about its own work
+  # (tests, files, adapters, doctor checks) instead of the ICP's world.
+  banned_words:
+    - "test"
+    - "tests"
+    - "adapter"
+    - "adapters"
+    - "doctor"
+    - "pipeline"
+    - "shim"
+    - "vault"
+    - "synced"
+    - "IDE"
+    - "git"
+    - "commit"
+    - "TDD"
+    - "toolchain"
+    - "source files"
+  # ICP-language markers — at least one must appear in `proof`. These are
+  # the words and phrases from audience.md, offer.md "Proof", and the
+  # user's own build-in-public examples. They are the signal that the
+  # proof is grounded in the ICP's world, not the system internals.
+  icp_markers:
+    - "session"
+    - "min"
+    - "avg"
+    - "average"
+    - "duration"
+    - "hour"
+    - "visitor"
+    - "users"
+    - "follower"
+    - "subscriber"
+    - "reader"
+    - "traffic"
+    - "conversion"
+    - "engagement"
+    - "retention"
+    - "growth"
+    - "attention"
+    - "distribution"
+    - "experiment"
+    - "before/after"
+    - "placed"
+    - "placement"
+    - "post"
+    - "posts"
+    - "publish"
+    - "writing"
+    - "shipped"
+    - "launched"
+    - "revenue"
+    - "signup"
+    - "click"
+    - "share"
+    - "reply"
+    - "open rate"
+    # Offer.md language (lifted from the canonical proof lines)
+    - "6-7 min"
+    - "6m 58s"
+    - "real-time"
+    - "in real time"
+    - "viral"
+  # Token overlap threshold (Jaccard) between offer.md "Why it is different"
+  # and brief's `point` field. The Point must blend offer.md language
+  # (the offer's differentiator) into the new mental model.
+  point_offer_overlap_min: 0.15
 

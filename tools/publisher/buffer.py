@@ -1,277 +1,275 @@
 #!/usr/bin/env python3
-"""publisher/buffer.py — Buffer multi-platform publisher.
+"""publisher/buffer.py — Buffer publisher via MCP subprocess.
 
-The Publisher role's primary dispatch path. One call fans a single draft
-out to all configured Buffer channels (X + LinkedIn + Threads in one go).
+Spawns @damusix/buffer-mcp as an MCP child process and uses it to
+list channels, create posts, and delete posts. No direct Buffer API calls.
 
 CLI:
     python3 tools/publisher/buffer.py <post-file> [--dry-run] [--yes] [--queue]
-
-Exit 0 on success, 1 on failure. Prints one-line result + archive path to stdout.
+    python3 tools/publisher/buffer.py --list-channels [--vault <path>]
+    python3 tools/publisher/buffer.py --delete <post-id> [--vault <path>]
 """
 
 from __future__ import annotations
 
 import argparse
-import base64
-import json
-import mimetypes
-import os
 import sys
-import urllib.error
-import urllib.parse
-import urllib.request
+from datetime import datetime
 from pathlib import Path
 
+import _common as common
 from _common import (
-    BANNERS_ROOT, ICONS_ROOT, VAULT, READY_DIR,
-    load_creds, extract_body, sanitize, archive, check_gates_verdict,
+    VAULT, READY_DIR, POSTED_DIR, ENV_FILE,
+    extract_body, sanitize, archive, check_gates_verdict, write_frontmatter,
+    set_vault,
 )
+from _mcp_client import MCPClient, MCPError
 
 
-BUFFER_API_URL = "https://api.buffer.com"
-ASSETS_BASE_URL = os.environ.get("ASSETS_BASE_URL", "")
-SMMS_API = "https://sm.ms/api/v2/upload"
-REQUIRED_CREDS = ("BUFFER_ACCESS_TOKEN", "BUFFER_CHANNEL_IDS")
-SERVICE_NORMALIZE = {
-    "twitter": "x", "x": "x", "linkedin": "linkedin",
-    "linkedin-page": "linkedin", "linkedin-profile": "linkedin",
+MCP_PACKAGE = "@damusix/buffer-mcp@latest"
+ORG_ID = "62f24e9ed7fef68ddf794937"
+
+CHANNELS_CACHE: list[dict] | None = None
+
+
+def _get_mcp_client() -> MCPClient:
+    token = ""
+    if ENV_FILE.exists():
+        for line in ENV_FILE.read_text().splitlines():
+            line = line.strip()
+            if line.startswith("BUFFER_ACCESS_TOKEN="):
+                token = line.split("=", 1)[1].strip().strip('"').strip("'")
+                break
+    if not token:
+        import os as _os
+        token = _os.environ.get("BUFFER_ACCESS_TOKEN", "")
+    if not token:
+        raise MCPError("BUFFER_ACCESS_TOKEN not found in .env or environment")
+    return MCPClient(
+        command=["npx", "-y", MCP_PACKAGE],
+        env={"BUFFER_ACCESS_TOKEN": token},
+        name="spielos-buffer",
+    )
+
+
+def list_channels() -> list[dict]:
+    global CHANNELS_CACHE
+    if CHANNELS_CACHE is not None:
+        return CHANNELS_CACHE
+    with _get_mcp_client() as mcp:
+        result = mcp.call_tool("use_buffer_api", {
+            "action": "listOrganizations",
+        })
+        orgs = (result.get("data") or {}).get("account", {}).get("organizations", [])
+        org_id = orgs[0]["id"] if orgs else ORG_ID
+        chan_result = mcp.call_tool("use_buffer_api", {
+            "action": "listChannels",
+            "payload": {"organizationId": org_id},
+        })
+        channels = (chan_result.get("data") or {}).get("channels", [])
+        CHANNELS_CACHE = channels
+    return CHANNELS_CACHE
+
+
+def find_channel_id(service: str) -> str | None:
+    for ch in list_channels():
+        if ch.get("service", "").lower() == service.lower():
+            return ch.get("id")
+    return None
+
+
+def _read_platform(post_file: Path) -> str:
+    text = post_file.read_text(encoding="utf-8")
+    if not text.startswith("---"):
+        raise ValueError("missing frontmatter; cannot infer Buffer platform")
+    parts = text.split("---", 2)
+    if len(parts) < 2:
+        raise ValueError("invalid frontmatter; cannot infer Buffer platform")
+    for line in parts[1].splitlines():
+        st = line.strip()
+        if st.startswith("platform:"):
+            platform = st.split(":", 1)[1].strip().lower()
+            if platform:
+                return platform
+    raise ValueError("missing platform in frontmatter; cannot infer Buffer channel")
+
+
+PLATFORM_TO_SERVICE = {
+    "x": "twitter",
+    "twitter": "twitter",
+    "linkedin": "linkedin",
     "threads": "threads",
 }
 
 
-def buffer_request(query: str, variables: dict, token: str) -> dict:
-    payload = json.dumps({"query": query, "variables": variables}).encode("utf-8")
-    req = urllib.request.Request(
-        BUFFER_API_URL, data=payload,
-        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            return json.loads(resp.read().decode("utf-8"))
-    except urllib.error.HTTPError as e:
-        err = e.read().decode("utf-8")[:300] if hasattr(e, 'read') else ""
-        raise RuntimeError(f"Buffer API HTTP {e.code}: {err}") from e
-    except urllib.error.URLError as e:
-        raise RuntimeError(f"Buffer API URLError: {e.reason}") from e
+def publish_via_mcp(post_file: Path, *, mode: str = "now") -> dict:
+    with _get_mcp_client() as mcp:
+        body_raw = extract_body(post_file)
+        body = sanitize(body_raw)
+        platform = _read_platform(post_file)
+        service = PLATFORM_TO_SERVICE.get(platform, platform)
+        channel_id = find_channel_id(service)
+        if not channel_id:
+            raise MCPError(f"No {service} channel found in Buffer account")
+        result = mcp.call_tool("use_buffer_api", {
+            "action": "createPost",
+            "payload": {
+                "channelId": channel_id,
+                "text": body,
+                "schedulingType": "automatic",
+                "mode": "addToQueue" if mode == "queue" else "shareNow",
+            },
+        })
+        post_data = (result.get("data") or {}).get("createPost", {}).get("post", {})
+        post_id = post_data.get("id", "")
+        if not post_id:
+            raise MCPError(f"Buffer did not return a post id: {result}")
+        return {
+            "channel_id": channel_id,
+            "service": service,
+            "post_id": post_id,
+            "post_data": post_data,
+        }
 
 
-def list_channels(token: str) -> list[dict]:
-    query = """
-    query { account { organizations { id name channels { id service name } } } }
-    """
-    data = buffer_request(query, {}, token)
-    orgs = (data.get("data") or {}).get("account", {}).get("organizations", []) or []
-    out = []
-    for org in orgs:
-        for ch in org.get("channels", []) or []:
-            out.append({
-                "id": ch.get("id"), "service": ch.get("service"),
-                "name": ch.get("name"), "organization_id": org.get("id"),
-                "organization_name": org.get("organization_name"),
-            })
-    return out
-
-
-def _upload_to_smms(path: Path) -> str | None:
-    if not path.exists():
-        return None
-    try:
-        data = path.read_bytes()
-        boundary = "----BOUNDARYBOUNDARY"
-        filename = path.name
-        mime = mimetypes.guess_type(str(path))[0] or "image/png"
-        body = (
-            f"--{boundary}\r\n"
-            f'Content-Disposition: form-data; name="smfile"; filename="{filename}"\r\n'
-            f"Content-Type: {mime}\r\n\r\n"
-        ).encode("utf-8") + data + f"\r\n--{boundary}--\r\n".encode("utf-8")
-        req = urllib.request.Request(
-            SMMS_API, data=body,
-            headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
-            method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            result = json.loads(resp.read().decode("utf-8"))
-        if result.get("success"):
-            return result.get("data", {}).get("url")
-        return None
-    except Exception:
-        return None
-
-
-def _read_banner_rel(post_file: Path) -> str | None:
-    try:
-        text = post_file.read_text()
-    except OSError:
-        return None
-    if not text.startswith("---"):
-        return None
-    parts = text.split("---", 2)
-    if len(parts) < 2:
-        return None
-    for line in parts[1].splitlines():
-        st = line.strip()
-        if st.startswith("banner:"):
-            return st.split(":", 1)[1].strip()
-    return None
-
-
-def _read_banner_url(post_file: Path) -> str | None:
-    try:
-        text = post_file.read_text()
-    except OSError:
-        return None
-    if not text.startswith("---"):
-        return None
-    parts = text.split("---", 2)
-    if len(parts) < 2:
-        return None
-    banner_rel = None
-    for line in parts[1].splitlines():
-        st = line.strip()
-        if st.startswith("banner:"):
-            banner_rel = st.split(":", 1)[1].strip()
-            break
-    if not banner_rel:
-        return None
-    if Path(banner_rel).is_absolute():
-        return None
-    banner_path = (VAULT / banner_rel).resolve()
-    try:
-        banner_path.relative_to(BANNERS_ROOT)
-    except ValueError:
-        try:
-            banner_path.relative_to(ICONS_ROOT)
-        except ValueError:
-            return None
-    if not banner_path.is_file():
-        return None
-    url = _upload_to_smms(banner_path)
-    if url:
-        return url
-    if ASSETS_BASE_URL:
-        if banner_rel.startswith("/"):
-            banner_rel = banner_rel.lstrip("/")
-        return f"{ASSETS_BASE_URL.rstrip('/')}/{banner_rel}"
-    return None
-
-
-def create_post(token: str, channel_id: str, text: str, *,
-                mode: str = "now",
-                assets: list[dict] | None = None) -> tuple[str, dict]:
-    scheduling_input = {
-        "text": text, "schedulingType": "automatic",
-        "mode": "addToQueue" if mode == "queue" else "shareNow",
-    }
-    if assets:
-        scheduling_input["assets"] = assets
-    variables = {"input": {"channelId": channel_id, **scheduling_input}}
-    data = buffer_request("""
-    mutation CreatePost($input: CreatePostInput!) {
-      createPost(input: $input) {
-        ... on PostActionSuccess { post { id text dueAt status channelId } }
-        ... on MutationError { message }
-      }
-    }
-    """, variables, token)
-    payload = data.get("data", {}).get("createPost") or {}
-    if "message" in payload:
-        raise RuntimeError(f"Buffer error: {payload['message']}")
-    post = payload.get("post") or {}
-    post_id = str(post.get("id", ""))
-    if not post_id:
-        raise RuntimeError("Buffer: no post id returned")
-    return post_id, post
-
-
-def publish(post_file: Path, *, mode: str = "now", dry_run: bool = False,
-            service: str | None = None) -> list[dict]:
-    creds = load_creds(list(REQUIRED_CREDS))
-    all_configured = [c.strip() for c in creds["BUFFER_CHANNEL_IDS"].split(",") if c.strip()]
-    if not all_configured:
-        raise RuntimeError("BUFFER_CHANNEL_IDS is empty")
-    body_raw = extract_body(post_file)
-    body = sanitize(body_raw)
-    if dry_run:
-        print(f"--- DRY RUN: {post_file.name} ---")
-        print(body)
-        svc_label = service or "all"
-        print(f"--- {len(body)} chars, service={svc_label} ---")
-        return []
-    channels = list_channels(creds["BUFFER_ACCESS_TOKEN"])
-    service_map = {}
-    for ch in channels:
-        if ch["id"] in all_configured:
-            svc_raw = (ch.get("service") or "").lower()
-            service_map[ch["id"]] = SERVICE_NORMALIZE.get(svc_raw, svc_raw)
-    if service:
-        channel_ids = [cid for cid, svc in service_map.items() if svc == service]
-        if not channel_ids:
-            raise RuntimeError(f"no Buffer channel configured for service '{service}'")
-    else:
-        channel_ids = all_configured
-    banner_url = _read_banner_url(post_file)
-    assets = None
-    if banner_url:
-        assets = [{"image": {"url": banner_url}}]
-        print(f"  banner: {banner_url}")
-    else:
-        banner_path = _read_banner_rel(post_file)
-        if banner_path:
-            print(f"  banner NOT uploaded: file at {banner_path}")
-            print(f"    set ASSETS_BASE_URL env var or check file exists")
-        else:
-            print(f"  no banner in frontmatter")
-    token = creds["BUFFER_ACCESS_TOKEN"]
-    results = []
-    for cid in channel_ids:
-        svc = service_map.get(cid, "unknown")
-        post_id, _ = create_post(token, cid, body, mode=mode, assets=assets)
-        results.append({"channel_id": cid, "service": svc, "post_id": post_id})
-        print(f"  {svc:9s} ({cid}): post {post_id}")
-    return results
+def delete_post(post_id: str) -> bool:
+    with _get_mcp_client() as mcp:
+        result = mcp.call_tool("use_buffer_api", {
+            "action": "deletePost",
+            "payload": {"postId": post_id},
+        })
+        typename = (result.get("data") or {}).get("deletePost", {}).get("__typename", "")
+        return typename == "DeletePostSuccess"
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Publish to Buffer")
-    parser.add_argument("post_file", help="Path to queue file")
-    parser.add_argument("--queue", action="store_true", help="Add to queue")
+    global VAULT, READY_DIR, POSTED_DIR, ENV_FILE
+    parser = argparse.ArgumentParser(description="Publish to Buffer via MCP")
+    parser.add_argument("post_file", nargs="?", help="Path to draft file")
+    parser.add_argument("--list-channels", action="store_true",
+                        help="List available Buffer channels")
+    parser.add_argument("--delete", metavar="POST_ID",
+                        help="Delete a Buffer post by ID")
+    parser.add_argument("--queue", action="store_true",
+                        help="Add to queue instead of posting now")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--yes", action="store_true")
+    parser.add_argument("--vault", help="SpielOS vault root")
     args = parser.parse_args()
+
+    if args.vault:
+        v = Path(args.vault).expanduser().resolve()
+        if (v / "team" / "strategist.md").is_file():
+            set_vault(v)
+            VAULT = common.VAULT
+            READY_DIR = common.READY_DIR
+            POSTED_DIR = common.POSTED_DIR
+            ENV_FILE = common.ENV_FILE
+        else:
+            print(f"ERROR: {v} is not a SpielOS vault (no team/strategist.md)", file=sys.stderr)
+            return 3
+
+    if args.list_channels:
+        channels = list_channels()
+        if not channels:
+            print("No channels found.")
+            return 0
+        for ch in channels:
+            sid = ch.get("id", "?")
+            svc = ch.get("service", "?")
+            name = ch.get("name", "?")
+            locked = " 🔒" if ch.get("isLocked") else ""
+            print(f"  {svc:10s} {sid}  {name}{locked}")
+        return 0
+
+    if args.delete:
+        ok = delete_post(args.delete)
+        if ok:
+            print(f"  ✓ deleted post {args.delete}")
+            return 0
+        else:
+            print(f"  ✗ failed to delete post {args.delete}", file=sys.stderr)
+            return 1
+
+    if not args.post_file:
+        parser.print_help()
+        return 1
+
     post_file = Path(args.post_file)
     if not post_file.is_absolute():
-        post_file = READY_DIR / post_file.name if not post_file.exists() else post_file
+        resolved = READY_DIR / post_file.name
+        if resolved.exists():
+            post_file = resolved
+
     if not post_file.exists():
-        print(f"ERROR: not found: {post_file}")
+        print(f"ERROR: not found: {post_file}", file=sys.stderr)
         return 1
-    # Gate enforcement: refuse to publish a draft that failed tools/editor.py
+
     ok, gate_msg = check_gates_verdict(post_file)
     if not ok:
         print(f"ERROR: refusing to publish: {gate_msg}", file=sys.stderr)
         return 1
-    if not args.yes and not args.dry_run:
+
+    if args.dry_run:
+        body = extract_body(post_file)
         try:
-            confirm = input(f"Post {post_file.name} via Buffer? (y/N): ")
+            platform = _read_platform(post_file)
+        except ValueError as e:
+            print(f"ERROR: {e}", file=sys.stderr)
+            return 1
+        service = PLATFORM_TO_SERVICE.get(platform, platform)
+        print(f"--- DRY RUN: {post_file.name} ---")
+        print(f"  platform: {service} (via Buffer MCP)")
+        print(f"  body ({len(body)} chars):")
+        print(body[:500] + ("..." if len(body) > 500 else ""))
+        print(f"---")
+        return 0
+
+    if not args.yes:
+        try:
+            platform = _read_platform(post_file)
+            service = PLATFORM_TO_SERVICE.get(platform, platform)
+            confirm = input(f"Post {post_file.name} to {service} via Buffer? (y/N): ")
         except EOFError:
             confirm = "y"
+        except ValueError as e:
+            print(f"ERROR: {e}", file=sys.stderr)
+            return 1
         if confirm.lower() not in ("y", "yes"):
             print("Cancelled.")
             return 0
+
     mode = "queue" if args.queue else "now"
     try:
-        results = publish(post_file, mode=mode, dry_run=args.dry_run)
-    except Exception as e:
+        result = publish_via_mcp(post_file, mode=mode)
+    except MCPError as e:
         print(f"ERROR: {e}", file=sys.stderr)
         return 1
-    if results:
-        try:
-            archived = archive(post_file, results, extract_body(post_file), mode)
-            print(f"  archived: {archived.relative_to(VAULT)}")
-        except Exception as e:
-            print(f"WARN: archive failed: {e}", file=sys.stderr)
+
+    post_id = result["post_id"]
+    print(f"  posted to {result['service']}: post_id={post_id}")
+    if args.queue:
+        print(f"  (queued — scheduled for later delivery)")
+
+    try:
+        body = extract_body(post_file)
+        fm, _ = __import__("_common", fromlist=["parse_frontmatter"]).parse_frontmatter(
+            post_file.read_text()
+        )
+        fm["status"] = "posted"
+        fm["posted_at"] = datetime.now().isoformat(timespec="seconds")
+        fm["buffer_post_id"] = post_id
+        fm["buffer_channel_id"] = result["channel_id"]
+        fm["buffer_mode"] = mode
+        fm["body"] = body
+        posted = POSTED_DIR / post_file.name
+        posted.parent.mkdir(parents=True, exist_ok=True)
+        write_frontmatter(posted, fm, body)
+        post_file.unlink(missing_ok=True)
+        print(f"  archived: content/posted/{post_file.name}")
+    except Exception as e:
+        print(f"  WARN: archive failed: {e}", file=sys.stderr)
+
     return 0
 
 
