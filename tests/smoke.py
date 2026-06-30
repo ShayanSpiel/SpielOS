@@ -99,7 +99,11 @@ platform: x
 status: ready
 source: content/current.md
 reader: founders
+pain: big code hides the actual customer problem
+belief: shipping should stay close to the work
 point: small files beat big
+meaning: smaller surfaces make the work easier to explain
+proof: session shipped v2 with one focused artifact
 angle: delete more
 ---
 
@@ -258,7 +262,9 @@ def test_sync_adapters() -> None:
         ".agents/plugins/marketplace.json",
     ]:
         check(f"  {path} exists", (ROOT / path).exists())
-    check("  Codex plugin skill is NOT packaged",
+    check("  Codex setup skill is packaged",
+          (ROOT / "plugins" / "spielos" / "skills" / "spiel-setup" / "SKILL.md").exists())
+    check("  Codex duplicated post skill is NOT packaged",
           not (ROOT / "plugins" / "spielos" / "skills" / "spiel-post" / "SKILL.md").exists())
     # Legacy/archived skills must NOT be in generated adapters
     check("  legacy skill format_wizard NOT generated",
@@ -285,7 +291,9 @@ def test_post_runtime() -> None:
     try:
         plugin = json.loads((ROOT / "plugins" / "spielos" / ".codex-plugin" / "plugin.json").read_text())
         check("Codex plugin manifest name", plugin.get("name") == "spielos")
-        check("Codex plugin does not expose duplicated skills", "skills" not in plugin)
+        check("Codex plugin does not expose duplicated pipeline skills", "skills" not in plugin)
+        check("Codex plugin default prompt leads with setup",
+              plugin.get("interface", {}).get("defaultPrompt", [""])[0].startswith("Set up SpielOS"))
     except Exception as e:
         check("Codex plugin manifest readable", False, str(e))
 

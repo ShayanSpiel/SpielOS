@@ -323,47 +323,50 @@ def emit_mcp() -> int:
 
 def _toml_agent(name: str, description: str, body: str) -> str:
     """Build a Codex agent TOML file from name + description + markdown body."""
-    import yaml
-    # Escape any triple-quotes in the body to avoid breaking the TOML literal.
-    safe_body = body.replace('"""', '\\"\\"\\"')
     return (
-        f'name = "{name}"\n'
-        f'description = "{description}"\n'
-        f'developer_instructions = """\n'
-        f'{safe_body}\n'
-        f'"""\n'
+        f"name = {json.dumps(name, ensure_ascii=False)}\n"
+        f"description = {json.dumps(description, ensure_ascii=False)}\n"
+        f"developer_instructions = {json.dumps(body, ensure_ascii=False)}\n"
     )
 
 
 CODEX_POST_DESCRIPTION = (
-    "Start a content run. The deterministic UserPromptSubmit hook "
-    "(plugins/spielos/hooks.json) runs first for topic/@file: invocations. "
-    "This agent handles session mode (compile transcript, run spiel post "
-    "--mode session) and advances the pipeline via spiel next for both modes. "
-    "See team/post.md for details."
+    "Thin Codex wrapper for the canonical SpielOS /post command in team/post.md."
 )
 
 
-def _build_codex_post_toml_template() -> str:
-    """Read the canonical Codex `post` subagent TOML template.
+def _codex_post_body() -> str:
+    """Build Codex's post wrapper from the canonical team/post.md command."""
+    post = TEAM_DIR / "post.md"
+    if not post.is_file():
+        return (
+            "# /post\n\n"
+            "Canonical command missing at `team/post.md`. Stop and ask the user "
+            "to run `spiel doctor`.\n"
+        )
+    _role_name, _description, _fm, body = role_metadata(post)
+    canonical = templated_text(body)
+    return (
+        "# /post\n\n"
+        "This Codex agent is a thin adapter. The product behavior below is copied "
+        "from the canonical `team/post.md` command at sync time. Do not add a "
+        "separate Codex pipeline model here.\n\n"
+        "Codex-specific dispatch rule: when the canonical command says to invoke "
+        "the next role, use the Codex subagent/task dispatch tool for exactly the "
+        "role returned by `spiel next`. If Codex requires a parent dispatcher, the "
+        "parent may run `spiel next` and dispatch the returned role, but it must "
+        "not reinterpret, skip, or duplicate any role contract.\n\n"
+        "--- canonical team/post.md ---\n\n"
+        f"{canonical}"
+    )
 
-    The canonical source `adapters/codex/agents/post.toml` is already in
-    Codex-compatible TOML form. Keep its `{vault_root}` placeholders intact
-    in the source tree. Installed copies are templated separately. If the
-    file is missing for any reason, fall back to a
-    minimal safe body.
-    """
-    canonical = ADAPTERS_DIR / "codex" / "agents" / "post.toml"
-    if canonical.is_file():
-        return canonical.read_text(encoding="utf-8")
+
+def _build_codex_post_toml_template() -> str:
+    """Build the Codex `post` TOML from the canonical post command."""
     return _toml_agent(
         name="post",
         description=CODEX_POST_DESCRIPTION,
-        body=(
-            "# /post\n\n"
-            "Deterministic runtime already initialized. Read content/.state.json, "
-            "run `spiel next`, and invoke the role it returns.\n"
-        ),
+        body=_codex_post_body(),
     )
 
 
@@ -391,8 +394,9 @@ def emit_codex() -> int:
         toml = _toml_agent(src.stem, description, body_with_vault)
         (agents_target / f"{src.stem}.toml").write_text(toml, encoding="utf-8")
         count += 1
-    # Post dispatcher template. Keep placeholders in adapters/ so this file
-    # can be copied to a different vault without baking this machine's path.
+    # Post dispatcher generated from team/post.md. Keep placeholders in
+    # adapters/ so this file can be copied to a different vault without
+    # baking this machine's path.
     post_toml = CODEX_POST_TOML_TEMPLATE
     (agents_target / "post.toml").write_text(post_toml, encoding="utf-8")
     count += 1
@@ -860,15 +864,20 @@ def _collect_installed_paths() -> dict[Path, str]:
     _walk(CLAUDE_CONFIG, ["agents", "skills", "commands"], "claude")
     # Codex: agents/ + plugin cache hooks/scripts
     _walk(CODEX_CONFIG, ["agents", "commands"], "codex")
-    # Codex plugin cache: hooks.json + scripts/post-hook.sh inside each
+    # Codex plugin cache: managed plugin files inside each
     # <marketplace>/<plugin>/<version>/.
     codex_cache = CODEX_CONFIG / "plugins" / "cache"
     if codex_cache.is_dir():
         for plugin_dir in codex_cache.glob("*/spielos/*"):
             if not plugin_dir.is_dir():
                 continue
-            for hook_file in ("hooks.json", "scripts/post-hook.sh"):
-                p = plugin_dir / hook_file
+            for managed_file in (
+                "hooks.json",
+                "scripts/post-hook.sh",
+                ".codex-plugin/plugin.json",
+                "skills/spiel-setup/SKILL.md",
+            ):
+                p = plugin_dir / managed_file
                 if p.is_file():
                     try:
                         out[p] = p.read_text(encoding="utf-8")
@@ -992,7 +1001,7 @@ def _expected_content() -> dict[Path, str]:
             )
         expected[CODEX_CONFIG / "agents" / "post.toml"] = CODEX_POST_TOML
 
-    # Codex plugin cache: hooks.json + scripts/post-hook.sh mirror.
+    # Codex plugin cache: hook/script/manifest/assets/setup skill mirror.
     # We register both files against the canonical bytes. The install
     # step copies the canonical content directly (chmod +x for the
     # script), so the on-disk bytes match the canonical bytes modulo
@@ -1001,8 +1010,12 @@ def _expected_content() -> dict[Path, str]:
     if codex_cache.is_dir():
         canonical_hooks = VAULT / "plugins" / "spielos" / "hooks.json"
         canonical_script = VAULT / "plugins" / "spielos" / "scripts" / "post-hook.sh"
+        canonical_plugin_json = VAULT / "plugins" / "spielos" / ".codex-plugin" / "plugin.json"
+        canonical_setup_skill = VAULT / "plugins" / "spielos" / "skills" / "spiel-setup" / "SKILL.md"
         hooks_text = canonical_hooks.read_text(encoding="utf-8") if canonical_hooks.is_file() else None
         script_text = canonical_script.read_text(encoding="utf-8") if canonical_script.is_file() else None
+        plugin_json_text = canonical_plugin_json.read_text(encoding="utf-8") if canonical_plugin_json.is_file() else None
+        setup_skill_text = canonical_setup_skill.read_text(encoding="utf-8") if canonical_setup_skill.is_file() else None
         for plugin_dir in codex_cache.glob("*/spielos/*"):
             if not plugin_dir.is_dir():
                 continue
@@ -1010,6 +1023,10 @@ def _expected_content() -> dict[Path, str]:
                 expected[plugin_dir / "hooks.json"] = hooks_text
             if script_text is not None:
                 expected[plugin_dir / "scripts" / "post-hook.sh"] = script_text
+            if plugin_json_text is not None:
+                expected[plugin_dir / ".codex-plugin" / "plugin.json"] = plugin_json_text
+            if setup_skill_text is not None:
+                expected[plugin_dir / "skills" / "spiel-setup" / "SKILL.md"] = templated_text(setup_skill_text)
 
     return expected
 

@@ -86,12 +86,15 @@ def run_simulator(args: list[str], vault: Path) -> subprocess.CompletedProcess:
 def write_world_args() -> list[str]:
     return [
         "write",
-        "--worldview", "The ICP is a founder who keeps shipping but never sees attention. They believe more output leads to more growth. They're tired of generic growth advice.",
-        "--failure-belief", "The ICP believes that more posts and more content will eventually produce predictable attention and growth.",
-        "--failure-consequence", "They keep shipping more and posting more, but the distribution stays flat. Their attention is treated as effort-output, not as a system to engineer.",
-        "--failure-mapping", "A better model: distribution is engineered before launch. The right placement, not more output, drives attention. One post in the right wave beats ten posts in the void.",
+        "--reader", "A founder who keeps shipping but never sees attention. They are tired of generic growth advice.",
+        "--belief", "More posts and more content will eventually produce predictable attention and growth.",
+        "--pain", "They keep shipping more and posting more, but distribution stays flat because attention is treated as effort-output, not as a system to engineer.",
+        "--point", "Distribution is engineered before launch. The right placement, not more output, drives attention. One post in the right wave beats ten posts in the void.",
+        "--proof", "6-7 min average sessions",
+        "--proof", "300 visitors from a single placed post",
         "--meaning", "The ICP walks away believing that placement beats more output, and that distribution is a system you engineer, not a result you wait for.",
-        "--evidence", "session duration backs the consequence, the decision to place inside an active attention wave backs the mapping, 6-7 min average sessions back the consequence, 300 visitors from a single placed post backs the mapping",
+        "--example-pattern", "Example 5 (contrarian: not more output but better placement)",
+        "--axis", "systemic",
     ]
 
 
@@ -118,12 +121,14 @@ def test_write_pass() -> None:
     out = vault / "content" / ".icp-world.json"
     check(".icp-world.json was created", out.is_file(), f"path: {out}")
     data = json.loads(out.read_text(encoding="utf-8"))
-    check("worldview field present", bool(data.get("worldview")))
-    check("failure_mode.belief present", bool(data.get("failure_mode", {}).get("belief")))
-    check("failure_mode.consequence present", bool(data.get("failure_mode", {}).get("consequence")))
-    check("failure_mode.mapping present", bool(data.get("failure_mode", {}).get("mapping")))
+    check("reader field present", bool(data.get("reader")))
+    check("belief field present", bool(data.get("belief")))
+    check("pain field present", bool(data.get("pain")))
+    check("point field present", bool(data.get("point")))
+    check("proof field present", bool(data.get("proof")))
     check("meaning field present", bool(data.get("meaning")))
-    check("evidence field present", bool(data.get("evidence")))
+    check("example_pattern field present", bool(data.get("example_pattern")))
+    check("axis field present", data.get("axis") == "systemic")
 
 
 def test_write_atomic() -> None:
@@ -152,12 +157,9 @@ def test_write_empty_field() -> None:
     print("\n[5] simulator write: empty field rejected")
     vault = fresh_vault()
     args = write_world_args()
-    # Replace the --worldview value with an empty string by injecting it
-    # via replacement: --worldview "" — but CLI requires non-empty. Use a
-    # very short space instead.
-    args[args.index("--worldview") + 1] = "  "
+    args[args.index("--reader") + 1] = "  "
     r = run_simulator(args, vault)
-    check("write exits 1 on empty worldview", r.returncode == 1, f"stderr: {r.stderr[:200]}")
+    check("write exits 1 on empty reader", r.returncode == 1, f"stderr: {r.stderr[:200]}")
 
 
 def test_check_pass() -> None:
@@ -184,7 +186,7 @@ def test_read() -> None:
     check("read exits 0", r.returncode == 0, f"stderr: {r.stderr[:200]}")
     data = json.loads(r.stdout)
     check("output is valid JSON", isinstance(data, dict))
-    check("JSON has worldview", bool(data.get("worldview")))
+    check("JSON has reader", bool(data.get("reader")))
 
 
 # ─── Runner ─────────────────────────────────────────────────────────────

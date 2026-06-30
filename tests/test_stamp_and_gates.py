@@ -72,7 +72,11 @@ platform: x
 status: draft
 source: content/current.md
 reader: founders
+pain: big code hides the customer problem
+belief: shipping more is the same as earning attention
 point: small files beat big
+meaning: smaller surfaces make the work easier to explain
+proof: session showed one focused artifact was easier to place
 angle: delete more
 ---
 
@@ -197,7 +201,8 @@ def test_check_gates_verdict_pending() -> None:
 def write_brief(vault: Path, *, mode: str = "session", pain: str = "default", point: str = "default",
                 meaning: str = "Builders learn that placement beats more output.",
                 proof: str = '["sample proof with 6-7 min sessions"]',
-                trace_axis: str = "systemic") -> Path:
+                trace_axis: str = "systemic",
+                example_pattern: str = "launch placement pattern") -> Path:
     brief = vault / "content" / "current.md"
     brief.parent.mkdir(parents=True, exist_ok=True)
     brief.write_text(f"""---
@@ -219,6 +224,8 @@ point: {point}
 proof: {proof}
 meaning: {meaning}
 angle: Test angle
+belief: Shipping more is the same as earning attention
+example_pattern: {example_pattern}
 formats: ["x", "linkedin", "blog"]
 
 ## Trace
@@ -237,14 +244,16 @@ def write_icp_world(vault: Path, *, consequence: str = "default consequence", ma
     p = vault / "content" / ".icp-world.json"
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(json.dumps({
-        "worldview": "Test worldview",
-        "failure_mode": {
-            "belief": "Test belief",
-            "consequence": consequence,
-            "mapping": mapping,
-        },
+        "reader": "Test reader",
+        "belief": "Shipping more is the same as earning attention",
+        "pain": consequence,
+        "point": mapping,
+        "proof": ["session, 6-7 min, traffic"],
         "meaning": "Test meaning",
-        "evidence": "session, 6-7 min, traffic",
+        "example_pattern": "launch placement pattern",
+        "axis": "systemic",
+        "created_at": "2026-06-28T00:00:00",
+        "source": "content/current.md",
     }))
     return p
 
@@ -290,8 +299,8 @@ def test_grounding_fail_no_simulator() -> None:
     check("grounding_check exits 1 on missing simulator", r.returncode == 1, f"stderr: {r.stderr[:300]}")
 
 
-def test_grounding_fail_pain_no_trace() -> None:
-    print("\n[9] grounding_check: fail case (brief's pain doesn't trace to consequence)")
+def test_grounding_fail_missing_example_pattern() -> None:
+    print("\n[9] grounding_check: fail case (missing example_pattern)")
     vault = fresh_vault()
     write_icp_world(
         vault,
@@ -301,12 +310,13 @@ def test_grounding_fail_pain_no_trace() -> None:
     write_brief(
         vault,
         mode="session",
-        pain="Something completely unrelated to the simulator's consequence",
+        pain="Distribution stays flat because attention is treated as effort-output not a system.",
         point="Distribution is engineered before launch. Placement beats more output.",
         meaning="Test meaning",
+        example_pattern="",
     )
     r = run_editor_brief(["check-brief"], vault)
-    check("grounding_check exits 1 on pain-trace failure", r.returncode == 1, f"stderr: {r.stderr[:300]}")
+    check("grounding_check exits 1 on missing example_pattern", r.returncode == 1, f"stderr: {r.stderr[:300]}")
 
 
 def test_grounding_fail_proof_has_build_log() -> None:
@@ -326,8 +336,13 @@ def test_grounding_fail_proof_has_build_log() -> None:
 
 
 def test_grounding_pass_topic_mode() -> None:
-    print("\n[11] grounding_check: pass case (topic mode, no simulator, proof has ICP marker)")
+    print("\n[11] grounding_check: pass case (topic mode, simulator present, proof has ICP marker)")
     vault = fresh_vault()
+    write_icp_world(
+        vault,
+        consequence="Founders keep posting more but distribution stays flat",
+        mapping="Distribution is engineered before launch. Placement beats more output.",
+    )
     write_brief(
         vault,
         mode="topic",
@@ -353,7 +368,7 @@ def main() -> int:
     test_check_gates_verdict_pending()
     test_grounding_pass_session()
     test_grounding_fail_no_simulator()
-    test_grounding_fail_pain_no_trace()
+    test_grounding_fail_missing_example_pattern()
     test_grounding_fail_proof_has_build_log()
     test_grounding_pass_topic_mode()
     print(f"\n{PASS} passed, {FAIL} failed")

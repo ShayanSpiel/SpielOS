@@ -46,6 +46,9 @@ adapters/codex/**/*.toml
 adapters/codex/**/*.md
 adapters/mcp/server.json
 skills/
+!plugins/spielos/skills/
+!plugins/spielos/skills/spiel-setup/
+!plugins/spielos/skills/spiel-setup/SKILL.md
 
 # Posts
 content/drafts/*.md

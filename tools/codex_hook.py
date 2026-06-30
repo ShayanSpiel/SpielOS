@@ -88,15 +88,33 @@ def extract_run_id(output: str) -> str | None:
     return None
 
 
+def setup_cta() -> str:
+    return (
+        "[spiel post] SpielOS is installed in Codex, but no vault is set up yet.\n\n"
+        "SpielOS needs one vault folder for strategy files and generated content.\n"
+        "Use the Codex prompt \"Set up SpielOS in ~/SpielOS\", or run:\n\n"
+        "  SPIELOS_INSTALL_DIR=\"$HOME/SpielOS\" bash <(curl -fsSL https://spielos.xyz/install)\n\n"
+        "If you already have a vault, run:\n\n"
+        "  spiel set-vault /path/to/your/SpielOS\n\n"
+        "After setup finishes, /post will save to that vault from any Codex project.\n"
+    )
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="SpielOS Codex hook")
     ap.add_argument("--vault", help="SpielOS vault root")
     args = ap.parse_args()
     start = now_ms()
 
+    if args.vault:
+        explicit_vault = Path(args.vault).expanduser()
+        if not (explicit_vault / "team" / "strategist.md").is_file():
+            sys.stdout.write(setup_cta())
+            return 0
+
     vault = resolve_vault(args.vault)
     if not vault:
-        sys.stdout.write("[spiel post] hook could not resolve vault. Run `spiel doctor`.\n")
+        sys.stdout.write(setup_cta())
         return 0
 
     raw_payload = sys.stdin.read()
@@ -124,11 +142,14 @@ def main() -> int:
             "1. Compile the visible Codex conversation into two files:\n"
             "   - /tmp/spiel-capture.md  (clean user/assistant text only, no tool noise)\n"
             "   - /tmp/spiel-capture.json  (decision, number, lesson, pattern, ship, summary, tags)\n"
-            "2. Run: spiel post --mode session "
+            "2. Run: SPIELOS_ADAPTER=codex SPIELOS_INVOKED_BY=post-agent "
+            "SPIELOS_TRANSCRIPT_SOURCE=live_conversation_llm_compiled "
+            "spiel post --mode session "
             "--transcript-file /tmp/spiel-capture.md "
             "--structured-json /tmp/spiel-capture.json "
             "--title \"<short session title>\" --tags \"build,ship\"\n"
-            "3. Run the Codex orchestration loop from the post agent.\n\n"
+            "3. Follow the canonical team/post.md command and dispatch the next "
+            "role returned by `spiel next`.\n\n"
             "Do not ask the user for a topic. Bare @post is always session mode. "
             "Never write drafts from @post.\n"
         )
@@ -137,6 +158,9 @@ def main() -> int:
     cmd = [str(vault / "bin" / "spiel"), "post", topic]
     env = os.environ.copy()
     env["VAULT_DIR"] = str(vault)
+    env["SPIELOS_ADAPTER"] = "codex"
+    env["SPIELOS_INVOKED_BY"] = "hook"
+    env["SPIELOS_TRANSCRIPT_SOURCE"] = "prompt"
     proc = subprocess.run(cmd, cwd=vault, env=env, text=True, capture_output=True)
     output = (proc.stdout or "").strip()
     error = (proc.stderr or "").strip()
@@ -154,7 +178,7 @@ def main() -> int:
     sys.stdout.write(
         "[spiel post] deterministic runtime started.\n\n"
         f"{output}\n\n"
-        "Next: run the Codex orchestration loop from the post agent. Never write drafts from @post.\n"
+        "Next: follow team/post.md and dispatch the role returned by `spiel next`. Never write drafts from @post.\n"
     )
     return 0
 

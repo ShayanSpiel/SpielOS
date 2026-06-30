@@ -127,6 +127,13 @@ def _render_frontmatter(args: argparse.Namespace, date_str: str, message_count: 
     tags_yaml = "[" + ", ".join(_yaml_quote(t) for t in tags) + "]"
     summary = (args.summary or "").strip().replace('"', '\\"')
     summary_line = f"summary: \"{summary}\"" if summary else "summary: \"\""
+    adapter = (args.adapter or os.environ.get("SPIELOS_ADAPTER") or "unknown").strip() or "unknown"
+    invoked_by = (args.invoked_by or os.environ.get("SPIELOS_INVOKED_BY") or "unknown").strip() or "unknown"
+    transcript_source = (
+        args.transcript_source
+        or os.environ.get("SPIELOS_TRANSCRIPT_SOURCE")
+        or "live_conversation_llm_compiled"
+    ).strip() or "live_conversation_llm_compiled"
 
     # 5 signal fields from structured input (the strategist's quick-read).
     # Per system/session-schema.md: decision, number, lesson, pattern, ship.
@@ -154,6 +161,9 @@ def _render_frontmatter(args: argparse.Namespace, date_str: str, message_count: 
         _signal("ship"),
         summary_line,
         f"captured_by: capture-session.py",
+        f"adapter: {_yaml_quote(adapter)}",
+        f"invoked_by: {_yaml_quote(invoked_by)}",
+        f"transcript_source: {_yaml_quote(transcript_source)}",
         f"captured_at: {datetime.now().isoformat(timespec='seconds')}",
         f"message_count: {message_count}",
         "---",
@@ -297,6 +307,9 @@ def main() -> int:
                     help="Status flag (default: in-progress)")
     ap.add_argument("--tags", help="Comma-separated tags, e.g. 's2,build,refactor'")
     ap.add_argument("--summary", help="One-line summary the LLM extracted")
+    ap.add_argument("--adapter", help="Adapter that initiated capture, e.g. codex/opencode/cursor/claude")
+    ap.add_argument("--invoked-by", help="Surface that invoked capture, e.g. post-agent/hook/command")
+    ap.add_argument("--transcript-source", help="Where the transcript came from")
     ap.add_argument("--structured-json",
                     help="Optional JSON with pre-extracted Patterns/Decisions/etc. sections")
     ap.add_argument("--out", help="Override output path (default: <vault>/content/sessions/<date>-session-current.md)")

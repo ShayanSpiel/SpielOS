@@ -407,6 +407,8 @@ The Codex path is the only one with a true deterministic surface. On all other I
 
 First-time Codex hook install: the hook is bundled in the plugin cache at `~/.codex/plugins/cache/<marketplace>/spielos/<version>/hooks.json`. Codex will ask the user to **trust** the new hook the first time it fires (Codex CLI: `/hooks`). Until trusted, the hook is skipped and the LLM-prompted `post.toml` agent takes over (and may behave unreliably for bare `/post`).
 
+Plugin install is not vault setup. If the Codex plugin is installed before the user runs the curl installer, `/post` must stop with a setup CTA and must not create files in the current project. The setup path is separate: `Set up SpielOS in ~/SpielOS` (plugin setup skill) or `SPIELOS_INSTALL_DIR="$HOME/SpielOS" bash <(curl -fsSL https://spielos.xyz/install)`. `/post` assumes a vault resolves and only runs the content pipeline.
+
 ### Install env vars
 
 | Var | Default | What |

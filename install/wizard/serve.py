@@ -1049,6 +1049,7 @@ def bootstrap_vault(target: Path, source: Path | None = None) -> None:
         "content", "content/sessions", "content/drafts", "content/ready",
         "content/posted", "content/rejected",
         "content/runs",
+        "plugins", "plugins/spielos", "plugins/spielos/skills", "plugins/spielos/skills/spiel-setup",
         "archive", "archive/roles", "archive/skills",
         "install", "install/wizard", "install/wizard/skeletons",
     ]
@@ -1060,7 +1061,7 @@ def bootstrap_vault(target: Path, source: Path | None = None) -> None:
         "team/strategist.md", "team/writer.md",
         "team/editor.md", "team/publisher.md", "team/post.md", "team/README.md",
         # System
-        "system/pipeline.md", "system/draft-schema.md", "system/run-state.md", "system/session-schema.md", "system/rules.yaml",
+        "system/pipeline.md", "system/draft-schema.md", "system/run-state.md", "system/session-schema.md", "system/setup.md", "system/rules.yaml",
         "system/brand.md", "system/brand.json",
         # Strategy skeletons (user will edit via wizard)
         "strategy/audience.md", "strategy/offer.md",
@@ -1090,6 +1091,7 @@ def bootstrap_vault(target: Path, source: Path | None = None) -> None:
         "plugins/spielos/.codex-plugin/plugin.json",
         "plugins/spielos/hooks.json",
         "plugins/spielos/scripts/post-hook.sh",
+        "plugins/spielos/skills/spiel-setup/SKILL.md",
         "plugins/spielos/assets/icon.png",
         "plugins/spielos/assets/logo.png",
         "plugins/spielos/assets/logo-dark.png",

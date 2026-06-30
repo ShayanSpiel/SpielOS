@@ -12,5 +12,14 @@ if command -v spiel >/dev/null 2>&1; then
   exec spiel codex-hook
 fi
 
-echo "[spiel post] spiel shim not found. Run the SpielOS installer or add ~/.local/bin to PATH."
+cat <<'MSG'
+[spiel post] SpielOS is installed in Codex, but no vault is set up yet.
+
+SpielOS needs one vault folder for strategy files and generated content.
+Use the Codex prompt "Set up SpielOS in ~/SpielOS", or run:
+
+  SPIELOS_INSTALL_DIR="$HOME/SpielOS" bash <(curl -fsSL https://spielos.xyz/install)
+
+After setup finishes, /post will save to that vault from any Codex project.
+MSG
 exit 0

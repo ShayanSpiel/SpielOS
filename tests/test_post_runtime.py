@@ -119,6 +119,12 @@ def test_session_post_captures_session_log() -> None:
             str(structured),
             "--title",
             "Runtime stabilization",
+            "--adapter",
+            "codex",
+            "--invoked-by",
+            "post-agent",
+            "--transcript-source",
+            "live_conversation_llm_compiled",
         ],
     )
     assert result.returncode == 0, result.stderr
@@ -134,6 +140,9 @@ def test_session_post_captures_session_log() -> None:
     session_text = session_path.read_text(encoding="utf-8")
     assert "Move orchestration into Python" in session_text
     assert "## Transcript" in session_text
+    assert "adapter: codex" in session_text
+    assert "invoked_by: post-agent" in session_text
+    assert "transcript_source: live_conversation_llm_compiled" in session_text
 
 
 def test_post_allows_untracked_drafts_after_reset() -> None:

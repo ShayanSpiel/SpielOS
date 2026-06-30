@@ -35,6 +35,14 @@ The installer:
 
 For Codex, the first `/post` triggers a one-time prompt to **trust the new hook** (use `/hooks` in Codex CLI). The hook is the only deterministic surface in Codex — it pre-resets state, runs `spiel post` for topic/file invocations, and prints the session-mode recipe for bare `@post`.
 
+If someone installs only the Codex plugin before running the installer, `/post` does not create files in the current project. It stops with a setup CTA. Use the plugin prompt `Set up SpielOS in ~/SpielOS`, or run:
+
+```bash
+SPIELOS_INSTALL_DIR="$HOME/SpielOS" bash <(curl -fsSL https://spielos.xyz/install)
+```
+
+Setup is separate from `/post`: setup creates/selects the vault, `/post` only runs the content pipeline once a vault resolves.
+
 Override the install path: `SPIELOS_INSTALL_DIR=/some/path bash <(curl ...)`. Override the wizard port: `SPIELOS_WIZARD_PORT=8080`. Override the timeout (default 30 min): `SPIELOS_WIZARD_TIMEOUT=300`.
 
 The vault is the directory you ran the installer from. A global config at `~/.config/spielos/config` stores the vault path and is used by `spiel` and all tools — **no cwd walk-up needed**. `/post` content always saves to the vault, even when your IDE is open in a different project.

@@ -150,6 +150,9 @@ def capture_session(
     structured_json: str | None,
     title: str | None,
     tags: str | None,
+    adapter: str | None,
+    invoked_by: str | None,
+    transcript_source: str | None,
 ) -> str:
     if not transcript.strip():
         raise RuntimeError("session transcript is empty")
@@ -168,6 +171,12 @@ def capture_session(
         cmd.extend(["--tags", tags])
     if structured_json:
         cmd.extend(["--structured-json", structured_json])
+    if adapter:
+        cmd.extend(["--adapter", adapter])
+    if invoked_by:
+        cmd.extend(["--invoked-by", invoked_by])
+    if transcript_source:
+        cmd.extend(["--transcript-source", transcript_source])
     result = subprocess.run(cmd, input=transcript, text=True, capture_output=True)
     if result.returncode != 0:
         raise RuntimeError(f"capture-session.py failed: {result.stderr.strip()}")
@@ -221,6 +230,9 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--structured-json", help="Structured session signal JSON from the agent")
     ap.add_argument("--title", help="Session title")
     ap.add_argument("--tags", help="Comma-separated session tags")
+    ap.add_argument("--adapter", help="Adapter that initiated this run, e.g. codex/opencode/cursor/claude")
+    ap.add_argument("--invoked-by", help="Surface that invoked this run, e.g. post-agent/hook/command")
+    ap.add_argument("--transcript-source", help="Where the session transcript came from")
     ap.add_argument("--json", action="store_true", help="Print machine-readable result")
     ap.add_argument("--ignore-guard", action="store_true", help="Start even if guard detects untracked content")
     return ap
@@ -275,7 +287,20 @@ def main() -> int:
                     "The Codex plugin should pass the clean transcript to spiel post."
                 )
             load_structured_json(args.structured_json)
-            session_rel = capture_session(vault, run_id, transcript, args.structured_json, args.title, args.tags)
+            adapter = args.adapter or os.environ.get("SPIELOS_ADAPTER")
+            invoked_by = args.invoked_by or os.environ.get("SPIELOS_INVOKED_BY")
+            transcript_source = args.transcript_source or os.environ.get("SPIELOS_TRANSCRIPT_SOURCE")
+            session_rel = capture_session(
+                vault,
+                run_id,
+                transcript,
+                args.structured_json,
+                args.title,
+                args.tags,
+                adapter,
+                invoked_by,
+                transcript_source,
+            )
             source_abs = str((vault / session_rel).resolve())
             write_current(vault, mode="session", run_id=run_id, source=source_abs, session=session_rel, input_text=None)
             log_event(vault, run_id, "artifact_written", path=str(CURRENT_REL), mode="session", session=session_rel)

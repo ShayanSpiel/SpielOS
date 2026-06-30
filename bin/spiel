@@ -252,7 +252,31 @@ _resolve_vault() {
   (cd "$candidate" && pwd)
 }
 
-VAULT=$(_resolve_vault) || exit 1
+_codex_setup_cta() {
+  cat <<'MSG'
+[spiel post] SpielOS is installed in Codex, but no vault is set up yet.
+
+SpielOS needs one vault folder for strategy files and generated content.
+Use the Codex prompt "Set up SpielOS in ~/SpielOS", or run:
+
+  SPIELOS_INSTALL_DIR="$HOME/SpielOS" bash <(curl -fsSL https://spielos.xyz/install)
+
+If you already have a vault, run:
+
+  spiel set-vault /path/to/your/SpielOS
+
+After setup finishes, /post will save to that vault from any Codex project.
+MSG
+}
+
+if [[ "${1:-}" == "codex-hook" ]]; then
+  if ! VAULT=$(_resolve_vault 2>/dev/null); then
+    _codex_setup_cta
+    exit 0
+  fi
+else
+  VAULT=$(_resolve_vault) || exit 1
+fi
 
 # ── Tarball overlay (fallback for `update` when git pull fails) ────────
 

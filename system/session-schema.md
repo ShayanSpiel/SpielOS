@@ -19,6 +19,9 @@ pattern: <one recurring signal observed>
 ship: <one thing that now exists that did not before>
 status: complete | in-progress
 captured_by: capture-session.py
+adapter: codex | opencode | cursor | claude | unknown
+invoked_by: hook | post-agent | command | unknown
+transcript_source: live_conversation_llm_compiled | prompt | unknown
 captured_at: 2026-06-26T12:00:00
 message_count: <n>
 tags: [build, ship]
@@ -67,6 +70,8 @@ The Transcript section is the appendix. The 6 body sections above it are the str
 2. `spiel post --mode session` calls `tools/capture-session.py` which writes `content/sessions/YYYY-MM-DD-session-current.md` atomically.
 3. `tools/post.py` writes `content/current.md` pointing to that path, initializes `content/.state.json`, and advances to `strategy`.
 4. The pipeline continues to the Strategist.
+
+The provenance fields (`adapter`, `invoked_by`, `transcript_source`) are audit metadata. They identify which IDE surface initiated capture and prevent guessing from hook logs or timestamps.
 
 ## Topic mode
 

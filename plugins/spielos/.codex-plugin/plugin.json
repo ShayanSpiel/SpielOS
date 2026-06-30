@@ -1,7 +1,7 @@
 {
   "name": "spielos",
   "version": "1.0.0",
-  "description": "Turn coding sessions into publishable posts, threads, and blog drafts without leaving your agent workflow.",
+  "description": "Set up one SpielOS vault, then turn coding sessions into publishable posts, threads, and blog drafts.",
   "author": {
     "name": "SpielOS",
     "url": "https://github.com/ShayanSpiel/SpielOS"
@@ -24,8 +24,8 @@
   ],
   "interface": {
     "displayName": "SpielOS",
-    "shortDescription": "Build sessions → Publishable content.",
-    "longDescription": "SpielOS is a session-as-content infrastructure for founders and builders. It captures your actual build sessions—coding, debugging, shipping—and extracts publish-ready posts for X, LinkedIn, and your blog. No context switching. No content creation. You stay in builder mode; the pipeline handles distribution.",
+    "shortDescription": "Set up a vault, then ship posts from build sessions.",
+    "longDescription": "Start by setting up a SpielOS vault, the folder where your strategy files and generated content live. After setup, /post turns actual build sessions, debugging, shipping, or topic notes into publish-ready drafts for X, LinkedIn, and your blog. The plugin stays a thin Codex entry surface while the vault runtime owns the pipeline.",
     "developerName": "SpielOS",
     "category": "Productivity",
     "capabilities": ["Interactive", "Write"],
@@ -36,9 +36,9 @@
     "logoDark": "./assets/logo-dark.png",
     "screenshots": [],
     "defaultPrompt": [
-      "Write v2 announcement post.",
-      "Read this PDF and turn it into an X thread.",
-      "@post {no args}, turns session into posts."
+      "Set up SpielOS in ~/SpielOS",
+      "/post",
+      "/post Write a v2 announcement post."
     ]
   }
 }
