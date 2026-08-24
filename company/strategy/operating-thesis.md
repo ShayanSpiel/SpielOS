@@ -1,7 +1,7 @@
 # Operating thesis
 
-SpielOS is built by operating SpielOS. The company harness is simultaneously
-the product, delivery system, proof, content source, credibility, and positioning.
-Departments publish from real run evidence, Analytics measures the result, and
-the Director feeds valid learning back into goals. Never manufacture proof or
-turn technical-only tests into market claims.
+## Operating thesis
+
+Replace with the one-paragraph thesis of how your company creates value:
+what you run autonomously, what stays human, and how proof is produced as a
+byproduct of operating.

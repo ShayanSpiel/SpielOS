@@ -106,11 +106,9 @@ the 2026-08-22 Cal retirement): a small icon-only call CTA (`data-cal-link`
 opening Cal's native embed popup) is allowed on the Contact page and in the
 Apply "Not sure?" section beside "Start a Review" — never as a primary CTA,
 never a required-call step. Do not expand booking CTAs to other pages without
-a new owner directive. The two services are AI DeSlopping (fix broken AI-built
-software) and AI Workers (hand repetitive work to AI), sold at $2,990/month
-with one active build at a time. The Live page is proof ("WE RUN ON AI
-OURSELVES"), framed as credibility, not a conversion destination. The legacy
-waitlist route no longer exists.
+a new owner directive. Replace this paragraph with your own commercial model: services, offer,
+pricing, and proof surfaces. Keep it to one primary conversion path; every
+other CTA is secondary.
 
 ### Strategy — single source of truth
 

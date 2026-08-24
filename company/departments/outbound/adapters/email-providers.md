@@ -46,11 +46,11 @@ Director audit + owner-approved change task `change-0893155801` (goal-0db6b0a1b4
 Main-zone `spielos.xyz` DNS updated in Cloudflare (zone `e64f6a563bf4f3b6a07dbb82b4b96543`):
 
 - **SPF** now: `v=spf1 include:_spf.mx.cloudflare.net include:relay.resend.net include:spf.brevo.com include:mailgun.org ~all`
-  (added `include:mailgun.org` — Mailgun is an active sender From `shayan@spielos.xyz`)
+  (added `include:mailgun.org` — Mailgun is an active sender From `hello@example.com`)
 - **DMARC** hardened at `_dmarc.spielos.xyz`:
-  `v=DMARC1; p=quarantine; sp=quarantine; pct=100; fo=1; rf=afrf; ri=86400; rua=mailto:shayan@spielos.xyz`
+  `v=DMARC1; p=quarantine; sp=quarantine; pct=100; fo=1; rf=afrf; ri=86400; rua=mailto:hello@example.com`
 - **TLS-RPT** added at `_smtp._tls.spielos.xyz`:
-  `v=TLSRPTv1; rua=mailto:shayan@spielos.xyz`
+  `v=TLSRPTv1; rua=mailto:hello@example.com`
 - **MTA-STS** added: TXT `_mta-sts.spielos.xyz` `v=STSv1; id=20260816`, CNAME
   `mta-sts.spielos.xyz -> spielos.xyz` (proxied), policy served at
   `https://mta-sts.spielos.xyz/.well-known/mta-sts.txt` from
