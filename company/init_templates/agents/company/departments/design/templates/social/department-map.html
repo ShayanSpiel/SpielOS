@@ -1,0 +1,153 @@
+<!doctype html>
+<!--
+  Flat canvas composition — ARCHETYPE: department-map (Threads/social image).
+  Research map (shortform-template-research-20260817): the "one map" idea
+  turns six reusable pieces into a single visual system; maps/process visuals
+  beat abstract decor on social. The archetype is a hub pill + flat tile grid
+  mirroring the architecture page DepartmentMap component, with the journey
+  signature riding the left margin. Flat only, semantic tokens, boxicons
+  only. The journey is the video-style line: smooth bezier, dashed route +
+  solid traveled fill, nodes on the path, flat bullseye.
+-->
+<html lang="en" data-theme="gruvbox-dark">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>SpielOS content template</title>
+  <link rel="stylesheet" href="/.agents/company/departments/design/system/production.css">
+  <link rel="stylesheet" href="/.agents/company/departments/design/system/journey-signature.css">
+  <link rel="stylesheet" href="../tools/vendor/boxicons/css/boxicons.min.css">
+  <style>
+    body { container-type: size; display: grid; place-items: center; }
+    .canvas { position: relative; width: 100%; height: 100%; display: grid; grid-template-rows: auto 1fr auto; place-items: center; overflow: hidden; background: radial-gradient(circle at 50% 38%, var(--primary-soft), transparent 46%), var(--background); }
+    .grid { position: absolute; inset: 0; opacity: .03; background-image: linear-gradient(var(--foreground) 1px, transparent 1px), linear-gradient(90deg, var(--foreground) 1px, transparent 1px); background-size: 5cqw 5cqw; }
+    header, main, footer { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; }
+    header { margin-top: 5cqh; }
+    .eyebrow { color: var(--primary); font: 600 clamp(13px, 2.1cqw, 30px)/1 var(--font-mono); letter-spacing: .14em; text-transform: uppercase; }
+    main { gap: 2.6cqh; width: 84%; }
+    h1 { max-width: 14ch; margin: 0; text-align: center; color: var(--foreground-strong); font-size: clamp(40px, 7.2cqw, 116px); font-weight: 800; line-height: .98; letter-spacing: -.045em; }
+    h1 .accent { color: var(--primary); }
+    /* Department hub pill — mirrors the architecture page map header
+       (inline-flex, rounded-md, primary border/soft, sans semibold). */
+    .map-hub { display: inline-flex; align-items: center; gap: .8cqw; padding: 1.4cqh 2.2cqw; border: 1px solid var(--primary); border-radius: var(--radius-md); background: var(--primary-soft); color: var(--primary); font: 600 clamp(13px, 1.8cqw, 26px)/1 var(--font-sans); }
+    .map-hub i { font-size: clamp(16px, 2.2cqw, 30px); }
+    /* Department description — the component's small muted line under the hub. */
+    .template-hook { max-width: none; margin: 0; text-align: center; color: var(--muted-foreground); font: 500 clamp(13px, 1.5cqw, 22px)/1.45 var(--font-sans); }
+    /* Branch rail + tile grid — flat map, mirrors DepartmentMap.astro
+       (branch rail inset-inline 9%, tile connectors to the rail, tiles
+       alternate primary/accent 30% borders, icons carry the part colors). */
+    .map-wrap { position: relative; width: 100%; --branch: 2cqh; }
+    .map-rail { position: absolute; top: 0; left: 9%; right: 9%; height: 1px; background: linear-gradient(90deg, transparent, var(--primary), var(--accent), transparent); opacity: .8; }
+    .map-tiles { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 2cqw 2.4cqw; padding-top: var(--branch); }
+    .map-tile { position: relative; display: flex; flex-direction: column; align-items: center; gap: 1cqh; border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent); border-radius: var(--radius-md); background: var(--panel-raised); padding: 2.2cqh 1.6cqw; text-align: center; }
+    .map-tile:nth-child(even) { border-color: color-mix(in srgb, var(--accent) 30%, transparent); }
+    .map-tile::before { content: ""; position: absolute; top: calc(-1 * var(--branch)); left: 50%; width: 1px; height: var(--branch); background: var(--border-strong); }
+    .map-tile i { font-size: clamp(20px, 2.6cqw, 36px); }
+    .map-tile .t-name { color: var(--foreground-strong); font: 600 clamp(12px, 1.5cqw, 22px)/1.2 var(--font-sans); }
+    .map-tile .t-note { color: var(--muted-foreground); font: 500 clamp(10px, 1.1cqw, 16px)/1.4 var(--font-sans); max-width: 18ch; }
+    /* Part colors exactly as DepartmentMap: workflow primary, agent accent,
+       skill purple, evals info, connection warning, artifact success. */
+    .t1 i { color: var(--primary); } .t2 i { color: var(--accent); } .t3 i { color: var(--purple); }
+    .t4 i { color: var(--info); } .t5 i { color: var(--warning); } .t6 i { color: var(--success); }
+    footer { margin-bottom: 5cqh; color: var(--muted-foreground); font: 500 clamp(20px, 1.7cqw, 26px)/1 var(--font-mono); }
+    @container (aspect-ratio > 8/5) {
+      header { margin-top: 4cqh; }
+      main { flex-direction: row; gap: 5cqw; }
+      h1 { max-width: 11ch; font-size: clamp(40px, 6cqw, 92px); }
+      .map-tiles { grid-template-columns: repeat(3, 1fr); }
+      .map-tile { padding: 1.8cqh 1.2cqw; }
+    }
+    @container (aspect-ratio <= 4/5) {
+      header { margin-top: 7cqh; }
+      h1 { font-size: clamp(44px, 9cqw, 92px); }
+      main { gap: 2.8cqh; }
+      .map-tile { padding: 2.6cqh 2.4cqw; }
+      .map-tile .t-note { max-width: 22ch; }
+      footer { margin-bottom: 7cqh; }
+    }
+  </style>
+</head>
+<body>
+<div class="canvas">
+  <div class="grid"></div>
+
+  <!-- Journey signature — left-edge vertical wave (portrait), bottom band
+       wave (landscape). The tile grid fills the middle; the signature rides
+       the empty margin so it never cuts through the tiles or descriptions. -->
+  <svg class="journey-svg journey-portrait" viewBox="0 0 1080 1350" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+    <path class="journey-path" d="M60,60 C45,220 78,320 50,520 C28,700 74,820 46,1000 C30,1120 60,1220 55,1300"/>
+    <path class="journey-path-fill" d="M60,60 C45,220 78,320 50,520"/>
+    <g class="journey-node" transform="translate(50,520)"><circle class="node-ring" r="16"/><circle class="node-dot" r="7"/></g>
+    <g class="journey-node" transform="translate(46,1000)"><circle class="node-ring" r="16"/><circle class="node-dot" r="7"/></g>
+    <g class="journey-goal" transform="translate(60,1300)">
+      <circle class="goal-ring" r="30"/><circle class="goal-ring-inner" r="17"/><circle class="goal-core" r="6"/>
+    </g>
+  </svg>
+  <svg class="journey-svg journey-landscape" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+    <path class="journey-path" d="M20,800 C200,660 400,820 600,720 C800,620 1000,800 1200,700 C1300,650 1450,720 1560,700"/>
+    <path class="journey-path-fill" d="M20,800 C200,660 400,820 600,720"/>
+    <g class="journey-node" transform="translate(600,720)"><circle class="node-ring" r="16"/><circle class="node-dot" r="7"/></g>
+    <g class="journey-node" transform="translate(1200,700)"><circle class="node-ring" r="16"/><circle class="node-dot" r="7"/></g>
+    <g class="journey-goal" transform="translate(1560,700)">
+      <circle class="goal-ring" r="30"/><circle class="goal-ring-inner" r="17"/><circle class="goal-core" r="6"/>
+    </g>
+  </svg>
+
+  <header>
+    <div class="eyebrow" id="template-eyebrow">Campaign context required</div>
+  </header>
+
+  <main>
+    <h1 class="canvas-title" id="template-title">Campaign title required</h1>
+    <div class="map-hub" id="map-hub"><i class="bx bx-group" aria-hidden="true"></i><span id="hub-label">Every piece has a place</span></div>
+    <p class="template-hook" id="template-hook">One map for the work behind your results.</p>
+    <div class="map-wrap">
+      <div class="map-rail" aria-hidden="true"></div>
+      <div class="map-tiles" id="map-tiles">
+        <div class="map-tile t1"><i class="bx bx-network-chart" aria-hidden="true"></i><span class="t-name">Workflow</span><span class="t-note">The repeated work</span></div>
+        <div class="map-tile t2"><i class="bx bx-user" aria-hidden="true"></i><span class="t-name">Owner</span><span class="t-note">One person answers for it</span></div>
+        <div class="map-tile t3"><i class="bx bx-task" aria-hidden="true"></i><span class="t-name">Standard</span><span class="t-note">How good is good enough</span></div>
+        <div class="map-tile t4"><i class="bx bx-check-shield" aria-hidden="true"></i><span class="t-name">Check</span><span class="t-note">The review before it ships</span></div>
+        <div class="map-tile t5"><i class="bx bx-link" aria-hidden="true"></i><span class="t-name">Tools</span><span class="t-note">The systems it needs</span></div>
+        <div class="map-tile t6"><i class="bx bx-file" aria-hidden="true"></i><span class="t-name">Record</span><span class="t-note">Proof it happened</span></div>
+      </div>
+    </div>
+  </main>
+
+  <footer><span class="brand-lockup"><img src="/public/assets/favicons/favicon.svg" alt="">spielos.xyz</span></footer>
+</div>
+<script>
+  (function () {
+    function applyRendition(order) {
+      if (!order || !order.design || !Array.isArray(order.design.title_lines)) {
+        document.documentElement.dataset.templateReady = 'error';
+        throw new Error('A typed campaign rendition is required');
+      }
+      var design = order.design;
+      document.documentElement.dataset.theme = design.theme;
+      document.body.dataset.layout = design.layout;
+      document.body.dataset.campaignId = order.campaign_id;
+      document.body.dataset.batchId = order.batch_id;
+      document.body.dataset.itemId = order.item_id;
+      document.body.dataset.contentId = order.content_id;
+      document.getElementById('template-eyebrow').textContent = design.eyebrow;
+      document.getElementById('template-hook').textContent = design.supporting_text;
+      document.getElementById('template-title').innerHTML = design.title_lines.map(function (line, index) {
+          var text = line.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          return index === design.accent_line ? '<span class="accent">' + text + '</span>' : text;
+      }).join('<br>');
+      var labels = design.station_labels || [];
+      if (labels.length >= 6) {
+        var tiles = document.querySelectorAll('#map-tiles .t-name');
+        tiles.forEach(function (tile, index) {
+          if (labels[index]) tile.textContent = labels[index];
+        });
+      }
+      document.title = 'SpielOS — ' + design.title_lines.join(' ');
+      document.documentElement.dataset.templateReady = 'true';
+    }
+    window.__applyCampaignRendition = applyRendition;
+    document.documentElement.dataset.templateReady = 'waiting';
+  }());
+</script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+[data-theme="monochrome-dark"] {
+  --mono-dark-bg0_h: #000000;
+  --mono-dark-bg0: #050505;
+  --mono-dark-bg0_s: #0a0a0a;
+  --mono-dark-bg1: #111111;
+  --mono-dark-bg2: #1a1a1a;
+  --mono-dark-bg3: #2a2a2a;
+  --mono-dark-bg4: #3a3a3a;
+
+  --mono-dark-fg0: #ffffff;
+  --mono-dark-fg1: #f5f5f5;
+  --mono-dark-fg2: #d4d4d4;
+  --mono-dark-fg3: #a3a3a3;
+  --mono-dark-fg4: #737373;
+
+  --mono-dark-gray: #525252;
+
+  --mono-dark-red: #f87171;
+  --mono-dark-green: #4ade80;
+  --mono-dark-yellow: #fbbf24;
+  --mono-dark-blue: #60a5fa;
+  --mono-dark-purple: #c084fc;
+  --mono-dark-aqua: #2dd4bf;
+  --mono-dark-orange: #fb923c;
+}

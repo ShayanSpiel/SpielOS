@@ -1,0 +1,226 @@
+<!doctype html>
+<!--
+  Flat canvas composition — ARCHETYPE: agent-brief (Threads/social image).
+  Portrait 1080x1350 like the rest of the social family. Mirrors the real
+  /services/agent-brief/#framework page: eyebrow + title + supporting text
+  on top, then the JOURNEY rail — MAX 4 stations that move toward the final
+  goal (Goal → Inputs → Outputs → Success).
+
+  Owner iteration 2 (2026-08-19, change-8a73ee327b):
+  1) SQUARES ONLY — every station mark is a ROUNDED-SQUARE tile (radius-md):
+     Goal primary-soft, middle stations flat panel-raised, Success a
+     success-soft square with the subtle square pulse (no rings anywhere).
+  2) THE RAIL LINE IS CLEAN, STRAIGHT, SQUARED-END — the connector between
+     tiles is now ONE straight horizontal rail (no curves/waves): a thin
+     dashed muted "route ahead" (full span between the outer tile edges) +
+     the system gradient primary→success progress line with the SAME
+     consistent stroke and butt (squared) caps, covering the traveled
+     Goal→Inputs→Outputs stretch; the Outputs→Success gap stays dashed
+     route-ahead with a slow rightward dash drift.
+  3) RAIL CENTERED ON THE CANVAS — the 4-icon rail center sits at the true
+     canvas center (rail center ≈ y 675 of 1350, icons clearly mid-frame,
+     NOT near the top).
+  4) TITLE LOWERED FOR ALIGNMENT — header margin 22cqh puts the title block
+     in the upper-third, tight title→rail gap (main margin-top 1cqh, rail
+     gap .8cqh), everything aligned on the shared center axis.
+  Kept: 4-station rendition contract (title_lines, eyebrow, supporting_text,
+  station_labels >= 4), family journey-signature bottom band, footer safe
+  area, responsive @container blocks, prefers-reduced-motion.
+-->
+<html lang="en" data-theme="gruvbox-dark">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>SpielOS content template</title>
+  <link rel="stylesheet" href="/.agents/company/departments/design/system/production.css">
+  <link rel="stylesheet" href="/.agents/company/departments/design/system/journey-signature.css">
+  <link rel="stylesheet" href="../tools/vendor/boxicons/css/boxicons.min.css">
+  <style>
+    body { container-type: size; display: grid; place-items: center; font-family: var(--font-sans); }
+    .canvas { position: relative; width: 100%; height: 100%; display: grid; grid-template-rows: auto 1fr auto; place-items: center; overflow: hidden; background: radial-gradient(circle at 30% 30%, var(--primary-soft), transparent 48%), var(--background); }
+    .grid { position: absolute; inset: 0; opacity: .03; background-image: linear-gradient(var(--foreground) 1px, transparent 1px), linear-gradient(90deg, var(--foreground) 1px, transparent 1px); background-size: 5cqw 5cqw; }
+    header, main, footer { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; text-align: center; }
+    /* Iteration 2: title lowered into the upper-third so it sits above the
+       centered rail with an intentional, tight gap (was 2cqh = floated).
+       20cqh places the 4-icon rail center at the true canvas center (~675). */
+    header { margin-top: 20cqh; }
+    .eyebrow { color: var(--primary); font: 600 clamp(12px, 1.8cqw, 20px)/1 var(--font-sans); letter-spacing: .16em; text-transform: uppercase; }
+    h1 { margin: 0; color: var(--foreground-strong); font-size: clamp(40px, 7.6cqw, 86px); font-weight: 800; line-height: 1.02; letter-spacing: -.035em; margin-top: .7cqh; }
+    h1 .accent { color: var(--primary); }
+    .template-hook { margin: .7cqh 0 0; color: var(--muted-foreground); font: 500 clamp(14px, 2cqw, 22px)/1.45 var(--font-sans); max-width: 44ch; }
+
+    /* Tight title→rail: main margin-top 1cqh, rail gap .8cqh. main is pinned
+       to the top of its 1fr row (align-self:start, no align-content spread)
+       so the rail hugs the title instead of floating in the leftover space. */
+    main { width: 92%; gap: .8cqh; margin-top: 1cqh; align-self: start; align-content: flex-start; }
+
+    /* JOURNEY RAIL — 4 stations, SQUARE marks only. Rounded-square tiles
+       (radius-md) mirror the design-system card language: Goal = primary-soft
+       tile, middle stations = flat panel-raised tiles, Success = success-soft
+       square goal mark with a subtle scale-pulse on the square (no ring).
+       Every tile is centered in its grid column on the shared center axis;
+       the whole rail is centered on the canvas center axis. */
+    .brief-rail { position: relative; display: grid; grid-template-columns: repeat(4, 1fr); gap: .75cqh; width: 100%; --tile: clamp(124px, 15.5cqw, 196px); }
+    /* Straight, squared-end connector line spanning exactly between the outer
+       tile edges (20.25%–79.75%); base = thin dashed muted route-ahead,
+       flow = system gradient primary→success progress with the SAME stroke
+       width and butt caps. No curves, no waves. */
+    .rail-journey { position: absolute; left: 50%; width: 100%; top: calc(var(--tile) / 2 - clamp(17px, 2.4cqw, 26px)); height: clamp(34px, 4.8cqw, 54px); transform: translateX(-50%); z-index: 1; pointer-events: none; overflow: visible; }
+    .rail-line-bg { fill: none; stroke: var(--foreground-muted); stroke-width: 3; stroke-linecap: butt; stroke-linejoin: miter; stroke-dasharray: 10 8; opacity: .45; animation: rail-ahead 1.6s linear infinite; }
+    .rail-line-flow { fill: none; stroke: url(#rail-grad); stroke-width: 3; stroke-linecap: butt; stroke-linejoin: miter; }
+    @keyframes rail-ahead { to { stroke-dashoffset: -36; } }
+
+    .step { position: relative; z-index: 2; display: flex; min-width: 0; flex-direction: column; align-items: center; gap: .8cqh; }
+    /* Square station tile — rounded square, radius-md, flat surface. The tile
+       owns the emphasis, not a ring: Goal + middle stations are calm, Success
+       pulses softly on its own square. */
+    .pipeline-icon {
+      position: relative; display: flex; align-items: center; justify-content: center;
+      width: var(--tile); height: var(--tile); flex-shrink: 0;
+      border-radius: var(--radius-md); border: 1px solid var(--border);
+      background: var(--panel-raised); color: var(--foreground-strong);
+      font-size: calc(var(--tile) * .54); line-height: 1;
+    }
+    .pipeline-icon i { display: block; line-height: 1; }
+    .pipeline-icon.node-goal { background: color-mix(in srgb, var(--primary) 20%, var(--panel-raised)); border-color: color-mix(in srgb, var(--primary) 45%, transparent); color: var(--primary); }
+    /* Final Square goal node — success color, subtle pulse ON THE SQUARE.
+       Opaque tint (site primary-soft family) so no translucency reads. */
+    .pipeline-icon.node-success { background: color-mix(in srgb, var(--success) 18%, var(--panel-raised)); border-color: color-mix(in srgb, var(--success) 45%, transparent); color: var(--success); animation: success-square-pulse 2.6s ease-in-out infinite; }
+    @keyframes success-square-pulse {
+      0%, 100% { transform: scale(1); }
+      50%      { transform: scale(1.05); }
+    }
+    .pipeline-label {
+      display: flex; align-items: baseline; gap: .3em; font: 600 clamp(13px, 1.9cqw, 20px)/1.2 var(--font-sans);
+      color: var(--muted-foreground); text-transform: uppercase; letter-spacing: .06em; white-space: nowrap;
+    }
+    .pipeline-num { color: var(--primary); font-weight: 700; }
+
+    /* Balanced footer band: 7cqh safe-area margin, sits evenly below the
+       raised journey signature instead of floating alone. */
+    footer { margin-bottom: 7cqh; color: var(--muted-foreground); font: 500 clamp(15px, 1.8cqw, 22px)/1 var(--font-sans); }
+    footer .brand-lockup { display: flex; align-items: center; gap: .5em; }
+    footer .brand-lockup img { width: 1.4em; height: 1.4em; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .rail-line-bg, .pipeline-icon.node-success { animation: none !important; }
+    }
+
+    /* Landscape fallback (if ever rendered wide): title top, rail below. */
+    @container (aspect-ratio > 8/5) {
+      header { margin-top: 14cqh; }
+      h1 { font-size: clamp(26px, 4cqw, 44px); }
+      .template-hook { font-size: clamp(12px, 1.5cqw, 16px); }
+      main { gap: 1cqh; margin-top: 1cqh; width: 96%; }
+      .brief-rail { --tile: clamp(64px, 8cqw, 100px); gap: .75cqh; }
+      .rail-journey { top: calc(var(--tile) / 2 - clamp(12px, 1.8cqw, 20px)); height: clamp(24px, 3.6cqw, 40px); }
+      .rail-line-bg, .rail-line-flow { stroke-width: 2.5; }
+      .pipeline-icon { font-size: calc(var(--tile) * .54); }
+      .pipeline-label { font-size: clamp(11px, 1.5cqw, 16px); }
+      footer { margin-bottom: 2.4cqh; }
+    }
+    @container (aspect-ratio <= 4/5) {
+      header { margin-top: 20cqh; }
+      h1 { font-size: clamp(46px, 8.4cqw, 94px); }
+      .template-hook { font-size: clamp(16px, 2.2cqw, 24px); }
+      main { gap: .8cqh; margin-top: 1cqh; }
+      .brief-rail { --tile: clamp(124px, 15.5cqw, 196px); }
+      .rail-journey { top: calc(var(--tile) / 2 - clamp(17px, 2.4cqw, 26px)); height: clamp(34px, 4.8cqw, 54px); }
+      .rail-line-bg, .rail-line-flow { stroke-width: 3; }
+      .pipeline-icon { font-size: calc(var(--tile) * .54); }
+      .pipeline-label { font-size: clamp(13px, 1.9cqw, 20px); }
+      footer { margin-bottom: 7cqh; font-size: clamp(18px, 2cqw, 26px); }
+    }
+  </style>
+</head>
+<body>
+<div class="canvas">
+  <div class="grid"></div>
+
+  <!-- Journey signature — portrait bottom-band wave (family geometry, KEPT),
+       landscape right-edge fallback unchanged. -->
+  <svg class="journey-svg journey-landscape" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+    <path class="journey-path" d="M20,800 C200,660 400,820 600,720 C800,620 1000,800 1200,700 C1300,650 1450,720 1560,700"/>
+    <path class="journey-path-fill" d="M20,800 C200,660 400,820 600,720"/>
+    <g class="journey-node" transform="translate(600,720)"><circle class="node-ring" r="16"/><circle class="node-dot" r="7"/></g>
+    <g class="journey-node" transform="translate(1200,700)"><circle class="node-ring" r="16"/><circle class="node-dot" r="7"/></g>
+    <g class="journey-goal" transform="translate(1560,700)">
+      <circle class="goal-ring" r="30"/><circle class="goal-ring-inner" r="17"/><circle class="goal-core" r="6"/>
+    </g>
+  </svg>
+  <svg class="journey-svg journey-portrait" viewBox="0 0 1080 1350" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+    <path class="journey-path" d="M20,1030 C180,810 340,1070 500,900 C660,730 820,1030 980,860 C1010,830 1035,820 1045,820"/>
+    <path class="journey-path-fill" d="M20,1030 C180,810 340,1070 500,900"/>
+    <g class="journey-node" transform="translate(500,900)"><circle class="node-ring" r="16"/><circle class="node-dot" r="7"/></g>
+    <g class="journey-node" transform="translate(980,860)"><circle class="node-ring" r="16"/><circle class="node-dot" r="7"/></g>
+    <g class="journey-goal" transform="translate(1045,820)">
+      <circle class="goal-ring" r="30"/><circle class="goal-ring-inner" r="17"/><circle class="goal-core" r="6"/>
+    </g>
+  </svg>
+
+  <header>
+    <div class="eyebrow" id="template-eyebrow">Campaign context required</div>
+    <h1 class="canvas-title" id="template-title">Campaign title required</h1>
+    <p class="template-hook" id="template-hook">We map one process and show you where the time goes.</p>
+  </header>
+
+  <main>
+    <div class="brief-rail" id="steps" aria-label="Agent Brief journey">
+      <!-- Connector rail (iteration 2): ONE straight horizontal line between
+           the outer tile edges — dashed muted route-ahead full span + the
+           system gradient primary→success progress over the traveled
+           Goal→Inputs→Outputs stretch. Consistent stroke, squared ends. -->
+      <svg class="rail-journey" viewBox="0 0 100 10" preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+          <linearGradient id="rail-grad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="var(--primary)"/>
+            <stop offset="100%" stop-color="var(--success)"/>
+          </linearGradient>
+        </defs>
+        <path class="rail-line-bg" d="M20.25,5 L79.75,5"/>
+        <path class="rail-line-flow" d="M20.25,5 L54.75,5" stroke="url(#rail-grad)"/>
+      </svg>
+      <div class="step"><span class="pipeline-icon node-goal"><i class="bx bx-bullseye"></i></span><span class="pipeline-label"><span class="pipeline-num">1.</span> <span class="step-name">Goal</span></span></div>
+      <div class="step"><span class="pipeline-icon"><i class="bx bx-file"></i></span><span class="pipeline-label"><span class="pipeline-num">2.</span> <span class="step-name">Inputs</span></span></div>
+      <div class="step"><span class="pipeline-icon"><i class="bx bx-export"></i></span><span class="pipeline-label"><span class="pipeline-num">3.</span> <span class="step-name">Outputs</span></span></div>
+      <div class="step"><span class="pipeline-icon node-success"><i class="bx bx-rocket"></i></span><span class="pipeline-label"><span class="pipeline-num">4.</span> <span class="step-name">Success</span></span></div>
+    </div>
+  </main>
+
+  <footer><span class="brand-lockup"><img src="/public/assets/favicons/favicon.svg" alt="">spielos.xyz</span></footer>
+</div>
+<script>
+  (function () {
+    function applyRendition(order) {
+      if (!order || !order.design || !Array.isArray(order.design.title_lines)) {
+        document.documentElement.dataset.templateReady = 'error';
+        throw new Error('A typed campaign rendition is required');
+      }
+      var design = order.design;
+      document.documentElement.dataset.theme = design.theme;
+      document.body.dataset.layout = design.layout;
+      document.body.dataset.campaignId = order.campaign_id;
+      document.body.dataset.batchId = order.batch_id;
+      document.body.dataset.itemId = order.item_id;
+      document.body.dataset.contentId = order.content_id;
+      document.getElementById('template-eyebrow').textContent = design.eyebrow;
+      document.getElementById('template-hook').textContent = design.supporting_text;
+      document.getElementById('template-title').innerHTML = design.title_lines.map(function (line, index) {
+          var text = line.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          return index === design.accent_line ? '<span class="accent">' + text + '</span>' : text;
+      }).join('<br>');
+      var labels = design.station_labels || [];
+      if (labels.length >= 4) {
+        var names = document.querySelectorAll('#steps .step-name');
+        names.forEach(function (name, index) {
+          if (labels[index]) name.textContent = labels[index];
+        });
+      }
+      document.title = 'SpielOS — ' + design.title_lines.join(' ');
+      document.documentElement.dataset.templateReady = 'true';
+    }
+    window.__applyCampaignRendition = applyRendition;
+    document.documentElement.dataset.templateReady = 'waiting';
+  }());
+</script>
+</body>
+</html>

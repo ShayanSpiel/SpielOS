@@ -1,0 +1,44 @@
+# Local-only credentials. Copy values into .spielos/.env; never commit that file.
+#
+# Multi-provider TTS fallback chain (owner contract 2026-08-12): Gemini is the
+# primary narration provider; Mistral Voxtral (two keys with failover),
+# Cartesia, and ElevenLabs are deterministic fallbacks. All five keys must be
+# present and non-empty for `node scripts/tts-providers.js --check` to pass.
+# The narration persona is pinned once in
+# .agents/company/departments/design/templates/video/narration.json
+# (`voice_selection`) and enforced by scripts/tts-gemini.js + scripts/mix-audio.js.
+GEMINI_API_KEY=
+MISTRAL_API_KEY=
+MISTRAL_API_KEY_2=
+CARTESIA_API_KEY=
+ELEVENLABS_API_KEY=
+
+# Outbound email signature CTA (owner directive 2026-08-22, Apply-first):
+# the only conversion link allowed in any outbound email or signature is
+#   https://spielos.xyz/apply/   ("Apply — Free Review")
+# with the microcopy "Free review · No required call · See the scope before
+# you pay". Cal booking links are retired from signatures and body copy;
+# booking exists only as the optional icon-only CTA on the site's Contact
+# and Apply pages — never as an outbound required-call step.
+OUTBOUND_SIGNATURE_CTA_URL=https://spielos.xyz/apply/
+
+# Post-transition hook (default empty = disabled).
+# When set, the runtime invokes this shell command template after every goal
+# transition instead of any built-in website deploy logic. Substitutions:
+#   {event}        event name, shell-quoted (currently "goal_transition")
+#   {payload_json} JSON payload, shell-quoted (goal_id, run_id, step,
+#                  run_status, goal_status)
+# Best-effort and hard-bounded: failures are logged, a hang is killed after
+# 20s; it can never block or roll back a goal transition. For THIS repo set
+# it to scripts/spielos-transition-hook.py so /live snapshot sync + git push
+# keep working (that script owns the debounce/marker semantics now):
+#   python3 <repo-root>/scripts/spielos-transition-hook.py {event} {payload_json}
+SPIELOS_TRANSITION_HOOK=
+
+# Live push gate consumed by scripts/spielos-transition-hook.py (NOT by the
+# runtime anymore): when 1/true, the hook commits + pushes the /live snapshot
+# files (debounced 120s via .spielos/state/.live_push_state.json).
+SPIELOS_LIVE_PUSH=
+
+# dev.to publishing API key (content department posting; local-only, never commit)
+DEVTO_API_KEY=

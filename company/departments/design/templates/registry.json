@@ -1,0 +1,228 @@
+{
+  "schema_version": "1.0",
+  "updated_at": "2026-08-20",
+  "owner": "design",
+  "authority": ".agents/company/departments/design/README.md",
+  "research_brief": ".spielos/artifacts/content-growth-20260812/research/shortform-template-research-20260817.md",
+  "selection_rule": {
+    "summary": "One archetype per item_id. No batch repeats one template. The design handoff picks an archetype per item_id that balances both experiment cells (control/variant) so no cell is starved of a template family.",
+    "rules": [
+      "Every item_id gets exactly one Shorts archetype and one Threads/social archetype.",
+      "No template is used twice within one batch (template_id must be unique per platform within the batch).",
+      "The handoff alternates/round-robins archetypes across item_ids and balances the archetype mix between the control and variant cells of the active experiment.",
+      "Legacy templates (scenario-b, scenario-c, harness-architecture) stay registered and usable; they are never removed or renamed.",
+      "A new archetype may only be registered with an existing, parseable HTML template and a documented research mapping (research_brief section)."
+    ]
+  },
+  "archetypes": [
+    {
+      "id": "scenario-b",
+      "kind": "shorts",
+      "file": "video/scenario-b.html",
+      "legacy": true,
+      "description": "Before/After — disconnected AI tools need one operating system before they work as a team.",
+      "content_relevance": "workflow/coordination content",
+      "research_map": "Before/after split; contrast tension; transformation storytelling (Hooksnap 2026-05-07).",
+      "scene_control": {
+        "contract": "scene_timing.<key> in narration.json; scene ids map 1:1 to the template scene nodes (s1..sN) and to campaign narration scenes.",
+        "timing_key": "b",
+        "scenes": [
+          "hook",
+          "pain",
+          "promise",
+          "pillars",
+          "director",
+          "cta"
+        ]
+      }
+    },
+    {
+      "id": "scenario-c",
+      "kind": "shorts",
+      "file": "video/scenario-c.html",
+      "legacy": true,
+      "description": "Build It — a real AI department is built from roles, context, standards, workflows.",
+      "content_relevance": "department/role/workflow content",
+      "research_map": "Numbered build steps act as a time contract / payoff moments (Blitzcut 2026-06-06).",
+      "scene_control": {
+        "contract": "scene_timing.<key> in narration.json; scene ids map 1:1 to the template scene nodes (s1..sN) and to campaign narration scenes.",
+        "timing_key": "c",
+        "scenes": [
+          "hook",
+          "build",
+          "live",
+          "director",
+          "cta"
+        ]
+      }
+    },
+    {
+      "id": "contrast-text",
+      "kind": "shorts",
+      "file": "video/contrast-text.html",
+      "legacy": false,
+      "description": "Contrast statement hook — 'X works. Y doesn't.' keyword in accent color; pattern interrupt (Hooksnap format B).",
+      "research_map": "Pattern interrupt / bold contrast hooks; first-2s window; centered key element >=1s (Tukey 2026-05-26; JAMS 2026-03-26).",
+      "scene_control": {
+        "contract": "scene_timing.<key> in narration.json; scene ids map 1:1 to the template scene nodes (s1..sN) and to campaign narration scenes.",
+        "timing_key": "d",
+        "scenes": [
+          "hook",
+          "claim",
+          "proof",
+          "resolve",
+          "cta"
+        ]
+      }
+    },
+    {
+      "id": "storyboard",
+      "kind": "shorts",
+      "file": "video/storyboard.html",
+      "legacy": false,
+      "status": "quarantined",
+      "quarantine_reason": "Storyboard produced blank scene frames in the last two campaign renders; restore only after direct media QA passes.",
+      "description": "Three-panel storyboard progression (Problem -> Turn -> Result) with numbered frames.",
+      "research_map": "Scene cuts boost attention, ~5% synchrony loss per extra scene second; keep scenes short and simple (JAMS 2026-03-26).",
+      "scene_control": {
+        "contract": "scene_timing.<key> in narration.json; scene ids map 1:1 to the template scene nodes (s1..sN) and to campaign narration scenes.",
+        "timing_key": "e",
+        "scenes": [
+          "problem",
+          "turn",
+          "result",
+          "cta"
+        ]
+      }
+    },
+    {
+      "id": "data-card",
+      "kind": "shorts",
+      "file": "video/data-card.html",
+      "legacy": false,
+      "description": "One hero fact/statistic with a counting number and a supporting line; bold claim + proof point.",
+      "research_map": "Currency/number anchors + proof point raise hook quality (viralfaceless 2026-05-10); bold claim hook (Tukey 2026-05-26).",
+      "scene_control": {
+        "contract": "scene_timing.<key> in narration.json; scene ids map 1:1 to the template scene nodes (s1..sN) and to campaign narration scenes.",
+        "timing_key": "f",
+        "scenes": [
+          "stat",
+          "claim",
+          "proof",
+          "cta"
+        ]
+      }
+    },
+    {
+      "id": "question-hook",
+      "kind": "shorts",
+      "file": "video/question-hook.html",
+      "legacy": false,
+      "description": "Open-loop question hook — the question lands on screen before speech; curiosity gap.",
+      "research_map": "Curiosity gap hooks (Tukey 2026-05-26); open-loop markers add the biggest curiosity boost (viralfaceless 2026-05-10).",
+      "scene_control": {
+        "contract": "scene_timing.<key> in narration.json; scene ids map 1:1 to the template scene nodes (s1..sN) and to campaign narration scenes.",
+        "timing_key": "g",
+        "scenes": [
+          "question",
+          "stakes",
+          "resolve",
+          "cta"
+        ]
+      }
+    },
+    {
+      "id": "harness-architecture",
+      "kind": "social",
+      "file": "social/harness-architecture.html",
+      "legacy": true,
+      "description": "Flat canvas — journey line through department stations, loop symbol GOAL->OBSERVE->DECIDE->ACT->EVALUATE, goal bullseye, centered Outfit 800 title.",
+      "research_map": "Images are the strongest Threads format; consistent brand template builds recognition (Buffer 2026-02-10; vidIQ 2026-05-28)."
+    },
+    {
+      "id": "single-fact",
+      "kind": "social",
+      "file": "social/single-fact.html",
+      "legacy": false,
+      "description": "Hook-first single fact — one bold claim/number in the title band, one supporting line, journey signature.",
+      "research_map": "One clear powerful message beats a carousel; first line is the hook window (Sendible 2025-08-26; Socialync 2026-05-14)."
+    },
+    {
+      "id": "list-checklist",
+      "kind": "social",
+      "file": "social/list-checklist.html",
+      "legacy": false,
+      "description": "Checklist/list layout — numbered rows with boxicon bullets under a hook title; flat, no card-with-arrows.",
+      "research_map": "Carousel/step-by-step content; short snappy segments; 5-8 words per item (Sendible 2025-08-26; RocketShip 2026-06-08)."
+    },
+    {
+      "id": "testimonial-pull-quote",
+      "kind": "social",
+      "file": "social/testimonial-pull-quote.html",
+      "legacy": false,
+      "description": "Pull-quote layout — large quoted line, attribution line, journey signature; conversation-first tone.",
+      "research_map": "Conversation starters and personal proof outperform announcements on Threads (Postory 2026-04-15; Murat Esmer 2026-03-18)."
+    },
+    {
+      "id": "loop-rail",
+      "kind": "shorts",
+      "file": "video/loop-rail.html",
+      "legacy": false,
+      "description": "Centered five-column OperatingLoop rail — GOAL->OBSERVE->DECIDE->ACT->EVALUATE nodes riding a gradient progress line.",
+      "research_map": "Process/loop visualization; step-by-step mapping keeps viewers oriented (JAMS 2026-03-26; Sendible 2025-08-26).",
+      "content_relevance": "process/loop content",
+      "scene_control": {
+        "contract": "scene_timing.<key> in narration.json; scene ids map 1:1 to the template scene nodes (s1..sN) and to campaign narration scenes.",
+        "timing_key": "h",
+        "scenes": [
+          "band",
+          "goal",
+          "watch",
+          "run",
+          "cta"
+        ]
+      }
+    },
+    {
+      "id": "heartbeat",
+      "kind": "shorts",
+      "file": "video/heartbeat.html",
+      "legacy": false,
+      "description": "Live heartbeat card — centered north star, run row, and a 2x2 stat grid over a minimal magical pulse.",
+      "research_map": "Live-ops/status storytelling; credible live numbers and current work outshine static claims (goal-live-heartbeat-clean-20260818).",
+      "content_relevance": "live-ops content",
+      "scene_control": {
+        "contract": "scene_timing.<key> in narration.json; scene ids map 1:1 to the template scene nodes (s1..sN) and to campaign narration scenes.",
+        "timing_key": "i",
+        "scenes": [
+          "band",
+          "goal",
+          "watch",
+          "cta"
+        ]
+      }
+    },
+    {
+      "id": "department-map",
+      "kind": "social",
+      "file": "social/department-map.html",
+      "legacy": false,
+      "description": "DepartmentMap hub — branch tile grid showing the company's real departments as connected stations.",
+      "research_map": "System/harness visualization; images are the strongest Threads format and a consistent brand template builds recognition (Buffer 2026-02-10; vidIQ 2026-05-28).",
+      "content_relevance": "system/harness content"
+    },
+    {
+      "id": "agent-brief",
+      "kind": "social",
+      "file": "social/agent-brief.html",
+      "legacy": false,
+      "description": "Seven-step Agent Brief pipeline with a flat deliverable/milestone showcase rail (no form UI).",
+      "research_map": "Assessment/request flow; a clear request journey converts better than a bare announcement (goal-creative-variety-v2-polish-20260818).",
+      "content_relevance": "brief/request content"
+    }
+  ],
+  "counts": {
+    "shorts_min": 4,
+    "social_min": 3
+  }
+}

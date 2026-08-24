@@ -1,0 +1,4 @@
+interface:
+  display_name: "Director"
+  short_description: "Operate durable company goals and engines"
+  default_prompt: "Use $director to inspect company state and pursue my business goal through the durable company loop."

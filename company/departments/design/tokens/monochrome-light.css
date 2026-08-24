@@ -1,0 +1,25 @@
+[data-theme="monochrome-light"] {
+  --mono-light-bg0_h: #ffffff;
+  --mono-light-bg0: #fafafa;
+  --mono-light-bg0_s: #f5f5f5;
+  --mono-light-bg1: #ededed;
+  --mono-light-bg2: #e5e5e5;
+  --mono-light-bg3: #d4d4d4;
+  --mono-light-bg4: #a3a3a3;
+
+  --mono-light-fg0: #000000;
+  --mono-light-fg1: #0a0a0a;
+  --mono-light-fg2: #404040;
+  --mono-light-fg3: #525252;
+  --mono-light-fg4: #737373;
+
+  --mono-light-gray: #737373;
+
+  --mono-light-red: #dc2626;
+  --mono-light-green: #15803d;
+  --mono-light-yellow: #a16207;
+  --mono-light-blue: #2563eb;
+  --mono-light-purple: #7e22ce;
+  --mono-light-aqua: #0f766e;
+  --mono-light-orange: #c2410c;
+}

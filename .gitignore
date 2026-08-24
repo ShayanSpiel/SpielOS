@@ -1,0 +1,16 @@
+# Runtime state, private data, generated work
+.spielos/
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+
+# Host-local
+.opencode/node_modules/
+
+# OS
+.DS_Store

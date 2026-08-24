@@ -1,0 +1,25 @@
+[data-theme="discord-dark"] {
+  --discord-dark-bg0_h: #111214;
+  --discord-dark-bg0: #1a1b1e;
+  --discord-dark-bg0_s: #232428;
+  --discord-dark-bg1: #2c2e33;
+  --discord-dark-bg2: #3a3c43;
+  --discord-dark-bg3: #4e5058;
+  --discord-dark-bg4: #6d6f78;
+
+  --discord-dark-fg0: #f2f3f5;
+  --discord-dark-fg1: #dbdee1;
+  --discord-dark-fg2: #b5bac1;
+  --discord-dark-fg3: #949ba4;
+  --discord-dark-fg4: #6d6f78;
+
+  --discord-dark-gray: #4e5058;
+
+  --discord-dark-red: #f23f43;
+  --discord-dark-green: #23a55a;
+  --discord-dark-yellow: #f0b232;
+  --discord-dark-blue: #5865f2;
+  --discord-dark-purple: #a855f7;
+  --discord-dark-aqua: #00b0b4;
+  --discord-dark-orange: #f47b67;
+}

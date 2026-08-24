@@ -1,0 +1,29 @@
+[data-theme="black-gold-dark"] {
+  --gold-dark-bg0_h: #000000;
+  --gold-dark-bg0: #0d0d0d;
+  --gold-dark-bg0_s: #1a1a1a;
+  --gold-dark-bg1: #262626;
+  --gold-dark-bg2: #333333;
+  --gold-dark-bg3: #404040;
+  --gold-dark-bg4: #595959;
+
+  --gold-dark-fg0: #faf6e8;
+  --gold-dark-fg1: #e8e0cc;
+  --gold-dark-fg2: #d4c9a8;
+  --gold-dark-fg3: #a69c7a;
+  --gold-dark-fg4: #8c8260;
+
+  --gold-dark-gray: #595959;
+
+  --gold-dark-gold: #d4a017;
+  --gold-dark-gold-muted: #c9a84c;
+  --gold-dark-gold-bright: #e8c84a;
+
+  --gold-dark-red: #ef4444;
+  --gold-dark-green: #22c55e;
+  --gold-dark-yellow: #eab308;
+  --gold-dark-blue: #60a5fa;
+  --gold-dark-purple: #c084fc;
+  --gold-dark-aqua: #2dd4bf;
+  --gold-dark-orange: #f97316;
+}

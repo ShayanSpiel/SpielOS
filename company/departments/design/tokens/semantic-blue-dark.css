@@ -1,0 +1,41 @@
+[data-theme="blue-dark"] {
+  --background: var(--blue-dark-bg0_h);
+  --background-deep: var(--blue-dark-bg0_h);
+  --panel: var(--blue-dark-bg0);
+  --panel-raised: var(--blue-dark-bg0_s);
+  --panel-strong: var(--blue-dark-bg1);
+  --panel-deep: var(--blue-dark-bg0_h);
+  --input: color-mix(in oklab, var(--blue-dark-bg1) 62%, var(--blue-dark-bg0));
+  --hover: color-mix(in oklab, var(--blue-dark-fg1) 7%, var(--blue-dark-bg0));
+  --selected: color-mix(in oklab, var(--blue-dark-blue) 17%, var(--blue-dark-bg0_s));
+  --border: color-mix(in oklab, var(--blue-dark-bg2) 62%, var(--blue-dark-bg0));
+  --border-strong: var(--blue-dark-bg2);
+  --ring: var(--blue-dark-blue);
+
+  --foreground: var(--blue-dark-fg1);
+  --foreground-strong: var(--blue-dark-fg0);
+  --foreground-muted: var(--blue-dark-fg3);
+  --muted-foreground: var(--blue-dark-fg4);
+
+  --primary: var(--blue-dark-blue);
+  --primary-foreground: var(--blue-dark-bg0);
+  --primary-soft: color-mix(in oklab, var(--blue-dark-blue) 20%, transparent);
+
+  --success: var(--blue-dark-green);
+  --success-soft: color-mix(in oklab, var(--blue-dark-green) 20%, transparent);
+  --warning: var(--blue-dark-yellow);
+  --warning-soft: color-mix(in oklab, var(--blue-dark-yellow) 20%, transparent);
+  --destructive: var(--blue-dark-red);
+  --destructive-soft: color-mix(in oklab, var(--blue-dark-red) 20%, transparent);
+  --info: var(--blue-dark-blue);
+  --info-soft: color-mix(in oklab, var(--blue-dark-blue) 20%, transparent);
+  --accent: var(--blue-dark-purple);
+  --accent-soft: color-mix(in oklab, var(--blue-dark-purple) 20%, transparent);
+  --purple: var(--blue-dark-purple);
+  --purple-soft: color-mix(in oklab, var(--blue-dark-purple) 20%, transparent);
+
+  --code-block: var(--blue-dark-bg0_h);
+
+  --shadow-panel: 0 1px 0 var(--blue-dark-bg1);
+  --shadow-popover: 0 8px 24px color-mix(in oklab, var(--blue-dark-bg0_h) 60%, transparent);
+}
