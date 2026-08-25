@@ -29,6 +29,36 @@ from pathlib import Path
 from .paths import package_vendored_root
 
 
+def _installed_distribution_templates() -> Path | None:
+    """init_templates shipped inside the installed ``spielos`` distribution.
+
+    A vendored home has no bundled templates of its own, yet its runtime
+    must be able to refresh from the newest release. Look at every other
+    ``sys.path`` entry (pipx/uv venv site-packages) for the packaged
+    templates, skipping the tree this module is executing from.
+    """
+    import sys
+
+    here = Path(__file__).resolve()
+    seen: set[Path] = set()
+    for entry in list(sys.path):
+        if not entry:
+            continue
+        try:
+            base = Path(entry).expanduser().resolve()
+        except OSError:
+            continue
+        if base in seen:
+            continue
+        seen.add(base)
+        if here.is_relative_to(base):
+            continue  # the tree we are running from (e.g. <home>/.agents)
+        candidate = base / "company" / "init_templates"
+        if (candidate / "agents").is_dir() and (candidate / "hosts").is_dir():
+            return candidate
+    return None
+
+
 def template_root() -> Path:
     """Template source resolution (see module docstring)."""
     import os
@@ -42,6 +72,9 @@ def template_root() -> Path:
     bundled = Path(__file__).resolve().parents[1] / "init_templates"
     if bundled.is_dir():
         return bundled
+    installed = _installed_distribution_templates()
+    if installed is not None:
+        return installed
     vendored = package_vendored_root()
     if vendored is not None and (vendored / ".agents" / "company").is_dir():
         staged = vendored / ".agents" / "company" / "init_templates"

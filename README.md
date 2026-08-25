@@ -16,19 +16,29 @@ clients of the same persisted state.
 ## Install (one line)
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/SpielOS/main/install.sh | sh
+pipx install spielos && spielos init
 ```
 
-The installer checks Python 3.11+, installs `pipx` for you when it is missing
-(brew or pip — no manual steps), installs `spielos`, and — in an empty folder,
-no questions asked — runs the first-run init right there. In a folder that has
-content it asks first and never touches your files. Re-running the same
-command updates an existing install.
+`spielos init` scaffolds a verified, self-contained harness home into your
+current folder — with OpenCode-style progress, a setup picker (full harness or
+minimal appliance), host detection, and a runtime verification before it
+reports success.
 
-Prefer to do it by hand?
+## Update (one line)
 
 ```sh
-pipx install "spielos @ git+https://github.com/ShayanSpiel/SpielOS.git" && spielos init
+pipx upgrade spielos && spielos refresh
+```
+
+`pipx upgrade` fetches the newest release; `spielos refresh` re-vendors the
+runtime spine and host adapters into every home on this machine while keeping
+your strategy, assets, departments, installed agents, and `.spielos/` state.
+
+No pipx yet? The bootstrap installer sets everything up (Python check,
+pipx, spielos) and runs init in an empty folder automatically:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/SpielOS/main/install.sh | sh
 ```
 
 `spielos init` vendors a complete, self-contained harness home into the current

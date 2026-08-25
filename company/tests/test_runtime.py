@@ -681,9 +681,14 @@ class DirectorIdentityContractTests(unittest.TestCase):
     def test_opencode_notification_hook_uses_native_question_and_chat_surface(self):
         root = Path(__file__).resolve().parents[2]
         config = (root / "opencode.json").read_text()
-        self.assertIn('company/init_templates/hosts/opencode/plugins/spielos-notifications.ts', config)
+        # This checkout vendors its host adapters at the repo root
+        # (.opencode/), so the plugin path is the local one, not the
+        # init_templates copy that scaffolded user homes receive.
+        self.assertIn('./.opencode/plugins/spielos-notifications.ts', config)
         self.assertIn("default_agent", config)
-        plugin = (root / "company/init_templates/hosts/opencode/plugins/spielos-notifications.ts").read_text()
+        self.assertTrue((root / ".opencode/agents/director.md").is_file())
+        self.assertTrue((root / ".opencode/commands/start.md").is_file())
+        plugin = (root / ".opencode/plugins/spielos-notifications.ts").read_text()
         self.assertIn("SpielOS1 event-driven notification surface", plugin)
         self.assertIn("ctx.session.synthetic", plugin)
         self.assertIn('"notifications", "ack"', plugin)

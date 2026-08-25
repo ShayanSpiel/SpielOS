@@ -136,7 +136,8 @@ class StrategyKernelTests(unittest.TestCase):
         with redirect_stdout(captured):
             self.assertEqual(0, main(["catalog"]))
         catalog = json.loads(captured.getvalue())
-        self.assertEqual("6.2.0", catalog["runtime"]["version"])
+        from company.runtime.config import VERSION
+        self.assertEqual(VERSION, catalog["runtime"]["version"])
         self.assertEqual(payload["state_hash"],
                          catalog["runtime"]["strategy_kernel"]["state_hash"])
 

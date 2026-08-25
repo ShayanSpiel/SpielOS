@@ -20,6 +20,8 @@ DEFAULT_DB = PROJECT_ROOT / ".spielos" / "state" / "company.sqlite"
 def build_parser():
     parser = argparse.ArgumentParser(prog="python3 -m company")
     parser.add_argument("--db", default=str(DEFAULT_DB))
+    parser.add_argument("--version", action="store_true",
+                        help="print the spielos version and exit")
     commands = parser.add_subparsers(dest="command", required=True)
     departments_parser = commands.add_parser("departments")
     departments_parser.add_argument("--json", action="store_true")
@@ -241,7 +243,12 @@ def _runtime_mode(args) -> str | None:
 
 
 def main(argv=None):
+    from .runtime.config import VERSION
+
     args = build_parser().parse_args(argv)
+    if getattr(args, "version", False):
+        print(f"spielos {VERSION}")
+        return 0
     mode = _runtime_mode(args)
     runtime = Runtime(args.db, readonly=(mode == "read")) if mode else None
     exit_code = 0
@@ -719,6 +726,8 @@ def _render_default(args, output) -> str:
     projection: they are machine views or runtime plumbing.
     """
     command = args.command
+    if command == "refresh":
+        return render_refresh(output)
     if command == "departments":
         return render_departments(output)
     if command == "strategy":
@@ -831,6 +840,17 @@ def render_notification_ack(item):
              f"- Kind: `{item['kind']}`",
              f"- Goal: `{item['goal_id']}`",
              f"- Status: `{item['status']}`"]
+    return "\n".join(lines) + "\n"
+
+
+def render_refresh(value):
+    """Card for `company refresh` — the update step after `pipx upgrade`."""
+    lines = ["# SpielOS home refreshed", "",
+             f"- Refreshed files: `{value.get('refreshed_files', 0)}`",
+             "- Preserved: strategy, assets, departments, installed agents, "
+             "config.user.json, .spielos/ state"]
+    lines += ["", "Confirm with `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.agents "
+              "python3 -B -m company status`."]
     return "\n".join(lines) + "\n"
 
 

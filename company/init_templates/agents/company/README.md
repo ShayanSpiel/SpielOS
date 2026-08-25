@@ -3,15 +3,20 @@
 ## Install (one line)
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/SpielOS/main/install.sh | sh
+pipx install spielos && spielos init
 ```
 
-The installer installs `pipx` for you when missing, installs `spielos`, and —
-in an empty folder — runs first-run init right there (it asks in folders that
-have content). Re-running it updates an existing install. By hand:
+## Update (one line)
 
 ```sh
-pipx install "spielos @ git+https://github.com/ShayanSpiel/SpielOS.git" && spielos init
+pipx upgrade spielos && spielos refresh
+```
+
+No pipx yet? The bootstrap installer sets up Python/pipx/spielos and runs
+first-run init in an empty folder automatically:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/SpielOS/main/install.sh | sh
 # or, from a checkout of this repository:
 pipx install . && spielos init
 ```
