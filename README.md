@@ -16,7 +16,7 @@ clients of the same persisted state.
 ## Install (one line)
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/SpielOS1/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/SpielOS/main/install.sh | sh
 ```
 
 The installer checks Python 3.11+, installs `pipx` for you when it is missing
@@ -28,7 +28,7 @@ command updates an existing install.
 Prefer to do it by hand?
 
 ```sh
-pipx install "spielos @ git+https://github.com/ShayanSpiel/SpielOS1.git" && spielos init
+pipx install "spielos @ git+https://github.com/ShayanSpiel/SpielOS.git" && spielos init
 ```
 
 `spielos init` vendors a complete, self-contained harness home into the current

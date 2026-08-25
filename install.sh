@@ -2,14 +2,14 @@
 # SpielOS installer — installs everything needed, then offers first-run init.
 #
 # One line:
-#   curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/SpielOS1/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/SpielOS/main/install.sh | sh
 #
 # The script is idempotent: re-running it upgrades an existing install.
 # Override the source repository with SPIELOS_REPO=<git-url>.
 
 set -eu
 
-REPO="${SPIELOS_REPO:-https://github.com/ShayanSpiel/SpielOS1.git}"
+REPO="${SPIELOS_REPO:-https://github.com/ShayanSpiel/SpielOS.git}"
 
 # ---- output helpers --------------------------------------------------------
 

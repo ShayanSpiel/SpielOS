@@ -10,7 +10,7 @@ agent. Authority for architecture and doctrine: `company/README.md` below.
 ## Install (one line)
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/SpielOS1/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/SpielOS/main/install.sh | sh
 ```
 
 The installer installs `pipx` for you when missing, installs `spielos`, and —
@@ -18,7 +18,7 @@ in an empty folder — runs first-run init right there (it asks in folders that
 have content). Re-running it updates an existing install. By hand:
 
 ```sh
-pipx install "spielos @ git+https://github.com/ShayanSpiel/SpielOS1.git" && spielos init
+pipx install "spielos @ git+https://github.com/ShayanSpiel/SpielOS.git" && spielos init
 # or, from a checkout of this repository:
 pipx install . && spielos init
 ```
