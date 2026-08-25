@@ -31,6 +31,10 @@ def build_parser():
                       help="single-department appliance: spine only, no example departments, no website skills")
     init.add_argument("--department", action="append", default=[],
                       help="with --minimal: vendor this department from templates (repeatable)")
+    init.add_argument("-y", "--yes", action="store_true",
+                      help="non-interactive: accept defaults, never prompt")
+    init.add_argument("--json", action="store_true",
+                      help="print the machine-readable receipt instead of the human card")
     add_cmd = commands.add_parser("add", help="install a department bundle (.sdep) or built-in id into this home")
     add_cmd.add_argument("source", help="path/to.bundle.sdep, bundle dir, or built-in department id")
     add_cmd.add_argument("--force", action="store_true")
@@ -243,15 +247,11 @@ def main(argv=None):
     exit_code = 0
     try:
         if args.command == "init":
-            from .runtime.bootstrap import scaffold
-            receipt = scaffold(Path(args.dir).expanduser(), force=args.force,
-                               minimal=args.minimal,
-                               departments=args.department or None)
-            print(f"SpielOS harness scaffolded at {receipt['root']} "
-                  f"({receipt['files_written']} files)")
-            for step in receipt["next_steps"]:
-                print(f"  - {step}")
-            return 0
+            from .runtime.onboard import run_init
+            return run_init(dir=args.dir, force=args.force,
+                            minimal=args.minimal,
+                            departments=args.department or None,
+                            assume_yes=args.yes, as_json=args.json)
         if args.command == "add":
             from .runtime.export import add_department
             receipt = add_department(args.source, force=args.force)
@@ -396,16 +396,16 @@ def main(argv=None):
             if args.runner_command == "tick":
                 output = runner.tick(args.goal_id, args.max_advances)
             elif args.runner_command == "watch":
-                # The daemon's watch cycle delivers pending notifications on
-                # every tick so they do not accumulate unseen while it is on.
-                from .runtime.notifications import deliver_pending
+                # The daemon reports pending attention but never acknowledges
+                # it. Only a host that actually displays an exact id may mark
+                # that notification delivered.
+                from .runtime.notifications import pending_notifications
                 for result in runner.watch(args.interval, args.goal_id, args.max_ticks):
-                    delivered = deliver_pending(runtime.store)
-                    print(json.dumps({**result, "notifications_delivered": delivered},
+                    pending = len(pending_notifications(runtime.store))
+                    print(json.dumps({**result, "notifications_pending": pending},
                                      ensure_ascii=False, default=str), flush=True)
                 return 0
             elif args.runner_command == "wake":
-                from .runtime.service import RunnerService
                 for event in runner.wake(
                         args.goal_id, every_seconds=args.every,
                         instruction=args.instruction, at=args.at,

@@ -10,19 +10,22 @@ agent. Authority for architecture and doctrine: `company/README.md` below.
 ## Install (one line)
 
 ```sh
-pipx install spielos && spielos init
+curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/SpielOS1/main/install.sh | sh
+```
+
+The installer installs `pipx` for you when missing, installs `spielos`, and
+offers first-run init. By hand:
+
+```sh
+pipx install "spielos @ git+https://github.com/ShayanSpiel/SpielOS1.git" && spielos init
+# or, from a checkout of this repository:
+pipx install . && spielos init
 ```
 
 `spielos init` vendors a complete, self-contained harness into the current
 directory — `.agents/` spine, `.spielos/` private state, OpenCode/Codex host
 adapters, `opencode.json`, `AGENTS.md`, and a gitignore — with zero runtime
-dependency on the installed package afterward. Until the package is on PyPI:
-
-```sh
-pipx install "spielos @ git+https://github.com/shayanspiel/spielos-harness.git" && spielos init
-# or, from this repository:
-pipx install ./.agents && spielos init
-```
+dependency on the installed package afterward.
 
 ## Departments as products (lego extraction)
 

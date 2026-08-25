@@ -129,6 +129,37 @@ class MemorySemanticsTests(unittest.TestCase):
         self.assertEqual("completed", result["cycle"]["run_status"])
         self.assertEqual((), self.runtime.store.memories("memory_test", goal["id"]))
 
+    def test_learning_can_cite_evidence_emitted_by_the_same_result(self):
+        goal = self.runtime.create_goal(
+            name="Learn from the current result", owner_id="memory_test",
+            metric="outputs", operator="ge", target=1,
+            config={"memory_fixture": "same_result"})
+        handler = self.runtime.registry["memory_test"]
+
+        def evaluate(ctx, action_result):
+            return StageResult(
+                "goal_check", {"outputs": 0}, RunStatus.COMPLETED,
+                evaluation={"verdict": "continue", "goal_met": False,
+                            "metrics": {"outputs": 0}, "validity": "business",
+                            "next_experiment": {}},
+                evidence=[{"ref": "current-output", "kind": "output",
+                           "source": "researcher", "payload": {"variant": "square"}}],
+                learnings=[{
+                    "claim": "Square framing is reusable for this workflow",
+                    "reusable": True,
+                    "decision_relevance": "Choose the next research frame",
+                    "evidence_refs": ["current-output"],
+                    "applies_to": {"metrics": ["outputs"], "workflows": ["primary"]},
+                }])
+
+        original = handler.evaluate
+        handler.evaluate = evaluate
+        self.addCleanup(setattr, handler, "evaluate", original)
+        self.runtime.once(goal["id"])
+        memories = self.runtime.store.memories("memory_test", goal["id"])
+        self.assertEqual(1, len(memories))
+        self.assertEqual(1, len(memories[0]["evidence"]["evidence_ids"]))
+
     def test_later_related_decision_retrieves_and_uses_ancestor_memory(self):
         parent = self.learning_goal()
         memory = self.runtime.store.memories("memory_test", parent["id"])[0]

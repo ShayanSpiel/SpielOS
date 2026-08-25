@@ -22,7 +22,7 @@ from .templates import SIGNATURE_HTML, SIGNATURE_TEXT
 # http(s) URL in a rendered email must live on these domains, so a mismatched
 # CTA (e.g. cal.com) never reaches the review gate again. Substring/host match,
 # case-insensitive, on the URL's hostname.
-ALLOWED_LINK_DOMAINS = ("spielos.xyz", "linkedin.com", "x.com")
+ALLOWED_LINK_DOMAINS = ("spielos.xyz", "linkedin.com", "x.com", "t.me")
 
 
 def _link_domain_violations(body_html: str) -> list:

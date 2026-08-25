@@ -15,13 +15,8 @@ Intended API contract (implementer must make every test pass by editing ONLY
    from a dead process must never report `running`, and `start()` must replace
    it with fresh metadata (reboot cleanup).
 
-2. Notifications: `company.runtime.notifications` (NEW module) delivers the
-   persisted pending notifications that the runner accumulates. Expose at least
-   one of:
-     - `deliver_pending(store, limit=100) -> int`   (marks pending notifications
-       delivered via store.acknowledge_notification; returns how many)
-   The runner watch cycle must call the delivery path so pending notifications
-   do not accumulate unseen while the runner is on.
+2. Notifications remain pending across runner ticks. Only a host that actually
+   surfaces exact notification ids may acknowledge them.
 
 3. Watcher: `Runner.watch(interval_seconds=..., goal_id=..., max_ticks=...)`
    keeps a configurable interval (not fixed at 2s) and stays bounded; the CLI
@@ -227,7 +222,7 @@ class RunnerNotificationTests(unittest.TestCase):
         result = Runner(self.runtime).tick(goal["id"])
         self.assertTrue(result["pending_notifications"])
 
-    def test_notifications_module_delivers_pending(self):  # expected after implementation
+    def test_notifications_require_an_exact_host_surface_receipt(self):
         try:
             from company.runtime import notifications
         except ImportError as exc:
@@ -243,9 +238,13 @@ class RunnerNotificationTests(unittest.TestCase):
         remaining = [row for row in self.runtime.store.notifications("pending")
                      if row["goal_id"] == goal["id"]
                      and row["kind"] == "approval_required"]
-        self.assertEqual([], remaining,
-                         "the runner delivery path must acknowledge pending "
-                         "notifications for the goal")
+        self.assertEqual(1, len(remaining),
+                         "discovery by the runner must not acknowledge unseen attention")
+        deliver(self.runtime.store, surfaced_ids=[remaining[0]["id"]])
+        remaining = [row for row in self.runtime.store.notifications("pending")
+                     if row["goal_id"] == goal["id"]
+                     and row["kind"] == "approval_required"]
+        self.assertEqual([], remaining)
 
 
 if __name__ == "__main__":

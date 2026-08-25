@@ -16,19 +16,29 @@ clients of the same persisted state.
 ## Install (one line)
 
 ```sh
-pipx install spielos && spielos init
+curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/SpielOS1/main/install.sh | sh
+```
+
+The installer checks Python 3.11+, installs `pipx` for you when it is missing
+(brew or pip — no manual steps), installs `spielos`, and offers to run the
+first-run init right away. Re-running it upgrades an existing install.
+
+Prefer to do it by hand?
+
+```sh
+pipx install "spielos @ git+https://github.com/ShayanSpiel/SpielOS1.git" && spielos init
 ```
 
 `spielos init` vendors a complete, self-contained harness home into the current
 directory — `.agents/company/` spine, `.spielos/` private state, OpenCode/Codex
 host adapters, `opencode.json`, `AGENTS.md`, gitignore — with zero runtime
-dependency on the installed package afterward.
+dependency on the installed package afterward. It verifies the new home runs
+before it reports success, and detects which host (OpenCode / Codex) you have.
 
-Until published on PyPI:
-
-```sh
-pipx install "spielos @ git+https://github.com/shayanspiel/SpielOS1.git" && spielos init
-```
+Interactive on a terminal: pick **full harness** (everything) or a
+**minimal appliance** (spine + one department). Scripted and CI runs stay
+deterministic: add `-y/--yes` to skip prompts, `--json` for a machine-readable
+receipt; exit code 0 means verified, 1 means failed with an actionable message.
 
 ## Departments as products
 

@@ -55,6 +55,15 @@ def template_root() -> Path:
 _template_root = template_root  # backward-compatible alias
 
 
+def available_departments() -> list[str]:
+    """Department ids vendorable with ``init --minimal --department ID``."""
+    root = template_root() / "agents" / "company" / "departments"
+    if not root.is_dir():
+        return []
+    return sorted(entry.name for entry in root.iterdir()
+                  if entry.is_dir() and not entry.name.startswith(("_", ".")))
+
+
 def _copy_tree(src: Path, dst: Path, overwrite: bool = False,
                skip=None) -> list[str]:
     written: list[str] = []
@@ -76,22 +85,29 @@ def _copy_tree(src: Path, dst: Path, overwrite: bool = False,
 
 
 def scaffold(target: Path | None = None, *, force: bool = False,
-             minimal: bool = False, departments: list[str] | None = None) -> dict:
+             minimal: bool = False, departments: list[str] | None = None,
+             on_phase=None) -> dict:
     """Materialize a complete harness home. Returns a receipt dict.
 
     ``minimal=True`` ships the spine with an EMPTY departments/ folder and
     no website skills — a single-department appliance. Pass
     ``departments=["id", ...]`` to also vendor those from the templates.
+    ``on_phase(label)`` is called before each materialization chunk so an
+    interactive driver can show progress; it is optional plumbing and
+    never changes what gets written.
     """
     root = (target or Path.cwd()).resolve()
     templates = template_root()
     written: list[str] = []
+    notify = on_phase or (lambda label: None)
 
     agents_dst = root / ".agents"
     if (agents_dst / "company" / "runtime").exists() and not force:
         raise FileExistsError(
-            f"{agents_dst / 'company'} already exists; use --force to overwrite")
+            "this folder already has a SpielOS home (.agents/company); "
+            "re-run with --force to overwrite")
 
+    notify("Vendoring harness spine")
     if minimal:
         # Shared cross-department modules are spine, not lego — always kept.
         spine_dept_files = {"company/departments/__init__.py",
@@ -117,18 +133,20 @@ def scaffold(target: Path | None = None, *, force: bool = False,
     else:
         written += _copy_tree(templates / "agents", root / ".agents",
                               overwrite=force)
-
-        # Host adapters.
+    notify("Installing host adapters (OpenCode, Codex)")
+    # Host adapters.
     for name in ("opencode", "codex"):
         src = templates / "hosts" / name
         if src.is_dir():
             written += _copy_tree(src, root / ("." + name), overwrite=force)
 
     # Private state/data/artifact trees (empty on purpose).
+    notify("Creating private state tree (.spielos)")
     for rel in (".spielos/state", ".spielos/data", ".spielos/artifacts"):
         (root / rel).mkdir(parents=True, exist_ok=True)
 
     # Credential contract example.
+    notify("Writing credential contract")
     env_example = templates / "dot-env-example"
     if env_example.is_file():
         dest = root / ".spielos" / ".env.example"
@@ -137,6 +155,7 @@ def scaffold(target: Path | None = None, *, force: bool = False,
             written.append(str(dest))
 
     # Host config: generic, no analytics/provider keys baked in.
+    notify("Writing host config (opencode.json)")
     opencode_json = root / "opencode.json"
     if force or not opencode_json.exists():
         opencode_json.write_text(json.dumps({
@@ -147,6 +166,7 @@ def scaffold(target: Path | None = None, *, force: bool = False,
         written.append(str(opencode_json))
 
     # Harness operating doc for hosts (AGENTS.md), website-agnostic.
+    notify("Writing operating doc (AGENTS.md)")
     agents_md = root / "AGENTS.md"
     if force or not agents_md.exists():
         agents_md.write_text(_AGENTS_MD)
@@ -174,7 +194,6 @@ def scaffold(target: Path | None = None, *, force: bool = False,
             "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.agents python3 -B -m company status",
             "Make it yours: edit .agents/company/strategy/ (ICP, voice) and departments.",
             "Set credentials in .spielos/.env (see .spielos/.env.example).",
-            "Install the OpenCode plugin deps: cd .opencode && npm install",
         ],
     }
 

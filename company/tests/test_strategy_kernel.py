@@ -6,6 +6,7 @@ import io
 import json
 import tempfile
 import unittest
+from unittest.mock import patch
 from contextlib import redirect_stdout
 from pathlib import Path
 
@@ -92,6 +93,18 @@ class StrategyKernelTests(unittest.TestCase):
             self.assertIn("policy.voice.copy_shape", ids)
             self.assertEqual(0, observed["memory_count"])
 
+    def test_default_goal_does_not_load_the_legacy_kernel(self):
+        goal = Goal(
+            id="goal-simple", name="Run a simple workflow", owner_id="content",
+            metric="outputs", operator="ge", target=1, deadline=None,
+            parent_id=None, goal_status="active", config={})
+        with patch("company.runtime.strategy.load_strategy_kernel",
+                   side_effect=AssertionError("legacy kernel should be opt-in")):
+            context = select_strategy_context(goal)
+        self.assertFalse(context["kernel_loaded"])
+        self.assertEqual([], context["sections"])
+        self.assertEqual("outputs", context["current_intent"]["metric"])
+
     def test_malformed_or_escaping_source_references_fail_closed(self):
         manifest = json.loads(MANIFEST_PATH.read_text())
         manifest["layers"]["intent"][0]["source"] = "../outside.md"
@@ -123,7 +136,7 @@ class StrategyKernelTests(unittest.TestCase):
         with redirect_stdout(captured):
             self.assertEqual(0, main(["catalog"]))
         catalog = json.loads(captured.getvalue())
-        self.assertEqual("6.0.0", catalog["runtime"]["version"])
+        self.assertEqual("6.2.0", catalog["runtime"]["version"])
         self.assertEqual(payload["state_hash"],
                          catalog["runtime"]["strategy_kernel"]["state_hash"])
 

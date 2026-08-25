@@ -381,9 +381,27 @@ class EmailWorkflow(GoalHandler):
             proposal = {"owner_id": "outbound", "from_version": self.version,
                         "target_version": ctx.goal.config.get("system_improvement_target_version", "2.0.1-compat"),
                         "problem": reason,
+                        "observed_reality": reason,
+                        "diagnosis_level": "system",
+                        "causal_hypothesis": (
+                            "The outbound transport implementation or provider mapping prevented "
+                            "the approved recipient set from being sent completely."),
+                        "smallest_intervention": (
+                            "Repair only the outbound email workflow or provider mapping needed "
+                            "to make the same approved send complete."),
+                        "expected_measurable_effect": (
+                            "A same-configuration retest sends every approved recipient and "
+                            "produces provider evidence without transport contamination."),
+                        "stop_condition": (
+                            "Stop after the declared acceptance tests pass and one same-variable "
+                            "retest is no longer contaminated; otherwise keep the repair blocked."),
+                        "non_goals": [
+                            "Change the offer, recipients, message, or business target",
+                            "Treat technical acceptance as market evidence",
+                            "Modify unrelated Departments or runtime architecture",
+                        ],
                         "allowed_files": ["company/departments/outbound/email_workflow.py", "company/departments/outbound/workflows/email/providers.py"],
                         "acceptance_tests": [
-                            "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.agents python3 -B -m unittest discover -s company/tests -q",
                             "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.agents python3 -B -m unittest discover -s company/tests -q",
                         ]}
             evaluation = {"verdict": "invalid", "goal_met": False, "metrics": metrics,

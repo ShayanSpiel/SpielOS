@@ -2,7 +2,7 @@
 """
 SpielOS Outbound — configuration.
 
-Everything is driven by environment variables (see `.agents/company/.env.example`).
+Everything is driven by environment variables (see `company/.env.example`).
 The one private company env file lives at `.spielos/.env` and is ignored.
 """
 
@@ -11,8 +11,14 @@ from pathlib import Path
 
 
 SCRIPT_DIR = Path(__file__).parent.resolve()
-AGENTS_DIR = SCRIPT_DIR.parents[4]
-PROJECT_ROOT = AGENTS_DIR.parent
+from .....runtime.paths import find_project_root
+
+# Project root discovery is centralized (runtime/paths.py): SPIELOS_HOME env,
+# nearest ancestor containing .spielos/state or .agents/company, else the
+# vendored checkout. Works identically for the product repo and for homes
+# where this package is vendored under .agents/company/.
+PROJECT_ROOT = find_project_root()
+AGENTS_DIR = PROJECT_ROOT / ".agents"
 DATA_DIR = Path(os.environ.get(
     "SPIELOS_DATA_DIR", PROJECT_ROOT / ".spielos" / "data" / "outbound")).expanduser()
 ENV_PATH = Path(os.environ.get(
@@ -125,7 +131,7 @@ def validate() -> None:
     if missing:
         raise SystemExit(
             f"ERROR: {missing} not set for provider '{EMAIL_PROVIDER}'. "
-            f"Add it to {ENV_PATH} (see .agents/company/.env.example)."
+            f"Add it to {ENV_PATH} (see company/.env.example)."
         )
 
     if not DATABASE_PATH.exists():

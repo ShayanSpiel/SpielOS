@@ -147,14 +147,38 @@ def strategy_kernel_summary(kernel: dict[str, Any] | None = None) -> dict[str, A
 
 def select_strategy_context(goal: Any, kernel: dict[str, Any] | None = None,
                             *, max_sections: int = MAX_CONTEXT_SECTIONS) -> dict[str, Any]:
-    """Select current Intent and only explicitly relevant strategy sections."""
+    """Select direct strategy references only when a Goal explicitly asks.
 
-    kernel = kernel or load_strategy_kernel()
+    Most Goals need their measurable intent, not a four-layer strategy graph.
+    Avoid loading or validating the legacy Kernel on every runtime transition;
+    an explicit ``strategy_context`` selector keeps the old bounded reference
+    view available for workflows that genuinely consume it.
+    """
+
     config = goal.config if hasattr(goal, "config") else goal.get("config", {})
     owner_id = goal.owner_id if hasattr(goal, "owner_id") else goal.get("owner_id")
     selector = config.get("strategy_context") or {}
     if not isinstance(selector, dict):
         selector = {}
+    current_intent = {
+        "goal_id": goal.id if hasattr(goal, "id") else goal.get("id"),
+        "name": goal.name if hasattr(goal, "name") else goal.get("name"),
+        "metric": goal.metric if hasattr(goal, "metric") else goal.get("metric"),
+        "operator": goal.operator if hasattr(goal, "operator") else goal.get("operator"),
+        "target": goal.target if hasattr(goal, "target") else goal.get("target"),
+    }
+    if not selector and kernel is None:
+        return {
+            "state_hash": None,
+            "current_intent": current_intent,
+            "selector": {"topics": [], "scopes": [], "layers": []},
+            "sections": [],
+            "section_limit": MAX_CONTEXT_SECTIONS,
+            "memory_separate": True,
+            "strategy_mutable": False,
+            "kernel_loaded": False,
+        }
+    kernel = kernel or load_strategy_kernel()
     topics = selector.get("topics") or ()
     scopes = selector.get("scopes") or (owner_id,)
     layers = selector.get("layers") or ("model", "policy", "constitution")
@@ -182,17 +206,12 @@ def select_strategy_context(goal: Any, kernel: dict[str, Any] | None = None,
             break
     return {
         "state_hash": kernel["state_hash"],
-        "current_intent": {
-            "goal_id": goal.id if hasattr(goal, "id") else goal.get("id"),
-            "name": goal.name if hasattr(goal, "name") else goal.get("name"),
-            "metric": goal.metric if hasattr(goal, "metric") else goal.get("metric"),
-            "operator": goal.operator if hasattr(goal, "operator") else goal.get("operator"),
-            "target": goal.target if hasattr(goal, "target") else goal.get("target"),
-        },
+        "current_intent": current_intent,
         "selector": {"topics": sorted(topic_set), "scopes": sorted(scope_set),
                      "layers": sorted(layer_set)},
         "sections": selected,
         "section_limit": MAX_CONTEXT_SECTIONS,
         "memory_separate": True,
         "strategy_mutable": False,
+        "kernel_loaded": True,
     }

@@ -27,9 +27,10 @@ Intended API contract (implementer must make every test pass by editing ONLY
 2. V1-only APIs are GONE: no `client.session.promptAsync`, no
    `client.tui.showToast`, no `command.execute.before` hook, no `$`/BunShell
    factory parameters.
-3. The compatibility adapter uses V2 event subscription only. It owns no
-   timer, polling, session prompt, heartbeat, or `runner tick` fallback; the
-   deterministic CLI wake command is the sole attached-session wake path.
+3. The SpielOS1 adapter uses V2 event subscription only. On session.idle it
+   reads pending notifications, surfaces them through `session.synthetic`, and
+   acknowledges exact ids only after display. It owns no timer, heartbeat,
+   watchdog, or `runner tick` fallback.
 4. T2 (load contract under bun): importing the module yields `mod.default`
    with the id/setup shape; invoking `setup` with a hermetic stub Context
    resolves to a cleanup function; invoking cleanup resolves without
@@ -183,11 +184,13 @@ class PluginExportContractStaticTests(unittest.TestCase):
 
     def test_v2_apis_used(self):
         self.assertIn("ctx.event.subscribe()", self.source)
-        self.assertIn("event.type === \"session.idle\"", self.source)
+        self.assertIn("event.type !== \"session.idle\"", self.source)
         self.assertNotIn("runner tick", self.source)
         self.assertNotIn("setInterval", self.source)
         self.assertNotIn("ctx.session.prompt({", self.source)
-        self.assertNotIn("ctx.session.synthetic({", self.source)
+        self.assertIn("ctx.session.synthetic({", self.source)
+        self.assertIn('"notifications", "list", "--status", "pending"', self.source)
+        self.assertIn('["notifications", "ack", item.id, "--json"]', self.source)
 
     def test_setup_returns_cleanup_without_a_second_watch_loop(self):
         self.assertIn("return async () => {", self.source)

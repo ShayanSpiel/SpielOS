@@ -56,8 +56,12 @@ class Director(GoalHandler):
                                decision={"type": "surface_attention",
                                          "rationale": "A child run requires approval or remediation",
                                          "payload": payload})
-        invalid = [c for c in children if c.get("evaluation") and
-                   c["evaluation"].get("validity") in ("contaminated", "invalid")]
+        invalid = [
+            c for c in children
+            if c.get("evaluation")
+            and c["evaluation"].get("validity") in ("contaminated", "invalid")
+            and not _existing_repair(children, c)
+        ]
         if invalid:
             child = invalid[0]
             child_evidence_ids = [
@@ -392,6 +396,35 @@ def _lineage_defects(lineage):
     if not lineage.get("non_goals"):
         defects.append("non_goals")
     return defects
+
+
+def _existing_repair(children, originating_child):
+    """Return the durable repair already assigned to one invalid Run.
+
+    Historical invalid evidence remains invalid after a repair. Without this
+    lookup every later Director observation creates the same repair again.
+    The originating Run is the identity boundary; failed same-scope attempts
+    stay on their existing system-improvement Goal.
+    """
+    evaluation = originating_child.get("evaluation") or {}
+    originating_run_id = evaluation.get("run_id")
+    proposal = (evaluation.get("next_experiment") or {}).get("system_improvement") or {}
+    if not originating_run_id or not proposal:
+        return None
+    for candidate in children:
+        if candidate.get("owner_id") != "system-improvement":
+            continue
+        if candidate.get("goal_status") in {"abandoned", "expired"}:
+            continue
+        config = candidate.get("config") or {}
+        if config.get("originating_run_id") != originating_run_id:
+            continue
+        if config.get("owner_id") != proposal.get("owner_id"):
+            continue
+        if config.get("target_version") != proposal.get("target_version"):
+            continue
+        return candidate
+    return None
 
 
 def _runnable(child):

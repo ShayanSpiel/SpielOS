@@ -1,11 +1,9 @@
 """Delivery and payload assembly of persisted company notifications.
 
 Notifications are durable rows in the SQLite store, accumulated by the runtime
-while goals advance. Delivery marks a pending notification as delivered via
-``store.acknowledge_notification`` so it stops piling up unseen while the
-runner daemon is on. The daemon's watch loop (the CLI ``runner watch``
-command spawned by ``RunnerService.start``) calls ``deliver_pending`` after
-every tick.
+while goals advance. The runner may count pending rows, but only a host that
+actually surfaced an exact notification id may acknowledge it. This keeps
+approvals, blockers, and completion suggestions visible across daemon ticks.
 
 Delivery only records that the notification was surfaced — it never changes
 the goal's run state. An ``approval_required`` notification is *seen*, not
@@ -49,9 +47,12 @@ def recommended_next_action(goal, goal_status: str) -> str:
     owner_id = _goal_value(goal, "owner_id", "")
     config = _goal_value(goal, "config") or {}
     if owner_id == "system-improvement":
-        return ("Deploy or verify the approved change: review the acceptance "
-                "evidence and complete the change task (`company change complete`), "
-                "or open a follow-up system-improvement goal.")
+        if goal_status == "achieved":
+            return ("The bounded change is complete. Confirm its originating Goal "
+                    "entered a fresh retest; for a standalone repair, choose the "
+                    "next company Goal only if more work is needed.")
+        return ("Review and verify the failed or stopped change evidence, then "
+                "decide whether to retry the same approved scope.")
     if owner_id == "outbound":
         return ("Review the campaign outcome and decide the next step: resume or "
                 "continue the campaign, or escalate the outcome to the Director.")
@@ -142,16 +143,21 @@ def digest_payload(*, emitted_at: str, interval_seconds: float,
     }
 
 
-def deliver_pending(store, limit: int = 100) -> int:
-    """Deliver up to ``limit`` pending notifications; return how many.
+def pending_notifications(store, limit: int = 100) -> list[dict]:
+    """Return the durable rows a host may surface, without changing them."""
+    return store.notifications("pending", limit)
 
-    Delivery is persistent: every pending row (oldest first, matching the
-    store's ordering) is marked ``delivered`` with a ``delivered_at``
-    timestamp through the same store call the CLI ``notifications ack``
-    command uses. The digest and terminal follow-up kinds ride this path like
-    every other kind, so they never pile up unseen while the daemon is on.
+
+def deliver_pending(store, limit: int = 100, *, surfaced_ids=()) -> int:
+    """Acknowledge only exact ids a host confirms it displayed.
+
+    The return value remains the number of pending rows discovered for
+    compatibility with existing host callers. Passing no ``surfaced_ids`` is
+    a read-only operation and is the only mode used by the runner daemon.
     """
-    pending = store.notifications("pending", limit)
+    pending = pending_notifications(store, limit)
+    surfaced = {str(item) for item in surfaced_ids if item}
     for row in pending:
-        store.acknowledge_notification(row["id"])
+        if row["id"] in surfaced:
+            store.acknowledge_notification(row["id"])
     return len(pending)

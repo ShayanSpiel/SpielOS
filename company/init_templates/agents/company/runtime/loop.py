@@ -386,16 +386,30 @@ class Runtime:
         # goal status, so the record never shows an achievement preceding its
         # evidence.
         run = self.store.run(cycle["id"])
+        evidence_refs = {}
+        for evidence in (result.evidence or ()):
+            persisted = self.store.add_evidence(
+                goal.id, cycle["id"], evidence["kind"],
+                evidence.get("source", goal.owner_id), evidence.get("payload", {}),
+                evidence.get("validity", run["evidence_validity"]))
+            if evidence.get("ref"):
+                evidence_refs[str(evidence["ref"])] = persisted["id"]
+        # A reusable learning may cite evidence produced by this same result.
+        # Persist evidence first, then evaluate the claim against the complete
+        # current-Run evidence set.
         current_evidence = list(self.store.evidence(cycle["id"]))
         for learning in (result.learnings or ()):
-            memory = eligible_memory(learning, current_evidence, goal, run)
+            normalized = dict(learning)
+            refs = normalized.pop("evidence_refs", ())
+            if isinstance(refs, (list, tuple)):
+                resolved = [evidence_refs[str(ref)] for ref in refs
+                            if str(ref) in evidence_refs]
+                normalized["evidence_ids"] = list(dict.fromkeys([
+                    *(normalized.get("evidence_ids") or ()), *resolved]))
+            memory = eligible_memory(normalized, current_evidence, goal, run)
             if memory:
                 self.store.learn(goal.owner_id, goal.id, memory["claim"],
                                  memory["evidence"], memory["confidence"])
-        for evidence in (result.evidence or ()):
-            self.store.add_evidence(goal.id, cycle["id"], evidence["kind"],
-                                    evidence.get("source", goal.owner_id), evidence.get("payload", {}),
-                                    evidence.get("validity", run["evidence_validity"]))
         if result.decision:
             decision = dict(result.decision)
             requested = list(decision.get("evidence_ids") or ())
@@ -744,9 +758,39 @@ class Runtime:
         if origin_goal["goal_status"] != "active":
             return
         origin_cycle = self.store.cycle(origin_goal_id)
+        # A repair resumes one exact historical run. If the originating Goal
+        # has already moved beyond it, the repair-return hook is an idempotent
+        # no-op rather than a second continuation.
+        if origin_cycle["id"] != resume_id:
+            return
         if origin_cycle["run_status"] == "completed":
-            if self.continuation_decision(origin_goal_id)["eligible"]:
-                self.next(origin_goal_id, automatic=True)
+            evaluation = self.store.evaluation(resume_id)
+            if evaluation and evaluation.get("goal_met"):
+                return
+            # Technical repair recovery is deliberately not normal automatic
+            # continuation. The originating run is commonly contaminated or
+            # invalid, which correctly makes continuation_decision ineligible.
+            # Successful repair instead creates a fresh retest with the same
+            # business snapshot and controlled/changed variables, while the
+            # current owner version records the repaired implementation.
+            metadata = {
+                "run_type": origin["run_type"],
+                "parent_run_id": resume_id,
+                "triggered_by_run_id": child_cycle["id"],
+                "owner_version": self.registry[origin_goal["owner_id"]].version,
+                "config_snapshot": origin["config_snapshot"],
+                "controlled_variables": origin["controlled_variables"],
+                "changed_variables": origin["changed_variables"],
+                "evidence_validity": origin["evidence_validity"],
+            }
+            created = self.store.new_cycle(origin_goal_id, metadata)
+            self.store.event(origin_goal_id, created["id"], "run.started", {
+                "previous_run_id": resume_id,
+                "reason": "retest_after_technical_repair",
+                "repair_goal_id": child["id"],
+                "repair_run_id": child_cycle["id"],
+                "business_variables_preserved": True,
+            })
             return
         self.store.wake_goal(origin_goal_id, f"resume_run:{resume_id}")
 

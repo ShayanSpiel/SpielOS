@@ -4,7 +4,6 @@ import importlib
 import pkgutil
 
 from .. import departments as department_package
-from ..departments.outbound.email_workflow import EmailWorkflow
 from .director import Director
 from .models import Department, GoalHandler
 from .system_improvement import SystemImprovement
@@ -16,9 +15,14 @@ def handlers() -> dict[str, GoalHandler]:
     installed: dict[str, GoalHandler] = {
         "director": Director(),
         "system-improvement": SystemImprovement(),
-        # Reads historical v4 goals. New email work is owned by Outbound.
-        "email": EmailWorkflow(),
     }
+    try:
+        from ..departments.outbound.email_workflow import EmailWorkflow
+    except ModuleNotFoundError:
+        pass  # minimal appliance without Outbound: no legacy alias to serve
+    else:
+        # Reads historical v4 goals. New email work is owned by Outbound.
+        installed["email"] = EmailWorkflow()
     for module_info in pkgutil.iter_modules(department_package.__path__):
         if module_info.name.startswith("_"):
             continue

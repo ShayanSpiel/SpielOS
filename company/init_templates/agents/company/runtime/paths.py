@@ -1,15 +1,19 @@
 """Single derivation of the SpielOS project root.
 
-The harness historically assumed it always lived at `<repo>/.agents/company/`.
-That holds for repository-vendored installs but breaks for a pip-installed
-console script. Resolution order:
+Resolution order — deterministic first:
 
-1. ``SPIELOS_HOME`` environment variable (explicit override);
-2. nearest ancestor of the current working directory that looks like a
-   SpielOS home (contains ``.spielos/state`` or ``.agents/company``);
-3. the vendored repository layout this package file lives in
-   (``<repo>/.agents/company/runtime/paths.py`` -> ``<repo>``), so an
-   uninstalled checkout behaves exactly as before.
+1. **Vendored anchor**: if this very file lives inside a real SpielOS home
+   (its checkout root contains ``.spielos/`` or ``.agents/``), that root is
+   returned unconditionally. This is the historical behavior: every process
+   — runner, plugin, supervisor, cron — resolves to the same home no matter
+   what its cwd is.
+2. ``SPIELOS_HOME`` environment variable (explicit override for installed
+   console-script usage).
+3. Nearest ancestor of the current working directory that looks like a
+   SpielOS home. Only used when the package is *installed* (site-packages)
+   and therefore has no vendored home of its own.
+4. Last resort: the current working directory (fresh ``spielos init`` runs
+   before any state exists).
 """
 
 from __future__ import annotations
@@ -18,40 +22,63 @@ import os
 from pathlib import Path
 
 
+def _looks_like_home(candidate: Path) -> bool:
+    return ((candidate / ".spielos").is_dir()
+            or (candidate / ".agents" / "company").is_dir())
+
+
 def package_vendored_root() -> Path | None:
-    """Project root implied by this file's location, when vendored."""
-    candidate = Path(__file__).resolve().parents[3]
-    if (candidate / ".agents" / "company").is_dir():
-        return candidate
+    """Project root implied by this file's location, when vendored.
+
+    Detects both layouts:
+      vendored:  <home>/.agents/company/runtime/paths.py   -> <home>
+      flat:      <repo>/company/runtime/paths.py           -> <repo>  (this product repo)
+    """
+    file = Path(__file__).resolve()
+    vendored = file.parents[3]
+    if (vendored / ".agents" / "company").is_dir() and _looks_like_home(vendored):
+        return vendored
+    flat = file.parents[2]
+    if ((flat / "company" / "runtime").is_dir()
+            and not _in_site_packages(flat)):
+        return flat
     return None
 
 
 def find_project_root() -> Path:
     """Resolve the active SpielOS project root (see module docstring)."""
+    vendored = package_vendored_root()
+    if vendored is not None and not _in_site_packages(vendored):
+        return vendored
+
     env_home = os.environ.get("SPIELOS_HOME")
     if env_home:
         return Path(env_home).expanduser().resolve()
 
     cwd = Path.cwd().resolve()
     for candidate in (cwd, *cwd.parents):
-        if ((candidate / ".spielos" / "state").is_dir()
-                or (candidate / ".agents" / "company").is_dir()):
+        if _looks_like_home(candidate):
             return candidate
 
-    vendored = package_vendored_root()
-    if vendored is not None:
-        return vendored
-
-    # Last resort: treat the cwd as the project root (fresh `spielos init`
-    # runs before any state exists).
     return cwd
 
 
+def _in_site_packages(home: Path) -> bool:
+    return "site-packages" in str(home) or "/.venv/" in str(home) + "/"
+
+
 def skills_root(project_root: Path | None = None) -> Path:
-    """The skills namespace root: ``<project_root>/.agents/skills``."""
+    """The skills namespace root: ``<project_root>/.agents/skills``.
+
+    Kept for backward compatibility with vendored homes using the legacy
+    layout. Product-repo checkouts resolve department-owned skills through
+    :mod:`company.agents` instead.
+    """
     root = project_root or find_project_root()
     candidate = root / ".agents" / "skills"
     if candidate.is_dir():
         return candidate
-    # Vendored fallback for tooling that runs before init scaffolds skills.
-    return Path(__file__).resolve().parents[2] / "skills"
+    legacy = Path(__file__).resolve().parents[2] / "skills"
+    if legacy.is_dir():
+        return legacy
+    return candidate

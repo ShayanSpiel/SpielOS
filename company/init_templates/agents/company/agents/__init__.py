@@ -199,13 +199,22 @@ def _load_installed_agents() -> dict[str, AgentSpec]:
         agent_id = str(payload.get("id") or "").strip()
         if not agent_id:
             continue
+        skill_ids = payload.get("skill_ids")
+        if skill_ids is None:  # schema 1 compatibility
+            skill_ids = payload.get("skills") or ()
+        produces = payload.get("produces")
+        if produces is None:  # schema 1 compatibility
+            produces = payload.get("evidence_kinds") or ("artifact",)
+        permissions = payload.get("permissions")
+        if permissions is None:
+            permissions = ["read_strategy", "write_evidence", *(
+                f"use_connection:{item}" for item in (payload.get("connections") or ()))]
         values[agent_id] = AgentSpec(
             id=agent_id,
             description=str(payload.get("description") or agent_id),
-            skill_ids=tuple(str(item) for item in (payload.get("skill_ids") or ())),
-            permissions=tuple(str(item) for item in (
-                payload.get("permissions") or ("read_strategy", "write_evidence"))),
-            produces=tuple(str(item) for item in (payload.get("produces") or ("artifact",))),
+            skill_ids=tuple(str(item) for item in skill_ids),
+            permissions=tuple(str(item) for item in permissions),
+            produces=tuple(str(item) for item in produces),
         )
     return values
 

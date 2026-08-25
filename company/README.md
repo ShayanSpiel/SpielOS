@@ -3,19 +3,22 @@
 ## Install (one line)
 
 ```sh
-pipx install spielos && spielos init
+curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/SpielOS1/main/install.sh | sh
+```
+
+The installer installs `pipx` for you when missing, installs `spielos`, and
+offers first-run init. By hand:
+
+```sh
+pipx install "spielos @ git+https://github.com/ShayanSpiel/SpielOS1.git" && spielos init
+# or, from a checkout of this repository:
+pipx install . && spielos init
 ```
 
 `spielos init` vendors a complete, self-contained harness into the current
 directory — `.agents/` spine, `.spielos/` private state, OpenCode/Codex host
 adapters, `opencode.json`, `AGENTS.md`, and a gitignore — with zero runtime
-dependency on the installed package afterward. Until the package is on PyPI:
-
-```sh
-pipx install "spielos @ git+https://github.com/shayanspiel/spielos-harness.git" && spielos init
-# or, from this repository:
-pipx install ./.agents && spielos init
-```
+dependency on the installed package afterward.
 
 ## Departments as products (lego extraction)
 
@@ -417,14 +420,12 @@ tests can resolve only as inconclusive, while technical-only acceptance may
 resolve a technical Run's hypothesis but never a business hypothesis. An
 adjacent child or repair therefore cannot settle its parent's prediction.
 
-Memory is narrower than a Run event or evaluation: it is an evidence-backed
-reusable claim likely to change or better justify a future decision. A handler
-must explicitly mark the claim reusable, state its decision relevance and
-applicability, and cite valid Evidence IDs from the current Run. Routine
-completion and shortfall summaries, invalid support, and unscoped claims stay
-out of Memory. Retrieval is bounded to the current Goal and its ancestor Goals
-owned by the same Department. When the shared interpreter uses a claim, the
-persisted decision names the Memory ID and includes the claim in its rationale.
+Memory is optional and narrow: an evidence-backed reusable claim that can
+change a later decision. Routine summaries and generated text stay out. A
+handler may cite prior Evidence IDs or use a local evidence `ref`/`evidence_refs`
+pair when the Evidence and learning are emitted together. Retrieval remains
+bounded to the current Goal and its ancestors; cross-Department retrieval is
+explicitly opt-in through `memory_topics`.
 
 Cross-Department retrieval is opt-in and bounded. A reusable claim must set
 `share_scope: company`, name its `audience_departments`, and declare `topics`.
@@ -446,16 +447,13 @@ operationally untrustworthy attempts cannot trigger escalation. The proposal
 parks for explicit owner approval; approval authorizes the discriminating
 experiment only and never mutates strategy automatically.
 
-The Strategy Kernel is a read-only logical graph over existing authority, not a
-second strategy store. `strategy/kernel.json` maps exact authoritative Markdown
-sections into Intent, Model, Policy, and Constitution and exposes ICP,
-positioning, voice, and measurement as named views. Every Goal context contains
-its current measurable Intent plus at most eight sections selected by explicit
-`config.strategy_context.topics`, scopes, and layers; required safety rules
-still apply. Each section carries its source path and hash. Evidence and Memory
-remain separate, and neither an experiment proposal nor its approval can edit a
-strategy source. `company strategy` shows the reference-only state; topic/scope
-options show the same bounded context selector used by the runtime.
+Canonical strategy remains the Markdown authority: ICP, positioning, voice,
+and measurement. Ordinary Goals receive only their measurable intent and do
+not load a strategy graph. A Workflow that genuinely needs strategy must opt in
+with `config.strategy_context`; the legacy read-only Kernel then selects at
+most eight referenced sections. Safety and approval invariants remain runtime
+rules, not a cognitive "Constitution" layer. `company strategy` is an audit
+view over the static sources, not dynamic company reasoning.
 
 ## Safety and system improvement
 
