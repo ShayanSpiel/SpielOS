@@ -17,7 +17,9 @@ Template source resolution order:
 1. ``SPIELOS_TEMPLATE_DIR`` (a directory containing ``agents/``,
    ``opencode/``, ``codex/``, ``dot-env-example``);
 2. the bundled ``company/init_templates/`` package data;
-3. a vendored repository checkout this package was imported from.
+3. the installed ``spielos`` distribution (pipx/uv) when this code runs
+   vendored inside a home — refresh reads the newest release from there;
+4. a vendored repository checkout this package was imported from.
 """
 
 from __future__ import annotations
@@ -29,33 +31,95 @@ from pathlib import Path
 from .paths import package_vendored_root
 
 
+def _spielos_launcher_venv() -> Path | None:
+    """Virtualenv backing the ``spielos`` launcher on PATH, if resolvable."""
+    import shutil
+
+    exe = shutil.which("spielos")
+    if not exe:
+        return None
+    try:
+        with open(exe, encoding="utf-8", errors="replace") as handle:
+            first = handle.readline().strip()
+    except OSError:
+        return None
+    if not first.startswith("#!"):
+        return None
+    import shlex
+
+    parts = shlex.split(first[2:])
+    if parts and Path(parts[0]).name == "env":
+        parts = parts[1:]
+        while parts and parts[0].startswith("-"):
+            parts = parts[1:]
+    if not parts:
+        return None
+    python = Path(parts[0]).expanduser()
+    if not python.exists() or not python.name.startswith("python"):
+        return None
+    venv = python.resolve().parents[1]
+    return None if venv == venv.parent else venv
+
+
 def _installed_distribution_templates() -> Path | None:
     """init_templates shipped inside the installed ``spielos`` distribution.
 
     A vendored home has no bundled templates of its own, yet its runtime
-    must be able to refresh from the newest release. Look at every other
-    ``sys.path`` entry (pipx/uv venv site-packages) for the packaged
-    templates, skipping the tree this module is executing from.
+    must be able to refresh from the newest release. The installing tool's
+    environment (pipx, uv) is not on this interpreter's ``sys.path``, so
+    look for it directly: other ``sys.path`` entries first, then the
+    ``spielos`` launcher's virtualenv, then conventional install homes.
     """
+    import os
     import sys
 
     here = Path(__file__).resolve()
-    seen: set[Path] = set()
+    bases: list[Path] = []
+
+    # 1. Other sys.path entries (works when templates are merely shadowed).
     for entry in list(sys.path):
-        if not entry:
-            continue
+        if entry:
+            bases.append(Path(entry).expanduser())
+
+    # 2. The virtualenv behind the spielos launcher.
+    launcher_venv = _spielos_launcher_venv()
+    if launcher_venv is not None:
+        bases.append(launcher_venv)
+
+    # 3. Conventional pipx / uv tool locations.
+    home = Path.home()
+    pipx_home = os.environ.get("PIPX_HOME", "").strip()
+    pipx_roots = [Path(pipx_home)] if pipx_home else []
+    pipx_roots += [home / ".local" / "pipx",
+                   home / "Library" / "Application Support" / "pipx",
+                   home / ".local" / "share" / "pipx"]
+    for root in pipx_roots:
+        bases.append(root / "venvs" / "spielos")
+    uv_tools = os.environ.get("UV_TOOL_DIR", "").strip()
+    uv_roots = [Path(uv_tools)] if uv_tools else []
+    uv_roots.append(home / ".local" / "share" / "uv" / "tools")
+    for root in uv_roots:
+        bases.append(root / "spielos")
+
+    seen: set[Path] = set()
+    for base in bases:
         try:
-            base = Path(entry).expanduser().resolve()
+            base = base.expanduser().resolve()
         except OSError:
             continue
-        if base in seen:
+        if base in seen or not base.is_dir():
             continue
         seen.add(base)
         if here.is_relative_to(base):
             continue  # the tree we are running from (e.g. <home>/.agents)
-        candidate = base / "company" / "init_templates"
-        if (candidate / "agents").is_dir() and (candidate / "hosts").is_dir():
-            return candidate
+        candidates = [base]
+        for pattern in ("lib/python*/site-packages", "Lib/site-packages"):
+            candidates.extend(sorted(base.glob(pattern)))
+        for site_packages in candidates:
+            packaged = site_packages / "company" / "init_templates"
+            if ((packaged / "agents").is_dir()
+                    and (packaged / "hosts").is_dir()):
+                return packaged
     return None
 
 

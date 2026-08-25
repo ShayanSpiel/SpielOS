@@ -274,7 +274,10 @@ def main(argv=None):
         if args.command == "refresh":
             from .runtime.export import refresh_home
             receipt = refresh_home(force=True)
-            print(json.dumps(receipt, indent=2))
+            if getattr(args, "json", False):
+                print(json.dumps(receipt, indent=2))
+            else:
+                print(render_refresh(receipt))
             return 0
         if args.command == "agent" and args.agent_command == "compile":
             from .runtime.agent_compile import compile_agent
