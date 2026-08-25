@@ -1,6 +1,9 @@
-# SpielOS — the company harness
+# SpielOS — AI Company Operating System (Open Source)
 
-One durable loop for operating AI work as a company system:
+**SpielOS is an open-source AI company operating system**: a local harness for
+running your company with AI agents — durable goals, supervised runs, evidence,
+approvals, and **AI departments** that do real business work under one Director
+loop:
 
 ```text
 GOAL -> OBSERVE -> DECIDE -> ACT -> EVALUATE
@@ -10,8 +13,9 @@ GOAL -> OBSERVE -> DECIDE -> ACT -> EVALUATE
 
 The runtime owns every Goal, Run, approval, evidence record, and notification.
 Departments are **Lego packages**: self-contained folders that supply business
-behavior and never create another loop. Codex, OpenCode, and humans are all
-clients of the same persisted state.
+behavior and never create another loop. Codex, OpenCode, Claude Code, and
+humans are all clients of the same persisted state. Nothing lives in chat
+memory — close the session, the company keeps its state on disk.
 
 ## Install (one line)
 
@@ -40,12 +44,6 @@ pipx, spielos) and runs init in an empty folder automatically:
 ```sh
 curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/SpielOS/main/install.sh | sh
 ```
-
-`spielos init` vendors a complete, self-contained harness home into the current
-directory — `.agents/company/` spine, `.spielos/` private state, OpenCode/Codex
-host adapters, `opencode.json`, `AGENTS.md`, gitignore — with zero runtime
-dependency on the installed package afterward. It verifies the new home runs
-before it reports success, and detects which host (OpenCode / Codex) you have.
 
 Interactive on a terminal: pick **full harness** (everything) or a
 **minimal appliance** (spine + one department). Scripted and CI runs stay
@@ -79,13 +77,38 @@ Emits the OpenCode agent, Codex TOML, and roster entry from one WorkflowSpec.
 The worker runs only that workflow, produces only its declared evidence kinds,
 never edits files; approvals still park in the runtime.
 
-## Updating
+## Extracted workers you can run today
 
-```sh
-pipx upgrade spielos   # new CLI
-spielos refresh        # re-vendor spine + hosts into an existing home;
-                       # preserves strategy/, assets/, departments/, .spielos/
-```
+The same worker pattern is published standalone — install once into
+[Claude Code](https://claude.com/claude-code),
+[OpenCode](https://opencode.ai), or [Codex CLI](https://github.com/openai/codex)
+with one pasted command, and it works immediately:
+
+| Worker | Keyword it owns | Repo | Guide |
+|---|---|---|---|
+| Lead Researcher | AI lead research agent | [Lead-Researcher](https://github.com/ShayanSpiel/Lead-Researcher) | [Guide](https://spielos.xyz/landing/lead-researcher/) |
+| AI Keyword Research Agent | AI keyword research automation skill | [AI-Keyword-Research-Agent](https://github.com/ShayanSpiel/AI-Keyword-Research-Agent) | [Guide](https://spielos.xyz/landing/ai-keyword-research-agent/) |
+| Social Lead Researcher | LinkedIn lead research agent | [Social-Lead-Researcher](https://github.com/ShayanSpiel/Social-Lead-Researcher) | [Guide](https://spielos.xyz/landing/social-lead-researcher/) |
+
+More workers and agent skills: [Skills library](https://github.com/ShayanSpiel/Skills) ·
+[Prompt-cache audit tool](https://github.com/ShayanSpiel/CacheCatch) ·
+[full ecosystem on the profile hub](https://github.com/ShayanSpiel).
+
+## How a SpielOS-run company is organized
+
+| Concept | Meaning | Docs |
+|---|---|---|
+| Director | One loop that owns goals, routing, approvals, evidence | [How it works](https://spielos.xyz/features/director/) |
+| Departments | Outbound, Content, Design, Analytics, SEO — Lego packages | [Departments](https://spielos.xyz/features/departments/) |
+| Workflows | Repeatable playbooks inside a department | [Workflows](https://spielos.xyz/features/workflows/) |
+| Agents | Bounded executors — one job each | [Agents](https://spielos.xyz/features/agents/) |
+| Skills | Reusable methods an agent follows | [Skills](https://spielos.xyz/features/skills/) |
+| Evals | Deterministic rubric evaluation of produced work | [Evals](https://spielos.xyz/features/evals/) |
+| Artifacts | Evidence-backed outputs of every run | [Artifacts](https://spielos.xyz/features/artifacts/) |
+| Connections | Access to external systems (Buffer, PostHog, Search Console…) | [Connections](https://spielos.xyz/features/connections/) |
+
+See it running live — the public record of a company operated by this system:
+**[spielos.xyz/live](https://spielos.xyz/live/)**
 
 ## Layout
 
@@ -105,3 +128,9 @@ docs/               architecture notes
 
 Authority for architecture, vocabulary, pursuit semantics, safety rules, and
 the owner doctrine: `company/README.md`.
+
+---
+
+**SpielOS is built in the open by [Shayan Spiel](https://github.com/ShayanSpiel).**
+Want these AI departments built, supervised, and measured *for* your business?
+[Apply — free review](https://spielos.xyz/apply/) · free review · no required call.
