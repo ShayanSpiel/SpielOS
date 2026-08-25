@@ -275,6 +275,9 @@ def refresh_home(*, force: bool = True) -> dict:
     _sync(spine / "agents", home / "company" / "agents",
           preserve={"installed"})
     _sync(spine / "skills", home / "company" / "skills")
+    # Contract tests are spine, not user layer: stale assertions against
+    # old adapters are exactly what a refresh must replace.
+    _sync(spine / "tests", home / "company" / "tests")
     for top_level in spine.glob("*.py"):
         shutil.copy2(top_level, home / "company" / top_level.name)
         refreshed.append(str(home / "company" / top_level.name))
@@ -287,4 +290,5 @@ def refresh_home(*, force: bool = True) -> dict:
 
     return {"refreshed_files": len(refreshed),
             "preserved": ["strategy/", "assets/", "departments/",
-                          "agents/", "config.user.json", ".spielos/"]}
+                          "agents/installed/", "config.user.json",
+                          ".spielos/"]}
