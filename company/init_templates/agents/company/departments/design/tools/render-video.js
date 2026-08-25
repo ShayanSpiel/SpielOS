@@ -99,6 +99,7 @@ const PRODUCTION_CSS = join(ROOT, ".agents/company/departments/design/system/pro
 function checkNarrationContract(failures) {
   if (!existsSync(NARRATION_PATH)) { failures.push("narration.json missing"); return; }
   const narration = JSON.parse(readFileSync(NARRATION_PATH, "utf8"));
+  const maxDuration = Number(narration.max_duration_seconds || 55);
   const voice = narration.voice_selection;
   if (!voice) failures.push("narration.json: voice_selection empty — no pinned single voice");
   const mix = narration.mix || {};
@@ -135,8 +136,8 @@ function checkNarrationContract(failures) {
       prev = sc.start;
     }
     const last = scenes[scenes.length - 1];
-    if (narrationLed && (!Number.isFinite(st.duration) || Math.abs(st.duration - last?.end) > 0.02 || st.duration >= 60)) {
-      failures.push(`narration.json: scenario ${s} needs one narration-led duration under 60s matching its final scene`);
+    if (!narrationLed || !Number.isFinite(st.duration) || Math.abs(st.duration - last?.end) > 0.02 || st.duration > maxDuration) {
+      failures.push(`narration.json: scenario ${s} needs one narration-led duration at or below ${maxDuration}s matching its final scene`);
     }
   }
   if (voices.size > 1) failures.push(`narration.json: ${voices.size} different voices across scenarios (${[...voices].join(", ")}) — ONE voice required`);

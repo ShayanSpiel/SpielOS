@@ -73,23 +73,16 @@ fi
 
 # ---- 3. spielos ------------------------------------------------------------
 
-printf '%s' "${DIM}   installing spielos ...${RESET}"
-if pipx list 2>/dev/null | grep -q '^package spielos'; then
-    if pipx upgrade spielos >/dev/null 2>&1 || pipx install "$REPO" >/dev/null 2>&1; then
-        printf '%s\n' " done"
-        step "spielos upgraded"
-    else
-        printf '%s\n' ""
-        fail "'pipx upgrade spielos' failed — run it manually to see why."
-    fi
+printf '%s' "${DIM}   installing/updating spielos ...${RESET}"
+# --force re-pins the package to REPO even when an older install exists,
+# so "update" always pulls from the canonical source instead of whatever
+# location a previous install happened to use.
+if pipx install --force "$REPO" >/dev/null 2>&1; then
+    printf '%s\n' " done"
+    step "spielos CLI ready at $(command -v spielos) ${DIM}(global tool — not your project folder)${RESET}"
 else
-    if pipx install "$REPO" >/dev/null 2>&1; then
-        printf '%s\n' " done"
-        step "spielos installed from $REPO"
-    else
-        printf '%s\n' ""
-        fail "'pipx install $REPO' failed — run it manually to see why."
-    fi
+    printf '%s\n' ""
+    fail "'pipx install $REPO' failed — run it manually to see why."
 fi
 
 case ":$PATH:" in
@@ -97,22 +90,41 @@ case ":$PATH:" in
     *) info "note: '$HOME/.local/bin' is not on your PATH; add it to your shell profile." ;;
 esac
 
-# ---- 4. optional first-run init --------------------------------------------
+# ---- 4. the home: this folder ----------------------------------------------
+#
+# pipx installs the CLI globally; the SpielOS HOME (the files that matter)
+# is created by init in the folder you are standing in. Auto-create it here
+# when safe: interactively we ask; through a pipe (curl | sh) we proceed
+# only in an empty directory so nothing of yours is ever touched.
 
-NEXT="spielos init"
-if [ -t 0 ] && [ ! -e "./.agents/company" ] && [ ! -f ./opencode.json ]; then
-    existing=$(ls -A 2>/dev/null | grep -v -e '^\.' -e '^\.\.$' | head -3)
-    printf '\n%s' "Set up a SpielOS home right here? [Y/n] "
-    read -r answer
-    case "$answer" in
-        n|N|no|No) ;;
-        *)
-            if spielos init; then exit 0; fi
-            NEXT="(run 'spielos init' again to retry)"
-            ;;
-    esac
+INIT_RAN=0
+if [ ! -e "./.agents/company" ] && [ ! -f ./opencode.json ]; then
+    do_init=0
+    if [ -t 0 ]; then
+        printf '\n%s\n' "${BOLD}Create your SpielOS home in this folder?${RESET}"
+        printf '%s\n' "${DIM}  writes .agents/, .spielos/, opencode.json, AGENTS.md here${RESET}"
+        printf '%s' "Proceed? [Y/n] "
+        read -r answer < /dev/tty || answer=""
+        case "$answer" in
+            n|N|no|No) ;;
+            *) do_init=1 ;;
+        esac
+    elif [ -z "$(ls -A 2>/dev/null)" ]; then
+        do_init=1  # piped install + empty directory: safe to proceed
+    fi
+    if [ "$do_init" = 1 ]; then
+        if spielos init -y </dev/null; then
+            INIT_RAN=1
+        else
+            info "init failed — run 'spielos init' to retry."
+        fi
+    fi
 fi
 
-printf '%s\n' ""
-printf '%s\n' "${BOLD}Next:${RESET} $NEXT"
-printf '%s\n' "${DIM}Docs: .agents/company/README.md after init · https://spielos.xyz${RESET}"
+if [ "$INIT_RAN" = 0 ]; then
+    printf '%s\n' ""
+    printf '%s\n' "${BOLD}Next:${RESET} cd into your project folder and run ${BOLD}spielos init${RESET}"
+    printf '%s\n' "${DIM}That creates the harness home (.agents/, .spielos/) — the CLI alone does not.${RESET}"
+fi
+printf '%s\n' "${DIM}Docs: https://spielos.xyz · .agents/company/README.md after init${RESET}"
+

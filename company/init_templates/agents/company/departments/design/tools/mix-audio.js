@@ -74,8 +74,9 @@ if (!timing.voice || timing.voice !== cfgVoice) {
   process.exit(1);
 }
 const DURATION = Number(timing.duration || timing.scenes?.at(-1)?.end || 0);
-if (!Number.isFinite(DURATION) || DURATION <= 0 || DURATION >= 60) {
-  console.error(`Invalid narration-led duration: ${DURATION}. Shorts must be positive and under 60 seconds.`);
+const MAX_DURATION = Number(cfg.max_duration_seconds || 55);
+if (!Number.isFinite(DURATION) || DURATION <= 0 || DURATION > MAX_DURATION) {
+  console.error(`Invalid narration-led duration: ${DURATION}. Limit: ${MAX_DURATION} seconds.`);
   process.exit(1);
 }
 

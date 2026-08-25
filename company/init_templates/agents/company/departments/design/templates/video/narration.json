@@ -45,6 +45,7 @@
   },
   "voice_direction": "Synthesize the spoken transcript only. A deep, grounded, low-register adult MALE narrator. Active, very confident, demanding, aggressive but friendly; professional AND casual — absolutely NOT formal. Short punchy sentences with deliberate pauses; every word should make the listener curious about the next one. He knows exactly what he is doing and saying. Deliver at a measured pace — slow enough that the full sentence lands inside its scene; never rush, never cut a word, and finish the final URL line completely: spielos dot xyz slash services.",
   "voice_selection": "Charon",
+  "max_duration_seconds": 55,
   "mix": {
     "narration_lufs": -16,
     "true_peak_dbtp": -1,
@@ -333,20 +334,6 @@
       ]
     }
   },
-  "quality_gates": [
-    "The video communicates one topic-specific idea connected to the company promise.",
-    "Every clip in BOTH scenarios uses the exact same pinned persona voice (voice_selection) — one consistent guy across every clip and both scenarios; no mixed generations, no auditions, no ambiguous voices.",
-    "Each line plays in full: scene timing is derived from measured spoken clip durations plus readable visual lead and hold, never from fixed windows that trim mid-sentence.",
-    "Each line earns a visual change; no narration merely restates on-screen copy.",
-    "The final audio is narration-only: no music bed in the mix or in the spec.",
-    "Provider fallback is deterministic (gemini -> mistral -> cartesia -> elevenlabs); a provider change restarts the whole scenario — the voice never changes mid-scenario.",
-    "The spoken URL is human-readable, not read as punctuation.",
-    "The final file contains both video and audio streams.",
-    "Every source narration clip is audible and its identity matches the campaign item before delivery.",
-    "The hook thumbnail is captured only after its full title composition is visible.",
-    "Campaign video, thumbnail, and QA report live together beneath the campaign batch artifact tree.",
-    "Final mix is checked on headphones and phone speaker."
-  ],
   "scenarios": {
     "b": [
       "AI works alone.",

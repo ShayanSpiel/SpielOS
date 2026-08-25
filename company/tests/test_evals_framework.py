@@ -220,11 +220,8 @@ class RegistryTests(unittest.TestCase):
         suite = get_suite("content-copy-top10")
         self.assertEqual("content", suite.department_id)
         self.assertEqual("campaign_manifest", suite.payload_kind)
-        self.assertEqual(10, len(suite.criteria))
-        self.assertEqual(["one_reader", "one_moment", "one_idea",
-                          "cold_audience_clarity", "buyer_language",
-                          "sharp_opening", "honest_claims", "platform_native",
-                          "flow_brevity", "fifth_item_reminder"],
+        self.assertEqual(4, len(suite.criteria))
+        self.assertEqual(["buyer", "idea", "claims", "native"],
                          [c.id for c in suite.criteria])
         self.assertEqual({"all_pass": True, "min_score": 1.0}, suite.thresholds)
 

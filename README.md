@@ -20,8 +20,10 @@ curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/SpielOS1/main/install.s
 ```
 
 The installer checks Python 3.11+, installs `pipx` for you when it is missing
-(brew or pip — no manual steps), installs `spielos`, and offers to run the
-first-run init right away. Re-running it upgrades an existing install.
+(brew or pip — no manual steps), installs `spielos`, and — in an empty folder,
+no questions asked — runs the first-run init right there. In a folder that has
+content it asks first and never touches your files. Re-running the same
+command updates an existing install.
 
 Prefer to do it by hand?
 

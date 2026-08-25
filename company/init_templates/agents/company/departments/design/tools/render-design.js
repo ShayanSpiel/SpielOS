@@ -25,6 +25,7 @@ function checkNarrationContract(failures) {
   const narrationPath = join(DESIGN_ROOT, "templates/video/narration.json");
   if (!existsSync(narrationPath)) { failures.push("narration.json missing"); return; }
   const narration = JSON.parse(readFileSync(narrationPath, "utf8"));
+  const maxDuration = Number(narration.max_duration_seconds || 55);
   const voice = narration.voice_selection;
   if (!voice) failures.push("narration.json: voice_selection empty — no pinned single voice");
   const mix = narration.mix || {};
@@ -41,8 +42,7 @@ function checkNarrationContract(failures) {
     voices.add(st.voice);
     const scenes = st.scenes || [];
     if (scenes.length < 4) { failures.push(`narration.json: scenario ${s} has ${scenes.length} scenes`); continue; }
-    // narration-led-v2 (speech measured inside each scene, one narration-led
-    // duration under 60s) or the legacy <=14.9s measured-window contract.
+    // One measured, narration-led schedule is the only supported timing contract.
     const narrationLed = st.timing_contract === "narration-led-v2";
     let prev = -0.001;
     for (const sc of scenes) {
@@ -63,10 +63,8 @@ function checkNarrationContract(failures) {
       prev = sc.start;
     }
     const last = scenes[scenes.length - 1];
-    if (narrationLed && (!Number.isFinite(st.duration) || Math.abs(st.duration - last?.end) > 0.02 || st.duration >= 60)) {
-      failures.push(`narration.json: scenario ${s} needs one narration-led duration under 60s matching its final scene`);
-    } else if (!narrationLed && last && last.end > 14.9) {
-      failures.push(`narration.json: scenario ${s} overruns 14.9s (${last.end}s) — tighten the TEXT, never cut speech`);
+    if (!narrationLed || !Number.isFinite(st.duration) || Math.abs(st.duration - last?.end) > 0.02 || st.duration > maxDuration) {
+      failures.push(`narration.json: scenario ${s} needs one narration-led duration at or below ${maxDuration}s matching its final scene`);
     }
   }
   if (voices.size > 1) failures.push(`narration.json: ${voices.size} different voices across scenarios (${[...voices].join(", ")}) — ONE voice required`);

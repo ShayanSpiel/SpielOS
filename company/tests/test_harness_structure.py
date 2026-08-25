@@ -161,10 +161,10 @@ class TemplateRegistryTests(unittest.TestCase):
         self.assertIn("variant", joined)
         self.assertIn("item_id", joined)
         readme = (ROOT / "company/departments/design/README.md").read_text()
-        self.assertIn("no batch repeats one template", readme.lower())
+        self.assertIn("do not repeat a template", readme.lower())
         skill = (ROOT / "company/departments/design/skills/video-creation/SKILL.md").read_text()
         self.assertIn("registry.json", skill)
-        self.assertIn("No batch repeats one template", skill)
+        self.assertIn("respects batch rotation", skill)
 
 
 class SocialWorkflowTests(unittest.TestCase):

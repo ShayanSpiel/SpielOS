@@ -62,39 +62,20 @@ class ContentCampaignContractTests(unittest.TestCase):
         self.assertIn("dailyPostingLimits", (ROOT / "company/connections/buffer.py").read_text())
 
     def test_dispatch_is_publish_commitment_with_final_receipt(self):
-        """The clean workflow contract: scheduled == published, final receipt."""
-        content = (ROOT / "company/departments/content/department.py").read_text()
+        """Provider receipts remain the publication authority."""
         buffer = (ROOT / "company/connections/buffer.py").read_text()
-        self.assertIn('version = "3.6.0"', content)
-        self.assertIn("PUBLICATION_RECEIPT_CONTRACT", content)
-        self.assertIn("scheduled == published", content)
-        self.assertIn("commitment_type", content)
-        self.assertIn("ok:true", content)
         self.assertIn("duplicate_guard", buffer)
         self.assertIn("--queue", buffer)
         self.assertIn("commitment_type", buffer)
 
 
 class ContentCampaignEvalGateTests(unittest.TestCase):
-    """The quality_gate is judge-gated: campaign copy cannot advance to
-    campaign_ready without a passing eval_report for every declared suite."""
+    """The quality gate is judge-gated before a campaign reaches Design."""
 
     BATCH_ID = "content-leads-20260812-batch-04"
 
     #: Declared suites must each carry a passing eval_report (v3.6).
     SUITE_IDS = ("content-copy-top10", "content-story-whole")
-
-    def setUp(self):
-        """The archived batch-04 manifest predates the v3.6 Design rotation
-        registry (its template family repeats are exactly what that registry
-        now forbids). These tests target the EVAL gate, not rotation, so the
-        rotation check is stubbed out."""
-        import unittest.mock
-        from company.departments.content import department as content_department
-        patcher = unittest.mock.patch.object(
-            content_department, "_design_rotation_errors", lambda *a, **k: [])
-        patcher.start()
-        self.addCleanup(patcher.stop)
 
     def _manifest(self):
         # The batch-04 approved manifest was archived; artifacts are
@@ -116,11 +97,6 @@ class ContentCampaignEvalGateTests(unittest.TestCase):
     def _run_gate(self, evidence):
         return departments()["content"].run_machine_step(
             self._context(evidence), {"step_id": "quality_gate"})
-
-    def _render_report_evidence(self):
-        return {"kind": "render_report", "source": "design", "validity": "technical_only",
-                "payload": {"campaign_id": "content-leads-20260812",
-                            "batch_id": self.BATCH_ID}}
 
     def _eval_report_evidence(self, payload):
         return {"kind": "eval_report", "source": f"evals:{payload.get('suite_id')}",
@@ -146,25 +122,23 @@ class ContentCampaignEvalGateTests(unittest.TestCase):
         return [self._eval_report(suite_id=suite_id, **kwargs)
                 for suite_id in self.SUITE_IDS]
 
-    def test_quality_gate_requires_eval_report_before_campaign_ready(self):
+    def test_quality_gate_requires_eval_report_before_design_handoff(self):
         result = self._run_gate([
             {"kind": "campaign_manifest", "source": "content-strategist",
              "validity": "business", "payload": self._manifest()},
-            self._render_report_evidence(),
         ])
         self.assertEqual("blocked", result["run_status"])
         errors = (result.get("attention") or {}).get("errors") or []
         self.assertTrue(any(
             "eval_report" in error and "content-copy-top10" in error
             for error in errors))
-        self.assertNotIn("campaign_ready",
+        self.assertNotIn("content_ready",
                          [item.get("kind") for item in (result.get("evidence") or [])])
 
     def test_quality_gate_blocks_failed_eval_with_criterion_errors(self):
         result = self._run_gate([
             {"kind": "campaign_manifest", "source": "content-strategist",
              "validity": "business", "payload": self._manifest()},
-            self._render_report_evidence(),
             *self._eval_reports(overall=False, per_item={
                 "batch-04-item-03": {
                     "cold_audience_clarity": {
@@ -185,7 +159,6 @@ class ContentCampaignEvalGateTests(unittest.TestCase):
         result = self._run_gate([
             {"kind": "campaign_manifest", "source": "content-strategist",
              "validity": "business", "payload": self._manifest()},
-            self._render_report_evidence(),
             *self._eval_reports(payload_id="content-leads-20260812-batch-03"),
         ])
         self.assertEqual("blocked", result["run_status"])
@@ -196,12 +169,11 @@ class ContentCampaignEvalGateTests(unittest.TestCase):
         result = self._run_gate([
             {"kind": "campaign_manifest", "source": "content-strategist",
              "validity": "business", "payload": self._manifest()},
-            self._render_report_evidence(),
             *self._eval_reports(),
         ])
-        self.assertEqual("Campaign quality gate passed", result.get("message"))
+        self.assertEqual("Content editorial review passed", result.get("message"))
         kinds = [item.get("kind") for item in (result.get("evidence") or [])]
-        self.assertIn("campaign_ready", kinds)
+        self.assertIn("content_ready", kinds)
 
     def test_eval_gate_helper_requires_each_declared_suite(self):
         errors = _eval_gate_errors([], {"batch_id": "b-7"}, ("content-copy-top10",))
@@ -220,7 +192,7 @@ class ContentCampaignEvalGateTests(unittest.TestCase):
         self.assertIn('"content-copy-top10"', evals_source)
         from company.evals import get_suite
         suite = get_suite("content-copy-top10")
-        self.assertEqual(10, len(suite.criteria))
+        self.assertEqual(4, len(suite.criteria))
         self.assertEqual({"all_pass": True, "min_score": 1.0}, suite.thresholds)
         self.assertEqual("campaign_manifest", suite.payload_kind)
 

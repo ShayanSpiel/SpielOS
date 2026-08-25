@@ -40,7 +40,7 @@ if [ "$SKIP_TTS" != "1" ]; then
   node "$SCRIPT_DIR/tts-gemini.js" "$SCENARIO"
 fi
 
-# 2) Narration-only mix (aspect-independent, 15s): no music bed. Refuses to
+# 2) Narration-only mix (aspect-independent): no music bed. Refuses to
 #    run without measured scene_timing or if the voice provenance mismatches.
 node "$SCRIPT_DIR/mix-audio.js" "$SCENARIO" "$ART/video/.mix-$SCENARIO.m4a"
 
@@ -49,7 +49,7 @@ CTA_SEC=$(python3 -c "
 import json
 d = json.load(open('$ROOT/.agents/company/departments/design/templates/video/narration.json'))
 scenes = d.get('scene_timing', {}).get('$SCENARIO', {}).get('scenes', [])
-print(min(scenes[-1]['start'] + 0.45, 14.6) if scenes else 13.2)
+print(scenes[-1]['start'] + 0.45 if scenes else 0)
 ")
 
 for ASPECT in $ASPECTS; do

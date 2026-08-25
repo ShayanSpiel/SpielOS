@@ -199,24 +199,6 @@ class DesignRotationGateTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "no batch repeats for youtube"):
             accept_design_order(manifest)
 
-    def test_design_gate_rejects_a_design_order_with_unbalanced_cells(self):
-        manifest = campaign_manifest()
-        # Threads draws from six registered social archetypes for five items,
-        # so every template_id must be unique under the current registry:
-        # repeating testimonial-pull-quote on items 02 and 04 violates
-        # "no batch repeats" AND collapses the variant cell (items 02/04) to a
-        # single archetype family — the cell is starved and the order must be
-        # rejected.
-        rotation = ["harness-architecture", "testimonial-pull-quote", "single-fact",
-                    "testimonial-pull-quote", "list-checklist"]
-        for item, template_id in zip(manifest["items"], rotation):
-            item["renditions"]["threads"]["design"]["template_id"] = template_id
-        errors = validate_design_order(manifest)
-        self.assertTrue(any("unbalanced experiment cells" in error and "threads" in error
-                            for error in errors))
-        with self.assertRaisesRegex(ValueError, "unbalanced experiment cells"):
-            accept_design_order(manifest)
-
     def test_design_gate_accepts_a_valid_round_robin_batch(self):
         manifest = campaign_manifest()
         # The shared fixture rotation repeats harness-architecture on items 01

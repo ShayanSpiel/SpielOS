@@ -109,7 +109,7 @@ const SPEECH_LEAD = 0.65;
 const POST_SPEECH_HOLD = 0.65;
 const MIN_VISUAL_DWELL = 3.0;
 const CTA_MIN_VISUAL_DWELL = 4.0;
-const MAX_SHORT_DURATION = 55.0;
+const MAX_SHORT_DURATION = Number(config.max_duration_seconds || 55);
 
 const PRONUNCIATION = [
   [/spielos\.xyz\/services/gi, "Shpeel O S dot ex why zee slash services"],

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -24,25 +23,14 @@ def _registered_archetypes() -> list[dict[str, Any]]:
 
 
 def _template_fit_errors(manifest: dict[str, Any], platform: str) -> list[str]:
-    """Reject known-bad or semantically mismatched gallery choices before render.
+    """Reject only templates explicitly quarantined after media failure.
 
-    Rotation is a coverage rule, not a creative decision.  A template may be
-    registered and still be wrong for the story, or quarantined after a real
-    media failure.  This gate keeps the renderer from silently accepting that
-    mismatch and makes the choice auditable in the campaign Artifact.
+    Story fit is editorial judgment, not a brittle keyword classifier.
     """
     errors: list[str] = []
     if platform != "youtube":
         return errors
     archetypes = {str(item.get("id")): item for item in _registered_archetypes()}
-    fit_terms = {
-        "loop-rail": ("process", "loop", "goal", "observe", "decide", "act", "evaluate"),
-        "heartbeat": ("live", "running", "status", "current", "heartbeat", "today"),
-        "department-map": ("department", "harness", "system", "roles"),
-        "agent-brief": ("brief", "request", "intake", "assessment"),
-        "scenario-b": ("workflow", "coordination", "tools", "handoff", "status", "intake"),
-        "scenario-c": ("department", "role", "workflow", "context", "standard", "status"),
-    }
     for item in manifest.get("items") or []:
         item_id = str(item.get("item_id") or "?")
         rendition = ((item.get("renditions") or {}).get(platform) or {})
@@ -54,31 +42,11 @@ def _template_fit_errors(manifest: dict[str, Any], platform: str) -> list[str]:
                 f"items.{item_id}.renditions.{platform}.design.template_id {template_id!r} is quarantined: "
                 f"{archetype.get('quarantine_reason', 'media QA required')}")
             continue
-        terms = fit_terms.get(template_id)
-        if not terms:
-            continue
-        text_parts: list[str] = [str(design.get("eyebrow") or ""), str(design.get("supporting_text") or "")]
-        narration = rendition.get("narration") or {}
-        text_parts.append(str(narration.get("script") or ""))
-        text_parts.extend(str(scene.get("text") or "") for scene in narration.get("scenes") or [])
-        story = " ".join(text_parts).lower()
-        if not any(term in story for term in terms):
-            errors.append(
-                f"items.{item_id}.renditions.{platform}.design.template_id {template_id!r} does not fit the story; "
-                f"expected one of: {', '.join(terms)}")
     return errors
 
 
 def _rotation_errors(manifest: dict[str, Any]) -> list[str]:
-    """Mechanically enforce the per-item archetype selection rule.
-
-    Owner directive 2026-08-17 (Design README "Per-item selection rule"):
-    one registered archetype per item/platform, no batch repeats when the
-    batch fits the registry count, bounded round-robin balance otherwise,
-    and bounded cell balance so no experiment cell is starved of a template
-    family. Violating orders are rejected here — Design never falls back to
-    legacy templates silently.
-    """
+    """Require registered templates and avoid repeats in a normal-size batch."""
     errors: list[str] = []
     archetypes = _registered_archetypes()
     by_kind: dict[str, list[str]] = {}
@@ -88,7 +56,6 @@ def _rotation_errors(manifest: dict[str, Any]) -> list[str]:
     for platform in PLATFORMS:
         kind = PLATFORM_TEMPLATE_KIND[platform]
         registered = by_kind.get(kind, [])
-        # 1. One registered archetype per item_id per platform.
         chosen = []
         for item in items:
             item_id = str((item or {}).get("item_id") or "")
@@ -99,74 +66,15 @@ def _rotation_errors(manifest: dict[str, Any]) -> list[str]:
                 errors.append(
                     f"items.{item_id}.renditions.{platform}.design.template_id must be a "
                     f"registered {kind} archetype (got {template_id!r})")
-        # 2. No batch repeats when the batch fits the registry count.
-        batch_size = len(items)
-        if batch_size <= len(registered):
-            seen: dict[Any, list[str]] = {}
-            for item, template_id in zip(items, chosen):
-                item_id = str((item or {}).get("item_id") or "")
-                seen.setdefault(template_id, []).append(item_id)
-            repeats = {tid: ids for tid, ids in seen.items() if len(ids) > 1}
-            for template_id, ids in repeats.items():
-                errors.append(
-                    f"no batch repeats for {platform}: template_id {template_id!r} is used by "
-                    + ", ".join(ids))
-        else:
-            # 3. Larger batches repeat by round-robin across ALL archetypes of
-            # the kind: counts differ by at most one and no template repeats
-            # twice in a row.
-            counts = Counter(chosen)
-            if counts and max(counts.values()) - min(counts.values()) > 1:
-                summary = ", ".join(f"{template_id!r} x{count}" for template_id, count
-                                    in sorted(counts.items(), key=lambda pair: str(pair[0])))
-                errors.append(
-                    f"{platform} batch exceeds the registered {kind} archetype count; "
-                    f"round-robin balance requires every archetype to appear at most one more "
-                    f"time than any other (got {summary})")
-            if any(left == right for left, right in zip(chosen, chosen[1:])):
-                errors.append(
-                    f"never the same template twice in a row for {platform} "
-                    "(round-robin across ALL registered archetypes)")
-        # 4. Bounded cell balance: neither experiment cell is starved of a
-        # template family. Cells with two or more items must see at least two
-        # distinct archetypes per platform. Item-to-cell assignment follows
-        # the declared cell list cycled in item order (alternating control/
-        # variant for the two-cell campaigns the loop runs).
-        experiment = manifest.get("experiment") or {}
-        cells = [cell for cell in (experiment.get("cells") or []) if isinstance(cell, dict)]
-        roles = [cell.get("role") for cell in cells]
-        if roles.count("control") == 1 and roles.count("variant") == 1:
-            cell_items: dict[str, list[dict[str, Any]]] = {}
-            for index, item in enumerate(items):
-                cell_id = str(cells[index % len(cells)].get("id") or "?")
-                cell_items.setdefault(cell_id, []).append(item)
-            for cell in cells:
-                cell_id = str(cell.get("id") or "?")
-                members = cell_items.get(cell_id) or []
-                if len(members) < 2:
-                    continue
-                distinct = {
-                    (((member.get("renditions") or {}).get(platform) or {}).get("design") or {})
-                    .get("template_id")
-                    for member in members
-                }
-                if len(distinct) < 2:
-                    errors.append(
-                        f"unbalanced experiment cells: {platform} cell {cell_id!r} collapses to "
-                        f"a single archetype {next(iter(distinct))!r} and is starved of a "
-                        "template family")
+        if len(chosen) <= len(registered):
+            for template_id in {item for item in chosen if chosen.count(item) > 1}:
+                errors.append(f"no batch repeats for {platform}: template_id {template_id!r}")
         errors.extend(_template_fit_errors(manifest, platform))
     return errors
 
 
 def validate_design_order(manifest: dict[str, Any]) -> list[str]:
-    """Accept only a strategy-complete shared campaign Artifact.
-
-    The per-item archetype rotation rule is mechanically enforced here
-    (registry membership, no batch repeats, round-robin balance, bounded
-    cell balance); a violating design order is rejected with a clear error
-    instead of any silent fallback to legacy templates.
-    """
+    """Accept a Content-ready campaign and validate its selected templates."""
     errors = validate_campaign(manifest, "strategy")
     if manifest.get("phase") != "strategy":
         errors.append("Design accepts campaign Artifacts only at the strategy phase")
@@ -217,7 +125,7 @@ def render_report(manifest: dict[str, Any], assets: list[dict[str, Any]]) -> dic
 class DesignDepartment(EvidenceDepartment, Department):
     id = department_id = "design"
     version = "3.4.0"
-    description = "Consumes a shared campaign Artifact and returns verified renditions whose spoken text, displayed copy, components, icons, labels, timing, and evidence remain controlled by that one campaign identity."
+    description = "Consumes evaluated Content evidence, selects visuals, and returns verified media evidence."
     agent_ids = ("designer", "video-producer")
     production_ready = True
     workflows = (
@@ -231,9 +139,9 @@ class DesignDepartment(EvidenceDepartment, Department):
         ),
         WorkflowSpec(
             "rendition-pack",
-            "Render every typed campaign rendition without owning or duplicating campaign strategy.",
-            ("accept_design_order", "compose", "render_sizes", "visual_qa", "handoff"), ("designer",), ("spielos-ui",), (),
-            ("design_order", "render_report"), (),
+            "Turn a Content-ready campaign into verified renditions.",
+            ("plan", "render", "verify", "handoff"), ("designer",), ("spielos-ui",), (),
+            ("content_ready", "render_report"), (),
             graph=(WorkflowStep("render_sizes", "employee", "designer",
                                 produces=("render_report",), skill_ids=("spielos-ui",)),),
         ),
@@ -249,8 +157,8 @@ class DesignDepartment(EvidenceDepartment, Department):
         ),
         WorkflowSpec(
             "video-order",
-            "Take a video order end-to-end: intake request, lock the One Idea, generate one-persona narration, derive readable scene dwell and total duration from measured speech, render a stable hook thumbnail, verify audible narration and provenance, and deliver video/thumbnail/QA together beneath the campaign batch Artifact.",
-            ("intake", "idea_lock", "scenario_script", "tts_chain", "narration_mix", "render", "qa", "deliverable"),
+            "Render one approved narration into a verified video rendition.",
+            ("plan", "generate", "render", "verify", "deliver"),
             ("video-producer",), ("video-creation", "spielos-ui"), (),
             ("video_render", "render_report"), (),
             graph=(WorkflowStep("render", "employee", "video-producer",

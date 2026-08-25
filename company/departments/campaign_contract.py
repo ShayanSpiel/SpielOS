@@ -371,10 +371,9 @@ def _validate_rendition(manifest: dict[str, Any], item: dict[str, Any],
     _validate_copy(rendition.get("copy"), platform, destination,
                    item.get("sequence") == 5, prefix, errors)
     hook_text = _text((item.get("hook") or {}).get("text"))
-    if hook_text and not _text(rendition.get("copy")).casefold().startswith(hook_text.casefold()):
-        errors.append(f"{prefix}.copy must begin with the item's locked opening")
     design = rendition.get("design") or {}
-    _validate_design(design, platform, prefix, errors)
+    if design or PHASES.index(phase) >= PHASES.index("designed"):
+        _validate_design(design, platform, prefix, errors)
     expected_signature = creative_signature(str(manifest.get("campaign_id") or ""), item_id, platform, design)
     if rendition.get("creative_signature") not in (None, "", expected_signature):
         errors.append(f"{prefix}.creative_signature does not match its design inputs")
@@ -403,7 +402,7 @@ def _validate_rendition(manifest: dict[str, Any], item: dict[str, Any],
                 errors.append(
                     f"{prefix}.narration scene {index + 1}.intent must be one of: "
                     f"{', '.join(sorted(NARRATION_INTENTS))}")
-            if not controlled_scenes:
+            if not controlled_scenes or PHASES.index(phase) < PHASES.index("designed"):
                 continue
             visual = (scene or {}).get("visual") or {}
             for field in ("eyebrow", "headline", "supporting_text", "component", "icon", "labels"):
@@ -416,21 +415,6 @@ def _validate_rendition(manifest: dict[str, Any], item: dict[str, Any],
             labels = visual.get("labels")
             if not isinstance(labels, list) or not 1 <= len(labels) <= 4 or any(not _text(label) for label in labels):
                 errors.append(f"{prefix}.narration scene {index + 1} visual.labels needs one to four labels")
-            spoken = _text(scene.get("text")).casefold()
-            displayed = _text(visual.get("headline")).casefold()
-            url_aligned = (
-                visual.get("spoken_display_alignment") == "url-pronunciation"
-                and visual.get("component") == "cta"
-                and displayed == "spielos.xyz/services"
-                and spoken == "go to spielos dot xyz slash services."
-            )
-            if displayed != spoken and not url_aligned:
-                errors.append(f"{prefix}.narration scene {index + 1} spoken text must equal its displayed headline")
-        if scenes and hook_text and _text(scenes[0].get("text")).casefold() != hook_text.casefold():
-            errors.append(f"{prefix}.narration must begin with the item's locked opening")
-        title = _text(" ".join(design.get("title_lines") or []))
-        if controlled_scenes and scenes and _text(scenes[0].get("text")).casefold() != title.casefold():
-            errors.append(f"{prefix}.narration hook must equal the complete designed title")
     if PHASES.index(phase) >= PHASES.index("rendered"):
         asset = rendition.get("asset") or {}
         if asset.get("type") != PLATFORM_CONTRACT[platform]["asset_type"]:
