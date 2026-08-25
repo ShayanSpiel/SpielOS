@@ -205,9 +205,10 @@ def _next_steps(root: Path, hosts: dict[str, bool], minimal: bool,
                   "python3 -B -m company status", ""))
     notes: dict[str, str] = {}
     if minimal:
-        owned = ", ".join(departments) if departments else "(none yet)"
-        notes["mode"] = ("Minimal appliance — add departments any time with "
-                         f"'spielos add <id>' (installed now: {owned})")
+        owned = ", ".join(departments) if departments else "none yet"
+        notes["mode"] = ("Fresh company — add departments any time with "
+                         f"'spielos add <id>' or 'spielos init --department' "
+                         f"(vendored now: {owned})")
     else:
         notes["mode"] = ("Full harness — make it yours in "
                          ".agents/company/strategy/ (ICP, voice)")
@@ -271,10 +272,15 @@ def _render_success(style: _Style, receipt: dict) -> None:
 # ---- the driver -------------------------------------------------------------
 
 
-def run_init(*, dir: str = ".", force: bool = False, minimal: bool = False,
+def run_init(*, dir: str = ".", force: bool = False, minimal: bool = True,
              departments: list[str] | None = None, assume_yes: bool = False,
              as_json: bool = False) -> int:
-    """Entry point for ``spielos init``. Returns the process exit code."""
+    """Entry point for ``spielos init``. Returns the process exit code.
+
+    A fresh home ships the spine only — zero departments. Starter
+    departments are an explicit opt-in (``--department``, ``--all-departments``
+    or the interactive picker).
+    """
     style = _Style()
     interactive = (style.tty and sys.stdin.isatty()
                    and not assume_yes and not as_json)
@@ -283,9 +289,9 @@ def run_init(*, dir: str = ".", force: bool = False, minimal: bool = False,
     try:
         if interactive:
             banner(style, target)
-            flavor, departments = _ask_setup(
-                style, minimal=minimal, departments=departments)
-            minimal = flavor == "minimal"
+            if not departments and minimal:
+                departments = _ask_starter_departments(
+                    style, departments=departments)
             force = force or _confirm_overwrite(style, target)
 
         receipt = None
@@ -299,10 +305,16 @@ def run_init(*, dir: str = ".", force: bool = False, minimal: bool = False,
                                departments=departments)
 
         hosts = _detect_hosts()
+        count = len(departments or [])
+        if not minimal:
+            mode_label = "Full harness"
+        elif count:
+            mode_label = f"Fresh spine + {count} department(s)"
+        else:
+            mode_label = "Fresh spine"
         receipt.update({"hosts": hosts, "minimal": minimal,
                         "departments": departments or [],
-                        "mode_label": "Minimal appliance" if minimal
-                        else "Full harness"})
+                        "mode_label": mode_label})
         # Verification runs in both modes; only the rendering differs.
         if as_json:
             ok, error = _verify_home(target)
@@ -357,28 +369,38 @@ def banner(style: _Style, target: Path) -> None:
     print()
 
 
-def _ask_setup(style: _Style, *, minimal: bool,
-               departments: list[str] | None) -> tuple[str, list[str] | None]:
-    """Interactive flavor picker. Honors explicit flags as preselections."""
-    if minimal:
-        chosen = departments
-        if not chosen:
-            known = available_departments()
-            if known:
-                options = [(dept, "vendor this department") for dept in known]
-                options.append(("skip", "empty appliance — add departments later"))
-                pick = _choose(style, "Which department should ship?",
-                               options, default=len(options))
-                chosen = [] if pick == len(options) else [options[pick - 1][0]]
-        return "minimal", chosen
-
-    pick = _choose(style, "What are we setting up?", [
-        ("full", "all example departments + website skills (recommended)"),
-        ("minimal", "spine only — single-department appliance"),
+def _ask_starter_departments(style: _Style,
+                             departments: list[str] | None) -> list[str] | None:
+    """Fresh homes start with zero departments; extras are opt-in."""
+    if departments is not None:
+        return departments
+    known = available_departments()
+    if not known:
+        return []
+    pick = _choose(style, "Starter departments?", [
+        ("none", "completely fresh company — add departments any time (recommended)"),
+        ("choose", "vendor starter departments from the template library"),
     ], default=1)
-    if pick == 2:
-        return _ask_setup(style, minimal=True, departments=None)
-    return "full", None
+    if pick == 1:
+        return []
+    print(f"  {style.dim('Available: ' + ', '.join(known))}")
+    raw = _prompt(style, "Departments to vendor (comma-separated, empty skips)",
+                  "")
+    chosen = []
+    for token in raw.replace(" ", "").split(","):
+        if not token:
+            continue
+        if token.isdigit() and 1 <= int(token) <= len(known):
+            chosen.append(known[int(token) - 1])
+        elif token in known:
+            chosen.append(token)
+        else:
+            print(style.yellow(f"  Unknown department '{token}' — skipped."))
+    deduped = sorted(set(chosen))
+    if deduped:
+        print(f"  {style.mark_ok()} Starter departments: "
+              f"{style.bold(', '.join(deduped))}")
+    return deduped
 
 
 def _confirm_overwrite(style: _Style, target: Path) -> bool:

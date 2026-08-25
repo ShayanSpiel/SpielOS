@@ -21,10 +21,11 @@ curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/SpielOS/main/install.sh
 pipx install . && spielos init
 ```
 
-`spielos init` vendors a complete, self-contained harness into the current
-directory — `.agents/` spine, `.spielos/` private state, OpenCode/Codex host
-adapters, `opencode.json`, `AGENTS.md`, and a gitignore — with zero runtime
-dependency on the installed package afterward.
+`spielos init` scaffolds a **fresh** home: the spine only — runtime, company
+skills, OpenCode/Codex adapters, empty `.spielos/` state, `opencode.json`,
+`AGENTS.md`. **Zero departments, zero strategy content.** Add capabilities
+when goals need them: `spielos add outbound`, `spielos add ./team.sdep`, or
+`spielos init --department seo`.
 
 ## Departments as products (lego extraction)
 
@@ -42,7 +43,7 @@ state — those are user-layer.
 Single-department appliance (no company scaffolding beyond one department):
 
 ```sh
-spielos init --minimal --department outbound
+spielos init --department outbound
 ```
 
 First-class agent worker (the lead-researcher pattern, generated):

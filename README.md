@@ -24,8 +24,8 @@ pipx install spielos && spielos init
 ```
 
 `spielos init` scaffolds a verified, self-contained harness home into your
-current folder — with OpenCode-style progress, a setup picker (full harness or
-minimal appliance), host detection, and a runtime verification before it
+current folder — with OpenCode-style progress, an optional starter-department
+picker, host detection, and a runtime verification before it
 reports success.
 
 ## Update (one line)
@@ -45,10 +45,24 @@ pipx, spielos) and runs init in an empty folder automatically:
 curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/SpielOS/main/install.sh | sh
 ```
 
-Interactive on a terminal: pick **full harness** (everything) or a
-**minimal appliance** (spine + one department). Scripted and CI runs stay
-deterministic: add `-y/--yes` to skip prompts, `--json` for a machine-readable
-receipt; exit code 0 means verified, 1 means failed with an actionable message.
+`spielos init` scaffolds a **fresh** home into your current folder — with
+OpenCode-style progress, an optional starter-department picker, host detection,
+and a runtime verification before it reports success.
+
+**Fresh means:** the spine only — runtime, company skills, OpenCode/Codex
+adapters, empty `.spielos/` state, `opencode.json`, `AGENTS.md`. **Zero
+departments, zero strategy content.** Your company starts empty; the Director
+onboards you and capabilities are added when goals need them:
+
+```sh
+spielos add outbound                 # install a built-in department
+spielos add ./team.sdep              # or your own exported bundle
+spielos init --department seo        # or vendor starters at scaffold time
+```
+
+Scripted and CI runs stay deterministic: add `-y/--yes` to skip prompts,
+`--json` for a machine-readable receipt; exit code 0 means verified, 1 means
+failed with an actionable message.
 
 ## Departments as products
 
@@ -59,7 +73,7 @@ workflows, evals, skills, templates, and tooling live together.
 spielos department export outbound --out ./dist   # portable .sdep bundle
 spielos add ./outbound.sdep                        # install into a home
 spielos add ./outbound.sdep --force                # upgrade in place
-spielos init --minimal --department outbound       # single-department appliance
+spielos init --department outbound                  # scaffold with one starter department
 ```
 
 Bundles carry a checksummed manifest plus the department's skills. They never

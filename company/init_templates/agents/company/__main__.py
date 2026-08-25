@@ -30,9 +30,11 @@ def build_parser():
     init.add_argument("--dir", default=".", help="target directory (default: cwd)")
     init.add_argument("--force", action="store_true", help="overwrite existing files")
     init.add_argument("--minimal", action="store_true",
-                      help="single-department appliance: spine only, no example departments, no website skills")
+                      help="legacy alias — the fresh spine (no departments) is already the default")
+    init.add_argument("--all-departments", action="store_true",
+                      help="vendor every example department + website skills")
     init.add_argument("--department", action="append", default=[],
-                      help="with --minimal: vendor this department from templates (repeatable)")
+                      help="vendor this starter department from templates (repeatable)")
     init.add_argument("-y", "--yes", action="store_true",
                       help="non-interactive: accept defaults, never prompt")
     init.add_argument("--json", action="store_true",
@@ -258,7 +260,7 @@ def main(argv=None):
         if args.command == "init":
             from .runtime.onboard import run_init
             return run_init(dir=args.dir, force=args.force,
-                            minimal=args.minimal,
+                            minimal=not args.all_departments,
                             departments=args.department or None,
                             assume_yes=args.yes, as_json=args.json)
         if args.command == "add":
