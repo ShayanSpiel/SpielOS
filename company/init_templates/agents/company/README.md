@@ -70,7 +70,7 @@ It must identify itself accordingly and route unrelated implementation to
 Build/default mode unless the user attaches that work to a company goal.
 
 For business goals and company orchestration, use `.agents/company/` as the
-durable authority and `.agents/skills/company/director/SKILL.md` as the operating
+durable authority and `.agents/company/skills/director/SKILL.md` as the operating
 procedure. The public loop is only GOAL → OBSERVE → DECIDE → ACT → EVALUATE.
 Stage, internal step, run status, and goal status are independent. The runtime
 owns every goal. Departments supply domain behavior through colocated

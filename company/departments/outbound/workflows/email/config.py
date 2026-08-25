@@ -75,25 +75,19 @@ for _pair in os.environ.get("PROVIDER_FROM_EMAILS", "").split(","):
         PROVIDER_FROM_EMAILS[_k.strip()] = _v.strip()
 PROVIDER_FROM_EMAILS.setdefault("mailgun", f"shayan@{MAILGUN_DOMAIN}")
 PROVIDER_FROM_EMAILS.setdefault("postmark", f"shayan@{POSTMARK_DOMAIN}")
-SIGNATURE_TITLE = os.environ.get("SIGNATURE_TITLE", "Founder of SpielOS · Agent Harness Architect").strip()
+SIGNATURE_TITLE = os.environ.get("SIGNATURE_TITLE", "Founder of SpielOS · AI Agent Architect").strip()
 SIGNATURE_AVATAR_URL = os.environ.get("SIGNATURE_AVATAR_URL", "https://spielos.xyz/assets/avatars/avatar.jpg").strip()
 SIGNATURE_LINKEDIN = os.environ.get("SIGNATURE_LINKEDIN", "https://linkedin.com/in/shayantawabi").strip()
 SIGNATURE_X = os.environ.get("SIGNATURE_X", "https://x.com/ShayanSpiel").strip()
-# UTM-tagged so PostHog attributes clicks from email signatures to outbound
-SIGNATURE_SERVICES = os.environ.get(
-    "SIGNATURE_SERVICES",
-    "https://spielos.xyz/services/?utm_source=outbound-email&utm_medium=email&utm_campaign=outbound-sig",
+# Owner directive 2026-08-25: exactly FOUR links in every outbound signature:
+# Home, X, LinkedIn, Telegram (@Shntwb). UTM-tagged so PostHog attributes clicks.
+SIGNATURE_HOME = os.environ.get(
+    "SIGNATURE_HOME",
+    "https://spielos.xyz/?utm_source=outbound-email&utm_medium=email&utm_campaign=outbound-sig",
 ).strip()
-# Apply-first CTA carried by every outbound signature.
-# Owner directive 2026-08-22/23 (supersedes goal-booking-signature-outbound-
-# 20260819): the funnel is Apply-first — "Apply — Free Review", no required
-# call. Booking is retired from outbound signatures entirely; the CTA stays
-# on the sending domain spielos.xyz (deliverability: URLs not matching the
-# sending domain trigger spam filters).
-SIGNATURE_APPLY = os.environ.get(
-    "SIGNATURE_APPLY",
-    "https://spielos.xyz/apply/?utm_source=outbound-email&utm_medium=email&utm_campaign=outbound-sig",
-).strip()
+SIGNATURE_TELEGRAM = os.environ.get("SIGNATURE_TELEGRAM", "https://t.me/Shntwb").strip()
+# Superseded 2026-08-25: the Apply CTA (and earlier booking links) are retired
+# from signatures entirely per owner directive. Four links only - see above.
 
 # ── Data ───────────────────────────────────────────────────────────────────────
 def _resolve_path(value: str, default: str, base: Path = DATA_DIR) -> Path:

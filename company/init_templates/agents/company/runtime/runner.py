@@ -421,6 +421,55 @@ class Runner:
             "quiescent": not self._candidates(goal_id),
         }
 
+    def wake(self, goal_id: str, *, every_seconds: float = 600.0,
+             instruction: str = "Continue the Goal cycle and handle its next actionable work.",
+             at: str | None = None, max_wakes: int | None = None, runner_status=None):
+        """Foreground sleep/echo helper for an attached Director host session.
+
+        This is intentionally *not* another runtime loop and never calls
+        ``tick``. It sleeps, then prints one deterministic wake event. The
+        host session receiving stdout decides and acts; a terminal Goal or an
+        explicit runtime stop ends the helper. ``--at`` supports one future
+        calendar wake using an ISO-8601 timestamp.
+        """
+        if every_seconds <= 0:
+            raise ValueError("--every must be greater than zero")
+        due = parse_dt(at) if at else None
+        if at and due is None:
+            raise ValueError("--at must be an ISO-8601 timestamp")
+        count = 0
+        while max_wakes is None or count < max_wakes:
+            if due is not None:
+                delay = max(0.0, (due - datetime.now(timezone.utc)).total_seconds())
+            else:
+                delay = every_seconds
+            time.sleep(delay)
+            try:
+                state = self.runtime.status(goal_id)
+            except KeyError:
+                yield {"event": "wake_stopped", "goal_id": goal_id,
+                       "reason": "goal_not_found"}
+                return
+            goal = state["goal"]
+            if goal["goal_status"] in {"achieved", "abandoned", "expired", "paused"}:
+                yield {"event": "wake_stopped", "goal_id": goal_id,
+                       "reason": f"goal_{goal['goal_status']}"}
+                return
+            if not automation_enabled(self.runtime.store.path.parent):
+                yield {"event": "wake_stopped", "goal_id": goal_id,
+                       "reason": "automation_disabled"}
+                return
+            service = runner_status() if runner_status else {}
+            yield {"event": "director_wake", "goal_id": goal_id,
+                   "instruction": instruction,
+                   "goal_status": goal["goal_status"],
+                   "run_status": state["cycle"]["run_status"],
+                   "runner_running": service.get("running"),
+                   "why_next": state.get("why_next")}
+            count += 1
+            if due is not None:
+                return
+
     def watch(self, interval_seconds: float = 2.0, goal_id: str | None = None,
               max_ticks: int | None = None):
         ticks, previous_pending = 0, None

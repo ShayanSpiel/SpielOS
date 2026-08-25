@@ -107,6 +107,8 @@ class CrossDepartmentLearningTests(unittest.TestCase):
         self.assertIn(memory["claim"], decision["rationale"])
         observed = result["cycle"]["data"]["observation"]["memory"]
         self.assertEqual([memory["id"]], [item["id"] for item in observed])
+        order = self.runtime.store.work_orders(status="open", goal_id=result["goal"]["id"])[0]
+        self.assertEqual([memory["id"]], [item["id"] for item in order["brief"]["memory"]])
 
     def test_wrong_topic_is_not_retrieved(self):
         self.learn(topics=["positioning"])

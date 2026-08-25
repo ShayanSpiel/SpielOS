@@ -10,7 +10,7 @@ permissions:
     effect: allow
 ---
 
-Read `.agents/skills/company/outbound-email/SKILL.md` and the canonical
+Read `.agents/company/departments/outbound/skills/outbound-email/SKILL.md` and the canonical
 `.agents/company/strategy/icp.md`. Work only from a persisted `action_required`
 notification that specifies the goal, filters, desired queue, and exact lead
 shortfall. Research, qualify, personalize, validate, and ingest enough leads to

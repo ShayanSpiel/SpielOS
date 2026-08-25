@@ -121,42 +121,31 @@ class ComposeTests(unittest.TestCase):
         self.assertIn("EN-101", skipped_ids)  # placeholder pain
 
 
-class SignatureApplyTests(unittest.TestCase):
-    """Owner directive 2026-08-22/23 (supersedes goal-booking-signature-
-    outbound-20260819): every composed email carries the Apply-first CTA
-    ("Apply — Free Review", no required call) in both signature layers, plus
-    UTM parameters, and carries NO booking/cal.com CTA anywhere."""
+class SignatureIdentityTests(unittest.TestCase):
+    """Current signature contract (owner redesign 2026-08-25): the identity
+    block carries LinkedIn / X / Telegram / spielos.xyz home with UTM params,
+    and never a booking or cal.com CTA."""
 
-    APPLY_LINE = "Apply for a Free Review"
-    APPLY_LINK = "https://spielos.xyz/apply/"
+    def test_signature_html_carries_identity_links(self):
+        for token in ("linkedin.com/in/", "x.com/", "t.me/",
+                      "spielos.xyz/?utm_source=outbound-email"):
+            self.assertIn(token, SIGNATURE_HTML, SIGNATURE_HTML[:160])
 
-    def test_signature_html_has_apply_line_and_link(self):
-        self.assertIn(self.APPLY_LINE, SIGNATURE_HTML)
-        self.assertIn(self.APPLY_LINK, SIGNATURE_HTML)
-
-    def test_signature_text_has_apply_line_and_link(self):
-        self.assertIn(self.APPLY_LINE, SIGNATURE_TEXT)
-        self.assertIn(self.APPLY_LINK, SIGNATURE_TEXT)
+    def test_signature_text_carries_identity_links(self):
+        for token in ("LinkedIn: https://linkedin.com/in/", "X: https://x.com/",
+                      "Telegram: https://t.me/", "Home: https://spielos.xyz/"):
+            self.assertIn(token, SIGNATURE_TEXT, SIGNATURE_TEXT[:200])
 
     def test_signature_carries_no_booking_cta(self):
         for sig in (SIGNATURE_HTML, SIGNATURE_TEXT):
-            self.assertNotIn("cal.com", sig, sig[:120])
-            self.assertNotIn("/book/", sig, sig[:120])
+            self.assertNotIn("cal.com", sig)
+            self.assertNotIn("/book/", sig)
 
-    def test_apply_link_carries_signature_utm_params(self):
+    def test_home_link_carries_signature_utm_params(self):
         for sig in (SIGNATURE_HTML, SIGNATURE_TEXT):
             self.assertIn("utm_source=outbound-email", sig, sig[:120])
             self.assertIn("utm_medium=email", sig, sig[:120])
             self.assertIn("utm_campaign=outbound-sig", sig, sig[:120])
-
-    def test_rendered_email_carries_apply_cta(self):
-        subject, html, text, reason = compose.render_checked(RESEARCHED, seq=0)
-        self.assertIsNone(reason)
-        self.assertIn(self.APPLY_LINE, html)
-        self.assertIn(self.APPLY_LINK, html)
-        self.assertIn(self.APPLY_LINE, text)
-        self.assertIn(self.APPLY_LINK, text)
-        self.assertNotIn("cal.com", html)
 
 
 class ValidatorTests(unittest.TestCase):

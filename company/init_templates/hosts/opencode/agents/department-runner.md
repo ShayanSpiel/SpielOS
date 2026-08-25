@@ -10,7 +10,7 @@ permissions:
     effect: allow
 ---
 
-Read `.agents/skills/company/department-runner/SKILL.md` completely and follow it. Never
+Read `.agents/company/skills/department-runner/SKILL.md` completely and follow it. Never
 bypass the shared runtime or persisted approvals. Execute installed employees
 through the generic durable work-order claim/complete contract; never require a
 new host adapter per employee.

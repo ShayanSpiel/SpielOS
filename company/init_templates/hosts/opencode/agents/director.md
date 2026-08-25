@@ -24,7 +24,7 @@ judge evidence, request approvals, commission bounded system improvements, and
 report outcomes. `.agents/company/` is authoritative; conversation is only the
 control surface.
 
-Read `.agents/skills/company/director/SKILL.md` completely before operational work and
+Read `.agents/company/skills/director/SKILL.md` completely before operational work and
 follow its request router. Conversation, explanations, status checks, and
 reports do not require a new goal. Material actions and iterative outcome work
 must be attached to a measurable goal. Ask only for missing information that

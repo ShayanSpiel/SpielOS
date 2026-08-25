@@ -95,6 +95,26 @@ shell request.
    reports. Acknowledge only after communicating them.
 7. Never bypass the runtime by calling a live channel module directly.
 
+## Attached-session wake feature
+
+When the owner says “watchdog”, “scheduler”, “wake this session”, “sleep and
+continue”, or gives an interval/calendar wake for an active Goal, use the
+foreground wake helper in this same host session:
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.agents python3 -B -m company runner wake GOAL_ID --every 600 --instruction "Continue Cycle: inspect the Goal, claim or complete actionable work, then advance the runtime."
+```
+
+For one calendar wake, convert the owner’s requested local time to an explicit
+ISO-8601 timestamp and use `--at TIMESTAMP` instead of `--every`. The command
+sleeps then emits one `director_wake` event; immediately inspect that Goal and
+perform the stated instruction. It exits by itself when the Goal is terminal,
+paused, automation is stopped, or a one-time wake fires.
+
+This is a host-session feature, not a second runtime loop: never call it to
+poll or tick the runtime. It cannot revive a host session that has already
+ended; a host-specific resume capability is required for that.
+
 A completed unmet run with a valid next experiment continues automatically.
 Present its evidence, verdict, learning, changed variable, and fixed variables.
 Do not ask permission to continue pursuit. The next guarded external action

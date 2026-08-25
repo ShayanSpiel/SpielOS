@@ -53,6 +53,7 @@ subprocesses, no live state is touched.
 
 import sys
 import unittest
+from company.tests._adapter_mode import requires_full_plugin
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -65,6 +66,7 @@ def indent_of(line):
     return len(line) - len(line.lstrip())
 
 
+@requires_full_plugin
 class NotificationSurfaceContractTests(unittest.TestCase):
     """Static-contract checks for the OpenCode notifications surfacing plugin."""
 

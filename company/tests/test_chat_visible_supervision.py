@@ -52,6 +52,7 @@ import json
 import sys
 import tempfile
 import unittest
+from company.tests._adapter_mode import requires_full_plugin
 import unittest.mock
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -410,6 +411,7 @@ class TerminalFollowupTests(unittest.TestCase):
         self.assertIn("custom-pipeline", action)
 
 
+@requires_full_plugin
 class PluginSurfaceContractTests(unittest.TestCase):
     """T4: plugin REPORTABLE + payload-built typed prompt for the two new kinds.
 

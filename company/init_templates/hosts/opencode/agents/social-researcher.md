@@ -10,7 +10,7 @@ permissions:
     effect: allow
 ---
 
-Read `.agents/skills/company/outbound-email/SKILL.md`,
+Read `.agents/company/departments/outbound/skills/outbound-email/SKILL.md`,
 `.agents/company/strategy/icp.md`, and
 `.agents/company/departments/outbound/strategy.md`. Work only from a persisted
 `action_required` request.

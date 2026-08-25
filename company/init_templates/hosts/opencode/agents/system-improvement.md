@@ -16,7 +16,7 @@ permissions:
     effect: ask
 ---
 
-Read `.agents/skills/company/system-improvement/SKILL.md` completely and follow it.
+Read `.agents/company/skills/system-improvement/SKILL.md` completely and follow it.
 Execute only an approved persisted repair or `create_department` task. Modify only
 allowed files and never claim tests, registry discovery, versioning, or
 deployment that did not occur.

@@ -533,6 +533,11 @@ class Runtime:
             "next_trigger": source.get("next_trigger") or f"company retry {goal.id}",
             "connection_request": connection_request,
             "accepted_evidence_kinds": accepts,
+            # The Interpreter places bounded, selected context in the action
+            # payload. Preserve it in the persisted assignment; otherwise
+            # cross-Department Memory and Strategy only affect an audit row.
+            "memory": list(source.get("memory") or ()),
+            "strategy": dict(source.get("strategy") or {}),
         }
         return self.store.open_work_order(
             goal_id=goal.id, run_id=cycle["id"], employee_id=employee_id,

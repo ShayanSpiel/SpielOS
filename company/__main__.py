@@ -135,6 +135,13 @@ def build_parser():
     runner_commands = runner.add_subparsers(dest="runner_command", required=True)
     tick = runner_commands.add_parser("tick"); tick.add_argument("goal_id", nargs="?"); tick.add_argument("--max-advances", type=int, default=100)
     watch = runner_commands.add_parser("watch"); watch.add_argument("goal_id", nargs="?"); watch.add_argument("--interval", type=float, default=2.0); watch.add_argument("--max-ticks", type=int)
+    wake = runner_commands.add_parser("wake", help="sleep and emit deterministic Director wake events for one Goal")
+    wake.add_argument("goal_id")
+    wake.add_argument("--every", type=float, default=600.0,
+                      help="seconds between wake events (default: 600)")
+    wake.add_argument("--instruction", default="Continue the Goal cycle and handle its next actionable work.")
+    wake.add_argument("--at", help="one wake at an ISO-8601 timestamp; then exit")
+    wake.add_argument("--max-wakes", type=int)
     start = runner_commands.add_parser("start"); start.add_argument("--interval", type=float, default=2.0)
     start.add_argument("--json", action="store_true")
     runner_commands.add_parser("enable")
@@ -396,6 +403,14 @@ def main(argv=None):
                     delivered = deliver_pending(runtime.store)
                     print(json.dumps({**result, "notifications_delivered": delivered},
                                      ensure_ascii=False, default=str), flush=True)
+                return 0
+            elif args.runner_command == "wake":
+                for event in runner.wake(
+                        args.goal_id, every_seconds=args.every,
+                        instruction=args.instruction, at=args.at,
+                        max_wakes=args.max_wakes,
+                        runner_status=lambda: RunnerService(PROJECT_ROOT, Path(args.db)).status()):
+                    print(json.dumps(event, ensure_ascii=False, default=str), flush=True)
                 return 0
             else:
                 service = RunnerService(PROJECT_ROOT, Path(args.db))

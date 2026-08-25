@@ -681,18 +681,17 @@ class DirectorIdentityContractTests(unittest.TestCase):
     def test_opencode_notification_hook_uses_native_question_and_chat_surface(self):
         root = Path(__file__).resolve().parents[2]
         config = (root / "opencode.json").read_text()
+        # Compatibility-only adapter contract: no plugin is registered by
+        # default; supervision belongs to the runner daemon + OS supervisor.
+        self.assertIn('"plugin": []', config)
+        self.assertIn("default_agent", config)
         plugin = (root / "company/init_templates/hosts/opencode/plugins/spielos-notifications.ts").read_text()
-        self.assertIn("spielos-notifications.ts", config)
-        self.assertIn('event.type === "session.idle"', plugin)
-        # V2 contract (opencode2, 0.0.0-next-17444): the approval wake-up uses
-        # ctx.session.prompt (no agent field, no V1 promptAsync) and the
-        # stop/start interception hook does not exist in the V2 CommandDomain
-        # — daemon lifecycle belongs to the OS supervisor.
-        self.assertIn("ctx.session.prompt", plugin)
+        self.assertIn("Compatibility-only", plugin)
+        self.assertIn("company runner watch", plugin)
+        # The full-plugin machinery must stay out of the shipped adapter.
+        self.assertNotIn("setInterval", plugin)
         self.assertNotIn("promptAsync", plugin)
         self.assertNotIn("command.execute.before", plugin)
-        self.assertIn("supervisor.py", plugin)
-        self.assertIn("native question tool", plugin)
 
     def test_system_improvement_groups_safe_permissions(self):
         root = Path(__file__).resolve().parents[2]

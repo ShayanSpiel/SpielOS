@@ -17,8 +17,8 @@ from .config import (
     SIGNATURE_AVATAR_URL,
     SIGNATURE_LINKEDIN,
     SIGNATURE_X,
-    SIGNATURE_SERVICES,
-    SIGNATURE_APPLY,
+    SIGNATURE_TELEGRAM,
+    SIGNATURE_HOME,
 )
 
 SIGNATURE_HTML = f"""\
@@ -30,15 +30,14 @@ SIGNATURE_HTML = f"""\
     <td style="vertical-align:middle;">
       <div style="font-size:14px;font-weight:bold;color:#111111;">{FROM_NAME}</div>
       <div style="color:#555555;">{SIGNATURE_TITLE}</div>
-      <div style="margin-top:4px;">
+      <div style="margin-top:6px;font-size:13px;color:#333333;">
         <a href="{SIGNATURE_LINKEDIN}" style="color:#0a66c2;text-decoration:none;">LinkedIn</a>
         &nbsp;&middot;&nbsp;
         <a href="{SIGNATURE_X}" style="color:#111111;text-decoration:none;">X</a>
         &nbsp;&middot;&nbsp;
-        <a href="{SIGNATURE_SERVICES}" style="color:#333333;text-decoration:none;">spielos.xyz/services</a>
-      </div>
-      <div style="margin-top:8px;">
-        <a href="{SIGNATURE_APPLY}" style="color:#2f81f7;text-decoration:none;font-weight:bold;">Apply for a Free Review</a>
+        <a href="{SIGNATURE_TELEGRAM}" style="color:#229ED9;text-decoration:none;">Telegram</a>
+        &nbsp;&middot;&nbsp;
+        <a href="{SIGNATURE_HOME}" style="color:#333333;text-decoration:none;">spielos.xyz &#10142;</a>
       </div>
     </td>
   </tr>
@@ -47,10 +46,10 @@ SIGNATURE_HTML = f"""\
 SIGNATURE_TEXT = f"""\
 {FROM_NAME}
 {SIGNATURE_TITLE}
-LinkedIn: {SIGNATURE_LINKEDIN}
+Home: {SIGNATURE_HOME}
 X: {SIGNATURE_X}
-{SIGNATURE_SERVICES}
-Apply for a Free Review (no call needed): {SIGNATURE_APPLY}"""
+LinkedIn: {SIGNATURE_LINKEDIN}
+Telegram: {SIGNATURE_TELEGRAM}"""
 
 TEMPLATES = {
     "English": [

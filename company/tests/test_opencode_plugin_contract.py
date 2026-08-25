@@ -27,10 +27,9 @@ Intended API contract (implementer must make every test pass by editing ONLY
 2. V1-only APIs are GONE: no `client.session.promptAsync`, no
    `client.tui.showToast`, no `command.execute.before` hook, no `$`/BunShell
    factory parameters.
-3. V2 APIs are used: `ctx.event.subscribe()` iteration reading
-   `event.data.sessionID` on `session.idle`, `ctx.session.prompt({ sessionID,
-   text: { text } })`, `ctx.session.synthetic({ sessionID, text: { text } })`
-   (HUD ticker), and `setup` returns a cleanup function that stops the timers.
+3. The compatibility adapter uses V2 event subscription only. It owns no
+   timer, polling, session prompt, heartbeat, or `runner tick` fallback; the
+   deterministic CLI wake command is the sole attached-session wake path.
 4. T2 (load contract under bun): importing the module yields `mod.default`
    with the id/setup shape; invoking `setup` with a hermetic stub Context
    resolves to a cleanup function; invoking cleanup resolves without
@@ -185,20 +184,13 @@ class PluginExportContractStaticTests(unittest.TestCase):
     def test_v2_apis_used(self):
         self.assertIn("ctx.event.subscribe()", self.source)
         self.assertIn("event.type === \"session.idle\"", self.source)
-        self.assertIn("event.data.sessionID", self.source)
-        self.assertIn("ctx.session.prompt({", self.source)
-        self.assertIn("ctx.session.synthetic({", self.source)
-        self.assertIn("sessionID: activeSessionID", self.source)
+        self.assertNotIn("runner tick", self.source)
+        self.assertNotIn("setInterval", self.source)
+        self.assertNotIn("ctx.session.prompt({", self.source)
+        self.assertNotIn("ctx.session.synthetic({", self.source)
 
-    def test_setup_returns_cleanup_that_clears_timers(self):
-        self.assertIn("clearInterval(timer)", self.source)
-        self.assertIn("clearInterval(hudTimer)", self.source)
+    def test_setup_returns_cleanup_without_a_second_watch_loop(self):
         self.assertIn("return async () => {", self.source)
-
-    def test_hud_ticker_cadence_is_configurable_constant(self):
-        self.assertIn("HUD_TICKER_INTERVAL_MS", self.source)
-        self.assertIn("60_000", self.source)
-        self.assertIn("buildHudTicker", self.source)
 
 
 class PluginLoadContractTests(unittest.TestCase):

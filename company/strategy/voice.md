@@ -10,4 +10,4 @@ Every artifact carries exactly one idea the buyer can repeat tomorrow.
 ## Copy shape
 
 Short sentences. Concrete nouns. Evidence over claims. The reader's work in
-the reader's words.
+the reader's words. Eliminate adverbs. Active voice.

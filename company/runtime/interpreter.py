@@ -79,6 +79,21 @@ def _memory_view(memory) -> list[dict[str, Any]]:
     return values
 
 
+def _strategy_view(strategy) -> dict[str, Any]:
+    """The bounded strategy context that an employee may actually use.
+
+    The runtime owns selection; this projection deliberately keeps the
+    work-order contract explicit instead of asking an employee to rediscover
+    strategy from local files.
+    """
+    value = dict(strategy or {})
+    return {
+        "state_hash": value.get("state_hash"),
+        "current_intent": dict(value.get("current_intent") or {}),
+        "sections": list(value.get("sections") or ()),
+    }
+
+
 def synthesize_graph(handler, workflow: WorkflowSpec | None, metric: str) -> tuple[WorkflowStep, ...]:
     """One employee step from catalog fields when a workflow has no explicit graph."""
 
@@ -157,6 +172,7 @@ class InterpretedDepartment:
             "workflow": workflow_id or (workflow.id if workflow else None),
             "evidence": evidence,
             "memory": memory,
+            "strategy": _strategy_view(ctx.strategy),
             "graph": [node.id for node in graph],
             "current_step": None if current is None else {
                 "id": current.id, "kind": current.kind,
@@ -296,6 +312,10 @@ class InterpretedDepartment:
             payload["skill_ids"] = list(step.skill_ids)
         payload["step_id"] = step.id
         payload["action"] = "request_agent"
+        # These are not merely audit decoration: the exact bounded context is
+        # copied into the durable work order below so the employee can apply it.
+        payload["memory"] = list(observation.get("memory") or ())
+        payload["strategy"] = dict(observation.get("strategy") or {})
         return StageResult("choose_intervention", payload,
                            decision=apply_memory({"type": "request_agent",
                                      "rationale": f"Workflow step `{step.id}` needs employee output",
