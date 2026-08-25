@@ -243,12 +243,14 @@ def _runtime_mode(args) -> str | None:
 
 
 def main(argv=None):
-    from .runtime.config import VERSION
-
-    args = build_parser().parse_args(argv)
-    if getattr(args, "version", False):
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if "--version" in argv or "-V" in argv:
+        # Checked before argparse: required subcommands would reject a bare
+        # --version otherwise.
+        from .runtime.config import VERSION
         print(f"spielos {VERSION}")
         return 0
+    args = build_parser().parse_args(argv)
     mode = _runtime_mode(args)
     runtime = Runtime(args.db, readonly=(mode == "read")) if mode else None
     exit_code = 0
