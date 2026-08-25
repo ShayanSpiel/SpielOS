@@ -4,6 +4,21 @@ This checkout IS the SpielOS harness product. When working here you may be the
 operating Director, a Department executor, or a bounded system-improvement
 agent. Authority for architecture and doctrine: `company/README.md` below.
 
+## Working in this checkout (dev mode)
+
+This repo runs the harness **from source**, not from a vendored home:
+
+- Runtime commands: `PYTHONDONTWRITEBYTECODE=1 python3 -B -m company …`
+  (no `PYTHONPATH=.agents` — that form is only for scaffolded user homes).
+- The Director skill lives at `company/skills/director/SKILL.md` here
+  (in vendored homes it is `.agents/company/skills/director/SKILL.md`).
+- Everything under `company/init_templates/` is what `spielos init` ships to
+  users. Executable spine files must stay byte-identical between
+  `company/` and `company/init_templates/agents/company/`
+  (`company/tests/test_template_parity.py` enforces this).
+- `.spielos/` here is private local runtime state; it is gitignored.
+
+
 ---
 # SpielOS Company Harness
 
