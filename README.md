@@ -103,6 +103,7 @@ with one pasted command, and it works immediately:
 | Lead Researcher | AI lead research agent | [Lead-Researcher](https://github.com/ShayanSpiel/Lead-Researcher) | [Guide](https://spielos.xyz/landing/lead-researcher/) |
 | AI Keyword Research Agent | AI keyword research automation skill | [AI-Keyword-Research-Agent](https://github.com/ShayanSpiel/AI-Keyword-Research-Agent) | [Guide](https://spielos.xyz/landing/ai-keyword-research-agent/) |
 | Social Lead Researcher | LinkedIn lead research agent | [Social-Lead-Researcher](https://github.com/ShayanSpiel/Social-Lead-Researcher) | [Guide](https://spielos.xyz/landing/social-lead-researcher/) |
+| Email Outreach Agent | Cold email automation agent | [Email-Outreach-Agent](https://github.com/ShayanSpiel/Email-Outreach-Agent) | Guide: see repo |
 
 More workers and agent skills: [Skills library](https://github.com/ShayanSpiel/Skills) ·
 [Prompt-cache audit tool](https://github.com/ShayanSpiel/CacheCatch) ·
