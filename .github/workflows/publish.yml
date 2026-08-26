@@ -20,3 +20,86 @@ jobs:
         run: pipx run build
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+
+  npm-publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    needs: pypi-publish
+    permissions:
+      id-token: write          # npm OIDC provenance
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+      - name: Publish to npm with provenance
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  homebrew-publish:
+    name: Update Homebrew tap
+    runs-on: ubuntu-latest
+    needs: pypi-publish
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compute sdist sha256 and update formula
+        id: dist
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          URL="https://files.pythonhosted.org/packages/source/s/spielos/spielos-${VERSION}.tar.gz"
+          echo "Downloading $URL"
+          curl -fsSL "$URL" -o spielos.tar.gz
+          SHA256=$(shasum -a 256 spielos.tar.gz | awk '{print $1}')
+          echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
+          echo "Computed sha256=$SHA256 for spielos-$VERSION.tar.gz"
+      - name: Inject computed sha256 into formula
+        run: |
+          set -euo pipefail
+          sed -i.bak "s|sha256 \".*\"|sha256 \"${{ steps.dist.outputs.sha256 }}\"|" homebrew/spielos.rb
+          rm -f homebrew/spielos.rb.bak
+          grep -q "${{ steps.dist.outputs.sha256 }}" homebrew/spielos.rb \
+            && echo "sha256 injected into homebrew/spielos.rb"
+      - name: Push updated formula to tap
+        uses: cpina/github-action-push-to-another-repository@main
+        env:
+          API_TOKEN_GITHUB: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        with:
+          source-directory: "homebrew"
+          destination-github-username: "ShayanSpiel"
+          destination-repository-name: "homebrew-spielos"
+          target-branch: "main"
+          commit-message: "spielos ${{ steps.dist.outputs.version }}"
+
+  docker-publish:
+    name: Build and push Docker image
+    runs-on: ubuntu-latest
+    needs: pypi-publish
+    permissions:
+      contents: read
+      packages: write         # push to GitHub Container Registry
+    steps:
+      - uses: actions/checkout@v4
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/shayanspiel/spielos:latest
+            ghcr.io/shayanspiel/spielos:${{ github.ref_name }}

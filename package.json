@@ -1,0 +1,26 @@
+{
+  "name": "spielos",
+  "version": "6.3.0",
+  "description": "SpielOS: one durable Goal loop, Departments, approvals, evidence, and evals for operating AI work as a company system.",
+  "bin": {
+    "spielos": "bin/spielos.js"
+  },
+  "files": [
+    "bin"
+  ],
+  "keywords": [
+    "ai-agents",
+    "agent-harness",
+    "company-runtime",
+    "spielos"
+  ],
+  "license": "MIT",
+  "homepage": "https://spielos.xyz",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ShayanSpiel/SpielOS.git"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

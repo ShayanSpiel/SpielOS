@@ -49,6 +49,27 @@ curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/SpielOS/main/install.sh
 OpenCode-style progress, an optional starter-department picker, host detection,
 and a runtime verification before it reports success.
 
+### Other install methods
+
+`spielos` is also published to npm, Homebrew, and as a Docker image. Pick
+whichever fits your environment — all of them expose the same `spielos` CLI
+(`python3 -m company` under the hood), so `spielos --version` works everywhere:
+
+```sh
+# npm (global)
+npm install -g spielos && spielos --version
+
+# Homebrew
+brew install shayanspiel/spielos/spielos && spielos --version
+
+# Docker (ephemeral home mounted from the current directory)
+docker run --rm -v "$PWD:/work" -w /work ghcr.io/shayanspiel/spielos:latest --version
+```
+
+The npm package and Homebrew formula are thin shims over the Python runtime, so
+Python 3.11+ with the `spielos` package available is still required on the host
+for the npm/Homebrew commands to run.
+
 **Fresh means:** the spine only — runtime, company skills, OpenCode/Codex
 adapters, empty `.spielos/` state, `opencode.json`, `AGENTS.md`. **Zero
 departments, zero strategy content.** Your company starts empty; the Director
