@@ -252,6 +252,30 @@ def main(argv=None):
         from .runtime.config import VERSION
         print(f"spielos {VERSION}")
         return 0
+    if not argv:
+        # Bare `spielos`: the destination folder is the product. In a home,
+        # show company state; in a folder without a spine, onboard it. The
+        # source checkout is exempt (dev mode keeps the parser help).
+        from .runtime.paths import find_project_root, package_vendored_root
+
+        vendored = package_vendored_root()
+        in_source_repo = (vendored is not None
+                          and "site-packages" not in str(vendored))
+        root = find_project_root()
+        if not in_source_repo:
+            if (root / ".agents" / "company").is_dir():
+                runtime = Runtime(DEFAULT_DB, readonly=True)
+                service = RunnerService(PROJECT_ROOT,
+                                        Path(DEFAULT_DB)).status()
+                snapshot = runtime.company_snapshot(5)
+                snapshot["automation"] = {
+                    "enabled": service["enabled"], "running": service["running"],
+                    "pid": service["pid"], "started_at": service.get("started_at"),
+                }
+                print(render_status(snapshot))
+                return 0
+            from .runtime.onboard import run_init
+            return run_init()
     args = build_parser().parse_args(argv)
     mode = _runtime_mode(args)
     runtime = Runtime(args.db, readonly=(mode == "read")) if mode else None

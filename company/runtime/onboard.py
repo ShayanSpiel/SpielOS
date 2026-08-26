@@ -78,14 +78,20 @@ class _Style:
 
 
 class _Spinner:
-    """Braille spinner on one line; finalize() replaces it with a marker."""
+    """Braille spinner on one line; the label updates live as phases land."""
 
     def __init__(self, style: _Style, label: str) -> None:
         self.style = style
         self.label = label
         self._stop = threading.Event()
+        self._lock = threading.Lock()
         self._thread: threading.Thread | None = None
         self._started_at = 0.0
+
+    def set_label(self, label: str) -> None:
+        """Progress hook: called between materialization phases."""
+        with self._lock:
+            self.label = label
 
     def __enter__(self) -> "_Spinner":
         self._started_at = time.monotonic()
@@ -100,8 +106,10 @@ class _Spinner:
         frames = SPINNER_FRAMES
         index = 0
         while not self._stop.wait(0.08):
+            with self._lock:
+                label = self.label
             frame = self.style.cyan(frames[index % len(frames)])
-            sys.stdout.write(f"\r{frame} {self.style.dim(self.label)}")
+            sys.stdout.write(f"\r\033[K{frame} {self.style.dim(label)}")
             sys.stdout.flush()
             index += 1
 
@@ -297,9 +305,10 @@ def run_init(*, dir: str = ".", force: bool = False, minimal: bool = True,
         receipt = None
         quiet = as_json  # machine mode: keep stdout parseable, no chrome
         if not quiet:
-            with _Spinner(style, "Vendoring SpielOS harness"):
+            with _Spinner(style, "Preparing") as spinner:
                 receipt = scaffold(target, force=force, minimal=minimal,
-                                   departments=departments)
+                                   departments=departments,
+                                   on_phase=spinner.set_label)
         else:
             receipt = scaffold(target, force=force, minimal=minimal,
                                departments=departments)
@@ -362,10 +371,23 @@ def run_init(*, dir: str = ".", force: bool = False, minimal: bool = True,
 
 
 def banner(style: _Style, target: Path) -> None:
+    from .config import VERSION
+
+    width = 52
     print()
-    print(style.bold(style.cyan("SpielOS")) + style.dim(
-        " — one durable loop for your AI company"))
-    print(style.dim(f"Setting up in {target}"))
+    print(style.cyan("╭" + "─" * (width - 2) + "╮"))
+    title = f" ◆ SpielOS v{VERSION}"
+    print(style.cyan("│") + style.bold(style.cyan(title.ljust(width - 2)))
+          + style.cyan("│"))
+    tagline = " one durable loop for your AI company"
+    print(style.cyan("│") + style.dim(tagline.ljust(width - 2))
+          + style.cyan("│"))
+    target_line = f" setting up: {target}"
+    if len(target_line) > width - 4:
+        target_line = target_line[:width - 7] + "..."
+    print(style.cyan("│") + style.dim(target_line.ljust(width - 2))
+          + style.cyan("│"))
+    print(style.cyan("╰" + "─" * (width - 2) + "╯"))
     print()
 
 
