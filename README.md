@@ -104,6 +104,8 @@ with one pasted command, and it works immediately:
 | AI Keyword Research Agent | AI keyword research automation skill | [AI-Keyword-Research-Agent](https://github.com/ShayanSpiel/AI-Keyword-Research-Agent) | [Guide](https://spielos.xyz/landing/ai-keyword-research-agent/) |
 | Social Lead Researcher | LinkedIn lead research agent | [Social-Lead-Researcher](https://github.com/ShayanSpiel/Social-Lead-Researcher) | [Guide](https://spielos.xyz/landing/social-lead-researcher/) |
 | Email Outreach Agent | Cold email automation agent | [Email-Outreach-Agent](https://github.com/ShayanSpiel/Email-Outreach-Agent) | Guide: see repo |
+| SEO Audit Agent | Technical SEO audit agent | [SEO-Audit-Agent](https://github.com/ShayanSpiel/SEO-Audit-Agent) | Guide: see repo |
+| SpielOS Workers | 22 automation playbook recipes | [SpielOS-Workers](https://github.com/ShayanSpiel/SpielOS-Workers) | [Catalog](https://spielos.xyz/solutions/) |
 
 More workers and agent skills: [Skills library](https://github.com/ShayanSpiel/Skills) ·
 [Prompt-cache audit tool](https://github.com/ShayanSpiel/CacheCatch) ·
