@@ -197,6 +197,32 @@ class AgentSpec:
 
 
 @dataclass(frozen=True)
+class WorkerSpec(AgentSpec):
+    """A Worker owns executable workflows inside one Workgroup.
+
+    ``AgentSpec`` remains the compatibility name for older installed rosters.
+    New package code should use WorkerSpec: an identity, its workbook methods,
+    its workkit permissions, and the workflows for which it is the lead.
+    """
+
+    workgroup_id: str = ""
+    workflows: tuple[WorkflowSpec, ...] = ()
+
+
+@dataclass(frozen=True)
+class WorkgroupSpec:
+    """Human-facing grouping and routing metadata; never an executor itself."""
+
+    id: str
+    version: str
+    description: str
+    workers: tuple[WorkerSpec, ...]
+    metrics: tuple[str, ...] = ()
+    config_schema: dict[str, Any] = field(default_factory=dict)
+    evidence_metrics: dict[str, tuple[str, ...]] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
 class ConnectionSpec:
     """Logical access to an external system, resolved by the active host."""
 

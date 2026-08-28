@@ -13,6 +13,7 @@ from company.runtime.loop import Runtime
 from company.runtime.models import Department, Goal, GoalContext, WorkflowSpec, WorkflowStep
 from company.runtime.package import validate_package
 from company.runtime.registry import departments
+from company.workgroups.legacy import WorkgroupHandler
 from company.tests.test_campaign_handoff_contract import campaign_manifest
 
 
@@ -89,7 +90,8 @@ class SharedInterpreterFlowTests(unittest.TestCase):
     def test_email_outreach_is_the_named_stage_exception(self):
         self.assertEqual(set(BESPOKE_STAGE_EXCEPTIONS), {"email-outreach"})
         department = departments()["outbound"]
-        self.assertIsInstance(department, OutboundDepartment)
+        self.assertIsInstance(department, WorkgroupHandler)
+        self.assertIsInstance(department._legacy, OutboundDepartment)
         email = Goal("g", "Send", "outbound", "reply_rate", "ge", 0.3,
                      None, None, "active", {"workflow": "email-outreach"})
         social = Goal("g2", "Research", "outbound", "qualified_social_leads", "ge", 1,
