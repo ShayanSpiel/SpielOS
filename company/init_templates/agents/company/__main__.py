@@ -89,6 +89,8 @@ def build_parser():
         item.add_argument("--file", help="path to Workgroup JSON file")
         if name == "install":
             item.add_argument("--force", action="store_true")
+            item.add_argument("--all", action="store_true",
+                              help="install every bundled starter Workgroup")
             item.add_argument("--dir", help="exact SpielOS home to modify (default: source checkout/current home)")
     workgroup_commands.add_parser("list")
     goal = commands.add_parser("goal")
@@ -341,6 +343,19 @@ def main(argv=None):
             else:
                 payload = (json.loads(Path(args.file).read_text()) if args.file else
                            json.loads(args.spec) if args.spec else None)
+                if args.workgroup_command == "install" and args.all:
+                    from .workgroups.registry import builtin_specs
+                    from .runtime.paths import package_vendored_root, selected_project_root, validate_home_destination
+                    selected = validate_home_destination(selected_project_root(args.dir))
+                    company_home = selected / ".agents" / "company"
+                    root = (selected / "company" / "workgroups" if not company_home.is_dir()
+                            and package_vendored_root() == selected else company_home / "workgroups")
+                    if not root.parent.is_dir():
+                        raise ValueError(f"no harness home at {selected}; run `spielos init --dir {selected}` first")
+                    output = [install_workgroup(spec, root=root, force=args.force)
+                              for spec in builtin_specs()]
+                    print(json.dumps(output, indent=2))
+                    return 0
                 if not isinstance(payload, dict):
                     raise ValueError("provide --spec JSON or --file path")
                 defects = validate_workgroup_spec(payload)
@@ -1013,7 +1028,7 @@ def render_refresh(value):
     """Card for `company refresh` — the update step after `pipx upgrade`."""
     lines = ["# SpielOS home refreshed", "",
              f"- Refreshed files: `{value.get('refreshed_files', 0)}`",
-             "- Preserved: strategy, assets, departments, installed agents, "
+             "- Preserved: strategy, assets, Workgroups, installed workers, "
              "config.user.json, .spielos/ state"]
     lines += ["", "Confirm with `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.agents "
               "python3 -B -m company status`."]

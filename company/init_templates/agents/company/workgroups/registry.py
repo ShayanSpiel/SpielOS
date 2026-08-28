@@ -11,6 +11,31 @@ from ..runtime.models import Department, WorkgroupSpec, WorkerSpec, WorkflowSpec
 ROOT = Path(__file__).resolve().parent
 
 
+def builtin_specs() -> tuple[dict, ...]:
+    """The operational starter catalog shipped with the source product."""
+    values = (
+        ("product-reliability", "Protect installation, upgrades, and regressions", "reliability-worker", "release_verification"),
+        ("ux-experience", "Improve onboarding, commands, delegation, and hand-offs", "ux-worker", "ux_finding"),
+        ("real-world-validation", "Collect repeatable real-home validation evidence", "validation-worker", "validation_receipt"),
+        ("user-feedback", "Turn user reports into verified problem records", "feedback-worker", "feedback_record"),
+        ("release-operations", "Prepare verified releases and upgrade receipts", "release-worker", "release_receipt"),
+        ("growth-community", "Measure discoverability and community feedback", "growth-worker", "growth_signal"),
+    )
+    return tuple({
+        "id": group_id, "version": "1.0.0", "description": description,
+        "metrics": [evidence], "evidence_metrics": {evidence: [evidence]},
+        "workers": [{
+            "id": worker_id, "description": description,
+            "workbook": [], "workkit": [], "produces": [evidence],
+            "workflows": [{
+                "id": f"{group_id}-workflow", "description": description,
+                "evidence": [evidence],
+                "worksteps": [{"id": "execute", "kind": "employee", "produces": [evidence]}],
+            }],
+        }],
+    } for group_id, description, worker_id, evidence in values)
+
+
 def _workflow(path: Path) -> WorkflowSpec:
     value = json.loads(path.read_text())
     graph = tuple(WorkflowStep(
@@ -63,6 +88,28 @@ class WorkgroupHandler(InterpretedDepartment, Department):
 
 
 def workgroups() -> dict[str, WorkgroupHandler]:
-    return {group.id: WorkgroupHandler(group) for folder in sorted(ROOT.iterdir())
+    discovered = {group.id: WorkgroupHandler(group) for folder in sorted(ROOT.iterdir())
             if folder.is_dir() and (folder / "workgroup.json").is_file()
             for group in (_group(folder),)}
+    for spec in builtin_specs():
+        if spec["id"] in discovered:
+            continue
+        workers = []
+        for worker in spec["workers"]:
+            flows = []
+            for flow in worker["workflows"]:
+                graph = tuple(WorkflowStep(
+                    id=step["id"], kind=step.get("kind", "employee"),
+                    employee_id=worker["id"], produces=tuple(step.get("produces") or ()))
+                    for step in flow["worksteps"])
+                flows.append(WorkflowSpec(
+                    flow["id"], flow["description"], (), (),
+                    tuple(flow.get("workbook") or ()), (), tuple(flow["evidence"]),
+                    tuple(flow.get("workkit") or ()), graph))
+            workers.append(WorkerSpec(
+                worker["id"], worker["description"], tuple(worker.get("workbook") or ()),
+                tuple(worker.get("workkit") or ()), tuple(worker["produces"]), spec["id"], tuple(flows)))
+        discovered[spec["id"]] = WorkgroupHandler(WorkgroupSpec(
+            spec["id"], spec["version"], spec["description"], tuple(workers),
+            tuple(spec["metrics"]), {}, {key: tuple(value) for key, value in spec["evidence_metrics"].items()}))
+    return discovered
