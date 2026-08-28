@@ -50,8 +50,13 @@ class Director(GoalHandler):
     def decide(self, ctx, observation):
         children = observation.get("children") or []
         if not children:
-            return StageResult("diagnose", {"reason": "no child goals"}, RunStatus.BLOCKED,
-                               Stage.DECIDE, message="Director needs at least one child goal")
+            return StageResult(
+                "select_next", {"action": "request_next_goal", "reason": "no active child goals"},
+                RunStatus.WAITING, Stage.DECIDE,
+                attention={"required_user_action": (
+                    "Director re-evaluated company state and needs the owner to select, "
+                    "create, or explicitly conclude the next objective")},
+                message="Director needs an explicit next-objective decision; no active goal is not completion")
         attention = sorted(
             [c for c in children if c["cycle"]["run_status"] in
              ("awaiting_approval", "blocked", "failed")],

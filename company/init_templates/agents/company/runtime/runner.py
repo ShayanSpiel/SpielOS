@@ -472,37 +472,15 @@ class Runner:
 
     def watch(self, interval_seconds: float = 2.0, goal_id: str | None = None,
               max_ticks: int | None = None):
-        ticks, previous_pending = 0, None
-        self._start_heartbeat_thread()
-        try:
-            while max_ticks is None or ticks < max_ticks:
-                self.write_heartbeat()
-                # Live HUD surface: refreshed once per watch cycle, only from
-                # the daemon path (tick() never writes it). Bounded content;
-                # best-effort write.
-                self._write_live_status()
-                try:
-                    result = self.tick(goal_id)
-                    pending = tuple(item["id"] for item in result["pending_notifications"])
-                    if result["advanced"] or pending != previous_pending:
-                        yield result
-                    previous_pending = pending
-                    ticks += 1
-                    self._check_stalled(goal_id)
-                    # Scheduled progress digest: emitted by the daemon watch
-                    # loop (not the plugin) so supervision stays visible on a
-                    # schedule while goals are active, independently of events.
-                    self._maybe_emit_digest(goal_id)
-                except Exception as exc:
-                    # Best-effort: tell the world the watch loop is dying before
-                    # the daemon exits. The heartbeat reader remains the primary
-                    # dead-daemon detector.
-                    self._emit_runner_down(exc)
-                    raise
-                if max_ticks is None or ticks < max_ticks:
-                    time.sleep(interval_seconds)
-        finally:
-            self._stop_heartbeat_thread()
+        """Advance persisted runnable work; supervision belongs to Director."""
+        ticks = 0
+        while max_ticks is None or ticks < max_ticks:
+            result = self.tick(goal_id)
+            if result["advanced"]:
+                yield result
+            ticks += 1
+            if max_ticks is None or ticks < max_ticks:
+                time.sleep(interval_seconds)
 
     def _candidates(self, goal_id: str | None) -> list[str]:
         rows = self.runtime.list_goals()

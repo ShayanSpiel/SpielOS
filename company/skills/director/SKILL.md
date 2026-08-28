@@ -98,10 +98,9 @@ shell request.
 2. Reuse the active Director root for company pursuit. Create it when the first
    material outcome is selected; attach production Department Goals beneath it.
    Run a Department independently only for a genuinely independent outcome.
-3. Ensure `runner status` is running for an active operational goal; use
-   `runner start` when needed. Use `runner tick GOAL_ID` for an immediate full
-   goal-tree advance. The repository-local worker then resumes due and
-   evidence-woken runs without an open chat session.
+3. Use `runner tick GOAL_ID` only to advance work the persisted state already
+   marks runnable. Runner never decides priorities, emits supervision digests,
+   or supervises the company.
 4. Treat approval as a hard stop unless durable authority already covers it.
    “Approve this” means this action; “approve this run” means the current Run;
    “everything is approved for this goal/until stopped” means
@@ -122,23 +121,22 @@ shell request.
 
 ## Attached-session wake feature
 
-When the owner says “watchdog”, “scheduler”, “wake this session”, “sleep and
-continue”, or gives an interval/calendar wake for an active Goal, use the
-foreground wake helper in this same host session:
+For an autonomous run, ask once: **“Do you want me to supervise this run every
+5 minutes?”** Only after approval, keep this Director session alive with:
 
 ```sh
-PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.agents python3 -B -m company runner wake GOAL_ID --every 600 --instruction "Continue Cycle: inspect the Goal, claim or complete actionable work, then advance the runtime."
+sleep 300; echo SPIELOS_WAKE
 ```
 
-For one calendar wake, convert the owner’s requested local time to an explicit
-ISO-8601 timestamp and use `--at TIMESTAMP` instead of `--every`. The command
-sleeps then emits one `director_wake` event; immediately inspect that Goal and
-perform the stated instruction. It exits by itself when the Goal is terminal,
-paused, automation is stopped, or a one-time wake fires.
+When it returns, re-read company state, inspect progress and problems, decide
+the next action, and arm the next five-minute wake only while supervision is
+still needed. Stop when the objective is complete, owner input is required, or
+supervision is disabled. After any terminal Goal, re-read company state and
+choose the next higher-level work, next Goal, owner question, or explicit
+conclusion. Never treat “no active Goal” as completion.
 
-This is a host-session feature, not a second runtime loop: never call it to
-poll or tick the runtime. It cannot revive a host session that has already
-ended; a host-specific resume capability is required for that.
+This is a host-session feature, not a daemon or second runtime loop. It cannot
+revive a session that has ended.
 
 A completed unmet run with a valid next experiment continues automatically.
 Present its evidence, verdict, learning, changed variable, and fixed variables.
