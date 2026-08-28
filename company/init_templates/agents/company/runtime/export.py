@@ -255,7 +255,7 @@ def refresh_home(*, force: bool = True,
                  target: str | Path | None = None) -> dict:
     """Re-vendor the SPINE (runtime code + company skills + host adapters)
     into the current home from the newest templates. User layer is preserved:
-    strategy/, assets/, departments/, agents/, config.user.json, .spielos/."""
+    strategy/, assets/, workgroups/, agents/, config.user.json, .spielos/."""
     from .bootstrap import template_root
 
     templates = template_root()
@@ -285,7 +285,6 @@ def refresh_home(*, force: bool = True,
     _sync(spine / "agents", home / "company" / "agents",
           preserve={"installed"})
     _sync(spine / "skills", home / "company" / "skills")
-    _sync(spine / "workgroups", home / "company" / "workgroups")
     # Note: the contract test suite deliberately does NOT ship to homes.
     # It validates this product repository's packaging layout and belongs
     # to the source checkout and CI. Homes verify through company status,
@@ -301,6 +300,6 @@ def refresh_home(*, force: bool = True,
                   preserve=set())
 
     return {"refreshed_files": len(refreshed),
-            "preserved": ["strategy/", "assets/", "departments/",
+            "preserved": ["strategy/", "assets/", "workgroups/",
                           "agents/installed/", "config.user.json",
                           ".spielos/"]}

@@ -186,7 +186,7 @@ def scaffold(target: Path | None = None, *, force: bool = False,
              on_phase=None) -> dict:
     """Materialize a complete harness home. Returns a receipt dict.
 
-    ``minimal=True`` ships the spine with an EMPTY departments/ folder and
+    ``minimal=True`` ships the spine with an EMPTY workgroups/ folder and
     no website skills — a single-department appliance. Pass
     ``departments=["id", ...]`` to also vendor those from the templates.
     ``on_phase(label)`` is called before each materialization chunk so an
@@ -211,7 +211,7 @@ def scaffold(target: Path | None = None, *, force: bool = False,
     preserved_user_prefixes = (
         "company/strategy/",
         "company/assets/",
-        "company/departments/",
+        "company/workgroups/",
         "company/agents/installed/",
     ) if existing_home else ()
 
@@ -220,28 +220,24 @@ def scaffold(target: Path | None = None, *, force: bool = False,
 
     notify("Vendoring harness spine")
     if minimal:
-        # Shared cross-department modules are spine, not lego — always kept.
-        spine_dept_files = {"company/departments/__init__.py",
-                            "company/departments/_evidence.py",
-                            "company/departments/campaign_contract.py"}
         written += _copy_tree(templates / "agents", root / ".agents",
                               overwrite=force,
                               skip=lambda rel: (
-                                  rel.startswith("company/departments/")
-                                  and rel not in spine_dept_files)
-                              or rel.startswith("skills/website/")
-                              or preserve_user_layer(rel))
-        # Keep the departments package importable even without its files.
-        dept_pkg = root / ".agents" / "company" / "departments"
-        dept_pkg.mkdir(parents=True, exist_ok=True)
-        (dept_pkg / "__init__.py").touch()
-        written.append(str(dept_pkg / "__init__.py"))
+                                  (rel.startswith("company/workgroups/")
+                                   and rel not in {"company/workgroups/__init__.py",
+                                                   "company/workgroups/registry.py"})
+                                  or rel.startswith("skills/website/")
+                                  or preserve_user_layer(rel)))
+        workgroups_pkg = root / ".agents" / "company" / "workgroups"
+        workgroups_pkg.mkdir(parents=True, exist_ok=True)
+        (workgroups_pkg / "__init__.py").touch()
+        written.append(str(workgroups_pkg / "__init__.py"))
         for dept_id in departments or []:
-            src = templates / "agents" / "company" / "departments" / dept_id
+            src = templates / "agents" / "company" / "workgroups" / dept_id
             if not src.is_dir():
                 raise ValueError(f"template has no department '{dept_id}'")
             written += _copy_tree(src, root / ".agents" / "company"
-                                  / "departments" / dept_id, overwrite=force)
+                                  / "workgroups" / dept_id, overwrite=force)
     else:
         written += _copy_tree(templates / "agents", root / ".agents",
                               overwrite=force,
@@ -305,7 +301,7 @@ def scaffold(target: Path | None = None, *, force: bool = False,
         "next_steps": [
             "cd " + str(root),
             "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.agents python3 -B -m company status",
-            "Make it yours: edit .agents/company/strategy/ (ICP, voice) and departments.",
+            "Make it yours: edit .agents/company/strategy/ (ICP, voice) and add a Workgroup.",
             "Set credentials in .spielos/.env (see .spielos/.env.example).",
         ],
     }

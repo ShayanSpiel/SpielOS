@@ -1,6 +1,0 @@
-interface:
-  display_name: "Outbound"
-  short_description: "Goal-driven, policy-safe outreach loops"
-  default_prompt: "Use $outbound to operate a qualified Outbound workflow through the one company loop."
-policy:
-  allow_implicit_invocation: true

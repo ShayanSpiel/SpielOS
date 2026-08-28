@@ -1,4 +1,5 @@
 from .registry import connection, connections
-from .buffer import BufferClient, BufferError, dispatch as dispatch_buffer
 
-__all__ = ["connection", "connections", "BufferClient", "BufferError", "dispatch_buffer"]
+# Delivery adapters are loaded by the Worker workkit that uses them.  Keeping
+# the registry import-only lets a fresh harness start with no legacy packages.
+__all__ = ["connection", "connections"]

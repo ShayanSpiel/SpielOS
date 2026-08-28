@@ -12,6 +12,16 @@ from ..agents import agents as installed_agents
 from .models import GoalHandler, WorkflowSpec
 
 
+def _worker(handler: GoalHandler, employee_id: str | None):
+    """Resolve a Worker from its Workgroup before consulting legacy rosters."""
+    group = getattr(handler, "workgroup", None)
+    if group and employee_id:
+        for worker in group.workers:
+            if worker.id == employee_id:
+                return worker
+    return installed_agents().get(employee_id) if employee_id else None
+
+
 def approval_interaction(goal: Any, result: Any) -> dict[str, Any]:
     """Build the single host-neutral question for one parked action."""
 
@@ -151,7 +161,7 @@ def accepted_evidence_for(handler: GoalHandler, *, workflow: WorkflowSpec | None
     else:
         kinds = []
 
-    agent = installed_agents().get(employee_id) if employee_id else None
+    agent = _worker(handler, employee_id)
     if agent and kinds:
         produces = set(agent.produces)
         narrowed = [kind for kind in kinds if kind in produces]
@@ -189,7 +199,7 @@ def agent_shortfall(handler: GoalHandler, *, goal_id: str, metric: str,
                                     employee_id=employee_id)
     skills = list(workflow.skill_ids) if workflow and workflow.skill_ids else []
     if not skills:
-        agent = installed_agents().get(employee_id)
+        agent = _worker(handler, employee_id)
         skills = list(agent.skill_ids) if agent else []
     connections = list(workflow.connection_ids) if workflow else []
     return {

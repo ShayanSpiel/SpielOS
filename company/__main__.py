@@ -81,6 +81,16 @@ def build_parser():
         help="bundle one department (+ its company skills) into a portable .sdep")
     dept_export.add_argument("id", help="department id to export")
     dept_export.add_argument("--out", default=".", help="output directory")
+    workgroup = commands.add_parser("workgroup", help="validate and install Worker-owned Workgroup packages")
+    workgroup_commands = workgroup.add_subparsers(dest="workgroup_command", required=True)
+    for name in ("validate", "install"):
+        item = workgroup_commands.add_parser(name)
+        item.add_argument("--spec", help="Workgroup JSON object")
+        item.add_argument("--file", help="path to Workgroup JSON file")
+        if name == "install":
+            item.add_argument("--force", action="store_true")
+            item.add_argument("--dir", help="exact SpielOS home to modify (default: source checkout/current home)")
+    workgroup_commands.add_parser("list")
     goal = commands.add_parser("goal")
     goals = goal.add_subparsers(dest="goal_command", required=True)
     create = goals.add_parser("create")
@@ -246,7 +256,7 @@ def _runtime_mode(args) -> str | None:
     if args.command in {"departments", "catalog", "strategy", "init", "add",
                         "refresh", "agent"}:
         return None
-    if args.command == "department":
+    if args.command in {"department", "workgroup"}:
         return None
     if args.command == "runner" and args.runner_command in {"status", "start", "stop", "enable"}:
         return None
@@ -320,6 +330,32 @@ def main(argv=None):
             from .runtime.export import export_department
             receipt = export_department(args.id, Path(args.out).expanduser())
             print(json.dumps(receipt, indent=2))
+            return 0
+        if args.command == "workgroup":
+            from .runtime.workgroup_install import install_workgroup, validate_workgroup_spec
+            if args.workgroup_command == "list":
+                from .runtime.registry import workgroups
+                output = [{"id": group.id, "workers": list(group.agent_ids),
+                           "workflows": [flow.id for flow in group.workflows]}
+                          for group in workgroups().values()]
+            else:
+                payload = (json.loads(Path(args.file).read_text()) if args.file else
+                           json.loads(args.spec) if args.spec else None)
+                if not isinstance(payload, dict):
+                    raise ValueError("provide --spec JSON or --file path")
+                defects = validate_workgroup_spec(payload)
+                if args.workgroup_command == "validate":
+                    output = {"ok": not defects, "defects": defects}
+                else:
+                    from .runtime.paths import package_vendored_root, selected_project_root, validate_home_destination
+                    selected = validate_home_destination(selected_project_root(args.dir))
+                    company_home = selected / ".agents" / "company"
+                    root = (selected / "company" / "workgroups" if not company_home.is_dir()
+                            and package_vendored_root() == selected else company_home / "workgroups")
+                    if not root.parent.is_dir():
+                        raise ValueError(f"no harness home at {selected}; run `spielos init --dir {selected}` first")
+                    output = install_workgroup(payload, root=root, force=args.force)
+            print(json.dumps(output, indent=2))
             return 0
         if args.command == "refresh":
             from .runtime.export import refresh_home

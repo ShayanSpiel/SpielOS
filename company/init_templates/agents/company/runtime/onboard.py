@@ -285,7 +285,7 @@ def run_init(*, dir: str = ".", force: bool = False, minimal: bool = True,
              as_json: bool = False) -> int:
     """Entry point for ``spielos init``. Returns the process exit code.
 
-    A fresh home ships the spine only — zero departments. Starter
+    A fresh home ships the spine only — zero Workgroups. Starter
     departments are an explicit opt-in (``--department``, ``--all-departments``
     or the interactive picker).
     """

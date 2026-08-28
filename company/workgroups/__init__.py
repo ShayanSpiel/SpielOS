@@ -1,9 +1,5 @@
-"""Workgroup discovery and compatibility migration helpers.
+"""Workgroup packages: workers own workflows, workbooks, and workkits."""
 
-Workgroups are organizational containers.  Workers own workflows; the runtime
-uses a small adapter only while legacy Department packages are being migrated.
-"""
+from .registry import WorkgroupHandler, workgroups
 
-from .legacy import WorkgroupHandler, workgroup_from_legacy
-
-__all__ = ["WorkgroupHandler", "workgroup_from_legacy"]
+__all__ = ["WorkgroupHandler", "workgroups"]
