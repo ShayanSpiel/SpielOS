@@ -265,6 +265,12 @@ class Store:
                     goal_id TEXT, claim TEXT NOT NULL, evidence_json TEXT NOT NULL,
                     confidence REAL NOT NULL, created_at TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS directives (
+                    id TEXT PRIMARY KEY, text TEXT NOT NULL,
+                    scope TEXT NOT NULL, goal_id TEXT REFERENCES goals(id),
+                    status TEXT NOT NULL, created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
                 CREATE TABLE IF NOT EXISTS leases (
                     goal_id TEXT PRIMARY KEY, holder TEXT NOT NULL, expires_at TEXT NOT NULL
                 );
@@ -347,6 +353,8 @@ class Store:
                     ON work_orders(status, created_at);
                 CREATE INDEX IF NOT EXISTS idx_work_orders_goal_run
                     ON work_orders(goal_id, run_id, status);
+                CREATE INDEX IF NOT EXISTS idx_directives_status
+                    ON directives(status, created_at);
                 CREATE TABLE IF NOT EXISTS dispatch_retries (
                     goal_id TEXT NOT NULL,
                     run_id TEXT NOT NULL,
@@ -549,6 +557,12 @@ class Store:
                 rows = con.execute("SELECT * FROM goals WHERE parent_id=? ORDER BY created_at", (parent_id,)).fetchall()
         return [self._decode(r) for r in rows]
 
+    def goals_supporting(self, goal_id: str) -> list[dict]:
+        """Goals whose semantic support edges point at ``goal_id``."""
+
+        from .alignment import support_goal_ids
+        return [goal for goal in self.goals() if goal_id in support_goal_ids(goal)]
+
     def goal_summaries(self, *, statuses: tuple[str, ...] | None = None,
                        limit: int = 20, goal_id: str | None = None) -> list[dict]:
         """Return bounded operational projections, never stored payload bodies."""
@@ -565,7 +579,9 @@ class Store:
         with self.connect() as con:
             rows = con.execute(f"""SELECT
                     g.id,g.name,g.owner_id,g.metric,g.operator,g.target_json,g.deadline,
-                    g.parent_id,g.goal_status,g.created_at,g.updated_at,
+                    g.parent_id,g.goal_status,
+                    json_extract(g.config_json,'$.priority') AS priority,
+                    g.created_at,g.updated_at,
                     c.id AS run_id,c.sequence,c.stage,c.step,c.run_status,c.resume_at,
                     c.data_json,c.updated_at AS runtime_updated_at,r.run_type,r.evidence_validity,
                     (SELECT COUNT(*) FROM evidence ev WHERE ev.run_id=c.id) AS evidence_count,
@@ -1120,12 +1136,21 @@ class Store:
 
     def memories(self, owner_id: str, goal_id: str,
                  ancestor_goal_ids: tuple[str, ...] = ()) -> tuple[dict, ...]:
+        """Relevant owner Memory, including prior sibling Goals.
+
+        Current/ancestor claims sort first. ``relevant_memory`` still applies
+        the metric/workflow filter before a claim may affect a decision, so a
+        Department gains cross-campaign recall without receiving arbitrary old
+        context.
+        """
+
         goal_ids = tuple(dict.fromkeys((goal_id, *ancestor_goal_ids)))
         marks = ",".join("?" for _ in goal_ids)
         with self.connect() as con:
             rows = con.execute(
-                f"SELECT * FROM memory WHERE owner_id=? AND goal_id IN ({marks}) "
-                "ORDER BY id DESC LIMIT 50", (owner_id, *goal_ids)).fetchall()
+                f"SELECT * FROM memory WHERE owner_id=? "
+                f"ORDER BY CASE WHEN goal_id IN ({marks}) THEN 0 ELSE 1 END,id DESC LIMIT 50",
+                (owner_id, *goal_ids)).fetchall()
         return tuple(self._decode(r) for r in rows)
 
     def shared_memories(self, audience_owner_id: str, topics: tuple[str, ...],
@@ -1154,8 +1179,73 @@ class Store:
 
     def learn(self, owner_id: str, goal_id: str, claim: str, evidence: dict, confidence: float) -> None:
         with self.connect() as con:
+            duplicate = con.execute(
+                "SELECT 1 FROM memory WHERE owner_id=? AND claim=? AND evidence_json=? LIMIT 1",
+                (owner_id, claim, json.dumps(evidence))).fetchone()
+            if duplicate:
+                return
             con.execute("INSERT INTO memory(owner_id,goal_id,claim,evidence_json,confidence,created_at) VALUES (?,?,?,?,?,?)",
                         (owner_id, goal_id, claim, json.dumps(evidence), confidence, now()))
+
+    def recent_memories(self, limit: int = 5) -> tuple[dict, ...]:
+        with self.connect() as con:
+            rows = con.execute(
+                "SELECT * FROM memory ORDER BY id DESC LIMIT ?",
+                (max(1, min(int(limit), 50)),)).fetchall()
+        return tuple(self._decode(row) for row in rows)
+
+    def record_directive(self, text: str, *, scope: str = "company",
+                         goal_id: str | None = None) -> dict:
+        value = str(text or "").strip()
+        if not value:
+            raise ValueError("directive text is required")
+        if scope not in {"company", "goal"}:
+            raise ValueError("directive scope must be company or goal")
+        if scope == "goal" and not goal_id:
+            raise ValueError("goal-scoped directive requires goal_id")
+        if goal_id:
+            self.goal(goal_id)
+        directive_id = f"directive-{uuid.uuid4().hex[:12]}"
+        stamp = now()
+        with self.connect() as con:
+            con.execute("INSERT INTO directives VALUES (?,?,?,?,?,?,?)", (
+                directive_id, value, scope, goal_id, "active", stamp, stamp))
+        return self.directive(directive_id)
+
+    def directive(self, directive_id: str) -> dict:
+        with self.connect() as con:
+            row = con.execute(
+                "SELECT * FROM directives WHERE id=?", (directive_id,)).fetchone()
+        value = self._decode(row)
+        if not value:
+            raise KeyError(f"unknown directive: {directive_id}")
+        return value
+
+    def directives(self, *, goal_ids: tuple[str, ...] = (),
+                   status: str = "active", limit: int = 20) -> tuple[dict, ...]:
+        lineage = tuple(dict.fromkeys(item for item in goal_ids if item))
+        parameters: list[Any] = [status]
+        clause = "scope='company'"
+        if lineage:
+            marks = ",".join("?" for _ in lineage)
+            clause += f" OR (scope='goal' AND goal_id IN ({marks}))"
+            parameters.extend(lineage)
+        parameters.append(max(1, min(int(limit), 100)))
+        with self.connect() as con:
+            rows = con.execute(
+                f"SELECT * FROM directives WHERE status=? AND ({clause}) "
+                "ORDER BY created_at DESC,id DESC LIMIT ?", parameters).fetchall()
+        return tuple(self._decode(row) for row in rows)
+
+    def retire_directive(self, directive_id: str) -> dict:
+        stamp = now()
+        with self.connect() as con:
+            changed = con.execute(
+                "UPDATE directives SET status='retired',updated_at=? "
+                "WHERE id=? AND status='active'", (stamp, directive_id)).rowcount
+        if not changed:
+            raise KeyError(f"unknown active directive: {directive_id}")
+        return self.directive(directive_id)
 
     def acquire(self, goal_id: str, holder: str, seconds: int = 60) -> bool:
         expires = (datetime.now(timezone.utc) + timedelta(seconds=seconds)).isoformat()
@@ -1259,7 +1349,12 @@ class Store:
             rows = con.execute(f"""SELECT w.*,g.name AS goal_name,g.owner_id,g.goal_status
                 FROM work_orders w JOIN goals g ON g.id=w.goal_id
                 {where}
-                ORDER BY w.created_at,w.id LIMIT ?""", parameters).fetchall()
+                ORDER BY CASE lower(CAST(json_extract(g.config_json,'$.priority') AS TEXT))
+                    WHEN 'critical' THEN 100 WHEN 'high' THEN 75
+                    WHEN 'normal' THEN 50 WHEN 'low' THEN 25
+                    WHEN 'deferred' THEN 0
+                    ELSE COALESCE(CAST(json_extract(g.config_json,'$.priority') AS REAL),50)
+                END DESC,w.created_at,w.id LIMIT ?""", parameters).fetchall()
         values = []
         for row in rows:
             item = self._decode(row)

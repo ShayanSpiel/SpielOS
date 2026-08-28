@@ -13,7 +13,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from .test_template_parity import ROOT
+from company.tests.test_template_parity import ROOT
 
 
 def _tree(root: Path) -> dict[str, bytes]:
@@ -84,6 +84,12 @@ class RefreshScopeTests(unittest.TestCase):
             self.assertEqual(outbound_py.read_bytes(),
                              before[str(outbound_py.relative_to(home))])
 
+            # Built-in logical connections must cover custom department
+            # dependencies after a refresh replaces the connection registry.
+            registry = (home / ".agents/company/connections/registry.py").read_text()
+            for connection_id in ("activepieces", "google-drive", "google-sheets"):
+                self.assertIn(f'"{connection_id}"', registry)
+
     def test_refresh_refuses_homes_without_a_spine(self):
         from company.runtime.export import refresh_home
 
@@ -94,6 +100,26 @@ class RefreshScopeTests(unittest.TestCase):
                             return_value=home):
                 with self.assertRaises(ValueError):
                     refresh_home(force=True)
+
+    def test_refresh_with_explicit_target_never_overwrites_strategy(self):
+        from company.runtime.bootstrap import scaffold
+        from company.runtime.export import refresh_home
+
+        with tempfile.TemporaryDirectory() as raw:
+            home = Path(raw).resolve()
+            scaffold(home, force=True, minimal=True)
+            strategy = home / ".agents/company/strategy"
+            before = {}
+            for path in strategy.rglob("*"):
+                if path.is_file():
+                    path.write_bytes(path.read_bytes() + b"\nowner sentinel\n")
+                    before[path] = path.read_bytes()
+
+            refresh_home(force=True, target=home)
+
+            self.assertTrue(before)
+            for path, expected in before.items():
+                self.assertEqual(expected, path.read_bytes(), str(path))
 
 
 if __name__ == "__main__":

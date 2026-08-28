@@ -6,8 +6,8 @@ import { existsSync, mkdirSync, readFileSync } from "fs";
 import { join, resolve, extname } from "path";
 import { fileURLToPath } from "url";
 
-const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
-const DESIGN_ROOT = join(ROOT, ".agents/company/departments/design");
+const ROOT = resolve(fileURLToPath(new URL("../../../..", import.meta.url)));
+const DESIGN_ROOT = join(ROOT, "company/departments/design");
 const TEMPLATE = join(DESIGN_ROOT, "templates/social/harness-architecture.html");
 const PRESETS_FILE = join(DESIGN_ROOT, "presets.json");
 const OUTPUT_ROOT = join(ROOT, ".spielos/artifacts/design-showcase/graphics");
@@ -95,7 +95,7 @@ function validateStatic(failures) {
   if (/class="[^"]*\bcard\b[^"]*"/i.test(html)) failures.push("template contains card-class layout elements (card-with-arrows layout is rejected)");
   if (/music/i.test(html)) failures.push("template contains a music reference");
   if (/music/i.test(css)) failures.push("production CSS contains a music reference");
-  if (!css.includes("src/styles/tokens/index.css")) failures.push("production CSS does not import canonical tokens");
+  if (!css.includes("company/departments/design/tokens/index.css")) failures.push("production CSS does not import the local canonical tokens");
   if (!css.includes('url("/public/assets/fonts/outfit-latin.woff2")')) failures.push("production CSS must load Outfit from repo-root-resolvable paths (no system-font fallback)");
   if (!css.includes("@font-face")) failures.push("production CSS must declare the website fonts itself for the render context");
   /* No second display font: every @font-face family must be a website family. */
@@ -144,7 +144,7 @@ async function applyOrder(page, order) {
 async function renderGate(baseUrl, browser) {
   const page = await browser.newPage();
   await page.setViewport({ width: 1600, height: 900, deviceScaleFactor: 1 });
-  await page.goto(`${baseUrl}/.agents/company/departments/design/templates/social/harness-architecture.html`, { waitUntil: "networkidle0" });
+  await page.goto(`${baseUrl}/company/departments/design/templates/social/harness-architecture.html`, { waitUntil: "networkidle0" });
   await applyOrder(page, checkFixture());
   await page.evaluate(() => document.fonts.ready);
   await new Promise((r) => setTimeout(r, 300));
@@ -203,7 +203,11 @@ async function renderGate(baseUrl, browser) {
 function startServer() {
   return new Promise((done) => {
     const server = createServer((req, res) => {
-      const path = join(ROOT, decodeURIComponent(req.url.split("?")[0]));
+      let requestPath = decodeURIComponent(req.url.split("?")[0]);
+      requestPath = requestPath.replace(/^\/\.agents\/company\//, "/company/");
+      requestPath = requestPath.replace(/\/templates\/tools\//, "/tools/");
+      requestPath = requestPath.replace(/\/favicons\/favicon\.svg$/, "/favicons/favicon-v2.svg");
+      const path = join(ROOT, requestPath);
       let data;
       try { data = readFileSync(path); }
       catch { res.writeHead(404); res.end("Not found"); return; }
@@ -255,7 +259,11 @@ async function render() {
     const page = await browser.newPage();
     for (const [name, size] of selected) {
       await page.setViewport({ ...size, deviceScaleFactor: 1 });
-      await page.goto(`${base}/.agents/company/departments/design/templates/social/harness-architecture.html`, { waitUntil: "networkidle0" });
+      const templateId = order.design.template_id || "harness-architecture";
+      const registry = JSON.parse(readFileSync(join(DESIGN_ROOT, "templates/registry.json"), "utf8"));
+      const template = (registry.archetypes || []).find((entry) => entry.id === templateId);
+      if (!template || template.kind !== "social") throw new Error(`Unknown social template: ${templateId}`);
+      await page.goto(`${base}/company/departments/design/templates/${template.file}`, { waitUntil: "networkidle0" });
       await applyOrder(page, order);
       await page.evaluate(() => document.fonts.ready);
       await page.screenshot({ path: join(output, `${order.content_id}-${name}-${size.width}x${size.height}.png`) });

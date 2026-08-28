@@ -11,7 +11,8 @@ from . import config
 from .alignment import (
     active_market_outcomes, alignment_override_interaction, approval_key,
     judge_alignment, needs_alignment, resolve_originating_goal,
-    validate_goal_topology,
+    priority_score, support_goal_ids, validate_goal_topology,
+    validate_support_edges,
 )
 from .continuation import ancestors_allow, conflicting_goal, continuation_decision
 from .errors import is_transient
@@ -60,6 +61,13 @@ class Runtime:
         handler = self.registry[values["owner_id"]]
         values["config"] = validate_goal_request(
             handler, metric=values["metric"], config=values.get("config"))
+        if values.get("parent_id"):
+            self.store.goal(values["parent_id"])
+        values.setdefault("goal_id", f"goal-{uuid.uuid4().hex[:10]}")
+        supports = support_goal_ids({"config": values["config"]})
+        if supports:
+            validate_support_edges(self.store, values["goal_id"], supports)
+            values["config"]["supports_goal_ids"] = list(supports)
         policy = (values["config"] or {}).get("approval_policy")
         if policy is not None:
             try:
@@ -175,8 +183,8 @@ class Runtime:
             before = self._state_signature(goal_id)
             result = self._advance(goal_id, holder)
             after = self._state_signature(goal_id)
-            if before != after and goal.get("parent_id"):
-                self._return_to_parent(goal_id)
+            if before != after:
+                self._return_to_dependents(goal_id)
             return result
         finally:
             self.store.release(goal_id, holder)
@@ -195,13 +203,35 @@ class Runtime:
         run_key = approval_key(cycle)
         if run_key == "alignment_override":
             return self.store.approval(goal["id"], cycle["id"], key)
-        policy = (goal.get("config") or {}).get("approval_policy")
+        policy = self._effective_approval_policy(goal)
         if policy == ApprovalPolicy.EVERYTHING_APPROVED.value:
             return "approved"
         if (policy == ApprovalPolicy.PER_RUN.value
                 and self.store.approval(goal["id"], cycle["id"], run_key) == "approved"):
             return "approved"
         return self.store.approval(goal["id"], cycle["id"], key)
+
+    def _effective_approval_policy(self, goal: dict) -> str | None:
+        """Local policy, plus durable authority inherited from ancestors.
+
+        Only ``everything_approved`` inherits. A per-Run grant belongs to the
+        exact Run that received it and never leaks into child work.
+        """
+
+        current = goal
+        local_policy = (goal.get("config") or {}).get("approval_policy")
+        while current:
+            policy = (current.get("config") or {}).get("approval_policy")
+            if policy == ApprovalPolicy.EVERYTHING_APPROVED.value:
+                return policy
+            parent_id = current.get("parent_id")
+            if not parent_id:
+                break
+            try:
+                current = self.store.goal(parent_id)
+            except KeyError:
+                break
+        return local_policy
 
     def _set_approval_policy(self, goal_id: str, policy: str) -> None:
         """Persist the Goal's approval mode in config; reject unknown modes."""
@@ -265,6 +295,8 @@ class Runtime:
                 memory_topics = ()
             shared_memory = self.store.shared_memories(
                 goal.owner_id, tuple(str(item) for item in memory_topics if item), limit=10)
+            directives = self.store.directives(
+                goal_ids=tuple((goal.id, *ancestor_goal_ids)), limit=20)
             context = GoalContext(
                 goal=goal, cycle={**cycle, "run": run, "children": tuple(children),
                                   "evidence": tuple(self.store.evidence(cycle["id"])),
@@ -278,7 +310,8 @@ class Runtime:
                     goal_id=g, run_id=r, **spec),
                 update_change_task=lambda task_id, status, result: self.store.complete_change_task(
                     task_id, status, result),
-                strategy=select_strategy_context(goal))
+                strategy=select_strategy_context(goal),
+                directives=directives)
             try:
                 result = self._call(handler, Stage(cycle["stage"]), context)
             except Exception as exc:
@@ -517,6 +550,13 @@ class Runtime:
             if connection_request.get("required_evidence") and not source.get("accepted_evidence_kinds"):
                 source["accepted_evidence_kinds"] = [connection_request["required_evidence"]]
 
+        # A blocked machine gate is a validation failure, not an employee
+        # assignment. Do not let catalog enrichment turn a missing ICP or
+        # failed editorial check into a generic strategist work order.
+        if source.get("action") == "run_machine_step" and connection_request is None \
+                and not source.get("agent_id") and not source.get("employee_id"):
+            return None
+
         handler = self.registry.get(goal.owner_id)
         goal_row = {"metric": goal.metric, "config": goal.config, "owner_id": goal.owner_id}
         source = enrich_work_order_source(handler, goal_row, source)
@@ -547,11 +587,18 @@ class Runtime:
             "next_trigger": source.get("next_trigger") or f"company retry {goal.id}",
             "connection_request": connection_request,
             "accepted_evidence_kinds": accepts,
+            # Preserve the complete bounded request in the durable assignment.
+            # A worker must not have to infer the ICP from the goal name or
+            # rediscover it from an unrelated local file.
+            "goal_config": dict(goal.config or {}),
+            "content_request": dict((goal.config or {}).get("content_request") or {})
+                if isinstance((goal.config or {}).get("content_request"), dict) else {},
             # The Interpreter places bounded, selected context in the action
             # payload. Preserve it in the persisted assignment; otherwise
             # cross-Department Memory and Strategy only affect an audit row.
             "memory": list(source.get("memory") or ()),
             "strategy": dict(source.get("strategy") or {}),
+            "strategy_context": dict(source.get("strategy") or {}),
         }
         return self.store.open_work_order(
             goal_id=goal.id, run_id=cycle["id"], employee_id=employee_id,
@@ -625,6 +672,9 @@ class Runtime:
         self._automation_gate("approve")
         cycle = self.store.cycle(goal_id)
         if cycle["run_status"] != "awaiting_approval":
+            if scope == ApprovalPolicy.EVERYTHING_APPROVED.value:
+                self._set_approval_policy(goal_id, scope)
+                return self.status(goal_id)
             raise RuntimeError(f"goal is not awaiting approval (status: {cycle['run_status']})")
         if approval_key(cycle) == "alignment_override":
             result = self._apply_alignment_override(goal_id, note)
@@ -700,9 +750,8 @@ class Runtime:
             self._halt_descendants(goal_id)
             if status is GoalStatus.PAUSED:
                 self.store.cancel_work_orders(goal_id, include_claimed=True)
-        if (self.store.goal(goal_id).get("parent_id")
-                and status in {GoalStatus.PAUSED, GoalStatus.ABANDONED}):
-            self._return_to_parent(goal_id)
+        if previous != status.value:
+            self._return_to_dependents(goal_id)
         return self.status(goal_id)
 
     def _halt_descendants(self, ancestor_id: str) -> None:
@@ -742,6 +791,35 @@ class Runtime:
                 "child_status": child["goal_status"],
                 "child_run_status": child_cycle["run_status"],
             }, reopen=True)
+
+    def _return_to_dependents(self, source_id: str) -> None:
+        """Wake the control parent and every semantically supported Goal.
+
+        Waking means re-observe its own metric. It never copies success,
+        evidence, or approval from the source Goal.
+        """
+
+        self._return_to_parent(source_id)
+        source = self.store.goal(source_id)
+        for target_id in support_goal_ids(source):
+            try:
+                target = self.store.goal(target_id)
+            except KeyError:
+                continue
+            if target["goal_status"] == "active":
+                self.store.wake_goal(target_id, f"support_changed:{source_id}")
+
+    def link_support(self, goal_id: str, target_id: str) -> dict:
+        goal = self.store.goal(goal_id)
+        targets = validate_support_edges(
+            self.store, goal_id, (*support_goal_ids(goal), target_id))
+        config = dict(goal.get("config") or {})
+        config["supports_goal_ids"] = list(targets)
+        self.store.update_goal_config(goal_id, config)
+        self.store.event(goal_id, self.store.cycle(goal_id)["id"],
+                         "goal.support_linked", {"supports_goal_id": target_id})
+        self.store.wake_goal(target_id, f"support_linked:{goal_id}")
+        return self.status(goal_id)
 
     def _resume_originating(self, child: dict, child_cycle: dict) -> None:
         child_run = self.store.run(child_cycle["id"])
@@ -1012,7 +1090,8 @@ class Runtime:
                              "evaluation": latest_evaluation,
                              "evidence": self.store.evidence(result_run_id),
                              "decisions": self.store.decisions(result_run_id)}
-        return {"goal": self.store.goal(goal_id), "cycle": cycle, "run": self.store.run(cycle["id"]),
+        goal = self.store.goal(goal_id)
+        return {"goal": goal, "cycle": cycle, "run": self.store.run(cycle["id"]),
                 "evidence": self.store.evidence(cycle["id"]),
                 "decisions": self.store.decisions(cycle["id"]),
                 "evaluation": self.store.evaluation(cycle["id"]),
@@ -1058,14 +1137,26 @@ class Runtime:
     def company_snapshot(self, recent_limit: int = 5) -> dict:
         """Small current-state projection; immutable history remains in SQLite."""
 
+        active = self.store.goal_summaries(statuses=("active",), limit=100)
+        active.sort(key=lambda item: (-priority_score(item), item.get("created_at") or ""))
+        roots = [item for item in active if not item.get("parent_id")]
+        focus = (roots or active or [None])[0]
+        all_goals = self.store.goals()
         return {
             "counts": self.store.goal_counts(),
+            "focus_goal": focus,
             "attention": self.store.attention(10),
             "work_orders": self.store.work_orders(status="active", limit=20),
-            "active_goals": self.store.goal_summaries(statuses=("active",), limit=20),
+            "active_goals": active[:20],
             "proposed_goals": self.store.goal_summaries(statuses=("proposed",), limit=10),
             "paused_goals": self.store.goal_summaries(statuses=("paused",), limit=10),
             "unread_results": self.store.unread_results(5),
+            "directives": self.store.directives(limit=10),
+            "recent_memory": self.store.recent_memories(5),
+            "support_links": [
+                {"goal_id": goal["id"], "supports_goal_id": target}
+                for goal in all_goals for target in support_goal_ids(goal)
+            ],
             "recent_results": self.store.goal_summaries(
                 statuses=TERMINAL, limit=recent_limit),
         }

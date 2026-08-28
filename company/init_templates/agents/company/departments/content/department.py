@@ -40,44 +40,123 @@ def _eval_gate_errors(evidence: list[dict[str, Any]], package: dict[str, Any],
     return errors
 
 
+# Content is the first customer-facing Department in the chain.  It therefore
+# opts into a complete, bounded strategy view instead of relying on a worker to
+# infer the buyer from a goal name.
+CONTENT_STRATEGY_CONTEXT = {
+    # The kernel is bounded to eight sections. These topics deliberately keep
+    # buyer, category context, voice, and safety in the selected window together.
+    "topics": ["buyer", "product", "content", "voice", "writing", "claims", "safety"],
+    "scopes": ["content", "all"],
+    "layers": ["intent", "model", "policy", "constitution"],
+}
+
+_CONTENT_REQUEST_FIELDS = ("icp", "reader", "intent", "topic")
+_PLACEHOLDER_STRATEGY_TEXT = (
+    "Describe the single buyer",
+    "List the audiences you deliberately exclude",
+    "Name the category you compete in",
+    "One sentence: what changes for the buyer",
+)
+
+
+def _content_request_errors(config: dict[str, Any]) -> list[str]:
+    request = config.get("content_request")
+    if not isinstance(request, dict):
+        return ["content_request is required; include icp, reader, intent, and topic"]
+    errors = [f"content_request.{field} is required" for field in _CONTENT_REQUEST_FIELDS
+              if not isinstance(request.get(field), str) or not request[field].strip()]
+    platforms = request.get("platforms")
+    formats = request.get("formats")
+    if not isinstance(platforms, list) or not platforms:
+        errors.append("content_request.platforms must name at least one platform")
+    if not isinstance(formats, list) or not formats:
+        errors.append("content_request.formats must name at least one format")
+    if request.get("cta_policy", "none") not in {"none", "soft", "conversion"}:
+        errors.append("content_request.cta_policy must be none, soft, or conversion")
+    if request.get("link_policy", "none") not in {"none", "contextual"}:
+        errors.append("content_request.link_policy must be none or contextual")
+    return errors
+
+
+def _strategy_errors(strategy: dict[str, Any]) -> list[str]:
+    if not isinstance(strategy, dict):
+        return ["selected Strategy context is missing"]
+    errors: list[str] = []
+    if not strategy.get("state_hash"):
+        errors.append("selected Strategy context has no state hash")
+    sections = strategy.get("sections")
+    if not isinstance(sections, list) or not sections:
+        errors.append("selected Strategy context has no sections")
+        return errors
+    section_ids = {section.get("id") for section in sections if isinstance(section, dict)}
+    for required in ("model.icp.buyer", "policy.voice.one_idea", "policy.voice.copy_shape"):
+        if required not in section_ids:
+            errors.append(f"selected Strategy context is missing {required}")
+    for section in sections:
+        text = section.get("content", "") if isinstance(section, dict) else ""
+        if any(marker in text for marker in _PLACEHOLDER_STRATEGY_TEXT):
+            errors.append("canonical ICP/positioning sources are still placeholders")
+            break
+    return errors
+
+
+def _writing_graph(final_kind: str) -> tuple[WorkflowStep, ...]:
+    return (
+        WorkflowStep("strategy_intake", "machine", produces=("content_intake",)),
+        WorkflowStep("worldview", "employee", "content-strategist",
+                      requires=("content_intake",), produces=("content_worldview",),
+                      skill_ids=("copywriting-en", "copywriting-fa")),
+        WorkflowStep("brief", "employee", "content-strategist",
+                      requires=("content_worldview",), produces=("content_brief",),
+                      skill_ids=("copywriting-en", "copywriting-fa")),
+        WorkflowStep("copy", "employee", "content-writer",
+                      requires=("content_brief",), produces=("content_copy",),
+                      skill_ids=("copywriting-en", "copywriting-fa")),
+        WorkflowStep("editorial_review", "machine", requires=("content_copy",),
+                      produces=(final_kind, "content_ready", "editorial_report")),
+    )
+
+
 class ContentDepartment(EvidenceDepartment, Department):
     id = department_id = "content"
-    version = "4.0.0"
-    description = "Writes and evaluates one customer message before Design renders it."
+    version = "4.1.0"
+    description = "Reasons from the canonical ICP, writes customer copy, and evaluates it before Design renders it."
     agent_ids = ("content-strategist", "content-writer", "publisher")
     eval_suites = ("content-copy-top10", "content-story-whole")
     production_ready = True
+    default_strategy_context = CONTENT_STRATEGY_CONTEXT
     workflows = (
         WorkflowSpec(
             "content-package", "Coordinate one idea across formats.",
-            ("evidence", "idea_lock", "brief", "produce", "review", "package"),
+            ("strategy", "worldview", "brief", "copy", "editorial_review"),
             ("content-strategist", "content-writer"), ("copywriting-en", "copywriting-fa"),
-            (), ("company_evidence", "content_package"), (),
-            graph=(WorkflowStep("package", "employee", "content-strategist", produces=("content_package",),
-                                skill_ids=("copywriting-en", "copywriting-fa")),),
+            (), ("content_intake", "content_worldview", "content_brief", "content_copy",
+                 "editorial_report", "content_package", "content_ready"), (),
+            graph=_writing_graph("content_package"),
         ),
         WorkflowSpec(
             "social-post", "Create one native post from approved evidence.",
-            ("idea_lock", "brief", "draft", "edit", "approve"), ("content-writer",),
-            ("copywriting-en", "copywriting-fa"), (), ("content_draft",), (),
-            graph=(WorkflowStep("draft", "employee", "content-writer", produces=("content_draft",),
-                                skill_ids=("copywriting-en", "copywriting-fa")),),
+            ("strategy", "worldview", "brief", "copy", "editorial_review"), ("content-writer",),
+            ("copywriting-en", "copywriting-fa"), (), ("content_intake", "content_worldview",
+             "content_brief", "content_copy", "editorial_report", "content_draft", "content_ready"), (),
+            graph=_writing_graph("content_draft"),
         ),
         WorkflowSpec(
             "article", "Create one evidence-backed argument.",
-            ("idea_lock", "brief", "draft", "edit", "seo_review", "approve"),
-            ("content-writer",), ("copywriting-en", "seo"), (), ("article_draft", "seo_brief"), (),
-            graph=(WorkflowStep("draft", "employee", "content-writer", produces=("article_draft",),
-                                skill_ids=("copywriting-en", "seo")),),
+            ("strategy", "worldview", "brief", "copy", "editorial_review"),
+            ("content-writer",), ("copywriting-en", "seo"), (), ("content_intake", "content_worldview",
+             "content_brief", "content_copy", "editorial_report", "article_draft", "seo_brief"), (),
+            graph=_writing_graph("article_draft"),
         ),
         WorkflowSpec(
             "content-campaign", "Write, evaluate, render, then publish one campaign.",
-            ("draft", "editorial_review", "design_handoff", "approval", "publish"),
-            ("content-strategist", "video-producer", "publisher"), ("copywriting-en", "video-creation"),
+            ("strategy", "worldview", "brief", "copy", "editorial_review", "design_handoff", "approval", "publish"),
+            ("content-strategist", "content-writer", "video-producer", "publisher"),
+            ("copywriting-en", "copywriting-fa", "video-creation"),
             ("publish",), ("campaign_manifest", "content_ready", "render_report", "publication_receipt"), ("buffer",),
             graph=(
-                WorkflowStep("draft", "employee", "content-strategist", produces=("campaign_manifest",),
-                             skill_ids=("copywriting-en",)),
+                *(_writing_graph("campaign_manifest")),
                 WorkflowStep("quality_gate", "machine", requires=("campaign_manifest",),
                              produces=("content_ready",)),
                 WorkflowStep("render_handoff", "employee", "video-producer", requires=("content_ready",),
@@ -101,6 +180,8 @@ class ContentDepartment(EvidenceDepartment, Department):
     goal_schema = {"metrics": ["content_packages", "approved_drafts", "published_items"],
                    "config": {"workflow": {"enum": [w.id for w in workflows]},
                               "required_count": {"type": "integer"},
+                              "content_request": {"type": "object"},
+                              "strategy_context": {"type": "object"},
                               "connection": {"enum": ["buffer", "website"]},
                               "execution_mode": {"enum": ["dry_run", "live"]}}}
     evidence_metrics = {"content_packages": ("content_package",),
@@ -110,9 +191,56 @@ class ContentDepartment(EvidenceDepartment, Department):
                        "social-post": "content-writer", "article": "content-writer", "publish": "publisher"}
 
     def run_machine_step(self, ctx, decision):
-        if decision.get("step_id") != "quality_gate":
-            return {"run_status": "blocked", "message": "Unknown content machine step"}
         evidence = list(ctx.cycle.get("evidence") or ())
+        step_id = decision.get("step_id")
+        if step_id == "strategy_intake":
+            errors = _content_request_errors(ctx.goal.config)
+            errors.extend(_strategy_errors(ctx.strategy))
+            if errors:
+                return {"run_status": "blocked",
+                        "message": "Content Strategy intake blocked; generic copy is not allowed",
+                        "attention": {"errors": errors}}
+            request = dict(ctx.goal.config["content_request"])
+            return {"message": "Content Strategy intake passed", "evidence": [{
+                "kind": "content_intake", "source": "content-strategy-intake", "validity": "business",
+                "payload": {"icp": request["icp"], "reader": request["reader"],
+                            "intent": request["intent"], "topic": request["topic"],
+                            "content_request": request, "strategy_state_hash": ctx.strategy.get("state_hash"),
+                            "strategy_section_ids": [item.get("id") for item in ctx.strategy.get("sections", [])]},
+            }]}
+
+        if step_id == "editorial_review":
+            copies = [item.get("payload") or {} for item in evidence if item.get("kind") == "content_copy"]
+            copy = copies[-1] if copies else {}
+            request = ctx.goal.config.get("content_request") or {}
+            errors = []
+            if not copy:
+                errors.append("content_copy is required before editorial review")
+            if copy.get("icp") != request.get("icp"):
+                errors.append("content_copy must carry the requested ICP exactly")
+            if copy.get("reader") != request.get("reader"):
+                errors.append("content_copy must carry the requested reader exactly")
+            if not isinstance(copy.get("renditions"), dict) or not copy["renditions"]:
+                errors.append("content_copy must contain at least one platform rendition")
+            if errors:
+                return {"run_status": "blocked", "message": "Content editorial review blocked; copy is not ICP-bound",
+                        "attention": {"errors": errors}}
+            final_kind = {"content-package": "content_package", "social-post": "content_draft",
+                          "article": "article_draft", "content-campaign": "campaign_manifest"}.get(
+                              decision.get("workflow_id"), "content_package")
+            package = {**copy, "content_request": request,
+                       "strategy_state_hash": ctx.strategy.get("state_hash"), "editorial_status": "passed"}
+            return {"message": "Content editorial review passed", "evidence": [
+                {"kind": "editorial_report", "source": "content-editorial-review", "validity": "business",
+                 "payload": {"status": "passed", "icp": request.get("icp"), "reader": request.get("reader")}},
+                {"kind": final_kind, "source": "content-editorial-review", "validity": "business",
+                 "payload": package},
+                {"kind": "content_ready", "source": "content-editorial-review", "validity": "business",
+                 "payload": {"artifact": package, "strategy_state_hash": ctx.strategy.get("state_hash")}},
+            ]}
+
+        if step_id != "quality_gate":
+            return {"run_status": "blocked", "message": "Unknown content machine step"}
         packages = [item.get("payload") or {} for item in evidence
                     if item.get("kind") in {"campaign_manifest", "content_package"}]
         package = packages[-1] if packages else {}

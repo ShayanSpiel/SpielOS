@@ -63,6 +63,40 @@ def find_project_root() -> Path:
     return cwd
 
 
+def selected_project_root(value: str | Path | None = None) -> Path:
+    """Return an exact user-selected home, or use normal home discovery.
+
+    Explicit command destinations must never walk to an ancestor or fall back
+    to the Python package location. Mutating CLI commands use this boundary.
+    """
+
+    if value is None:
+        return find_project_root()
+    return Path(value).expanduser().resolve()
+
+
+def virtual_environment_root(candidate: str | Path) -> Path | None:
+    """Return the containing virtualenv root, if *candidate* is inside one."""
+
+    path = Path(candidate).expanduser().resolve()
+    for current in (path, *path.parents):
+        if (current / "pyvenv.cfg").is_file():
+            return current
+    return None
+
+
+def validate_home_destination(candidate: str | Path) -> Path:
+    """Reject accidental harness installation inside a Python virtualenv."""
+
+    path = Path(candidate).expanduser().resolve()
+    venv = virtual_environment_root(path)
+    if venv is not None:
+        raise ValueError(
+            f"refusing to install a SpielOS home inside Python virtualenv {venv}; "
+            "select your project folder with --dir PATH")
+    return path
+
+
 def _in_site_packages(home: Path) -> bool:
     return "site-packages" in str(home) or "/.venv/" in str(home) + "/"
 

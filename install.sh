@@ -10,6 +10,7 @@
 set -eu
 
 REPO="${SPIELOS_REPO:-https://github.com/ShayanSpiel/SpielOS.git}"
+TARGET_DIR="${SPIELOS_DIR:-$(pwd)}"
 
 # ---- output helpers --------------------------------------------------------
 
@@ -90,30 +91,38 @@ case ":$PATH:" in
     *) info "note: '$HOME/.local/bin' is not on your PATH; add it to your shell profile." ;;
 esac
 
-# ---- 4. the home: this folder ----------------------------------------------
+# ---- 4. the home: selected project folder ---------------------------------
 #
 # pipx installs the CLI globally; the SpielOS HOME (the files that matter)
 # is created by init in the folder you are standing in. Auto-create it here
 # when safe: interactively we ask; through a pipe (curl | sh) we proceed
 # only in an empty directory so nothing of yours is ever touched.
 
+if [ -t 0 ]; then
+    printf '\n%s\n' "${BOLD}SpielOS project folder${RESET}"
+    printf '%s' "Path [${TARGET_DIR}]: "
+    read -r selected_dir < /dev/tty || selected_dir=""
+    if [ -n "$selected_dir" ]; then TARGET_DIR="$selected_dir"; fi
+fi
+TARGET_DIR=$("$PY" -c 'import os,sys; print(os.path.abspath(os.path.expanduser(sys.argv[1])))' "$TARGET_DIR")
+
 INIT_RAN=0
-if [ ! -e "./.agents/company" ] && [ ! -f ./opencode.json ]; then
+if [ ! -e "$TARGET_DIR/.agents/company" ] && [ ! -f "$TARGET_DIR/opencode.json" ]; then
     do_init=0
     if [ -t 0 ]; then
         printf '\n%s\n' "${BOLD}Create your SpielOS home in this folder?${RESET}"
-        printf '%s\n' "${DIM}  writes .agents/, .spielos/, opencode.json, AGENTS.md here${RESET}"
+        printf '%s\n' "${DIM}  $TARGET_DIR${RESET}"
         printf '%s' "Proceed? [Y/n] "
         read -r answer < /dev/tty || answer=""
         case "$answer" in
             n|N|no|No) ;;
             *) do_init=1 ;;
         esac
-    elif [ -z "$(ls -A 2>/dev/null)" ]; then
+    elif [ -z "$(ls -A "$TARGET_DIR" 2>/dev/null)" ]; then
         do_init=1  # piped install + empty directory: safe to proceed
     fi
     if [ "$do_init" = 1 ]; then
-        if spielos init -y </dev/null; then
+        if spielos init --dir "$TARGET_DIR" -y </dev/null; then
             INIT_RAN=1
         else
             info "init failed — run 'spielos init' to retry."
@@ -123,8 +132,7 @@ fi
 
 if [ "$INIT_RAN" = 0 ]; then
     printf '%s\n' ""
-    printf '%s\n' "${BOLD}Next:${RESET} cd into your project folder and run ${BOLD}spielos init${RESET}"
+    printf '%s\n' "${BOLD}Next:${RESET} run ${BOLD}spielos init --dir /path/to/project${RESET}"
     printf '%s\n' "${DIM}That creates the harness home (.agents/, .spielos/) — the CLI alone does not.${RESET}"
 fi
 printf '%s\n' "${DIM}Docs: https://spielos.xyz · .agents/company/README.md after init${RESET}"
-

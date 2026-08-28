@@ -23,6 +23,7 @@ type Notification = {
   id: string
   kind: string
   goal_id: string
+  run_id?: string
   payload?: Record<string, any>
   why_next?: string
 }
@@ -77,11 +78,29 @@ const surfacePending = async (ctx: V2Context, sessionID: string) => {
   const rows = await runCompany([
     "notifications", "list", "--status", "pending", "--limit", "20", "--json",
   ]) as Notification[]
-  for (const item of rows.filter((row) => REPORTABLE.has(row.kind))) {
+  const reportable = rows.filter((row) => REPORTABLE.has(row.kind))
+  const approvals = reportable.filter((row) => row.kind === "approval_required")
+  const ordinary = reportable.filter((row) => row.kind !== "approval_required")
+  const preferred = new Map<string, Notification>()
+  for (const item of ordinary) {
+    const key = `${item.goal_id}:${item.run_id || ""}`
+    const current = preferred.get(key)
+    if (!current || item.kind === "goal_completed_followup") preferred.set(key, item)
+  }
+  for (const item of approvals) {
     await ctx.session.synthetic({
       sessionID,
       text: { text: formatNotification(item) },
     })
+  }
+  if (preferred.size) {
+    const sections = [...preferred.values()].map(formatNotification)
+    await ctx.session.synthetic({
+      sessionID,
+      text: { text: `SpielOS company update\n\n${sections.join("\n\n")}` },
+    })
+  }
+  for (const item of reportable) {
     await runCompany(["notifications", "ack", item.id, "--json"])
   }
 }

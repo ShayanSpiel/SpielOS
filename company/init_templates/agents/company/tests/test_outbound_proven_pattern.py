@@ -3,15 +3,13 @@ pattern gates in compose.
 
 The proven outbound pattern (strategy.md PROVEN PATTERN RULES 1-4, locked
 2026-08-18): only researched owner-operator leads with firm-specific pain
-and a per-lead hook are sendable (EN-1358 SDG Accountant, EN-1157 Sigma
-Recruitment — both produced qualified replies). The anti-pattern is the
-GCA bulk-framework cohort (EN-1419/1508/1834 + ~321 more): title "Named
-framework contact", segment-generic verbatim pain, GCA CSV source — that
-324-run produced 0 replies / 3 clicks at 51% opens.
+and a per-lead hook are sendable. The anti-pattern is a bulk-framework
+cohort: title "Named framework contact", segment-generic verbatim pain,
+bulk CSV source.
 
 Covered:
   - accepted: owner-operator title + firm-specific pain + per-lead hook
-    composes (SDG pattern, Sigma pattern — regression);
+    composes (researched-personal regression);
   - rejected: "Named framework contact" title + segment-generic pain;
   - rejected: pain containing an RM#### framework identifier;
   - rejected: pain exactly matching a known segment-generic signature
@@ -33,12 +31,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from company.departments.outbound.workflows.email import compose  # noqa: E402
 
-# Proven-pattern leads modeled on the real master rows (EN-1358, EN-1157).
+# Proven-pattern leads: fictional firms for tests only.
 SDG_ACCOUNTANT = {
     "lead_id": "EN-1358",
-    "email": "sami@sdgaccountant.com",
-    "company": "SDG Accountant",
-    "contact_name": "Sami Ghaith",
+    "email": "founder@example.com",
+    "company": "Example Accounting",
+    "contact_name": "Alex Founder",
     "title": "Founder & Managing Director",
     "segment": "accounting and bookkeeping",
     "country": "Canada",
@@ -46,20 +44,20 @@ SDG_ACCOUNTANT = {
     "send_recommendation": "Ready to personalized",
     "outreach_tier": "A",
     "email_status": "Publicly listed; not deliverability-verified",
-    "personalization_hook": ("Reference Sami Ghaith's role as Founder and Managing "
+    "personalization_hook": ("Reference Alex Founder's role as Founder and Managing "
                              "Director and one observable a cross-border tax practice "
                              "serving Canadian and US clients."),
     "pain_hypothesis": ("Compliance and advisory work runs on manual document "
                         "gathering and filing coordination per client."),
-    "source": "Director web research 2026-08-12",
-    "source_url": "https://accountingtoronto.ca/teams/sami-ghaith/",
+    "source": "Director web research",
+    "source_url": "https://example.com/team/founder",
 }
 
 SIGMA_RECRUITMENT = {
     "lead_id": "EN-1157",
-    "email": "rhys@sigmarecruitment.co.uk",
-    "company": "Sigma Recruitment",
-    "contact_name": "Rhys Williams",
+    "email": "staffing@example.net",
+    "company": "Example Staffing",
+    "contact_name": "Riley Owner",
     "title": "Founder & Managing Director",
     "segment": "Recruitment & staffing",
     "country": "United Kingdom",
@@ -67,20 +65,21 @@ SIGMA_RECRUITMENT = {
     "send_recommendation": "Ready to personalized",
     "outreach_tier": "A",
     "email_status": "Publicly listed; not deliverability-verified",
-    "personalization_hook": ("Reference Rhys Williams's role as Founder & Managing "
-                             "Director at Sigma Recruitment"),
+    "personalization_hook": ("Reference Riley Owner's role as Founder & Managing "
+                             "Director at Example Staffing"),
     "pain_hypothesis": ("Engineering and manufacturing candidate shortlisting at "
-                        "Sigma runs on manual consultant network sourcing per role."),
+                        "Example Staffing runs on manual consultant network sourcing per role."),
     "source": "Company website",
+    "source_url": "https://example.com/staffing",
     "suggested_cta": "map the shortlist stage with you",
 }
 
-# Anti-pattern lead modeled on the real GCA bulk cohort (EN-1419).
+# Anti-pattern lead modeled on a bulk-framework cohort.
 GCA_BULK_LEAD = {
     "lead_id": "EN-1419",
-    "email": "cheryl.denham@athona.com",
-    "company": "ATHONA LIMITED",
-    "contact_name": "Cheryl Denham",
+    "email": "bulk@bulk-example.org",
+    "company": "Example Bulk Ltd",
+    "contact_name": "Casey Contact",
     "title": "Named framework contact",
     "segment": "Recruitment & staffing",
     "country": "United Kingdom",
@@ -88,15 +87,13 @@ GCA_BULK_LEAD = {
     "send_recommendation": "Ready to personalized",
     "outreach_tier": "A",
     "email_status": "Publicly listed; not deliverability-verified",
-    "personalization_hook": ("Reference Cheryl Denham's role as a named framework "
-                             "contact and one observable RM6281 Clinical & Healthcare "
-                             "Staffing supplier in Medical Staffing | AHP/HSS/Emergency "
-                             "| Nursing & Midwifery."),
+    "personalization_hook": ("Reference Casey Contact's role as a named framework "
+                             "contact and one observable bulk-list supplier row."),
     "pain_hypothesis": ("Clinical and healthcare staffing runs on manual candidate "
                         "sourcing, compliance handling and placement administration "
                         "per role."),
-    "source": "GCA framework public supplier contacts 2026-08-12",
-    "source_url": "https://www.gca.gov.uk/agreements/RM6281%3A2/lot-suppliers/csv",
+    "source": "Public framework supplier contacts",
+    "source_url": "https://example.com/framework/suppliers.csv",
 }
 
 GCA_GENERIC_PAIN = (
@@ -115,15 +112,15 @@ class ProvenPatternAcceptedTests(unittest.TestCase):
     def test_sdg_owner_operator_pattern_composes(self):
         subject, html, text, reason = compose.render_checked(SDG_ACCOUNTANT, seq=0)
         self.assertIsNone(reason)
-        self.assertIn("SDG Accountant", subject)
-        self.assertIn("Sami", text)
+        self.assertIn("Example Accounting", subject)
+        self.assertIn("Alex", text)
         self.assertIn("Compliance and advisory work", text)
 
     def test_sigma_owner_operator_pattern_composes(self):
         subject, html, text, reason = compose.render_checked(SIGMA_RECRUITMENT, seq=0)
         self.assertIsNone(reason)
-        self.assertIn("Sigma Recruitment", subject)
-        self.assertIn("Rhys", text)
+        self.assertIn("Example Staffing", subject)
+        self.assertIn("Riley", text)
         self.assertIn("shortlist", text.casefold())
 
     def test_accepted_leads_clear_the_proven_pattern_gate(self):

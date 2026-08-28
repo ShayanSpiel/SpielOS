@@ -124,8 +124,8 @@ def render_report(manifest: dict[str, Any], assets: list[dict[str, Any]]) -> dic
 
 class DesignDepartment(EvidenceDepartment, Department):
     id = department_id = "design"
-    version = "3.4.0"
-    description = "Consumes evaluated Content evidence, selects visuals, and returns verified media evidence."
+    version = "3.5.0"
+    description = "Consumes Content-ready copy, selects registered templates, renders media, and returns verified evidence."
     agent_ids = ("designer", "video-producer")
     production_ready = True
     workflows = (
@@ -133,7 +133,7 @@ class DesignDepartment(EvidenceDepartment, Department):
             "social-visual",
             "Render a focused platform-ready social graphic.",
             ("idea_lock", "brief", "compose", "render", "qa"), ("designer",), ("spielos-ui",), (),
-            ("design_brief", "render_report"), (),
+            ("design_brief", "render_report", "content_ready"), (),
             graph=(WorkflowStep("render", "employee", "designer",
                                 produces=("approved_design",), skill_ids=("spielos-ui",)),),
         ),
@@ -150,7 +150,7 @@ class DesignDepartment(EvidenceDepartment, Department):
             "Render and verify a focused design-system-aligned video.",
             ("idea_lock", "brief", "script", "animate", "render", "audio_mix", "qa"),
             ("video-producer",), ("video-creation", "spielos-ui"), (),
-            ("video_render", "render_report"), (),
+            ("video_render", "render_report", "content_ready"), (),
             graph=(WorkflowStep("render", "employee", "video-producer",
                                 produces=("video_render",),
                                 skill_ids=("video-creation", "spielos-ui")),),
@@ -160,7 +160,7 @@ class DesignDepartment(EvidenceDepartment, Department):
             "Render one approved narration into a verified video rendition.",
             ("plan", "generate", "render", "verify", "deliver"),
             ("video-producer",), ("video-creation", "spielos-ui"), (),
-            ("video_render", "render_report"), (),
+            ("video_render", "render_report", "content_ready"), (),
             graph=(WorkflowStep("render", "employee", "video-producer",
                                 produces=("video_render",),
                                 skill_ids=("video-creation", "spielos-ui")),),

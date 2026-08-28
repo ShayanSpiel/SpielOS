@@ -29,7 +29,7 @@ The bulk-framework anti-pattern — list-signature titles ("Named framework
 contact"), segment-generic pain repeated verbatim across leads, and GCA CSV
 bulk sources — produced 0 replies / 3 clicks at 51% opens (324-run) and is
 rejected here as "unprepared" so it can never reach an inbox. The proven
-class (EN-1358 SDG Accountant, EN-1157 Sigma Recruitment) still composes.
+class (researched owner-operator leads) still composes.
 The Persian template ladder is untouched: the gate guards the English STRICT
 path only.
 """

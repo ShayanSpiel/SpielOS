@@ -61,11 +61,11 @@ CF_ACCOUNT_ID = os.environ.get("CF_ACCOUNT_ID", "").strip()
 SMTP_TLS = os.environ.get("SMTP_TLS", "true").strip().lower() in ("1", "true", "yes")
 
 # ── Sender identity ────────────────────────────────────────────────────────────
-FROM_EMAIL = os.environ.get("EMAIL_FROM", "shayan@spielos.xyz").strip()
-FROM_NAME = os.environ.get("EMAIL_FROM_NAME", "Shayan Spiel").strip()
+FROM_EMAIL = os.environ.get("EMAIL_FROM", "outbound@example.com").strip()
+FROM_NAME = os.environ.get("EMAIL_FROM_NAME", "Outbound").strip()
 # Owner inbox: every captured human reply is forwarded here once
 # (forward-on-capture in email_workflow.py).
-OWNER_EMAIL = os.environ.get("OWNER_EMAIL", "shayan@spielos.xyz").strip()
+OWNER_EMAIL = os.environ.get("OWNER_EMAIL", "owner@example.com").strip()
 # Per-provider From address: each provider must send from a domain it has
 # verified (FKIM/SPF). Falling back to FROM_EMAIL only for the default provider.
 PROVIDER_FROM_EMAILS = {}
@@ -73,19 +73,19 @@ for _pair in os.environ.get("PROVIDER_FROM_EMAILS", "").split(","):
     if ":" in _pair:
         _k, _v = _pair.split(":", 1)
         PROVIDER_FROM_EMAILS[_k.strip()] = _v.strip()
-PROVIDER_FROM_EMAILS.setdefault("mailgun", f"shayan@{MAILGUN_DOMAIN}")
-PROVIDER_FROM_EMAILS.setdefault("postmark", f"shayan@{POSTMARK_DOMAIN}")
-SIGNATURE_TITLE = os.environ.get("SIGNATURE_TITLE", "Founder of SpielOS · AI Agent Architect").strip()
-SIGNATURE_AVATAR_URL = os.environ.get("SIGNATURE_AVATAR_URL", "https://spielos.xyz/assets/avatars/avatar.jpg").strip()
-SIGNATURE_LINKEDIN = os.environ.get("SIGNATURE_LINKEDIN", "https://linkedin.com/in/shayantawabi").strip()
-SIGNATURE_X = os.environ.get("SIGNATURE_X", "https://x.com/ShayanSpiel").strip()
-# Owner directive 2026-08-25: exactly FOUR links in every outbound signature:
-# Home, X, LinkedIn, Telegram (@Shntwb). UTM-tagged so PostHog attributes clicks.
+if MAILGUN_DOMAIN:
+    PROVIDER_FROM_EMAILS.setdefault("mailgun", f"outbound@{MAILGUN_DOMAIN}")
+if POSTMARK_DOMAIN:
+    PROVIDER_FROM_EMAILS.setdefault("postmark", f"outbound@{POSTMARK_DOMAIN}")
+SIGNATURE_TITLE = os.environ.get("SIGNATURE_TITLE", "Operator").strip()
+SIGNATURE_AVATAR_URL = os.environ.get("SIGNATURE_AVATAR_URL", "").strip()
+SIGNATURE_LINKEDIN = os.environ.get("SIGNATURE_LINKEDIN", "https://linkedin.com/in/example").strip()
+SIGNATURE_X = os.environ.get("SIGNATURE_X", "https://x.com/example").strip()
 SIGNATURE_HOME = os.environ.get(
     "SIGNATURE_HOME",
-    "https://spielos.xyz/?utm_source=outbound-email&utm_medium=email&utm_campaign=outbound-sig",
+    "https://example.com/?utm_source=outbound-email&utm_medium=email&utm_campaign=outbound-sig",
 ).strip()
-SIGNATURE_TELEGRAM = os.environ.get("SIGNATURE_TELEGRAM", "https://t.me/Shntwb").strip()
+SIGNATURE_TELEGRAM = os.environ.get("SIGNATURE_TELEGRAM", "https://t.me/example").strip()
 # Superseded 2026-08-25: the Apply CTA (and earlier booking links) are retired
 # from signatures entirely per owner directive. Four links only - see above.
 

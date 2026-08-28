@@ -173,6 +173,7 @@ class InterpretedDepartment:
             "evidence": evidence,
             "memory": memory,
             "strategy": _strategy_view(ctx.strategy),
+            "directives": [item.get("text") for item in ctx.directives if item.get("text")],
             "graph": [node.id for node in graph],
             "current_step": None if current is None else {
                 "id": current.id, "kind": current.kind,
@@ -427,8 +428,26 @@ class InterpretedDepartment:
                           "action": "continue_workflow",
                           "workflow_id": workflow_id,
                           "change_one_variable": "workflow_step_output"}}
+        evidence_ids = [item["id"] for item in evidence if item.get("id")]
+        learnings = []
+        if not met and evidence_ids and validity in {"business", "technical_only"}:
+            learnings.append({
+                "reusable": True,
+                "claim": (f"Workflow {workflow_id or 'default'} produced {metric}={value} "
+                          f"against target {ctx.goal.operator} {ctx.goal.target}."),
+                "decision_relevance": (
+                    "Do not repeat the same workflow configuration expecting a different "
+                    "result; change one declared variable or choose another workflow."),
+                "evidence_ids": evidence_ids,
+                "applies_to": {"metrics": [metric],
+                               "workflows": [workflow_id] if workflow_id else []},
+                "confidence": 0.8,
+                "evidence": {"observed_value": value, "target": ctx.goal.target,
+                             "run_id": ctx.cycle.get("id")},
+            })
         return StageResult("goal_check", {metric: value}, RunStatus.COMPLETED,
                            goal_status=GoalStatus.ACHIEVED if met else None,
                            evaluation=evaluation,
+                           learnings=learnings,
                            message=("Department package goal achieved" if met
                                     else "Department package run completed; more evidence required"))

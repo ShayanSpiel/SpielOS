@@ -37,7 +37,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync } from "fs
 import { join, resolve } from "path";
 import { fileURLToPath } from "url";
 
-const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
+const ROOT = resolve(fileURLToPath(new URL("../../../..", import.meta.url)));
 const ENV_PATH = join(ROOT, ".spielos/.env");
 
 /* ── Deterministic chain (owner contract) ──

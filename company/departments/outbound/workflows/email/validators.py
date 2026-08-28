@@ -16,20 +16,41 @@ from urllib.parse import urlparse
 
 from . import outbound
 from .compose import FORBIDDEN_OBSERVATIONS, FORBIDDEN_OFFER_PHRASES, SPAM_WORDS
+from .config import (SIGNATURE_HOME, SIGNATURE_LINKEDIN, SIGNATURE_TELEGRAM,
+                     SIGNATURE_X)
 from .templates import SIGNATURE_HTML, SIGNATURE_TEXT
 
 # Structural link allowance (2026-08-19 deliverability insight): every absolute
 # http(s) URL in a rendered email must live on these domains, so a mismatched
 # CTA (e.g. cal.com) never reaches the review gate again. Substring/host match,
 # case-insensitive, on the URL's hostname.
-ALLOWED_LINK_DOMAINS = ("spielos.xyz", "linkedin.com", "x.com", "t.me")
+def _allowed_link_domains() -> tuple[str, ...]:
+    """Hosts configured for the signature, plus their registrable fallbacks.
+
+    The shipped package has intentionally generic signature defaults.  A
+    validator must therefore follow the configured identity rather than
+    silently hard-code the source project's production domain.
+    """
+
+    defaults = {"linkedin.com", "x.com", "t.me"}
+    for value in (SIGNATURE_HOME, SIGNATURE_LINKEDIN, SIGNATURE_X,
+                  SIGNATURE_TELEGRAM):
+        host = (urlparse(value).hostname or "").casefold()
+        if host:
+            defaults.add(host)
+            parts = host.split(".")
+            if len(parts) >= 2:
+                defaults.add(".".join(parts[-2:]))
+    return tuple(sorted(defaults))
 
 
 def _link_domain_violations(body_html: str) -> list:
     bad = []
+    allowed_domains = _allowed_link_domains()
     for url in re.findall(r"https?://[^\s\"'<>]+", body_html or ""):
         host = (urlparse(url).hostname or "").casefold()
-        if not any(allowed in host for allowed in ALLOWED_LINK_DOMAINS):
+        if not any(host == allowed or host.endswith("." + allowed)
+                   for allowed in allowed_domains):
             bad.append(url)
     return bad
 
@@ -97,7 +118,8 @@ def validate(ctx, batch: dict) -> list:
 
         for url in _link_domain_violations(body_html):
             issues.append({"lead_id": lead_id, "code": "link_domain",
-                           "message": f"link outside allowed domains ({', '.join(ALLOWED_LINK_DOMAINS)}): {url}",
+                           "message": ("link outside configured signature domains "
+                                       f"({', '.join(_allowed_link_domains())}): {url}"),
                            "skippable": False})
 
         # Hard dedup process gate (goal-4357632a68): a recipient

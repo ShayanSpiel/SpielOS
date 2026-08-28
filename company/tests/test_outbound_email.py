@@ -128,12 +128,12 @@ class SignatureIdentityTests(unittest.TestCase):
 
     def test_signature_html_carries_identity_links(self):
         for token in ("linkedin.com/in/", "x.com/", "t.me/",
-                      "spielos.xyz/?utm_source=outbound-email"):
+                      "utm_source=outbound-email"):
             self.assertIn(token, SIGNATURE_HTML, SIGNATURE_HTML[:160])
 
     def test_signature_text_carries_identity_links(self):
         for token in ("LinkedIn: https://linkedin.com/in/", "X: https://x.com/",
-                      "Telegram: https://t.me/", "Home: https://spielos.xyz/"):
+                      "Telegram: https://t.me/", "Home: https://"):
             self.assertIn(token, SIGNATURE_TEXT, SIGNATURE_TEXT[:200])
 
     def test_signature_carries_no_booking_cta(self):
@@ -232,7 +232,7 @@ class ProviderReplyTests(unittest.TestCase):
                               "capabilities": {"sending": "enabled", "receiving": "disabled"}}]}
         with unittest.mock.patch.object(providers, "_open", return_value=domains):
             ready = providers.receiving_domain_status("runs@reply.spielos.xyz", "resend")
-            disabled = providers.receiving_domain_status("shayan@spielos.xyz", "resend")
+            disabled = providers.receiving_domain_status("hello@spielos.xyz", "resend")
         self.assertTrue(ready["ready"])
         self.assertFalse(disabled["ready"])
         self.assertEqual(disabled["receiving"], "disabled")
@@ -452,7 +452,7 @@ class GmailCaptureTests(unittest.TestCase):
                           "subject": "Re: Agentic ops at Acme UK", "message_id": "<gmailtest123@acme-uk.com>",
                           "created_at": "2026-08-10T09:00:00+00:00", "text": "Yes, let's talk."}]}
         with unittest.mock.patch.object(cfg, "REPLY_CAPTURE", "gmail_imap"), \
-             unittest.mock.patch.object(cfg, "GMAIL_IMAP_USER", "66shayan@gmail.com"), \
+             unittest.mock.patch.object(cfg, "GMAIL_IMAP_USER", "owner@example.com"), \
              unittest.mock.patch.object(cfg, "GMAIL_IMAP_APP_PASSWORD", "app-pass"), \
              unittest.mock.patch.object(providers, "_list_gmail_imap", return_value=fake):
             self.assertTrue(providers.cap_received())

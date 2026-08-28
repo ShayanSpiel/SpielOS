@@ -15,7 +15,7 @@ import { readFileSync, existsSync } from "fs";
 import { join, resolve } from "path";
 import { fileURLToPath } from "url";
 
-const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
+const ROOT = resolve(fileURLToPath(new URL("../../../..", import.meta.url)));
 const images = process.argv.slice(2);
 if (!images.length) {
   console.error("Usage: node scripts/validate-design.js <image> [image...]");

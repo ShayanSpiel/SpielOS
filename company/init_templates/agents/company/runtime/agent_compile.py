@@ -40,10 +40,11 @@ def _clean(value) -> str:
 
 
 def compile_agent(department_id: str, workflow_id: str, name: str | None = None,
-                  *, force: bool = False) -> dict:
-    from .paths import find_project_root
+                  *, force: bool = False,
+                  home: str | Path | None = None) -> dict:
+    from .paths import selected_project_root, validate_home_destination
 
-    root = find_project_root()
+    root = validate_home_destination(selected_project_root(home))
     dept, spec = _workflow(department_id, workflow_id)
     agent_name = name or f"{department_id}-{_slug(spec.id)}"
 

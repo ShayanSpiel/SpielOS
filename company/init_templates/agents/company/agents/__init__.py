@@ -42,17 +42,17 @@ AGENTS = {
         ),
         AgentSpec(
             id="content-strategist",
-            description="Maps approved company evidence and strategy into one lean cross-format content package.",
+            description="Turns the selected ICP, strategy, and evidence into a worldview and locked Content Brief.",
             skill_ids=("copywriting-en", "seo", "analytics"),
             permissions=("read_strategy", "read_company_evidence", "write_briefs"),
-            produces=("content_package", "content_brief"),
+            produces=("content_worldview", "content_brief", "content_package"),
         ),
         AgentSpec(
             id="content-writer",
-            description="Turns approved company work and evidence into buyer-relevant written content.",
+            description="Turns a locked Content Brief into platform-native posts, narrations, articles, and captions.",
             skill_ids=("copywriting-en", "copywriting-fa", "translation-fa"),
             permissions=("read_strategy", "read_approved_assets", "write_drafts"),
-            produces=("content_draft",),
+            produces=("content_copy", "content_draft", "article_draft", "campaign_manifest"),
         ),
         AgentSpec(
             id="designer",

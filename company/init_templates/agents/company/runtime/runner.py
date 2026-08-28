@@ -10,7 +10,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from .alignment import approval_key
+from .alignment import approval_key, priority_score
 from .loop import Runtime
 from .notifications import digest_payload
 from .service import automation_enabled
@@ -508,8 +508,24 @@ class Runner:
         rows = self.runtime.list_goals()
         rows = self._scope_rows(goal_id, rows)
         runnable = [row for row in rows if self._runnable(row)]
-        runnable.sort(key=lambda row: (-self._depth(row["goal"], rows), row["goal"]["created_at"]))
+        runnable.sort(key=lambda row: (
+            -self._root_priority(row["goal"], rows),
+            -priority_score(row["goal"]),
+            -self._depth(row["goal"], rows),
+            row["goal"]["created_at"]))
         return [row["goal"]["id"] for row in runnable]
+
+    @staticmethod
+    def _root_priority(goal: dict, rows: list[dict]) -> float:
+        by_id = {row["goal"]["id"]: row["goal"] for row in rows}
+        current, seen = goal, set()
+        while current.get("parent_id") and current["parent_id"] not in seen:
+            seen.add(current["id"])
+            parent = by_id.get(current["parent_id"])
+            if not parent:
+                break
+            current = parent
+        return priority_score(current)
 
     def _runnable(self, row: dict) -> bool:
         if row["goal"]["goal_status"] != "active":
@@ -523,8 +539,8 @@ class Runner:
         if status in {"blocked", "failed"}:
             return self.runtime.repair_iteration_decision(row["goal"]["id"])["eligible"]
         if status == "awaiting_approval":
-            return self.runtime.store.approval(
-                row["goal"]["id"], cycle["id"], approval_key(cycle)) == "approved"
+            return self.runtime._approval_status(
+                row["goal"], cycle, approval_key(cycle)) == "approved"
         if status == "running":
             # Mid-flight cycle whose client died (no live lease) must stay
             # resumable, or the goal parks invisibly until a manual `once`.

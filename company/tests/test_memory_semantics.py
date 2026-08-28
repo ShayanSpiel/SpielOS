@@ -8,6 +8,7 @@ from pathlib import Path
 
 from company.runtime.interpreter import InterpretedDepartment
 from company.runtime.loop import Runtime
+from company.runtime.memory import relevant_memory
 from company.runtime.models import (
     Department, RunStatus, StageResult, WorkflowSpec, WorkflowStep,
 )
@@ -173,7 +174,7 @@ class MemorySemanticsTests(unittest.TestCase):
         self.assertEqual([memory["id"]], decision["payload"]["memory_ids"])
         self.assertIn(memory["claim"], decision["rationale"])
 
-    def test_unrelated_goal_does_not_receive_owner_memory(self):
+    def test_later_sibling_goal_receives_applicable_owner_memory(self):
         self.learning_goal()
         unrelated = self.runtime.create_goal(
             name="Unrelated output", owner_id="memory_test",
@@ -182,7 +183,13 @@ class MemorySemanticsTests(unittest.TestCase):
         result = self.runtime.once(unrelated["id"])
         decision = next(item for item in result["decisions"]
                         if item["decision_type"] == "request_agent")
-        self.assertNotIn("memory_ids", decision["payload"])
+        self.assertIn("memory_ids", decision["payload"])
+
+    def test_later_sibling_goal_ignores_memory_for_another_workflow(self):
+        goal = self.learning_goal()
+        memories = self.runtime.store.memories("memory_test", goal["id"])
+        self.assertIsNone(relevant_memory(
+            memories, metric="outputs", workflow_id="secondary"))
 
 
 if __name__ == "__main__":

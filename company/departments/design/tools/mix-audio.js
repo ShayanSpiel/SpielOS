@@ -28,10 +28,10 @@ import { existsSync, mkdirSync, readFileSync } from "fs";
 import { join, resolve } from "path";
 import { fileURLToPath } from "url";
 
-const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
+const ROOT = resolve(fileURLToPath(new URL("../../../..", import.meta.url)));
 const AUDIO = join(ROOT, "public/videos/audio");
 const MANIFEST = join(AUDIO, ".voice-manifest.json");
-const TEMPLATES = join(ROOT, ".agents/company/departments/design/templates/video");
+const TEMPLATES = join(ROOT, "company/departments/design/templates/video");
 const SCENARIOS = { b: ["hook", "pain", "promise", "pillars", "director", "cta"], c: ["hook", "build", "live", "director", "cta"] };
 
 const LUFS_TARGET = -16;

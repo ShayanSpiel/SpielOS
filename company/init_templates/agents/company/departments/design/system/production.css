@@ -22,7 +22,7 @@
  * root. There is no second display font and no system-font fallback for
  * titles.
  */
-@import url("/src/styles/tokens/index.css");
+@import url("/company/departments/design/tokens/index.css");
 
 @font-face {
   font-family: "Outfit";

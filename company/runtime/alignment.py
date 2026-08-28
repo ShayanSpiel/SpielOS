@@ -40,6 +40,14 @@ GOAL_PURSUIT_KINDS = frozenset({
 })
 NON_GOAL_PURSUIT_KINDS = frozenset({"run", "batch", "task", "guardrail"})
 
+PRIORITY_SCORES = {
+    "critical": 100,
+    "high": 75,
+    "normal": 50,
+    "low": 25,
+    "deferred": 0,
+}
+
 ALIGNMENT_CLASSES = ("supports", "enables", "protects", "explores")
 ALIGNMENT_JUDGMENTS = ("aligned", "defer_recommended")
 ALIGNMENT_OVERRIDE_ACTIONS = frozenset({"alignment_override", "request_owner_override"})
@@ -87,6 +95,75 @@ def validate_goal_topology(request) -> None:
         raise ValueError("a primary_goal cannot have a parent Goal")
     if kind == "supporting_goal" and not parent_id:
         raise ValueError("a supporting_goal requires a parent Goal")
+
+
+def priority_score(goal) -> float:
+    """Comparable attention priority without adding a schema column.
+
+    Named values keep the conversational surface simple; numeric values allow
+    deliberate ordering when two active bottlenecks need finer control.
+    """
+
+    raw = (_field(goal, "config") or {}).get(
+        "priority", _field(goal, "priority") or "normal")
+    if isinstance(raw, str):
+        named = PRIORITY_SCORES.get(raw.strip().lower())
+        if named is not None:
+            return float(named)
+    try:
+        return max(0.0, min(100.0, float(raw)))
+    except (TypeError, ValueError):
+        return float(PRIORITY_SCORES["normal"])
+
+
+def support_goal_ids(goal) -> tuple[str, ...]:
+    """Semantic Goal edges, separate from the one-parent control tree.
+
+    ``alignment.outcome_id`` remains readable as the original single support
+    edge. New work writes ``supports_goal_ids`` and may point to more than one
+    outcome without gaining multiple control parents.
+    """
+
+    config = dict(_field(goal, "config") or {})
+    raw = config.get("supports_goal_ids") or ()
+    if isinstance(raw, str):
+        raw = (raw,)
+    if not isinstance(raw, (list, tuple)):
+        raw = ()
+    values = [str(item) for item in raw if str(item).strip()]
+    alignment = config.get("alignment")
+    if isinstance(alignment, dict) and alignment.get("outcome_id"):
+        values.append(str(alignment["outcome_id"]))
+    return tuple(dict.fromkeys(values))
+
+
+def validate_support_edges(store, goal_id: str, target_ids) -> tuple[str, ...]:
+    """Validate a bounded acyclic support DAG over the existing Goal tree."""
+
+    targets = tuple(dict.fromkeys(str(item) for item in (target_ids or ()) if item))
+    if goal_id in targets:
+        raise ValueError("a Goal cannot support itself")
+    for target_id in targets:
+        try:
+            store.goal(target_id)
+        except KeyError as exc:
+            raise ValueError(f"unknown supported Goal: {target_id}") from exc
+
+        # A cycle exists when the proposed target already reaches the source.
+        frontier, seen = [target_id], set()
+        while frontier:
+            current = frontier.pop()
+            if current == goal_id:
+                raise ValueError(
+                    f"support edge {goal_id} -> {target_id} creates a cycle")
+            if current in seen:
+                continue
+            seen.add(current)
+            try:
+                frontier.extend(support_goal_ids(store.goal(current)))
+            except KeyError:
+                continue
+    return targets
 
 
 def pursuit_kind(goal) -> str:

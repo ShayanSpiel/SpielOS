@@ -10,8 +10,10 @@ Read `company/strategy/icp.md`, `company/strategy/positioning.md`, and
 
 ## Input
 
-Use the item brief only: reader, customer moment, one idea, desired result,
-intent, SpielOS relevance, and optional proof.
+Use the selected ICP and strategy context plus the locked Content Brief. The
+request must identify the ICP, reader, intent, topic, platforms, and formats.
+If the ICP or reader is missing, stop and request a complete brief; do not
+substitute generic language such as “teams” or “owners.”
 
 ## Output
 
@@ -20,6 +22,8 @@ intent, SpielOS relevance, and optional proof.
 - Use a natural product bridge and CTA only when earned.
 - Adapt the expression for each platform; do not force a shared opening.
 - For a Short, write one complete narration before any scene split.
+- Carry `icp`, `reader`, and the brief identity on the copy artifact so the
+  editorial gate can prove that the writing stayed bound to the requested buyer.
 
 ## Platform checks
 

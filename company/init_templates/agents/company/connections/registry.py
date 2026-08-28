@@ -53,6 +53,25 @@ _CONNECTIONS = {
              "list_entries", "notes"),
             ("opencode",),
         ),
+        ConnectionSpec(
+            "activepieces",
+            "Workflow automation through the active host Activepieces MCP.",
+            ("list_flows", "create_flow", "update_flow", "validate_flow",
+             "publish_flow", "read_run", "retry_run"),
+            ("opencode",),
+        ),
+        ConnectionSpec(
+            "google-drive",
+            "Google Drive files and folders through the active host Connection.",
+            ("create_folder", "upload_file", "list_files", "share"),
+            ("opencode",),
+        ),
+        ConnectionSpec(
+            "google-sheets",
+            "Google Sheets records and trackers through the active host Connection.",
+            ("create_spreadsheet", "append_row", "read_rows", "update_row"),
+            ("opencode",),
+        ),
     )
 }
 

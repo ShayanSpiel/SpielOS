@@ -28,8 +28,8 @@ import { fileURLToPath } from "url";
 import { createServer } from "http";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
-const ROOT = resolve(__dirname, "..");
-const TEMPLATE_ROOT = join(ROOT, ".agents/company/departments/design/templates/video");
+const ROOT = resolve(__dirname, "../../../..");
+const TEMPLATE_ROOT = join(ROOT, "company/departments/design/templates/video");
 
 /* ── Aspect ratios ── */
 const ASPECTS = {
@@ -154,7 +154,7 @@ function checkStaticFiles(failures) {
   const pc = existsSync(PRODUCTION_CSS) ? readFileSync(PRODUCTION_CSS, "utf8") : "";
   if (!pc) failures.push("production.css missing");
   else {
-    if (!pc.includes("src/styles/tokens/index.css")) failures.push("production.css: missing canonical tokens import");
+    if (!pc.includes("company/departments/design/tokens/index.css")) failures.push("production.css: missing local canonical tokens import");
     if (!pc.includes('url("/public/assets/fonts/outfit-latin.woff2")')) failures.push("production.css: Outfit must load from repo-root-resolvable paths (no system-font fallback)");
     if (!pc.includes('font-weight: 100 900')) failures.push("production.css: Outfit must be the variable 100-900 family (bold 800 titles)");
     if (pc.includes("music")) failures.push("production.css: music reference");
@@ -167,7 +167,7 @@ function checkStaticFiles(failures) {
     }
     if (faceFamilies.length && !faceFamilies.includes("Outfit")) failures.push("production.css: Outfit @font-face missing");
   }
-  for (const file of ["scripts/mix-audio.js", "scripts/tts-gemini.js", "scripts/render-all.sh"]) {
+  for (const file of ["company/departments/design/tools/mix-audio.js", "company/departments/design/tools/tts-gemini.js", "company/departments/design/tools/render-all.sh"]) {
     if (!existsSync(join(ROOT, file))) { failures.push(`${file} missing`); continue; }
     const s = readFileSync(join(ROOT, file), "utf8");
     for (const bad of ["music-ambient", "music_direction", "music_duck_db", "am_michael", "atempo=", "Puck"]) {
@@ -233,7 +233,7 @@ function checkClipProvenance(failures) {
 async function videoRenderGate(baseUrl, browser, scenarioKey) {
   const page = await browser.newPage();
   await page.setViewport({ width: 1920, height: 1080, deviceScaleFactor: 1 });
-  const templateUrl = `${baseUrl}/.agents/company/departments/design/templates/video/${SCENARIOS[scenarioKey].file}`;
+  const templateUrl = `${baseUrl}/company/departments/design/templates/video/${SCENARIOS[scenarioKey].file}`;
   await page.goto(templateUrl, { waitUntil: "networkidle0", timeout: 30000 });
   await page.evaluate(() => document.fonts.ready);
   try {
@@ -368,7 +368,11 @@ const MIME = {
 function startServer() {
   return new Promise((resolve) => {
     const server = createServer((req, res) => {
-      let filePath = join(ROOT, decodeURIComponent(req.url.split("?")[0]));
+      let requestPath = decodeURIComponent(req.url.split("?")[0]);
+      requestPath = requestPath.replace(/^\/\.agents\/company\//, "/company/");
+      requestPath = requestPath.replace(/\/templates\/tools\//, "/tools/");
+      requestPath = requestPath.replace(/\/favicons\/favicon\.svg$/, "/favicons/favicon-v2.svg");
+      let filePath = join(ROOT, requestPath);
       if (filePath.endsWith("/")) filePath = join(filePath, "index.html");
 
       const ext = "." + filePath.split(".").pop().toLowerCase();
@@ -417,7 +421,7 @@ async function render() {
   const page = await browser.newPage();
   await page.setViewport({ width, height, deviceScaleFactor: 1 });
 
-  const templateUrl = `${baseUrl}/.agents/company/departments/design/templates/video/${scenarioFile}`;
+  const templateUrl = `${baseUrl}/company/departments/design/templates/video/${scenarioFile}`;
   console.log(`  Loading: ${templateUrl}`);
   await page.goto(templateUrl, { waitUntil: "networkidle0", timeout: 30000 });
   await page.evaluate(() => document.fonts.ready);

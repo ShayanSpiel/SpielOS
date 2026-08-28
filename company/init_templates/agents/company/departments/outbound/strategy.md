@@ -76,19 +76,16 @@ Research rules for every new lead (apply at qualification, write into the row):
    objection-handling variant.
 3. **Rejection classes** (for reply classification):
    - R1 "not looking for an external solution at the moment" — in-house
-     capability / timing objection (Web Katalyst 2026-08-11)
+     capability / timing objection
    - R2 generic pass / no reason given
    - R3 budget / cost objection
    - R4 wrong fit (segment mismatch)
    - R5 follow-up later / revisit
 4. **Lead editor in Notes** after any reply: outcome + class + date, so the
    master carries feedback into re-qualification.
-5. **Manual-loop hook (locked 2026-08-15)** — every lead gets ONE researched, named
+5. **Manual-loop hook** — every lead gets ONE researched, named
    operational loop in `research_fact` (what the loop is, where it runs, who does it
-   by hand). This is the proven converting hook: "Manual loop at SDG Accountant"
-   (EN-1358, researched-personal) produced a qualified reply 2026-08-14 —
-   "Can you build it out using our Ring Central?" (interested, accounting &
-   bookkeeping, owner-confirmed). Continue defaulting the researched single-loop
+   by hand). Continue defaulting the researched single-loop
    pain paragraph; keep subject family "Manual loop / One workflow / Repetitive work
    at {company}" in the generic-workflow bank.
 
@@ -98,7 +95,7 @@ Research rules for every new lead (apply at qualification, write into the row):
 2. Record in the row `Notes`: OOO date, return date if stated, and any named
    alternative contact (phone/email) from the OOO text.
 3. A NAMED alternative with a published email becomes a new verified lead
-   (source: OOO + company page; score normally; EN-1279 Josh Barlow precedent).
+   (source: OOO + company page; score normally).
 4. ROLE inboxes (accounts@, info@...) from OOO texts are OUT OF POLICY —
    do not create leads from them; surface to the owner instead.
 5. If the OOO gives a return date and the contact is back, flag the row for
@@ -115,20 +112,15 @@ Research must treat "Verified" as necessary-not-sufficient:
    window green.
 4. Batch sizing assumes ~20% hard-bounce attrition in the verified class.
 
-## PROVEN PATTERN — the only sendable pattern (locked 2026-08-18, goal-40946f9dab)
+## PROVEN PATTERN — the only sendable pattern
 
-Evidence (see `company/assets/outbound-feedback.md` and
-`outbound-proof-2026-08-15-sdg-accountant.md`):
+Replies come from leads with a per-lead researched operational loop.
+Bulk public lists without that research do not convert even when they open.
 
 | Lead | Source | Content | Result |
 |---|---|---|---|
-| EN-1358 SDG Accountant | Director web research w/ source URL (accountingtoronto.ca/teams/sami-ghaith/) | researched-personal: "Manual loop at SDG Accountant" + named loop pain + soft CTA | **Interested reply** ("Can you build it out using our Ring Central?") |
-| EN-1157 Sigma Recruitment | Company website (sigmarecruitment.co.uk) | researched-personal: "Staffing loop at Sigma Recruitment" + shortlist-stage pain + "Reply map" CTA | **Accepted reply** ("happy to have a demo") |
-| 324-run (EN-14xx/15xx/18xx bulk) | GCA framework public supplier contacts (one bulk list) | segment-generic pain + "named framework contact" hook | **0 replies, 3 clicks, 51% opens** |
-
-The bulk-framework run proves opens measure deliverability, not interest:
-51% of unverified bulk leads opened and still produced zero replies. The
-replies came only from leads with a per-lead researched operational loop.
+| Example researched lead | Company website or recorded research URL | researched-personal: named manual loop + soft CTA | Qualified reply |
+| Example bulk list | Public framework/supplier contacts without per-lead research | segment-generic pain | Opens without replies |
 
 ### RULE 1 — Source pattern (mandatory)
 1. Every sendable lead must come from a researched source: **company website

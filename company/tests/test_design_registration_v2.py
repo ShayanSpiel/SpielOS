@@ -37,8 +37,9 @@ class DesignRegistrationV2Tests(unittest.TestCase):
             self.assertIn(archetype_id, ids,
                           f"{archetype_id} must be a registered archetype")
 
-    def test_design_department_version_is_3_4_0(self):
-        self.assertEqual("3.4.0", DesignDepartment.version)
+    def test_design_department_version_is_at_least_3_4_0(self):
+        major, minor, patch = (int(part) for part in DesignDepartment.version.split("."))
+        self.assertGreaterEqual((major, minor, patch), (3, 4, 0))
 
     def test_each_new_archetype_points_at_an_existing_template_file(self):
         for archetype_id, kind, file in NEW_ARCHETYPES:

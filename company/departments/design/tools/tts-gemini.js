@@ -46,10 +46,10 @@ import { join, resolve } from "path";
 import { fileURLToPath } from "url";
 import { CHAIN, VOICE_PINS, loadEnv, keyFor, synthesize, ProviderError, TRANSIENT_STATUSES, discoverVoices } from "./tts-providers.js";
 
-const ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
+const ROOT = resolve(fileURLToPath(new URL("../../../..", import.meta.url)));
 const AUDIO = join(ROOT, "public/videos/audio");
 const MANIFEST = join(AUDIO, ".voice-manifest.json");
-const NARRATION = join(ROOT, ".agents/company/departments/design/templates/video/narration.json");
+const NARRATION = join(ROOT, "company/departments/design/templates/video/narration.json");
 const config = JSON.parse(readFileSync(NARRATION, "utf8"));
 const CAMPAIGN_PATH = process.env.CAMPAIGN_MANIFEST
   ? resolve(process.env.CAMPAIGN_MANIFEST) : null;

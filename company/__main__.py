@@ -42,8 +42,10 @@ def build_parser():
     add_cmd = commands.add_parser("add", help="install a department bundle (.sdep) or built-in id into this home")
     add_cmd.add_argument("source", help="path/to.bundle.sdep, bundle dir, or built-in department id")
     add_cmd.add_argument("--force", action="store_true")
+    add_cmd.add_argument("--dir", help="exact SpielOS home to modify (default: current/nearest home)")
     refresh = commands.add_parser("refresh", help="re-vendor the runtime spine + host adapters from newest templates (user layer preserved)")
     refresh.add_argument("--force", action="store_true", default=True)
+    refresh.add_argument("--dir", help="exact SpielOS home to update (default: current/nearest home)")
     agent = commands.add_parser("agent", help="first-class worker operations")
     agent_commands = agent.add_subparsers(dest="agent_command", required=True)
     compile_cmd = agent_commands.add_parser("compile",
@@ -52,6 +54,7 @@ def build_parser():
     compile_cmd.add_argument("--workflow", required=True, help="workflow id inside the department")
     compile_cmd.add_argument("--name", help="worker name (default: <department>-<workflow>)")
     compile_cmd.add_argument("--force", action="store_true")
+    compile_cmd.add_argument("--dir", help="exact SpielOS home to modify (default: current/nearest home)")
     strategy = commands.add_parser("strategy", help="show the read-only Strategy Kernel")
     strategy.add_argument("--topic", action="append", default=[])
     strategy.add_argument("--scope", action="append", default=[])
@@ -67,6 +70,7 @@ def build_parser():
     install.add_argument("--force", action="store_true")
     install.add_argument("--id", help="override/default department id")
     install.add_argument("--version", help="override/default version")
+    install.add_argument("--dir", help="exact SpielOS home to modify (default: current/nearest home)")
     validate = department_commands.add_parser("validate")
     validate.add_argument("--spec", help="department_spec JSON object")
     validate.add_argument("--file", help="path to department_spec JSON file")
@@ -87,6 +91,9 @@ def build_parser():
     create.add_argument("--target", required=True)
     create.add_argument("--deadline")
     create.add_argument("--parent")
+    create.add_argument("--supports", action="append", default=[],
+                        help="Goal ID this Goal causally supports; repeat for a support DAG")
+    create.add_argument("--priority", choices=("critical", "high", "normal", "low", "deferred"))
     create.add_argument("--config", default="{}")
     create.add_argument("--id")
     create.add_argument("--run-type", default="execution",
@@ -104,6 +111,9 @@ def build_parser():
     goal_list.add_argument("--json", action="store_true")
     show = goals.add_parser("show"); show.add_argument("goal_id")
     show.add_argument("--json", action="store_true")
+    link = goals.add_parser("link"); link.add_argument("goal_id")
+    link.add_argument("--supports", required=True)
+    link.add_argument("--json", action="store_true")
     once = commands.add_parser("once"); once.add_argument("goal_id")
     once.add_argument("--json", action="store_true")
     next_run = commands.add_parser("next"); next_run.add_argument("goal_id")
@@ -123,6 +133,19 @@ def build_parser():
                          help="approval mode for this Goal: approve now AND record the policy "
                               "(per_run/everything_approved), or just approve (per_action/none)")
     approve.add_argument("--json", action="store_true")
+    directive = commands.add_parser("directive", help="durable owner operating direction")
+    directive_commands = directive.add_subparsers(dest="directive_command", required=True)
+    directive_add = directive_commands.add_parser("add")
+    directive_add.add_argument("--text", required=True)
+    directive_add.add_argument("--goal")
+    directive_add.add_argument("--scope", choices=("company", "goal"), default="company")
+    directive_add.add_argument("--json", action="store_true")
+    directive_list = directive_commands.add_parser("list")
+    directive_list.add_argument("--goal")
+    directive_list.add_argument("--json", action="store_true")
+    directive_retire = directive_commands.add_parser("retire")
+    directive_retire.add_argument("directive_id")
+    directive_retire.add_argument("--json", action="store_true")
     for name in ("pause", "resume", "abandon"):
         item = commands.add_parser(name); item.add_argument("goal_id")
         item.add_argument("--json", action="store_true")
@@ -289,7 +312,8 @@ def main(argv=None):
                             assume_yes=args.yes, as_json=args.json)
         if args.command == "add":
             from .runtime.export import add_department
-            receipt = add_department(args.source, force=args.force)
+            receipt = add_department(args.source, force=args.force,
+                                     home=args.dir)
             print(json.dumps(receipt, indent=2))
             return 0
         if args.command == "department" and args.department_command == "export":
@@ -299,7 +323,7 @@ def main(argv=None):
             return 0
         if args.command == "refresh":
             from .runtime.export import refresh_home
-            receipt = refresh_home(force=True)
+            receipt = refresh_home(force=True, target=args.dir)
             if getattr(args, "json", False):
                 print(json.dumps(receipt, indent=2))
             else:
@@ -308,7 +332,7 @@ def main(argv=None):
         if args.command == "agent" and args.agent_command == "compile":
             from .runtime.agent_compile import compile_agent
             receipt = compile_agent(args.department, args.workflow,
-                                    args.name, force=args.force)
+                                    args.name, force=args.force, home=args.dir)
             print(json.dumps(receipt, indent=2))
             return 0
         if args.command == "departments":
@@ -361,9 +385,29 @@ def main(argv=None):
                     defects = validate_department_spec(normalized)
                     output = {"ok": not defects, "defects": defects, "package": normalized}
                 else:
+                    from .runtime.paths import (
+                        package_vendored_root, selected_project_root,
+                        validate_home_destination)
+                    selected = validate_home_destination(
+                        selected_project_root(args.dir))
+                    company_home = selected / ".agents" / "company"
+                    source_root = package_vendored_root()
+                    source_checkout = (not company_home.is_dir()
+                                       and source_root == selected)
+                    if source_checkout:
+                        company_home = selected / "company"
+                    if not company_home.is_dir():
+                        raise ValueError(
+                            f"no harness home at {selected}; "
+                            f"run `spielos init --dir {selected}` first")
+                    install_root = (None if source_checkout else
+                                    company_home / "departments")
+                    installed_agents_root = (None if source_checkout else
+                                              company_home / "agents" / "installed")
                     output = install_department(
                         payload, default_id=args.id, default_version=args.version,
-                        force=args.force)
+                        force=args.force, root=install_root,
+                        agents_root=installed_agents_root)
         elif args.command == "goal" and args.goal_command == "create":
             config = json.loads(args.config)
             hypothesis = json.loads(args.hypothesis)
@@ -371,6 +415,10 @@ def main(argv=None):
             changed = json.loads(args.changed)
             if not isinstance(config, dict):
                 raise ValueError("--config must be a JSON object")
+            if args.supports:
+                config["supports_goal_ids"] = list(dict.fromkeys(args.supports))
+            if args.priority:
+                config["priority"] = args.priority
             output = runtime.create_goal(name=args.name, owner_id=args.owner, metric=args.metric,
                 operator=args.operator, target=scalar(args.target), deadline=args.deadline,
                 parent_id=args.parent, config=config, goal_id=args.id, run_type=args.run_type,
@@ -379,6 +427,8 @@ def main(argv=None):
                 triggered_by_run_id=args.triggered_by, resume_run_id=args.resume_run)
         elif args.command == "goal" and args.goal_command == "list":
             output = runtime.store.goal_summaries(limit=100)
+        elif args.command == "goal" and args.goal_command == "link":
+            output = runtime.link_support(args.goal_id, args.supports)
         elif args.command == "goal":
             output = runtime.status(args.goal_id)
         elif args.command == "once":
@@ -409,6 +459,16 @@ def main(argv=None):
         elif args.command == "approve":
             runtime.approve(args.goal_id, args.note, scope=args.scope)
             output = runtime.status(args.goal_id)
+        elif args.command == "directive":
+            if args.directive_command == "add":
+                scope = "goal" if args.goal else args.scope
+                output = runtime.store.record_directive(
+                    args.text, scope=scope, goal_id=args.goal)
+            elif args.directive_command == "retire":
+                output = runtime.store.retire_directive(args.directive_id)
+            else:
+                goal_ids = (args.goal,) if args.goal else ()
+                output = list(runtime.store.directives(goal_ids=goal_ids, limit=100))
         elif args.command in ("pause", "resume", "abandon"):
             statuses = {"pause": GoalStatus.PAUSED, "resume": GoalStatus.ACTIVE, "abandon": GoalStatus.ABANDONED}
             output = runtime.set_goal_status(args.goal_id, statuses[args.command])
@@ -614,6 +674,29 @@ def _goal_line(item):
     return line
 
 
+def _goal_hierarchy_lines(items):
+    """Compact one-parent tree; semantic support edges stay in the JSON view."""
+
+    by_parent = {}
+    ids = {item["id"] for item in items}
+    for item in items:
+        by_parent.setdefault(item.get("parent_id"), []).append(item)
+    roots = [item for item in items if item.get("parent_id") not in ids]
+    lines = []
+
+    def visit(item, depth):
+        rendered = _goal_line(item).splitlines()
+        prefix = "  " * depth
+        lines.append(prefix + rendered[0])
+        lines.extend(prefix + line for line in rendered[1:])
+        for child in by_parent.get(item["id"], []):
+            visit(child, depth + 1)
+
+    for root in roots:
+        visit(root, 0)
+    return lines
+
+
 def _work_order_line(item):
     accepts = ", ".join(item.get("accepts_evidence") or []) or "capability handoff"
     goal_name = item.get("goal_name") or item.get("goal_id")
@@ -696,8 +779,16 @@ def render_status(value, history=False):
         header = ("Local runner: **paused** - start with `company runner start`; "
                   "goals only advance while this machine is on.")
     lines = ["# SpielOS company", "", header, ""]
+    focus = value.get("focus_goal")
+    lines.append("## Focus now")
+    if focus:
+        lines.append(_goal_line(focus))
+        if focus.get("why_next"):
+            lines += ["", "## Why", f"- {focus['why_next']}"]
+    else:
+        lines.append("- No active company outcome.")
     attention = value["attention"]
-    lines.append(f"## Needs attention ({len(attention)})")
+    lines += ["", f"## Need from you ({len(attention)})"]
     if attention:
         for item in attention:
             required = item.get("required_user_action") or item.get("message") or "Review"
@@ -705,14 +796,14 @@ def render_status(value, history=False):
     else:
         lines.append("- Nothing requires action.")
     work_orders = value.get("work_orders") or []
-    lines += ["", f"## Open work orders ({len(work_orders)})"]
+    lines += ["", f"## Moving · Open work orders ({len(work_orders)})"]
     if work_orders:
         lines.extend(_work_order_line(item) for item in work_orders)
     else:
         lines.append("- None.")
     active = value["active_goals"]
-    lines += ["", f"## Active goals ({len(active)})"]
-    lines.extend(_goal_line(item) for item in active) if active else lines.append("- None.")
+    lines += ["", f"## Active goals ({len(active)}) · hierarchy"]
+    lines.extend(_goal_hierarchy_lines(active)) if active else lines.append("- None.")
     proposed = value.get("proposed_goals") or []
     if proposed:
         lines += ["", f"## Proposed / deferred ({len(proposed)})"]
@@ -725,6 +816,14 @@ def render_status(value, history=False):
         lines.extend(f"- `{item['kind']}` · {item['name']} (`{item['goal_id']}`)"
                      + (f": {item['why_next']}" if item.get("why_next") else "")
                      for item in value["unread_results"])
+    memories = value.get("recent_memory") or []
+    if memories:
+        lines += ["", "## Learned"]
+        lines.extend(f"- {item['claim']}" for item in memories)
+    directives = value.get("directives") or []
+    if directives:
+        lines += ["", "## Company direction"]
+        lines.extend(f"- {item['text']}" for item in directives)
     recent = value["recent_results"]
     lines += ["", f"## Recent results ({len(recent)})"]
     lines.extend(_goal_line(item) for item in recent) if recent else lines.append("- None.")

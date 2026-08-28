@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from . import config
 from .alignment import (
     UNKNOWN, as_goal_record, is_market_outcome, judge_alignment, present,
+    priority_score,
 )
 from .models import GoalHandler, GoalStatus, RunStatus, Stage, StageResult
 from .strategic import strategic_frontier
@@ -18,7 +19,12 @@ from .util import compare as _shared_compare, parse_dt
 class Director(GoalHandler):
     id = "director"
     description = "Coordinates child goals while preserving their state and approvals."
-    version = "2.8.0"
+    version = "2.9.0"
+    default_strategy_context = {
+        "topics": ["company", "focus", "goals", "priorities", "evidence"],
+        "scopes": ["director"],
+        "layers": ["intent", "policy", "constitution"],
+    }
     goal_schema = {
         "metrics": list(config.director_metrics()),
         "config": {"accepted_evidence_validity": {"type": "array"}},
@@ -46,8 +52,10 @@ class Director(GoalHandler):
         if not children:
             return StageResult("diagnose", {"reason": "no child goals"}, RunStatus.BLOCKED,
                                Stage.DECIDE, message="Director needs at least one child goal")
-        attention = [c for c in children if c["cycle"]["run_status"] in
-                     ("awaiting_approval", "blocked", "failed")]
+        attention = sorted(
+            [c for c in children if c["cycle"]["run_status"] in
+             ("awaiting_approval", "blocked", "failed")],
+            key=lambda item: (-priority_score(item), item.get("created_at") or ""))
         if attention:
             child = attention[0]
             payload = {"action": "surface", "child_id": child["id"],
@@ -128,7 +136,9 @@ class Director(GoalHandler):
                     "next_run_type": "business_experiment",
                     "payload": strategic,
                 })
-        runnable = [c for c in children if c["goal_status"] == "active" and _runnable(c)]
+        runnable = sorted(
+            [c for c in children if c["goal_status"] == "active" and _runnable(c)],
+            key=lambda item: (-priority_score(item), item.get("created_at") or ""))
         if runnable:
             payload = {"action": "dispatch", "child_id": runnable[0]["id"]}
             return StageResult("choose_intervention", payload,

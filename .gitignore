@@ -8,6 +8,15 @@ __pycache__/
 *.egg-info/
 build/
 dist/
+node_modules/
+public/
+
+# Local design-demo material; the customized website owns these experiments.
+company/departments/design/tools/finalize-content-demo.py
+company/departments/design/tools/generate-content-demo.mjs
+company/departments/design/tools/package.json
+company/init_templates/agents/company/departments/design/tools/finalize-content-demo.py
+company/init_templates/agents/company/departments/design/tools/package.json
 
 # Host-local
 .opencode/node_modules/

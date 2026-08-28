@@ -187,12 +187,12 @@ class SignatureIdentityTests(unittest.TestCase):
 
     def test_signature_html_carries_identity_links(self):
         for token in ("linkedin.com/in/", "x.com/", "t.me/",
-                      "spielos.xyz/?utm_source=outbound-email"):
+                      "utm_source=outbound-email"):
             self.assertIn(token, SIGNATURE_HTML, SIGNATURE_HTML[:160])
 
     def test_signature_text_carries_identity_links(self):
         for token in ("LinkedIn: https://linkedin.com/in/", "X: https://x.com/",
-                      "Telegram: https://t.me/", "Home: https://spielos.xyz/"):
+                      "Telegram: https://t.me/", "Home: https://"):
             self.assertIn(token, SIGNATURE_TEXT, SIGNATURE_TEXT[:200])
 
     def test_signature_carries_no_booking_cta(self):

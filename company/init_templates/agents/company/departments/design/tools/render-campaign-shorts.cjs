@@ -31,12 +31,12 @@ const { createServer } = require("http");
 const { readFileSync, writeFileSync, existsSync, mkdirSync, rmSync, statSync, readdirSync } = require("fs");
 const { join, resolve } = require("path");
 
-const ROOT = resolve(__dirname, "..");
-const REGISTRY = join(ROOT, ".agents/company/departments/design/templates/registry.json");
-const TEMPLATE_DIR = join(ROOT, ".agents/company/departments/design/templates/video");
-const NARRATION = join(TEMPLATE_DIR, "narration.json");
-const AUDIO = join(ROOT, "public/videos/audio");
-const MANIFEST = join(AUDIO, ".voice-manifest.json");
+const ROOT = resolve(__dirname, "../../../..");
+const REGISTRY = join(ROOT, "company/departments/design/templates/registry.json");
+const TEMPLATE_DIR = join(ROOT, "company/departments/design/templates/video");
+const NARRATION = process.env.NARRATION_PATH ? resolve(process.env.NARRATION_PATH) : join(TEMPLATE_DIR, "narration.json");
+const AUDIO = process.env.LOCAL_AUDIO_ROOT ? resolve(process.env.LOCAL_AUDIO_ROOT) : join(ROOT, "public/videos/audio");
+const MANIFEST = process.env.VOICE_MANIFEST ? resolve(process.env.VOICE_MANIFEST) : join(AUDIO, ".voice-manifest.json");
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const FPS = 30;
 const FLOW_QA_SCHEMA = "1.0";
@@ -143,7 +143,7 @@ function checkMode() {
       if (!re.test(source)) errors.push(`${label}: injection slot #${slot} missing from ${tpl}`);
     }
   }
-  const selfSource = readFileSync(join(ROOT, "scripts/render-campaign-shorts.cjs"), "utf8");
+  const selfSource = readFileSync(join(ROOT, "company/departments/design/tools/render-campaign-shorts.cjs"), "utf8");
   if (selfSource.includes(STILL_TITLE_REF)) {
     errors.push("plain-frame thumbnail policy violated: driver calls " + STILL_TITLE_REF);
   }
@@ -189,7 +189,8 @@ function planFor(item, registry) {
     spokenDisplayAlignment: s.visual.spoken_display_alignment || "",
     intent: s.intent || "",
   }));
-  return { scenario: key, template: row.id, file: row.file, scenes };
+  return { scenario: key, template: row.id, file: row.file, scenes,
+    ctaEnabled: yt.design.cta_enabled !== false };
 }
 
 function expectedFlowText(plan, sceneIndex) {
@@ -200,6 +201,9 @@ function expectedFlowText(plan, sceneIndex) {
     else if (value) values.push({ field, text: String(value) });
   };
   const addCore = (...fields) => fields.forEach((field) => add(field, scene[field]));
+  if (sceneIndex === plan.scenes.length - 1 && !plan.ctaEnabled) {
+    return values;
+  }
   if (sceneIndex === plan.scenes.length - 1) {
     addCore("eyebrow");
     values.push({ field: "visual.headline", text: scene.headline || URL_LINE });
@@ -293,6 +297,10 @@ function splitLines(text, maxChars) {
     else hide(id2);
   }
   function cta(s, badgeDefault) {
+    if (plan.ctaEnabled === false) {
+      hide('ct0'); hide('ct1'); hide('ct2');
+      return;
+    }
     // FIX: use s.eyebrow when labels is just ['Services'] generic - eyebrow holds actual workflow (MAP ONE XXX)
     let badge = (s.labels && s.labels.length && !/^$/.test(String(s.labels[0])) && String(s.labels[0]).toLowerCase() !== 'services') ? s.labels[0] : '';
     if (!badge) badge = (s.eyebrow && s.eyebrow.trim()) ? s.eyebrow : (badgeDefault || 'AI agent implementation');
@@ -569,7 +577,8 @@ async function inspectFlowQa(page, timing, plan) {
     scenes.push({ index, id: plan.scenes[index]?.id || `scene-${index + 1}`, time: probeTime, frame, ...result });
   }
 
-  const ctaLayout = await page.evaluate(() => {
+  const ctaLayout = await page.evaluate((ctaEnabled) => {
+    if (!ctaEnabled) return { passed: true, disabled: true, lines: [], url: null, normalized_title: "" };
     const title = document.getElementById("ct1");
     const url = document.getElementById("ct2");
     if (!title || !url) return { passed: false, reason: "CTA slots missing" };
@@ -586,7 +595,7 @@ async function inspectFlowQa(page, timing, plan) {
     const passed = separated && noOverlap && rects.every(inViewport) && inViewport(urlRect) && normalize(title.innerText || "") === "go to services";
     return { passed, lines: rects, url: { left: urlRect.left, top: urlRect.top, right: urlRect.right, bottom: urlRect.bottom, width: urlRect.width, height: urlRect.height }, normalized_title: normalize(title.innerText || ""), reason: passed ? "" : "CTA must be two separated in-viewport lines with readable URL" };
     function normalize(value) { return String(value || "").toLowerCase().replace(/\s+/g, " ").trim(); }
-  });
+  }, plan.ctaEnabled);
   const sceneTextCoveragePassed = scenes.every((scene) => scene.passed);
   const noHiddenTextOverflow = scenes.every((scene) => scene.overflow.length === 0);
   return {
@@ -711,7 +720,16 @@ function buildMediaQa(videoPath, thumbPath, expectedDuration, flow, temporal) {
 function startServer() {
   return new Promise((res, rej) => {
     const server = createServer((req, rsp) => {
-      let fp = join(ROOT, decodeURIComponent(req.url.split("?")[0]));
+      let requestPath = decodeURIComponent(req.url.split("?")[0]);
+      requestPath = requestPath.replace(/^\/\.agents\/company\//, "/company/");
+      requestPath = requestPath.replace(/\/templates\/tools\//, "/tools/");
+      requestPath = requestPath.replace(/\/favicons\/favicon\.svg$/, "/favicons/favicon-v2.svg");
+      if (requestPath.endsWith("/templates/video/narration.json") && NARRATION !== join(TEMPLATE_DIR, "narration.json")) {
+        rsp.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-cache" });
+        rsp.end(readFileSync(NARRATION));
+        return;
+      }
+      let fp = join(ROOT, requestPath);
       if (fp.endsWith("/")) fp = join(fp, "index.html");
       if (!existsSync(fp)) { rsp.writeHead(404); rsp.end(); return; }
       const ext = fp.split(".").pop().toLowerCase();
@@ -741,15 +759,17 @@ async function runPipeline(item, probeOnly, manifestPath, registry) {
   }
   if (!probeOnly && !videoExists) {
     console.log(`\n[${item.item_id}] TTS scenario ${plan.scenario} (${plan.template})...`);
-    execSync(`CAMPAIGN_MANIFEST=${JSON.stringify(manifestPath)} CAMPAIGN_ITEM_ID=${item.item_id} node scripts/tts-gemini.js ${plan.scenario}`,
-      { cwd: ROOT, stdio: "inherit", env: { ...process.env }, shell: "/bin/zsh" });
+    if (process.env.SKIP_TTS !== "1") {
+      execSync(`CAMPAIGN_MANIFEST=${JSON.stringify(manifestPath)} CAMPAIGN_ITEM_ID=${item.item_id} node company/departments/design/tools/tts-gemini.js ${plan.scenario}`,
+        { cwd: ROOT, stdio: "inherit", env: { ...process.env }, shell: "/bin/zsh" });
+    }
     console.log(`[${item.item_id}] Mixing narration-only track...`);
     mixNarration(plan.scenario, mixM4a);
   }
 
   const server = await startServer();
   const baseUrl = `http://127.0.0.1:${server.address().port}`;
-  const templateUrl = `${baseUrl}/.agents/company/departments/design/templates/video/${plan.file.split("/").pop()}`;
+  const templateUrl = `${baseUrl}/company/departments/design/templates/video/${plan.file.split("/").pop()}`;
   console.log(`[${item.item_id}] Rendering ${plan.template} @ portrait ${FPS}fps`);
 
   const browser = await puppeteer.launch({
@@ -835,7 +855,7 @@ async function runPipeline(item, probeOnly, manifestPath, registry) {
     rmSync(framesDir, { recursive: true });
 
     if (!existsSync(mixM4a)) throw new Error(`missing narration.m4a for ${item.item_id}`);
-    execSync(`ffmpeg -y -i ${silentMp4} -i ${mixM4a} -c:v copy -c:a aac -b:a 192k -shortest ${videoOut}`, { stdio: "pipe" });
+    execSync(`ffmpeg -y -i ${silentMp4} -i ${mixM4a} -map 0:v:0 -map 1:a:0 -c:v copy -c:a aac -b:a 192k -af apad -t ${durationSec.toFixed(1)} ${videoOut}`, { stdio: "pipe" });
     rmSync(silentMp4, { force: true });
 
     /* Stable plain-frame thumbnail: hook window frame grab, no still-title
@@ -863,7 +883,7 @@ async function runPipeline(item, probeOnly, manifestPath, registry) {
   }
   const absoluteManifest = resolve(manifestPath);
   const probeOnly = args.includes("--probe");
-  const onlyId = args.find((a) => a.includes("item-")) || null;
+  const onlyId = args.find((a) => !a.startsWith("--") && !a.endsWith(".json")) || null;
   const manifest = JSON.parse(readFileSync(absoluteManifest, "utf8"));
   const registry = readRegistry();
   const yt = manifest.items.filter((it) => !onlyId || it.item_id === onlyId);

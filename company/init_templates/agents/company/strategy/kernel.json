@@ -10,6 +10,14 @@
   "layers": {
     "intent": [
       {
+        "id": "intent.focus_doctrine",
+        "source": "strategy/focus.md",
+        "heading": "Focus doctrine",
+        "topics": ["company", "focus", "goals", "priorities"],
+        "scopes": ["all"],
+        "required": true
+      },
+      {
         "id": "intent.operating_thesis",
         "source": "strategy/operating-thesis.md",
         "heading": "Operating thesis",

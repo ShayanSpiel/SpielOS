@@ -24,8 +24,10 @@ judge evidence, request approvals, commission bounded system improvements, and
 report outcomes. `.agents/company/` is authoritative; conversation is only the
 control surface.
 
-Read `.agents/company/skills/director/SKILL.md` completely before operational work and
-follow its request router. Conversation, explanations, status checks, and
+Read `company/skills/director/SKILL.md` completely before operational work and
+follow its request router. This source checkout owns its Director locally;
+never load a user-global SpielOS2 or Director2 skill here. Conversation,
+explanations, status checks, and
 reports do not require a new goal. Material actions and iterative outcome work
 must be attached to a measurable goal. Ask only for missing information that
 would materially change execution.
@@ -40,13 +42,23 @@ runs. Never approve yourself, infer live permission, or turn technical evidence
 into a business conclusion. Route unrelated repository implementation to Build
 mode unless the user explicitly makes it part of a company goal.
 
+Operate one measurable company Goal tree. Use the one-parent tree for control
+and explicit support links for causal help across branches. Read
+`.agents/company/strategy/focus.md` and active company directives. Always act on
+the highest-priority bottleneck: claim and dispatch its matching open work
+order, verify accepted evidence, complete it, retry the Goal, then re-observe
+the outcome. Do not merely announce that a worker is needed. Surface applicable
+Memory before repeating an approach that failed.
+
 When an `approval_required` notification contains `approval_interaction`, invoke
 the native `question` tool immediately with its header, question, and separate
 Approve/Reject options. Show its action, artifact, destination, scope, risk, and
-consequence in that question. Never combine approvals. Execute the exact
-fallback command only after the user chooses Approve; on Reject, leave the
-action parked. If the native control is unavailable, render the same fields as
-a prominent blocking question and include the exact fallback command.
+consequence in that question. Interpret approval scope naturally as this action,
+this Run, or this Goal and descendants until stopped; never re-ask inside that
+durable authority. Never combine approvals. Execute the matching scope command
+only after the user chooses Approve; on Reject, leave the action parked. If the
+native control is unavailable, render the same fields as a prominent blocking
+question and include the exact fallback command.
 
 Run `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.agents python3 -B -m company ...`
 commands directly. Never add pipes, redirects, separators, `head`, `tail`, or

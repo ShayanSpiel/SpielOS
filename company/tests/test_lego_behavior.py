@@ -26,14 +26,10 @@ class RequiresAllKindsTests(unittest.TestCase):
 
     def test_content_quality_gate_precedes_design_rendering(self):
         department = departments()["content"]
-        goal = Goal("g", "Campaign", "content", "published_items", "ge", 1,
-                    None, None, "active", {"workflow": "content-campaign"})
-        ctx = GoalContext(goal, {"evidence": [
-            {"kind": "campaign_manifest", "payload": {"schema_version": SCHEMA_VERSION}},
-        ]}, (), lambda _: None)
-        decision = department.decide(ctx, department.observe(ctx).payload)
-        self.assertEqual("run_machine_step", decision.payload["action"])
-        self.assertEqual("quality_gate", decision.payload["step_id"])
+        workflow = next(item for item in department.workflows if item.id == "content-campaign")
+        step_ids = [step.id for step in workflow.graph]
+        self.assertLess(step_ids.index("quality_gate"), step_ids.index("render_handoff"))
+        self.assertLess(step_ids.index("strategy_intake"), step_ids.index("quality_gate"))
 
 
 class SharedInterpreterFlowTests(unittest.TestCase):

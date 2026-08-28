@@ -238,9 +238,18 @@ class EmailWorkflow(GoalHandler):
         payload = {"batch_id": row["id"], "metrics": metrics, "verdict": verdict,
                    "metric_value": value, "goal_met": met}
         label = verdict.get("verdict") or "inconclusive"
+        evidence_ids = [item["id"] for item in (ctx.cycle.get("evidence") or ())
+                        if item.get("id") and item.get("validity") == "business"]
         learning = {"claim": f"Email intervention verdict: {label}",
                     "evidence": {"batch_id": row["id"], "metrics": metrics, "verdict": verdict},
-                    "confidence": 0.4 if label == "inconclusive" else 0.8}
+                    "confidence": 0.4 if label == "inconclusive" else 0.8,
+                    "reusable": not met,
+                    "decision_relevance": (
+                        "Do not repeat this email intervention unchanged; use the verdict "
+                        "to change one declared campaign variable."),
+                    "evidence_ids": evidence_ids,
+                    "applies_to": {"metrics": [ctx.goal.metric],
+                                   "workflows": [ctx.goal.config.get("workflow") or "email-outreach"]}}
         next_decision = outbound.workflow.decide(outbound, snapshot) or {}
         next_experiment = {} if met else {
             "action": "run_email_batch",
@@ -425,8 +434,17 @@ class EmailWorkflow(GoalHandler):
         evaluation = {"verdict": "goal_met" if met else "not_yet", "goal_met": met,
                       "metrics": metrics, "validity": "technical_only",
                       "contamination_reason": None, "next_experiment": next_experiment}
+        evidence_ids = [item["id"] for item in (ctx.cycle.get("evidence") or ())
+                        if item.get("id") and item.get("validity") == "technical_only"]
         learning = {"claim": f"Technical test reply rate was {reply_rate:.1%}",
-                    "evidence": metrics, "confidence": 1.0}
+                    "evidence": metrics, "confidence": 1.0,
+                    "reusable": not met,
+                    "decision_relevance": (
+                        "Change the trace token or reply-capture variable before repeating "
+                        "this controlled transport test."),
+                    "evidence_ids": evidence_ids,
+                    "applies_to": {"metrics": [ctx.goal.metric],
+                                   "workflows": [ctx.goal.config.get("workflow") or "email-outreach"]}}
         if met:
             return StageResult("goal_check", metrics, RunStatus.COMPLETED, goal_status=GoalStatus.ACHIEVED,
                                evaluation=evaluation, learnings=[learning],

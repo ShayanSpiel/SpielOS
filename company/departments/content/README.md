@@ -5,19 +5,23 @@ media, or publish.
 
 ## Flow
 
-`brief → copy and whole narration → editorial evaluation → Design handoff`
+`Strategy intake → worldview → Content Brief → copywriter → editorial gate → Design handoff`
 
-1. Read the canonical buyer, positioning, and voice sources in
-   `company/strategy/`.
-2. Write one brief and platform-native copy per item. A Short starts as one
+1. Validate the requested ICP, reader, intent, topic, platforms, and formats
+   against the selected canonical strategy context. Missing or placeholder
+   strategy blocks production.
+2. The Strategist writes the worldview and locks one Content Brief. The
+   Copywriter then writes platform-native copy per item. A Short starts as one
    complete `narration.script`; scene splitting happens only after review.
-3. Record passing `content-copy-top10` and `content-story-whole` reports.
-4. Emit `content_ready`. Design consumes that evidence, chooses a template,
+3. The editorial gate verifies every copy artifact carries the requested ICP
+   and reader, and emits the final text artifact plus `content_ready`.
+4. Design consumes that evidence, chooses a template,
    creates the scene plan, and returns its own `render_report`.
 
 ## Brief
 
-Each item has `reader`, `customer_moment`, `one_idea`, `desired_result`,
+Each request has `icp`, `reader`, `intent`, `topic`, `platforms`, and `formats`.
+Each item brief has `reader`, `customer_moment`, `one_idea`, `desired_result`,
 `intent`, `spielos_relevance`, and optional `proof`. Renditions may adapt the
 expression, never the idea.
 

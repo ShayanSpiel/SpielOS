@@ -27,7 +27,15 @@ class CompanySnapshotTests(unittest.TestCase):
         return self.runtime.create_goal(
             goal_id=goal_id, name=name, owner_id="content",
             metric="content_packages", operator="ge", target=1,
-            config={"workflow": "content-package", "allowed_files": ["x" * 10_000]},
+            config={"workflow": "content-package", "allowed_files": ["x" * 10_000],
+                    "content_request": {
+                        "icp": "Recruitment-company operators",
+                        "reader": "Agency owner",
+                        "intent": "Explain a supervised AI workflow",
+                        "topic": "candidate follow-up",
+                        "platforms": ["threads"], "formats": ["post"],
+                        "cta_policy": "none", "link_policy": "none",
+                    }},
         )
 
     def capture(self, *arguments):
@@ -47,19 +55,16 @@ class CompanySnapshotTests(unittest.TestCase):
         self.assertNotIn("x" * 100, output)
         self.assertLess(len(output), 5_000)
 
-    def test_status_and_tasks_surface_open_work_orders(self):
+    def test_machine_validation_blocks_without_creating_a_work_order(self):
         goal = self.goal("goal-work-order")
         blocked = self.runtime.once(goal["id"])
         self.assertEqual("blocked", blocked["cycle"]["run_status"])
         orders = self.runtime.store.work_orders(status="open", goal_id=goal["id"])
-        self.assertEqual(1, len(orders))
-        self.assertEqual("content-strategist", orders[0]["employee_id"])
+        self.assertEqual([], orders)
         output = self.capture("status")
-        self.assertIn(orders[0]["id"], output)
-        self.assertIn("content-strategist", output)
+        self.assertIn("Content Strategy intake blocked", output)
         tasks = self.capture("tasks")
-        self.assertIn(orders[0]["id"], tasks)
-        self.assertIn("content-strategist", tasks)
+        self.assertNotIn("goal-work-order", tasks)
 
     def test_raw_status_remains_an_explicit_full_audit_escape_hatch(self):
         self.goal("goal-raw")

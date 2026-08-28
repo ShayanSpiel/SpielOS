@@ -35,6 +35,8 @@ def approval_interaction(goal: Any, result: Any) -> dict[str, Any]:
     goal_id = goal.id
     fallback = ("PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.agents python3 -B -m company "
                 f"approve {goal_id}")
+    run_fallback = f"{fallback} --scope per_run"
+    goal_fallback = f"{fallback} --scope everything_approved"
     return {
         "id": f"approval:{goal_id}",
         "header": "Approval required",
@@ -51,6 +53,12 @@ def approval_interaction(goal: Any, result: Any) -> dict[str, Any]:
             {"label": "Reject", "value": "reject", "command": None},
         ],
         "fallback_command": fallback,
+        "authority_scopes": [
+            {"label": "This action", "scope": "per_action", "command": fallback},
+            {"label": "This run", "scope": "per_run", "command": run_fallback},
+            {"label": "This goal until stopped", "scope": "everything_approved",
+             "command": goal_fallback},
+        ],
     }
 
 
@@ -103,6 +111,16 @@ def validate_goal_request(handler: GoalHandler, *, metric: str,
             raise ValueError(
                 f"workflow '{config['workflow']}' is not supported by '{handler.id}'; "
                 f"use: {', '.join(sorted(allowed))}")
+
+    # A Department may declare the bounded Strategy context its workers need.
+    # Keep this opt-in and handler-owned: ordinary technical Goals must not
+    # load the Strategy Kernel, while Content Goals must not silently run with
+    # an empty buyer/voice context.
+    default_strategy_context = getattr(handler, "default_strategy_context", None)
+    if (isinstance(default_strategy_context, dict)
+            and not config.get("strategy_context")
+            and config.get("workflow") not in {"publish"}):
+        config["strategy_context"] = dict(default_strategy_context)
 
     for key, rule in cfg_schema.items():
         if not isinstance(rule, dict) or key == "workflow":

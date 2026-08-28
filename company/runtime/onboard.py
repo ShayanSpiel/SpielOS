@@ -176,13 +176,13 @@ def _detect_hosts() -> dict[str, bool]:
 
 
 def _verify_home(root: Path) -> tuple[bool, str]:
-    """Prove the vendored home actually runs before claiming success."""
+    """Prove the vendored home runs without creating operational state."""
     env = dict(os.environ,
                PYTHONPATH=str(root / ".agents"),
                PYTHONDONTWRITEBYTECODE="1")
     try:
         result = subprocess.run(
-            [sys.executable, "-B", "-m", "company", "status", "--json"],
+            [sys.executable, "-B", "-m", "company", "catalog"],
             cwd=root, env=env, capture_output=True, text=True, timeout=120)
     except subprocess.TimeoutExpired:
         return False, "verification timed out after 120s"
@@ -194,7 +194,7 @@ def _verify_home(root: Path) -> tuple[bool, str]:
     try:
         json.loads(result.stdout)
     except json.JSONDecodeError:
-        return False, "status did not return valid JSON"
+        return False, "catalog did not return valid JSON"
     return True, ""
 
 

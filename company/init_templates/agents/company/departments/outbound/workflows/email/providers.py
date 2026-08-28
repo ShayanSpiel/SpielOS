@@ -819,7 +819,7 @@ def receiving_domain_status(address: str, provider: str = "") -> dict:
 
 # ── Unified Gmail reply capture (owner direction 2026-08-10) ────────────────
 # Every send sets Reply-To: replies@spielos.xyz; Cloudflare Email Routing
-# forwards that address to the founder inbox (66shayan@gmail.com); these
+# forwards that address to the owner inbox; these
 # functions read that inbox over IMAP so reply-rate evidence is automatic.
 # No receiving domain, no plan upgrade, no MX changes.
 

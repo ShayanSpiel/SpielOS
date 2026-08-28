@@ -29,8 +29,9 @@ class GrowthDepartmentTests(unittest.TestCase):
         self.assertNotIn("tools", value)
         self.assertNotIn("control_engines", value)
         self.assertEqual("interpreter", value["runtime"]["department_runtime"])
-        self.assertEqual({"attio", "buffer", "cal-booking", "posthog", "search-console", "website", "web-research",
-                          "email-delivery"},
+        self.assertEqual({"activepieces", "attio", "buffer", "cal-booking", "email-delivery",
+                          "google-drive", "google-sheets", "posthog", "search-console", "website",
+                          "web-research"},
                          {item["id"] for item in value["connections"]})
         known_connections = {item["id"] for item in value["connections"]}
         referenced = {

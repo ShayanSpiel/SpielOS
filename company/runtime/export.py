@@ -126,9 +126,15 @@ def _find_skill_dir(skill_id: str) -> Path | None:
     return _locate(skill_id)
 
 
-def add_department(source: str, *, force: bool = False) -> dict:
+def add_department(source: str, *, force: bool = False,
+                   home: str | Path | None = None) -> dict:
     """Install a department into the current home from a .sdep file, a
     bundle directory, or a built-in example id shipped with the package."""
+    agents_home = _home_agents_dir(home)
+    if not (agents_home / "company").is_dir():
+        raise ValueError(
+            f"no harness home at {agents_home.parent}; "
+            f"run `spielos init --dir {agents_home.parent}` first")
     target = Path(source)
 
     if target.suffix == ".sdep" and target.is_file():
@@ -139,27 +145,27 @@ def add_department(source: str, *, force: bool = False) -> dict:
         with tarfile.open(target, "r:gz") as tar:
             tar.extractall(extract_dir, filter="data")
         inner = next(extract_dir.iterdir())
-        receipt = _install_bundle_dir(inner, force=force)
+        receipt = _install_bundle_dir(inner, force=force, home=home)
         shutil.rmtree(extract_dir)
         return receipt
 
     if target.is_dir() and (target / "manifest.json").is_file():
-        return _install_bundle_dir(target, force=force)
+        return _install_bundle_dir(target, force=force, home=home)
 
     # Built-in example: copy straight from the vendored/template tree.
     template_dept = _template_department(source)
     if template_dept is not None:
-        return _install_plain_department(template_dept, force=force)
+        return _install_plain_department(template_dept, force=force, home=home)
 
     raise ValueError(
         f"cannot add '{source}': not a .sdep file, bundle directory, "
         "or built-in department id")
 
 
-def _home_agents_dir() -> Path:
-    from .paths import find_project_root
+def _home_agents_dir(home: str | Path | None = None) -> Path:
+    from .paths import selected_project_root, validate_home_destination
 
-    return find_project_root() / ".agents"
+    return validate_home_destination(selected_project_root(home)) / ".agents"
 
 
 def _template_department(department_id: str) -> Path | None:
@@ -186,10 +192,11 @@ def _verify_manifest(bundle: Path) -> dict:
     return manifest
 
 
-def _install_bundle_dir(bundle: Path, *, force: bool) -> dict:
+def _install_bundle_dir(bundle: Path, *, force: bool,
+                        home: str | Path | None = None) -> dict:
     manifest = _verify_manifest(bundle)
     department_id = manifest["id"]
-    home = _home_agents_dir()
+    home = _home_agents_dir(home)
 
     # Skills first so validation sees them. Bundled skills install into the
     # shared department-skills shelf (methods used across departments).
@@ -217,9 +224,11 @@ def _install_bundle_dir(bundle: Path, *, force: bool) -> dict:
             "note": "run `python3 -m company departments` to confirm discovery"}
 
 
-def _install_plain_department(template: Path, *, force: bool) -> dict:
+def _install_plain_department(template: Path, *, force: bool,
+                              home: str | Path | None = None) -> dict:
     department_id = template.name
-    dept_dst = _home_agents_dir() / "company" / "departments" / department_id
+    dept_dst = (_home_agents_dir(home) / "company" / "departments"
+                / department_id)
     if dept_dst.exists() and not force:
         raise FileExistsError(
             f"department '{department_id}' already exists; pass --force to replace")
@@ -242,14 +251,15 @@ def _department_version(dept_dir: Path) -> str:
     return "unknown"
 
 
-def refresh_home(*, force: bool = True) -> dict:
+def refresh_home(*, force: bool = True,
+                 target: str | Path | None = None) -> dict:
     """Re-vendor the SPINE (runtime code + company skills + host adapters)
     into the current home from the newest templates. User layer is preserved:
     strategy/, assets/, departments/, agents/, config.user.json, .spielos/."""
     from .bootstrap import template_root
 
     templates = template_root()
-    home = _home_agents_dir()
+    home = _home_agents_dir(target)
     if not (home / "company").is_dir():
         raise ValueError("no harness home here; run `spielos init` first")
 

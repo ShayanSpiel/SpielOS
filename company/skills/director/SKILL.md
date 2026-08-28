@@ -45,6 +45,26 @@ source that would materially change execution. Never invent those fields.
 
 ## Runtime contract
 
+### One company pursuit
+
+Use one active measurable Director Goal as the control root when the company is
+coordinating material work. Attach autonomous bottlenecks as child Goals. A Goal
+has one control parent; when one branch causally helps several outcomes, record
+those semantic links with `goal link --supports`. Do not create a second root
+for ordinary supporting work, a batch, a task, or a system repair. Independent
+roots are exceptional and must represent genuinely independent company outcomes.
+
+Before creating material work, state which active outcome it supports. If it
+supports none, recommend deferral and name the opportunity cost; accept a clear
+owner override without repeated ceremony. Follow `strategy/focus.md`: build,
+subtract, ship. Durable owner direction such as “simplify from now on” belongs
+in `company directive add`, not in empirical Memory.
+
+Use `config.priority` (`critical`, `high`, `normal`, `low`, `deferred`) to make
+the current bottleneck explicit. After every child or support-branch change,
+return to the outcome, re-observe its metric, and choose the next highest-value
+branch. Child success never means parent success.
+
 Use exactly `GOAL -> OBSERVE -> DECIDE -> ACT -> EVALUATE`. Keep separate:
 
 - goal lifecycle;
@@ -75,13 +95,18 @@ shell request.
    `status --raw` only for explicit audit work or a real inconsistency. Never
    reconstruct routine state from saved shell-output files. This retrieval
    discipline does not limit investigation or delegation when genuinely needed.
-2. Create one Director goal only when coordinating multiple Departments or
-   child goals is useful. Production-ready Departments may run independently.
+2. Reuse the active Director root for company pursuit. Create it when the first
+   material outcome is selected; attach production Department Goals beneath it.
+   Run a Department independently only for a genuinely independent outcome.
 3. Ensure `runner status` is running for an active operational goal; use
    `runner start` when needed. Use `runner tick GOAL_ID` for an immediate full
    goal-tree advance. The repository-local worker then resumes due and
    evidence-woken runs without an open chat session.
-4. Treat approval as a hard stop. Show exact artifact, action, scope, risk, and
+4. Treat approval as a hard stop unless durable authority already covers it.
+   “Approve this” means this action; “approve this run” means the current Run;
+   “everything is approved for this goal/until stopped” means
+   `everything_approved` on that Goal and its descendants. Do not re-ask inside
+   that scope. Show exact artifact, action, scope, risk, and
    consequence. The `approve` command releases the approved action and the
    runner continues automatically.
    When the notification provides `approval_interaction`, invoke the host's
@@ -122,9 +147,15 @@ still parks for approval. `company next GOAL_ID` is only the manual escape
 hatch when automatic continuation is not eligible.
 
 When a notification requests a capability such as `lead_research`, coordinate
-the matching bounded agent/capability, verify its completion evidence, then use
-`company retry GOAL_ID`. Do not weaken batch scope, ICP, or guardrails merely to
-make a blocked Department runnable.
+the matching bounded Agent immediately: select the highest-priority open work
+order, claim it through the portable work-order contract, delegate its declared
+Workflow, verify accepted evidence, complete it, then use `company retry
+GOAL_ID`. Do not stop at “a worker is needed,” and do not weaken batch scope,
+ICP, or guardrails merely to make a blocked Department runnable.
+
+When Memory applies, tell the owner plainly: what happened before, the evidence
+behind it, and what variable must change before repeating the approach. Never
+bury a prior failed pattern inside an audit report.
 
 ## Runs and Department development
 
@@ -149,7 +180,7 @@ discovery pass.
 
 ## Communication
 
-Lead with the business state, not implementation details. For operational work,
-report goal, run, stage/step/status, evidence, decision, result, next trigger,
-and required user action. Return proactively only for approval, material
+Lead with `Focus now`, then `Why`, `Moving`, `Waiting`, `Learned`, and `Need from
+you`. Omit empty sections. Keep implementation detail behind the compact status
+unless it changes the decision. Return proactively only for approval, material
 authority, genuine blocker, requested status, or terminal report.

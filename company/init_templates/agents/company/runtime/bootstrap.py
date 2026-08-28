@@ -28,7 +28,7 @@ import json
 import shutil
 from pathlib import Path
 
-from .paths import package_vendored_root
+from .paths import package_vendored_root, validate_home_destination
 
 
 def _spielos_launcher_venv() -> Path | None:
@@ -193,16 +193,30 @@ def scaffold(target: Path | None = None, *, force: bool = False,
     interactive driver can show progress; it is optional plumbing and
     never changes what gets written.
     """
-    root = (target or Path.cwd()).resolve()
+    root = validate_home_destination(target or Path.cwd())
     templates = template_root()
     written: list[str] = []
     notify = on_phase or (lambda label: None)
 
     agents_dst = root / ".agents"
-    if (agents_dst / "company" / "runtime").exists() and not force:
+    existing_home = (agents_dst / "company" / "runtime").exists()
+    if existing_home and not force:
         raise FileExistsError(
             "this folder already has a SpielOS home (.agents/company); "
             "re-run with --force to overwrite")
+
+    # A forced init on an existing home is effectively an update. Seed the
+    # generic strategy only for a genuinely fresh home; never replace the
+    # existing home's user-owned layer.
+    preserved_user_prefixes = (
+        "company/strategy/",
+        "company/assets/",
+        "company/departments/",
+        "company/agents/installed/",
+    ) if existing_home else ()
+
+    def preserve_user_layer(rel: str) -> bool:
+        return any(rel.startswith(prefix) for prefix in preserved_user_prefixes)
 
     notify("Vendoring harness spine")
     if minimal:
@@ -215,7 +229,8 @@ def scaffold(target: Path | None = None, *, force: bool = False,
                               skip=lambda rel: (
                                   rel.startswith("company/departments/")
                                   and rel not in spine_dept_files)
-                              or rel.startswith("skills/website/"))
+                              or rel.startswith("skills/website/")
+                              or preserve_user_layer(rel))
         # Keep the departments package importable even without its files.
         dept_pkg = root / ".agents" / "company" / "departments"
         dept_pkg.mkdir(parents=True, exist_ok=True)
@@ -229,7 +244,8 @@ def scaffold(target: Path | None = None, *, force: bool = False,
                                   / "departments" / dept_id, overwrite=force)
     else:
         written += _copy_tree(templates / "agents", root / ".agents",
-                              overwrite=force)
+                              overwrite=force,
+                              skip=preserve_user_layer)
     notify("Installing host adapters (OpenCode, Codex)")
     # Host adapters.
     for name in ("opencode", "codex"):
