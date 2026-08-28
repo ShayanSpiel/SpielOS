@@ -1,176 +1,50 @@
-# SpielOS — AI Company Operating System (Open Source)
+# SpielOS — Worker-owned AI Company Operating System
 
-**SpielOS is an open-source AI company operating system**: a local harness for
-running your company with AI agents — durable goals, supervised runs, evidence,
-approvals, and **AI departments** that do real business work under one Director
-loop:
+SpielOS is an open-source local harness for running durable company work with AI: one Director owns the Goal loop, workers complete bounded workflows, and every approval, hand-off, and result is persisted on disk.
 
-```text
-GOAL -> OBSERVE -> DECIDE -> ACT -> EVALUATE
-          ^                            |
-          +----------------------------+
+```
+GOAL → OBSERVE → DECIDE → ACT → EVALUATE
 ```
 
-The runtime owns every Goal, Run, approval, evidence record, and notification.
-Departments are **Lego packages**: self-contained folders that supply business
-behavior and never create another loop. Codex, OpenCode, Claude Code, and
-humans are all clients of the same persisted state. Nothing lives in chat
-memory — close the session, the company keeps its state on disk.
-
-## Install (one line)
+## Install
 
 ```sh
-pipx install spielos && spielos init
+pipx install spielos && spielos init --dir /your/chosen/folder
 ```
 
-`spielos init` scaffolds a verified, self-contained harness home into your
-current folder — with OpenCode-style progress, an optional starter-department
-picker, host detection, and a runtime verification before it
-reports success.
+The chosen folder becomes a self-contained SpielOS home. It receives the runtime, worker host adapters for Codex and OpenCode, empty private state, and no pre-installed workgroups.
 
-## Update (one line)
+## Update
 
 ```sh
-pipx upgrade spielos && spielos refresh
+pipx upgrade spielos && spielos refresh --dir /your/chosen/folder
 ```
 
-`pipx upgrade` fetches the newest release; `spielos refresh` re-vendors the
-runtime spine and host adapters into every home on this machine while keeping
-your strategy, assets, departments, installed agents, and `.spielos/` state.
+Refresh replaces only the harness spine and adapters. It preserves the home’s strategy, assets, installed workgroups, and private `.spielos/` state.
 
-No pipx yet? The bootstrap installer sets everything up (Python check,
-pipx, spielos) and runs init in an empty folder automatically:
+## Workgroups and workers
+
+A Workgroup is an installable, worker-owned capability. Its workers own narrowly-scoped workflows and can only produce their declared evidence. The Director routes work through durable work orders; workers never own the company loop or approve external actions.
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/SpielOS/main/install.sh | sh
+spielos workgroup validate --file workgroup.json
+spielos workgroup install --file workgroup.json --dir /your/chosen/folder
+spielos workgroup list
 ```
 
-`spielos init` scaffolds a **fresh** home into your current folder — with
-OpenCode-style progress, an optional starter-department picker, host detection,
-and a runtime verification before it reports success.
+The first release after the worker-owned reset deliberately ships with no starter Workgroups. Add only validated capabilities that match a real company outcome.
 
-### Other install methods
+## What is persisted
 
-`spielos` is also published to npm, Homebrew, and as a Docker image. Pick
-whichever fits your environment — all of them expose the same `spielos` CLI
-(`python3 -m company` under the hood), so `spielos --version` works everywhere:
+Goals, runs, approvals, work orders, evidence, explicit directives, and evidence-backed reusable Memory are stored locally in `.spielos/state/`. Chat history is not product state. Strategy is source-controlled Markdown; it is changed deliberately, never inferred from a conversation.
+
+## Development
 
 ```sh
-# npm (global)
-npm install -g spielos && spielos --version
-
-# Homebrew
-brew install shayanspiel/spielos/spielos && spielos --version
-
-# Docker (ephemeral home mounted from the current directory)
-docker run --rm -v "$PWD:/work" -w /work ghcr.io/shayanspiel/spielos:latest --version
+PYTHONDONTWRITEBYTECODE=1 python3 -B -m company status
+PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest discover -s company/tests -v
 ```
 
-The npm package and Homebrew formula are thin shims over the Python runtime, so
-Python 3.11+ with the `spielos` package available is still required on the host
-for the npm/Homebrew commands to run.
+The shipped home is built from `company/init_templates/`; runtime spine files must remain identical between source and template.
 
-**Fresh means:** the spine only — runtime, company skills, OpenCode/Codex
-adapters, empty `.spielos/` state, `opencode.json`, `AGENTS.md`. **Zero
-departments, zero strategy content.** Your company starts empty; the Director
-onboards you and capabilities are added when goals need them:
-
-```sh
-spielos add outbound                 # install a built-in department
-spielos add ./team.sdep              # or your own exported bundle
-spielos init --department seo        # or vendor starters at scaffold time
-```
-
-Scripted and CI runs stay deterministic: add `-y/--yes` to skip prompts,
-`--json` for a machine-readable receipt; exit code 0 means verified, 1 means
-failed with an actionable message.
-
-## Departments as products
-
-Every department is one extractable folder: behavior (`department.py`),
-workflows, evals, skills, templates, and tooling live together.
-
-```sh
-spielos department export outbound --out ./dist   # portable .sdep bundle
-spielos add ./outbound.sdep                        # install into a home
-spielos add ./outbound.sdep --force                # upgrade in place
-spielos init --department outbound                  # scaffold with one starter department
-```
-
-Bundles carry a checksummed manifest plus the department's skills. They never
-carry strategy, assets, credentials, or run state.
-
-## First-class workers
-
-Any workflow compiles into a bounded agent worker (no Director, no routing):
-
-```sh
-spielos agent compile outbound --workflow social-lead-research --name lead-researcher
-```
-
-Emits the OpenCode agent, Codex TOML, and roster entry from one WorkflowSpec.
-The worker runs only that workflow, produces only its declared evidence kinds,
-never edits files; approvals still park in the runtime.
-
-## Extracted workers you can run today
-
-The same worker pattern is published standalone — install once into
-[Claude Code](https://claude.com/claude-code),
-[OpenCode](https://opencode.ai), or [Codex CLI](https://github.com/openai/codex)
-with one pasted command, and it works immediately:
-
-| Worker | Keyword it owns | Repo | Guide |
-|---|---|---|---|
-| Lead Researcher | AI lead research agent | [Lead-Researcher](https://github.com/ShayanSpiel/Lead-Researcher) | [Guide](https://spielos.xyz/landing/lead-researcher/) |
-| AI Keyword Research Agent | AI keyword research automation skill | [AI-Keyword-Research-Agent](https://github.com/ShayanSpiel/AI-Keyword-Research-Agent) | [Guide](https://spielos.xyz/landing/ai-keyword-research-agent/) |
-| Social Lead Researcher | LinkedIn lead research agent | [Social-Lead-Researcher](https://github.com/ShayanSpiel/Social-Lead-Researcher) | [Guide](https://spielos.xyz/landing/social-lead-researcher/) |
-| Email Outreach Agent | Cold email automation agent | [Email-Outreach-Agent](https://github.com/ShayanSpiel/Email-Outreach-Agent) | Guide: see repo |
-| SEO Audit Agent | Technical SEO audit agent | [SEO-Audit-Agent](https://github.com/ShayanSpiel/SEO-Audit-Agent) | Guide: see repo |
-| Content Production Agent | AI article pipeline agent | [Content-Production-Agent](https://github.com/ShayanSpiel/Content-Production-Agent) | Guide: see repo |
-| Analytics Agent | Marketing analytics agent | [Analytics-Agent](https://github.com/ShayanSpiel/Analytics-Agent) | Guide: see repo |
-| SpielOS Workers | 22 automation playbook recipes | [SpielOS-Workers](https://github.com/ShayanSpiel/SpielOS-Workers) | [Catalog](https://spielos.xyz/solutions/) |
-
-More workers and agent skills: [Skills library](https://github.com/ShayanSpiel/Skills) ·
-[Prompt-cache audit tool](https://github.com/ShayanSpiel/CacheCatch) ·
-[full ecosystem on the profile hub](https://github.com/ShayanSpiel).
-
-## How a SpielOS-run company is organized
-
-| Concept | Meaning | Docs |
-|---|---|---|
-| Director | One loop that owns goals, routing, approvals, evidence | [How it works](https://spielos.xyz/features/director/) |
-| Departments | Outbound, Content, Design, Analytics, SEO — Lego packages | [Departments](https://spielos.xyz/features/departments/) |
-| Workflows | Repeatable playbooks inside a department | [Workflows](https://spielos.xyz/features/workflows/) |
-| Agents | Bounded executors — one job each | [Agents](https://spielos.xyz/features/agents/) |
-| Skills | Reusable methods an agent follows | [Skills](https://spielos.xyz/features/skills/) |
-| Evals | Deterministic rubric evaluation of produced work | [Evals](https://spielos.xyz/features/evals/) |
-| Artifacts | Evidence-backed outputs of every run | [Artifacts](https://spielos.xyz/features/artifacts/) |
-| Connections | Access to external systems (Buffer, PostHog, Search Console…) | [Connections](https://spielos.xyz/features/connections/) |
-
-See it running live — the public record of a company operated by this system:
-**[spielos.xyz/live](https://spielos.xyz/live/)**
-
-## Layout
-
-```text
-company/            Python package: runtime spine, evals, connections, CLI
-  skills/           operator methods (director, department-runner, …)
-  departments/      LEGO SHELF — each folder is an extractable product
-    _shared/        cross-department contract + shared methods
-    <id>/skills/    department-owned methods
-    design/tools/   render/TTS tooling · design/tokens/ brand tokens
-hosts/              adapter sources vendored into homes by init
-tests/              → company/tests/ (in-package)
-docs/               architecture notes
-.spielos/           private runtime state (gitignored; exists only when this
-                    checkout itself operates as a live company home)
-```
-
-Authority for architecture, vocabulary, pursuit semantics, safety rules, and
-the owner doctrine: `company/README.md`.
-
----
-
-**SpielOS is built in the open by [Shayan Spiel](https://github.com/ShayanSpiel).**
-Want these AI departments built, supervised, and measured *for* your business?
-[Apply — free review](https://spielos.xyz/apply/) · free review · no required call.
+See [company/README.md](company/README.md) for the operating contract.
