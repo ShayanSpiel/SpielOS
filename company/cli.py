@@ -18,7 +18,15 @@ def _vendored_home(start: Path | None = None) -> Path | None:
 
 def main() -> int:
     """Run the local home's runtime, or the installed package outside a home."""
-    home = _vendored_home()
+    try:
+        home = _vendored_home()
+    except FileNotFoundError:
+        print(
+            "SpielOS cannot continue because this shell's current folder was deleted.\n"
+            "Run `cd ~/Desktop/Projects`, then rerun SpielOS from that existing folder.",
+            file=sys.stderr,
+        )
+        return 2
     if home is not None:
         environment = os.environ.copy()
         agents_root = str(home / ".agents")

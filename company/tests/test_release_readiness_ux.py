@@ -2,14 +2,15 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import tempfile
 import unittest
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
 from company.__main__ import build_parser, main
-from company.cli import _vendored_home
+from company.cli import _vendored_home, main as console_main
 from company.runtime.artifacts import (
     finalize_workspace, prepare_workspace, present_artifact)
 from company.runtime.friction import friction_summary, record_friction
@@ -67,6 +68,24 @@ class OrientationTests(unittest.TestCase):
             nested = home / "projects" / "website"
             nested.mkdir(parents=True)
             self.assertEqual(home.resolve(), _vendored_home(nested))
+
+    def test_console_explains_how_to_recover_from_deleted_cwd(self):
+        original = os.getcwd()
+        with tempfile.TemporaryDirectory() as directory:
+            deleted = Path(directory) / "deleted-home"
+            deleted.mkdir()
+            os.chdir(deleted)
+            deleted.rmdir()
+            output = io.StringIO()
+            try:
+                with redirect_stderr(output):
+                    code = console_main()
+            finally:
+                os.chdir(original)
+
+        self.assertEqual(code, 2)
+        self.assertIn("current folder was deleted", output.getvalue())
+        self.assertIn("cd ~/Desktop/Projects", output.getvalue())
 
     def test_release_readiness_commands_are_discoverable(self):
         parser = build_parser()
