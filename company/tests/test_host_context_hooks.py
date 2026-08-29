@@ -46,8 +46,9 @@ class HostContextHookTests(unittest.TestCase):
 
     def test_opencode_injects_on_model_request_and_keeps_idle_notifications(self):
         plugin = (ROOT / ".opencode" / "plugins" / "spielos-notifications.ts").read_text()
-        self.assertIn("PluginModule", plugin)
-        self.assertIn("server: SpielOSContext", plugin)
+        self.assertIn("export const SpielOSContext: Plugin", plugin)
+        self.assertNotIn("PluginModule", plugin)
+        self.assertNotIn("server: SpielOSContext", plugin)
         self.assertIn('"context", "--prompt"', plugin)
         self.assertIn('args.push("--boot")', plugin)
         self.assertIn('"experimental.chat.system.transform"', plugin)
@@ -86,11 +87,28 @@ class HostContextHookTests(unittest.TestCase):
             line for line in combined.splitlines()
             if "spielos-notifications.ts" in line))
 
+    @unittest.skipUnless(shutil.which("opencode"), "OpenCode is not installed")
+    def test_installed_opencode_discovers_director_with_plugin_enabled(self):
+        with tempfile.TemporaryDirectory() as directory:
+            env = os.environ.copy()
+            env.update({
+                "XDG_DATA_HOME": str(Path(directory) / "data"),
+                "XDG_STATE_HOME": str(Path(directory) / "state"),
+                "XDG_CACHE_HOME": str(Path(directory) / "cache"),
+            })
+            result = subprocess.run(
+                ["opencode", "agent", "list"], cwd=ROOT, env=env,
+                text=True, capture_output=True, timeout=30)
+
+        combined = result.stdout + result.stderr
+        self.assertEqual(0, result.returncode, combined[-2000:])
+        self.assertIn("director (primary)", combined)
+
     @unittest.skipUnless(shutil.which("bun"), "Bun is not installed")
     def test_opencode_adapter_executes_real_context_injection(self):
         script = r'''
-import plugin from "./.opencode/plugins/spielos-notifications.ts"
-const hooks = await plugin.server({
+import { SpielOSContext } from "./.opencode/plugins/spielos-notifications.ts"
+const hooks = await SpielOSContext({
   client: { session: { prompt: async () => ({}) } },
   directory: process.cwd(),
 })
@@ -115,8 +133,8 @@ console.log(JSON.stringify(output.system))
     @unittest.skipUnless(shutil.which("bun"), "Bun is not installed")
     def test_opencode_adapter_routes_bare_greeting_without_state_probe(self):
         script = r'''
-import plugin from "./.opencode/plugins/spielos-notifications.ts"
-const hooks = await plugin.server({
+import { SpielOSContext } from "./.opencode/plugins/spielos-notifications.ts"
+const hooks = await SpielOSContext({
   client: { session: { prompt: async () => ({}) } },
   directory: process.cwd(),
 })

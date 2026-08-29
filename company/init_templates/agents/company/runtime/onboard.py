@@ -74,7 +74,7 @@ class _Style:
         return self.yellow("•" if self.unicode else "[!]")
 
     def mark_info(self) -> str:
-        return self.cyan("◆" if self.unicode else "*")
+        return self.cyan("›" if self.unicode else ">")
 
 
 class _Spinner:
@@ -290,10 +290,10 @@ def run_init(*, dir: str = ".", force: bool = False, minimal: bool = True,
         receipt = None
         quiet = as_json  # machine mode: keep stdout parseable, no chrome
         if not quiet:
-            with _Spinner(style, "Preparing") as spinner:
-                receipt = scaffold(target, force=force, minimal=minimal,
-                                   workgroups=workgroups,
-                                   on_phase=spinner.set_label)
+            receipt = scaffold(target, force=force, minimal=minimal,
+                               workgroups=workgroups)
+            print(f"{style.mark_ok()} Company runtime installed", flush=True)
+            print(f"{style.mark_ok()} Director added to Codex and OpenCode", flush=True)
         else:
             receipt = scaffold(target, force=force, minimal=minimal,
                                workgroups=workgroups)
@@ -316,8 +316,7 @@ def run_init(*, dir: str = ".", force: bool = False, minimal: bool = True,
             print(json.dumps(receipt, indent=2))
             return 0 if ok else _fail_json(error)
 
-        with _Spinner(style, "Verifying the new home runs"):
-            ok, error = _verify_home(target)
+        ok, error = _verify_home(target)
         receipt["verified"] = ok
         if not ok:
             _render_success(style, receipt)  # still show what landed
@@ -326,6 +325,7 @@ def run_init(*, dir: str = ".", force: bool = False, minimal: bool = True,
                          error,
                          hint=f"cd {target} && PYTHONDONTWRITEBYTECODE=1 "
                               "PYTHONPATH=.agents python3 -B -m company status")
+        print(f"{style.mark_ok()} Runtime verified", flush=True)
         _render_success(style, receipt)
         return 0
     except KeyboardInterrupt:
@@ -362,10 +362,10 @@ def banner(style: _Style, target: Path) -> None:
     width = 52
     print()
     print(style.cyan("╭" + "─" * (width - 2) + "╮"))
-    title = f" ◆ SpielOS v{VERSION}"
+    title = " SpielOS"
     print(style.cyan("│") + style.bold(style.cyan(title.ljust(width - 2)))
           + style.cyan("│"))
-    tagline = " one durable loop for your AI company"
+    tagline = f" company operating system · v{VERSION}"
     print(style.cyan("│") + style.dim(tagline.ljust(width - 2))
           + style.cyan("│"))
     target_line = f" setting up: {target}"

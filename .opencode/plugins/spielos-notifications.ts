@@ -3,7 +3,7 @@
 // Every model request receives one bounded, read-only company projection. On
 // session idle, pending runtime attention is surfaced as synthetic messages.
 
-import type { Plugin, PluginModule } from "@opencode-ai/plugin"
+import type { Plugin } from "@opencode-ai/plugin"
 
 type Notification = {
   id: string
@@ -154,10 +154,3 @@ export const SpielOSContext: Plugin = async ({ client, directory }) => {
     },
   }
 }
-
-const plugin: PluginModule = {
-  id: "spielos-notifications",
-  server: SpielOSContext,
-}
-
-export default plugin

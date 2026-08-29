@@ -3,7 +3,7 @@ from __future__ import annotations
 import io
 import tempfile
 import unittest
-from contextlib import redirect_stderr
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
@@ -12,6 +12,18 @@ from company.runtime.paths import validate_home_destination
 
 
 class OnboardingTests(unittest.TestCase):
+    def test_banner_uses_spielos_wordmark_without_fake_diamond(self):
+        output = io.StringIO()
+        style = onboard._Style()
+        style.enabled = False
+        with redirect_stdout(output):
+            onboard.banner(style, Path("/tmp/new-company"))
+
+        rendered = output.getvalue()
+        self.assertIn("SpielOS", rendered)
+        self.assertIn("company operating system", rendered)
+        self.assertNotIn("◆", rendered)
+
     def test_next_steps_handoff_to_director_in_both_hosts(self):
         root = Path("/tmp/new-company")
         steps, notes = onboard._next_steps(
@@ -45,6 +57,30 @@ class OnboardingTests(unittest.TestCase):
 
         self.assertEqual(0, result)
         self.assertIsNone(scaffold.call_args.kwargs["workgroups"])
+
+    def test_init_prints_stable_install_and_director_handoff(self):
+        receipt = {
+            "root": "/tmp/new-company",
+            "files_written": 85,
+            "next_steps": [],
+        }
+        style = onboard._Style()
+        style.enabled = False
+        style.tty = False
+        output = io.StringIO()
+        with patch.object(onboard, "_Style", return_value=style), \
+                patch.object(onboard, "scaffold", return_value=receipt), \
+                patch.object(onboard, "_verify_home", return_value=(True, "")), \
+                redirect_stdout(output):
+            result = onboard.run_init(dir="/tmp/new-company", assume_yes=True)
+
+        rendered = output.getvalue()
+        self.assertEqual(0, result)
+        self.assertIn("Company runtime installed", rendered)
+        self.assertIn("Director added to Codex and OpenCode", rendered)
+        self.assertIn("Runtime verified", rendered)
+        self.assertIn("call @Director", rendered)
+        self.assertIn("run /agent, select the Director agent", rendered)
 
     def test_trash_destination_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "inside macOS Trash"):
