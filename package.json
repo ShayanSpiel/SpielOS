@@ -1,7 +1,7 @@
 {
   "name": "spielos",
-  "version": "6.3.0",
-  "description": "SpielOS: one durable Goal loop, Departments, approvals, evidence, and evals for operating AI work as a company system.",
+  "version": "7.2.0",
+  "description": "SpielOS: one durable Goal loop, Worker-owned Workgroups, approvals, evidence, and evals for operating AI work.",
   "bin": {
     "spielos": "bin/spielos.js"
   },
