@@ -21,7 +21,7 @@ COMPANY_ROOT = Path(__file__).resolve().parents[1]
 USER_CONFIG_PATH = COMPANY_ROOT / "config.user.json"
 
 # Runtime version: defined once here; every other module imports it.
-VERSION = "7.2.0"
+VERSION = "7.2.1"
 
 # Generic defaults. Values mirror the current SpielOS deployment so behavior
 # is unchanged whether or not config.user.json exists.

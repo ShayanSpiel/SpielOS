@@ -86,9 +86,13 @@ def virtual_environment_root(candidate: str | Path) -> Path | None:
 
 
 def validate_home_destination(candidate: str | Path) -> Path:
-    """Reject accidental harness installation inside a Python virtualenv."""
+    """Reject accidental harness installation inside unsafe destinations."""
 
     path = Path(candidate).expanduser().resolve()
+    if ".Trash" in path.parts:
+        raise ValueError(
+            "refusing to install a SpielOS home inside macOS Trash; "
+            "select a project folder with --dir PATH")
     venv = virtual_environment_root(path)
     if venv is not None:
         raise ValueError(

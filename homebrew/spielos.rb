@@ -10,8 +10,8 @@ class Spielos < Formula
   desc "AI company operating system with durable goals, Workgroups, and approvals"
   homepage "https://spielos.xyz"
   # Source sdist on PyPI. The filename version must match `version` below.
-  url "https://files.pythonhosted.org/packages/source/s/spielos/spielos-7.2.0.tar.gz"
-  # REPLACE with the real sha256 of the 7.2.0 sdist at release time. The
+  url "https://files.pythonhosted.org/packages/source/s/spielos/spielos-7.2.1.tar.gz"
+  # REPLACE with the real sha256 of the 7.2.1 sdist at release time. The
   # publish.yml Homebrew job computes and injects this automatically.
   sha256 "0000000000000000000000000000000000000000000000000000000000000000"
   license "MIT"

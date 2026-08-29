@@ -200,25 +200,15 @@ def _verify_home(root: Path) -> tuple[bool, str]:
 
 def _next_steps(root: Path, hosts: dict[str, bool], minimal: bool,
                 workgroups: list[str]) -> tuple[list[str], dict[str, str]]:
-    """Tailored follow-up commands plus short inline notes."""
-    steps = [("cd " + str(root), "")]
-    if hosts["opencode"]:
-        steps.append(("opencode", "then select the Director agent before chatting (not Build)"))
-    elif hosts["codex"]:
-        steps.append(("codex", "then select the Director agent before chatting"))
-    else:
-        steps.append(("curl -fsSL https://opencode.ai/install | bash",
-                      "recommended host — then reopen this folder with opencode"))
-    notes: dict[str, str] = {}
-    if minimal:
-        owned = ", ".join(workgroups) if workgroups else "none yet"
-        notes["mode"] = ("Fresh company — install Workgroups any time with "
-                         f"'spielos workgroup install --file <package.json>' "
-                         f"(vendored now: {owned})")
-    else:
-        notes["mode"] = ("Full harness — make it yours in "
-                         ".agents/company/strategy/ (ICP, voice)")
-    notes["credentials"] = ".spielos/.env — copy from .spielos/.env.example"
+    """Hand the fresh home to the Director instead of onboarding in the CLI."""
+    steps = [
+        ("cd " + str(root), ""),
+        ("codex", "call @Director and talk to the SpielOS Director agent"),
+        ("opencode", "run /agent, select the Director agent, and talk to it"),
+    ]
+    notes = {
+        "handoff": "Choose Codex or OpenCode; the SpielOS Director handles onboarding in chat.",
+    }
     return steps, notes
 
 
@@ -295,9 +285,6 @@ def run_init(*, dir: str = ".", force: bool = False, minimal: bool = True,
     try:
         if interactive:
             banner(style, target)
-            if not workgroups and minimal:
-                workgroups = _ask_starter_workgroups(
-                    style, workgroups=workgroups)
             force = force or _confirm_overwrite(style, target)
 
         receipt = None
@@ -353,13 +340,14 @@ def run_init(*, dir: str = ".", force: bool = False, minimal: bool = True,
                      hint="spielos init --force   # overwrite vendored files\n"
                           "           (your .spielos/ state is never touched)")
     except ValueError as exc:
+        detail = str(exc)
         known = available_workgroups()
         hint = (f"available Workgroups: {', '.join(known)}"
-                if known else None)
+                if known and "Workgroup" in detail else None)
         if as_json:
-            print(json.dumps({"error": str(exc)}, indent=2), file=sys.stderr)
+            print(json.dumps({"error": detail}, indent=2), file=sys.stderr)
             return 1
-        return _fail(style, "Could not scaffold the harness.", str(exc), hint=hint)
+        return _fail(style, "Could not scaffold the harness.", detail, hint=hint)
     except OSError as exc:
         if as_json:
             print(json.dumps({"error": str(exc)}, indent=2), file=sys.stderr)
@@ -387,40 +375,6 @@ def banner(style: _Style, target: Path) -> None:
           + style.cyan("│"))
     print(style.cyan("╰" + "─" * (width - 2) + "╯"))
     print()
-
-
-def _ask_starter_workgroups(style: _Style,
-                            workgroups: list[str] | None) -> list[str] | None:
-    """Fresh homes start with zero Workgroups; extras are opt-in."""
-    if workgroups is not None:
-        return workgroups
-    known = available_workgroups()
-    if not known:
-        return []
-    pick = _choose(style, "Starter Workgroups?", [
-        ("none", "completely fresh company — add Workgroups any time (recommended)"),
-        ("choose", "vendor starter Workgroups from the template library"),
-    ], default=1)
-    if pick == 1:
-        return []
-    print(f"  {style.dim('Available: ' + ', '.join(known))}")
-    raw = _prompt(style, "Workgroups to vendor (comma-separated, empty skips)",
-                  "")
-    chosen = []
-    for token in raw.replace(" ", "").split(","):
-        if not token:
-            continue
-        if token.isdigit() and 1 <= int(token) <= len(known):
-            chosen.append(known[int(token) - 1])
-        elif token in known:
-            chosen.append(token)
-        else:
-            print(style.yellow(f"  Unknown Workgroup '{token}' — skipped."))
-    deduped = sorted(set(chosen))
-    if deduped:
-        print(f"  {style.mark_ok()} Starter Workgroups: "
-              f"{style.bold(', '.join(deduped))}")
-    return deduped
 
 
 def _confirm_overwrite(style: _Style, target: Path) -> bool:
