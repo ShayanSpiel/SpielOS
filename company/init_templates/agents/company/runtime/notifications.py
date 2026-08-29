@@ -9,15 +9,8 @@ Delivery only records that the notification was surfaced — it never changes
 the goal's run state. An ``approval_required`` notification is *seen*, not
 approved; ``company approve`` remains the only gate for the prepared action.
 
-Besides delivery, this module assembles the payloads for the two chat-visible
-supervision surfaces (goal-chat-visible-supervision-20260815):
-
-* ``digest_payload`` — the company-wide progress digest (kind
-  ``watchdog_digest``) emitted by the runner's watch loop at most once per
-  ``DIGEST_INTERVAL_SECONDS`` while any goal is active. It summarizes active
-  goals with stage/step, last tick and resume_at, pending approvals, recent
-  terminal outcomes, and blockers.
-* ``terminal_state_payload`` / ``followup_payload`` — the terminal-state
+Besides delivery, this module assembles terminal-state payloads. The
+``terminal_state_payload`` / ``followup_payload`` pair provides the terminal-state
   follow-up (kind ``goal_completed_followup``) emitted next to the existing
   ``goal_<status>`` notification. Its payload carries a
   ``recommended_next_action`` derived from the goal context
@@ -58,7 +51,7 @@ def recommended_next_action(goal, goal_status: str) -> str:
                 "continue the campaign, or escalate the outcome to the Director.")
     if owner_id == "director":
         return ("Review the outcome and decide the next goal: resume orchestration "
-                "or open a new Department goal.")
+                "or open a new Workgroup Goal.")
     workflow = config.get("workflow")
     if workflow:
         return (f"Review the {workflow} outcome and either continue with the next "
@@ -111,35 +104,6 @@ def followup_payload(payload: dict, *, goal, goal_status: str) -> dict:
         "result": {**result, "message": f"{message} Next: {action}"},
         "required_user_action": action,
         "next_trigger": payload.get("next_trigger") or "company status <goal id>",
-    }
-
-
-def digest_payload(*, emitted_at: str, interval_seconds: float,
-                   active_goals: list, pending_approvals: list,
-                   recent_terminal: list, blockers: list,
-                   message: str | None = None) -> dict:
-    """The ``watchdog_digest`` payload: active goals with stage/step and
-    resume_at, pending approvals, recent terminal outcomes, and blockers,
-    plus a numeric summary the plugin can turn into prompt text."""
-    return {
-        "watchdog": {"signal": "progress_digest", "generated_at": emitted_at,
-                     "interval_seconds": interval_seconds},
-        "goals": active_goals,
-        "pending_approvals": pending_approvals,
-        "recent_terminal": recent_terminal,
-        "blockers": blockers,
-        "summary": {"active_goals": len(active_goals),
-                    "pending_approvals": len(pending_approvals),
-                    "recent_terminal": len(recent_terminal),
-                    "blockers": len(blockers)},
-        "result": {"message": message or (
-            f"Progress digest: {len(active_goals)} active goal(s), "
-            f"{len(pending_approvals)} pending approval(s), "
-            f"{len(blockers)} blocker(s), "
-            f"{len(recent_terminal)} recent terminal outcome(s).")},
-        "required_user_action": ("Review the digest; approve parked actions, "
-                                 "resume waiting goals, or escalate to the Director."),
-        "next_trigger": "company status <goal id>",
     }
 
 

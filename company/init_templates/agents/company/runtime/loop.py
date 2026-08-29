@@ -11,7 +11,8 @@ from . import config
 from .alignment import (
     active_market_outcomes, alignment_override_interaction, approval_key,
     judge_alignment, needs_alignment, resolve_originating_goal,
-    priority_score, support_goal_ids, validate_goal_topology,
+    priority_score, support_goal_ids, prepare_goal_topology, audit_goal_topology,
+    validate_goal_topology,
     validate_support_edges,
 )
 from .continuation import ancestors_allow, conflicting_goal, continuation_decision
@@ -57,13 +58,12 @@ class Runtime:
             raise KeyError(f"goal owner '{values['owner_id']}' is not installed")
         if values.get("deadline"):
             _timestamp(values["deadline"])
-        validate_goal_topology(values)
         handler = self.registry[values["owner_id"]]
         values["config"] = validate_goal_request(
             handler, metric=values["metric"], config=values.get("config"))
-        if values.get("parent_id"):
-            self.store.goal(values["parent_id"])
         values.setdefault("goal_id", f"goal-{uuid.uuid4().hex[:10]}")
+        values = prepare_goal_topology(self.store, values)
+        validate_goal_topology(values)
         supports = support_goal_ids({"config": values["config"]})
         if supports:
             validate_support_edges(self.store, values["goal_id"], supports)
@@ -80,6 +80,11 @@ class Runtime:
         if needs_alignment(values):
             return self._create_aligned_goal(values)
         return self.store.create_goal(**values)
+
+    def topology_audit(self) -> dict:
+        """Return a non-destructive audit and owner-reviewed migration plan."""
+
+        return audit_goal_topology(self.store)
 
     def _create_aligned_goal(self, values: dict) -> dict:
         config = dict(values.get("config") or {})
@@ -443,6 +448,16 @@ class Runtime:
             if memory:
                 self.store.learn(goal.owner_id, goal.id, memory["claim"],
                                  memory["evidence"], memory["confidence"])
+                self.store.record_experiment_memory(
+                    owner_id=goal.owner_id,
+                    goal_id=goal.id,
+                    run_id=cycle["id"],
+                    claim=memory["claim"],
+                    verdict=memory["verdict"],
+                    context=memory["context"],
+                    evidence_ids=list(memory["evidence"]["evidence_ids"]),
+                    confidence=memory["confidence"],
+                )
         if result.decision:
             decision = dict(result.decision)
             requested = list(decision.get("evidence_ids") or ())

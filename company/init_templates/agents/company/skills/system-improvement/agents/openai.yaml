@@ -1,4 +1,4 @@
 interface:
   display_name: "System Improvement"
   short_description: "Build or repair engines with bounded tests"
-  default_prompt: "Use $system-improvement to execute this approved bounded Department or runtime improvement."
+  default_prompt: "Use $system-improvement to execute this approved bounded Workgroup or runtime improvement."

@@ -24,6 +24,11 @@ The runtime owns Goals, runs, approvals, evidence, work orders, notifications, a
 
 The terms above are the only public layers. The runtime owns the loop; a Workgroup supplies a capability; a Worker executes its assigned Workflow; Skills and Connections are declared inputs; Artifacts are the durable outputs.
 
+Owner wording is accepted without creating parallel types: Department maps to
+Workgroup; Agent and Employee map to Worker. The Director translates these
+aliases silently and `company overview` returns Goals, topology health,
+Workgroups, Workers, assignments, artifacts, and friction in one read.
+
 ## Pursuit semantics and alignment
 
 A primary Goal is a durable measurable outcome. A supporting Goal is an active bottleneck. A system-improvement Goal is a bounded technical change that enables or protects an active outcome. A run, batch, task, and guardrail are not Goals. Technical acceptance proves only technical readiness, never market success.
@@ -37,19 +42,82 @@ Install into a chosen home only after validation:
 ```sh
 spielos workgroup validate --file workgroup.json
 spielos workgroup install --file workgroup.json --dir /chosen/home
+spielos workgroup install --all --dir /chosen/home
 ```
 
 ## Safety and system improvement
 
 External actions always park for approval. Generated material is not business evidence. Technical-only, invalid, or contaminated evidence cannot support market conclusions.
 
-Reusable Memory is optional and evidence-backed. It is recorded only when a run explicitly marks a claim reusable, names valid evidence, and states where it applies. Company-wide sharing is opt-in and topic-bound. Owner instructions are separate explicit directives. Strategy lives in `strategy/` and is changed only by deliberate source edits.
+Durable knowledge is separated by authority:
+
+- `strategy/` is the reviewed company-profile base. Typed profile overlays hold
+  owner-explicit updates to identity, ICP, positioning, offers, voice, methods,
+  and related strategy. A new value supersedes only the same key and scope.
+- Experiment Memory comes only from the EVALUATE stage of a Goal run, after a
+  reusable claim cites valid evidence and declares where it applies. Repeated
+  matching outcomes reinforce it; contradictions reduce confidence.
+- Workflow Memory starts as a concise procedural candidate. A direct reusable
+  correction hardens immediately; otherwise the same instruction must appear
+  twice within 14 days. Consolidation expires stale one-off candidates.
+- Goals, the control tree/support graph, work orders, approvals, and attention
+  remain operational state—not semantic Memory.
+
+The context assembler is a bounded projection, not another database. Codex runs
+it at `SessionStart` and `UserPromptSubmit`; OpenCode runs it before each model
+request. Boot context loads compact strategy, top Goal state, and attention.
+Per-message context retrieves only relevant profile overlays, evidence-backed
+learning, and Workflow instructions. Both adapters are read-only, deterministic,
+and fail open. The host continues to own conversation and tool history.
+
+Agents persist explicit owner updates with `company profile set` and concise
+procedures with `company memory observe-workflow`; they can inspect the projection
+with `company context --prompt ...`. Ambiguous comments and task-only detail are
+never promoted automatically.
 
 Source changes use a bounded system-improvement Goal with an explicit problem, allowed files, and acceptance commands. The executor records actual acceptance evidence before the change is complete.
 
+## Artifact contract
+
+Every generated task uses
+`.spielos/artifacts/<goal>/<run>/<workflow?>/{work,final}` plus `manifest.json`.
+Intermediates live in `work`; only verified outcomes live in `final`.
+`company artifact finalize` records hashes and removes the canonical work folder
+unless an intermediate is required evidence. After an owner-facing creative or
+content task (video, image, audio, copy, document, deck, or comparable output),
+the executing host presents the final path and opens the final folder. Code,
+packages, archives, tests, logs, manifests, migration plans, and internal
+evidence are linked but never opened unless the owner explicitly asks. The host
+never opens an intermediate render directory or deletes outside canonical work.
+
+## Friction contract
+
+A missing or misleading tool, command, instruction, contradiction, duplicate,
+unexpected result shape, or required fallback is recorded with `company friction
+report`. The Director tells the owner what was expected, what happened, and the
+safe fallback before continuing. Repeated fingerprints remain visible in
+`company overview`; they are system-improvement evidence, not hidden retries.
+
+## Migration contract
+
+Migration starts in a fresh home with `company migration inspect --from PATH`
+and `company migration plan --from PATH --out PLAN.json`. The current runtime
+schema is authority. Foreign runtime code is replaced, unknown files are
+quarantined, historical state is archived, and only owner-selected Goals with
+explicit lineage enter the new active graph. Department/Workgroup normalizes to
+Workgroup; Agent/Employee/Worker to Worker; playbooks to Workflows; methods and
+prompts to Workbook methods; tools, permissions, and integrations to Workkit
+capabilities; outputs to Artifacts or Evidence. Each Workgroup is converted,
+validated, tested, and installed atomically with external credentials disabled.
+
 ## Home lifecycle
 
-`spielos init --dir PATH` creates a clean self-contained home with no installed Workgroups. `spielos refresh --dir PATH` updates the runtime and host adapters while preserving strategy, assets, installed Workgroups, and `.spielos/` state.
+`spielos init --dir PATH` creates a clean self-contained home with no installed
+Workgroups. Open OpenCode or Codex and select the Director before chatting;
+fresh state is injected automatically. After installing a newer SpielOS
+release, `spielos update --dir PATH` replaces the runtime and host adapters
+while preserving strategy, assets, installed Workgroups, configuration, and
+`.spielos/` state. `spielos refresh` remains a compatibility alias.
 
 The source checkout runs with:
 

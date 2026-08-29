@@ -1,0 +1,1 @@
+{"id":"reliability-engineer","description":"Runs clean-home and upgrade checks and reports reproducible failures.","workbook":["release-validation"],"workkit":[],"produces":["reliability_report"]}

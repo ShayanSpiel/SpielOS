@@ -1,0 +1,1 @@
+{"id":"release-operations","version":"1.0.0","description":"Prepare and verify versioned SpielOS releases and upgrade receipts.","metrics":["release_receipt"],"evidence_metrics":{"release_receipt":["release_receipt"]}}

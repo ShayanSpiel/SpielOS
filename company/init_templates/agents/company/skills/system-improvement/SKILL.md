@@ -1,6 +1,6 @@
 ---
 name: system-improvement
-description: Execute a bounded SpielOS runtime repair or new-Department build created by the Director, with allowed-file scope, acceptance tests, versioning, and return to the originating goal. Use when a persisted system-improvement goal is approved and waiting for a coding executor.
+description: Execute a bounded SpielOS runtime or Workgroup repair created by the Director, with allowed-file scope, acceptance tests, versioning, and return to the originating Goal.
 ---
 
 # System Improvement
@@ -24,9 +24,7 @@ acceptance commands, version before, and target version.
 The business run remains suspended or contaminated during this work. Never
 silently resume it with different business variables.
 
-For `change_kind: create_department`, also require `department_spec` with purpose,
-supported metrics, configuration contract, external actions, approval points,
-evidence sources, and acceptance behavior. Use `from_version: new`, implement
-the shared four-stage Department contract, add contract tests, and prove catalog
-discovery before recording version `1.0.0` or later. A new Department is a durable
-business capability, not a renamed prompt or subagent.
+For a new Workgroup package, require its purpose, metrics, Workers, Worker-owned
+Workflows, declared evidence, and exact allowed paths. Validate the package
+before editing and prove catalog discovery plus a clean-home install before
+recording version `1.0.0` or later.

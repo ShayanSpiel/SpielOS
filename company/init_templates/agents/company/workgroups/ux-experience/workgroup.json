@@ -1,0 +1,1 @@
+{"id":"ux-experience","version":"1.0.0","description":"Improve onboarding, commands, delegation, and worker hand-offs.","metrics":["handoff_validation"],"evidence_metrics":{"handoff_validation":["handoff_validation"]}}

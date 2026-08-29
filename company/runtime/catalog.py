@@ -44,6 +44,15 @@ def catalog():
             } for worker in group.workers],
         })
     return {
+        "vocabulary": {
+            "canonical": {"capability": "Workgroup", "executor": "Worker"},
+            "input_aliases": {
+                "department": "Workgroup",
+                "agent": "Worker",
+                "employee": "Worker",
+            },
+            "rule": "Aliases are translated at intake; they never create parallel runtime models.",
+        },
         "runtime": {
             "version": runtime_config.VERSION,
             "loop": ["GOAL", "OBSERVE", "DECIDE", "ACT", "EVALUATE"],
@@ -54,6 +63,55 @@ def catalog():
         },
         "workgroups": workgroups,
         "artifact_authority": ".spielos/artifacts/",
+    }
+
+
+def company_overview(runtime, *, project_root: str | Path | None = None) -> dict:
+    """One orientation read for Goals, capabilities, executors, and health."""
+    from .artifacts import artifact_root
+    from .friction import friction_summary
+
+    root = Path(project_root or COMPANY_ROOT.parent).resolve()
+    package = catalog()
+    snapshot = runtime.company_snapshot(5)
+    topology = runtime.topology_audit()
+    workers = []
+    for group in package["workgroups"]:
+        for worker in group["workers"]:
+            workers.append({
+                "id": worker["id"],
+                "workgroup_id": group["id"],
+                "workflows": [item["id"] for item in worker["workflows"]],
+                "produces": worker["produces"],
+            })
+    return {
+        "schema_version": 1,
+        "runtime": package["runtime"],
+        "vocabulary": package["vocabulary"],
+        "goals": {
+            "counts": snapshot["counts"],
+            "focus": snapshot.get("focus_goal"),
+            "active": snapshot.get("active_goals") or [],
+            "topology": {
+                "canonical_root_goal_id": topology["canonical_root_goal_id"],
+                "root_goal_ids": topology["root_goal_ids"],
+                "defect_count": len(topology["defects"]),
+                "defects": topology["defects"],
+            },
+        },
+        "workgroups": package["workgroups"],
+        "workers": workers,
+        "work_orders": snapshot.get("work_orders") or [],
+        "attention": snapshot.get("attention") or [],
+        "friction": friction_summary(project_root=root),
+        "artifacts": {
+            "root": str(artifact_root(root)),
+            "policy": "goal/run/workflow/{work,final,manifest.json}",
+        },
+        "migration": {
+            "inspect": "company migration inspect --from PATH",
+            "plan": "company migration plan --from PATH --out migration-plan.json",
+        },
     }
 
 

@@ -107,7 +107,16 @@ fi
 TARGET_DIR=$("$PY" -c 'import os,sys; print(os.path.abspath(os.path.expanduser(sys.argv[1])))' "$TARGET_DIR")
 
 INIT_RAN=0
-if [ ! -e "$TARGET_DIR/.agents/company" ] && [ ! -f "$TARGET_DIR/opencode.json" ]; then
+HOME_UPDATED=0
+if [ -d "$TARGET_DIR/.agents/company" ]; then
+    info "updating the existing SpielOS home ..."
+    if spielos update --dir "$TARGET_DIR"; then
+        HOME_UPDATED=1
+        step "existing SpielOS home updated"
+    else
+        fail "the CLI was upgraded, but the existing home update failed. Run 'spielos update --dir $TARGET_DIR' to see the diagnostic."
+    fi
+elif [ ! -f "$TARGET_DIR/opencode.json" ]; then
     do_init=0
     if [ -t 0 ]; then
         printf '\n%s\n' "${BOLD}Create your SpielOS home in this folder?${RESET}"
@@ -130,7 +139,7 @@ if [ ! -e "$TARGET_DIR/.agents/company" ] && [ ! -f "$TARGET_DIR/opencode.json" 
     fi
 fi
 
-if [ "$INIT_RAN" = 0 ]; then
+if [ "$INIT_RAN" = 0 ] && [ "$HOME_UPDATED" = 0 ]; then
     printf '%s\n' ""
     printf '%s\n' "${BOLD}Next:${RESET} run ${BOLD}spielos init --dir /path/to/project${RESET}"
     printf '%s\n' "${DIM}That creates the harness home (.agents/, .spielos/) — the CLI alone does not.${RESET}"

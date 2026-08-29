@@ -13,6 +13,28 @@ from pathlib import Path
 from typing import Any
 
 
+def load_workgroup_spec(folder: Path) -> dict[str, Any]:
+    """Read one inspectable Workgroup package directory into install shape."""
+    group = json.loads((folder / "workgroup.json").read_text())
+    workers = []
+    for worker_file in sorted((folder / "workers").glob("*/worker.json")):
+        worker = json.loads(worker_file.read_text())
+        worker["workflows"] = [
+            json.loads(path.read_text())
+            for path in sorted(worker_file.parent.glob("workflows/*.json"))]
+        workers.append(worker)
+    return {**group, "workers": workers}
+
+
+def bundled_workgroup_specs() -> tuple[dict[str, Any], ...]:
+    """Load the real package folders shipped in init_templates."""
+    from .bootstrap import template_root
+
+    root = template_root() / "agents" / "company" / "workgroups"
+    return tuple(load_workgroup_spec(folder) for folder in sorted(root.iterdir())
+                 if folder.is_dir() and (folder / "workgroup.json").is_file())
+
+
 def validate_workgroup_spec(spec: dict[str, Any]) -> list[str]:
     defects: list[str] = []
     identifier = spec.get("id")
@@ -27,6 +49,7 @@ def validate_workgroup_spec(spec: dict[str, Any]) -> list[str]:
         return defects + ["workers must contain at least one Worker"]
     worker_ids: set[str] = set()
     workflow_ids: set[str] = set()
+    produced_by_group: set[str] = set()
     for worker in workers:
         if not isinstance(worker, dict):
             defects.append("each Worker must be an object")
@@ -42,6 +65,8 @@ def validate_workgroup_spec(spec: dict[str, Any]) -> list[str]:
             defects.append(f"Worker '{worker_id}' needs a description")
         if not isinstance(worker.get("produces"), list) or not worker["produces"]:
             defects.append(f"Worker '{worker_id}' must declare evidence it produces")
+        else:
+            produced_by_group.update(worker["produces"])
         flows = worker.get("workflows")
         if not isinstance(flows, list) or not flows:
             defects.append(f"Worker '{worker_id}' must own at least one Workflow")
@@ -59,6 +84,44 @@ def validate_workgroup_spec(spec: dict[str, Any]) -> list[str]:
             evidence = flow.get("evidence")
             if not isinstance(evidence, list) or not evidence:
                 defects.append(f"Workflow '{flow_id}' must declare evidence")
+            steps = flow.get("worksteps")
+            if not isinstance(steps, list) or not steps:
+                defects.append(f"Workflow '{flow_id}' must contain worksteps")
+                continue
+            seen_step_ids: set[str] = set()
+            for step in steps:
+                if not isinstance(step, dict) or not isinstance(step.get("id"), str):
+                    defects.append(f"Workflow '{flow_id}' has a workstep without an id")
+                    continue
+                if step["id"] in seen_step_ids:
+                    defects.append(f"Workflow '{flow_id}' has duplicate workstep '{step['id']}'")
+                seen_step_ids.add(step["id"])
+                if not isinstance(step.get("produces"), list) or not step["produces"]:
+                    defects.append(f"Workstep '{step['id']}' must produce evidence")
+                else:
+                    produced_by_group.update(step["produces"])
+                assigned = step.get("worker_id", worker_id)
+                if assigned not in worker_ids and assigned not in {
+                        item.get("id") for item in workers if isinstance(item, dict)}:
+                    defects.append(
+                        f"Workstep '{step['id']}' names unknown Worker '{assigned}'")
+    for worker in workers:
+        if not isinstance(worker, dict):
+            continue
+        for flow in worker.get("workflows") or []:
+            if not isinstance(flow, dict):
+                continue
+            for step in flow.get("worksteps") or []:
+                if not isinstance(step, dict):
+                    continue
+                for required in step.get("requires") or []:
+                    if required not in produced_by_group:
+                        defects.append(
+                            f"Workstep '{step.get('id')}' requires unknown evidence '{required}'")
+            for expected in flow.get("evidence") or []:
+                if expected not in produced_by_group:
+                    defects.append(
+                        f"Workflow '{flow.get('id')}' declares unproduced evidence '{expected}'")
     return defects
 
 

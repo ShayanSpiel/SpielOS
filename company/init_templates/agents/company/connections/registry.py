@@ -6,12 +6,6 @@ from ..runtime.models import ConnectionSpec
 _CONNECTIONS = {
     item.id: item for item in (
         ConnectionSpec(
-            "buffer",
-            "Direct Buffer GraphQL publishing for approved Threads and YouTube packages.",
-            ("create_draft", "schedule", "publish", "verify", "metrics", "delete"),
-            ("direct",), True, ("BUFFER_API_KEY",),
-        ),
-        ConnectionSpec(
             "posthog",
             "Product and funnel analytics through the active host Connection.",
             ("query_events", "query_funnel", "query_timeseries"),

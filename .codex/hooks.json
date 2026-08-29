@@ -1,0 +1,28 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/python3 .codex/hooks/spielos-context.py",
+            "timeout": 10,
+            "statusMessage": "Loading SpielOS company context"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/python3 .codex/hooks/spielos-context.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

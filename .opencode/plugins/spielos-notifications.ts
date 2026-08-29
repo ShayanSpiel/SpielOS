@@ -1,23 +1,9 @@
-// SpielOS1 event-driven notification surface.
+// SpielOS OpenCode adapter for the stable 1.x plugin contract.
 //
-// The durable runner advances deterministic work. This adapter does one host
-// job on session.idle: display pending runtime attention, then acknowledge
-// only the exact ids successfully shown. It owns no timer, advancement,
-// heartbeat, watchdog, or second scheduling loop.
+// Every model request receives one bounded, read-only company projection. On
+// session idle, pending runtime attention is surfaced as synthetic messages.
 
-type V2SessionIdleEvent = {
-  type: "session.idle"
-  data: { sessionID: string }
-}
-
-type V2Event = V2SessionIdleEvent | { type: string; data?: Record<string, unknown> }
-
-type V2Context = {
-  event: { subscribe(): AsyncIterable<V2Event> }
-  session: {
-    synthetic(input: { sessionID: string; text: { text: string } }): Promise<unknown>
-  }
-}
+import type { Plugin, PluginModule } from "@opencode-ai/plugin"
 
 type Notification = {
   id: string
@@ -34,19 +20,31 @@ const REPORTABLE = new Set([
   "goal_completed_followup", "watchdog_digest", "runner_down",
 ])
 
-const runCompany = async (args: string[]): Promise<any> => {
+const companyRunner = (directory: string) => async (args: string[]): Promise<any> => {
+  const vendoredPythonPath = `${directory}/.agents`
+  const pythonPath = process.env.PYTHONPATH
+    ? `${vendoredPythonPath}:${process.env.PYTHONPATH}`
+    : vendoredPythonPath
   const child = Bun.spawn({
     cmd: ["python3", "-B", "-m", "company", ...args],
-    cwd: process.cwd(),
+    cwd: directory,
     stdout: "pipe",
     stderr: "pipe",
-    env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" },
+    env: {
+      ...process.env,
+      PYTHONDONTWRITEBYTECODE: "1",
+      PYTHONPATH: pythonPath,
+    },
   })
-  const [code, stdout] = await Promise.all([
+  const [code, stdout, stderr] = await Promise.all([
     child.exited,
     new Response(child.stdout).text(),
+    new Response(child.stderr).text(),
   ])
-  if (code !== 0) throw new Error(`company command failed (${code})`)
+  if (code !== 0) {
+    const detail = stderr.trim().split("\n").at(-1) || `exit ${code}`
+    throw new Error(`company command failed: ${detail}`)
+  }
   return JSON.parse(stdout)
 }
 
@@ -74,7 +72,12 @@ const formatNotification = (item: Notification): string => {
   return lines.join("\n")
 }
 
-const surfacePending = async (ctx: V2Context, sessionID: string) => {
+const surfacePending = async (
+  client: any,
+  directory: string,
+  sessionID: string,
+  runCompany: (args: string[]) => Promise<any>,
+) => {
   const rows = await runCompany([
     "notifications", "list", "--status", "pending", "--limit", "20", "--json",
   ]) as Notification[]
@@ -87,17 +90,20 @@ const surfacePending = async (ctx: V2Context, sessionID: string) => {
     const current = preferred.get(key)
     if (!current || item.kind === "goal_completed_followup") preferred.set(key, item)
   }
-  for (const item of approvals) {
-    await ctx.session.synthetic({
-      sessionID,
-      text: { text: formatNotification(item) },
-    })
-  }
-  if (preferred.size) {
-    const sections = [...preferred.values()].map(formatNotification)
-    await ctx.session.synthetic({
-      sessionID,
-      text: { text: `SpielOS company update\n\n${sections.join("\n\n")}` },
+  const messages = [
+    ...approvals.map(formatNotification),
+    ...([...preferred.values()].length
+      ? [`SpielOS company update\n\n${[...preferred.values()].map(formatNotification).join("\n\n")}`]
+      : []),
+  ]
+  for (const text of messages) {
+    await client.session.prompt({
+      path: { id: sessionID },
+      query: { directory },
+      body: {
+        noReply: true,
+        parts: [{ type: "text", text, synthetic: true }],
+      },
     })
   }
   for (const item of reportable) {
@@ -105,22 +111,53 @@ const surfacePending = async (ctx: V2Context, sessionID: string) => {
   }
 }
 
-export default {
-  id: "spielos-notifications",
-  setup: async (ctx: V2Context) => {
-    let disposed = false
-    void (async () => {
-      for await (const event of ctx.event.subscribe()) {
-        if (disposed) break
-        if (event.type !== "session.idle") continue
-        try {
-          await surfacePending(ctx, event.data.sessionID)
-        } catch {
-          // Persistence is the fallback. A failed host surface leaves every
-          // notification pending for the next idle event or `company status`.
-        }
+export const SpielOSContext: Plugin = async ({ client, directory }) => {
+  const runCompany = companyRunner(directory)
+  const prompts = new Map<string, string>()
+  const seen = new Set<string>()
+  return {
+    "chat.message": async (input, output) => {
+      prompts.set(input.sessionID, output.parts
+        .filter((part) => part.type === "text")
+        .map((part) => "text" in part ? part.text : "")
+        .join("\n"))
+    },
+    "experimental.chat.system.transform": async (input, output) => {
+      const sessionID = input.sessionID || ""
+      try {
+        const args = [
+          "context", "--prompt", prompts.get(sessionID) || "",
+          "--owner", "director",
+        ]
+        if (!seen.has(sessionID)) args.push("--boot")
+        args.push("--json")
+        const projection = await runCompany(args) as { context?: string }
+        if (!projection.context) throw new Error("empty context projection")
+        output.system.push(projection.context)
+        seen.add(sessionID)
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : "unknown host error"
+        output.system.push(
+          "SpielOS context unavailable for this request. Do not search the repository " +
+          "or guess company state. Tell the owner that host context injection failed " +
+          `and report this diagnostic: ${detail}`,
+        )
       }
-    })()
-    return async () => { disposed = true }
-  },
+    },
+    event: async ({ event }) => {
+      if (event.type !== "session.idle") return
+      try {
+        await surfacePending(client, directory, event.properties.sessionID, runCompany)
+      } catch {
+        // Persistence is the fallback. Failed delivery remains pending.
+      }
+    },
+  }
 }
+
+const plugin: PluginModule = {
+  id: "spielos-notifications",
+  server: SpielOSContext,
+}
+
+export default plugin

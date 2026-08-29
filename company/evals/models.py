@@ -1,8 +1,8 @@
 """Core model for the reusable LLM-as-judge evals Lego piece.
 
-An eval suite is a first-class harness building block, like a Department,
+An eval suite is a reusable harness building block for a Workgroup,
 Workflow, mechanical gate, Connection, or Artifact: abstract, registered, and
-duplicatable across departments.  One suite encodes a quality standard for one
+duplicatable across Workgroups. One suite encodes a quality standard for one
 kind of payload (e.g. campaign copy, outbound email sample) and a judge
 produces a structured EvalReport that can gate a machine step.
 
@@ -43,7 +43,7 @@ class EvalCriterion:
 
 @dataclass(frozen=True)
 class EvalSuite:
-    """One named eval standard for one payload_kind of one department."""
+    """One named eval standard for one payload kind of one Workgroup."""
 
     id: str
     name: str

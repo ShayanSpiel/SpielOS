@@ -1,0 +1,1 @@
+{"id":"product-reliability","version":"1.0.0","description":"Protect installation, upgrades, and regressions with reproducible evidence.","metrics":["reliability_report"],"evidence_metrics":{"reliability_report":["reliability_report"]}}

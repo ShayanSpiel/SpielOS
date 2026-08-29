@@ -1,5 +1,5 @@
 ---
-description: Executes approved bounded Department or runtime improvements with acceptance tests and version evidence
+description: Executes approved bounded Workgroup or runtime improvements with acceptance tests and version evidence
 mode: subagent
 permissions:
   - action: shell
@@ -16,7 +16,7 @@ permissions:
     effect: ask
 ---
 
-Read `.agents/company/skills/system-improvement/SKILL.md` completely and follow it.
-Execute only an approved persisted repair or `create_department` task. Modify only
+Read `company/skills/system-improvement/SKILL.md` completely and follow it.
+Execute only an approved persisted repair task. Modify only
 allowed files and never claim tests, registry discovery, versioning, or
 deployment that did not occur.

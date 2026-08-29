@@ -21,7 +21,7 @@ COMPANY_ROOT = Path(__file__).resolve().parents[1]
 USER_CONFIG_PATH = COMPANY_ROOT / "config.user.json"
 
 # Runtime version: defined once here; every other module imports it.
-VERSION = "6.3.0"
+VERSION = "7.2.0"
 
 # Generic defaults. Values mirror the current SpielOS deployment so behavior
 # is unchanged whether or not config.user.json exists.
@@ -38,15 +38,13 @@ GENERIC_DEFAULTS: dict = {
         "all_children_achieved", "achieved_children",
         "reply_rate", "sales", "booked_calls",
     ],
-    # Department attention capability -> catalog employee/workflow mapping.
+    # Attention capability -> catalog Worker/Workflow mapping.
     "capability_employees": {"lead_research": "lead-researcher"},
     "capability_workflows": {"lead_research": "lead-research"},
     # Resource-conflict channel groups: owners that share one exclusive
     # channel and cannot run concurrently. Single source consumed by the
     # store's busy-goal projection and continuation's resource keys.
     "channel_groups": {"email": ["email", "outbound"]},
-    # macOS supervisor notification title (user-facing brand copy).
-    "supervisor_alert_title": "SpielOS supervisor",
 }
 
 _cache: dict | None = None
@@ -131,7 +129,3 @@ def resource_key(owner_id: str, config: dict | None = None,
     if channel is not None:
         return ("channel", channel)
     return ("owner", owner_id)
-
-
-def supervisor_alert_title() -> str:
-    return str(get("supervisor_alert_title") or "SpielOS supervisor")

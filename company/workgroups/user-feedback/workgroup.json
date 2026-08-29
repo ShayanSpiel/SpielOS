@@ -1,0 +1,1 @@
+{"id":"user-feedback","version":"1.0.0","description":"Turn user reports into reproduced, prioritized, and verified problems.","metrics":["feedback_resolution"],"evidence_metrics":{"feedback_resolution":["feedback_resolution"]}}

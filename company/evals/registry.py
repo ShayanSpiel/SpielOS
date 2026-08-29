@@ -1,18 +1,7 @@
-"""Eval suite registry with department auto-discovery.
-
-Discovery mirrors the Department registry: every `departments/<name>/evals.py`
-module that exports `EVAL_SUITES` (a list/tuple of EvalSuite) registers its
-suites.  This makes an eval suite a first-class, duplicatable Lego piece:
-a department adds one file and its standards are immediately visible to
-`company eval list`, the catalog, and the machine-step quality gates.
-"""
+"""Explicit registry for reusable evaluation suites."""
 
 from __future__ import annotations
 
-import importlib
-import pkgutil
-
-from .. import departments as department_package
 from .models import EvalSuite
 
 _REGISTRY: dict[str, EvalSuite] = {}
@@ -29,23 +18,10 @@ def register_suite(suite: EvalSuite) -> None:
 
 
 def discover_suites() -> dict[str, EvalSuite]:
-    """Scan department dirs for `evals.py` modules exporting EVAL_SUITES."""
+    """Return suites explicitly registered by runtime or Workgroup code."""
     global _DISCOVERED
     if _DISCOVERED:
         return _REGISTRY
-    for module_info in pkgutil.iter_modules(department_package.__path__):
-        if module_info.name.startswith("_"):
-            continue
-        module_name = f"{department_package.__name__}.{module_info.name}.evals"
-        try:
-            module = importlib.import_module(module_name)
-        except ModuleNotFoundError as error:
-            if error.name == module_name:
-                continue
-            raise
-        suites = tuple(getattr(module, "EVAL_SUITES", ()) or ())
-        for suite in suites:
-            register_suite(suite)
     _DISCOVERED = True
     return _REGISTRY
 

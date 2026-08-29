@@ -1,0 +1,1 @@
+{"id":"community-growth-review","description":"Observe community signals, identify a bottleneck, and propose one experiment.","evidence":["growth_report"],"worksteps":[{"id":"observe-signals","kind":"employee","produces":["growth_signal"]},{"id":"propose-experiment","kind":"employee","requires":["growth_signal"],"produces":["growth_report"]}]}

@@ -74,17 +74,10 @@ def needs_alignment(request) -> bool:
 
 
 def validate_goal_topology(request) -> None:
-    """Reject explicit attempts to persist a non-Goal pursuit kind as a Goal.
-
-    Existing records need no new taxonomy column. Callers may declare a
-    `pursuit_kind` in config when the distinction matters; absence keeps the
-    current inferred behavior.
-    """
+    """Reject Goals that cannot participate in one rooted control tree."""
 
     config = dict(_field(request, "config") or {})
-    kind = config.get("pursuit_kind")
-    if kind is None:
-        return
+    kind = config.get("pursuit_kind") or pursuit_kind(request)
     if kind not in PURSUIT_KINDS:
         raise ValueError(f"unknown pursuit_kind: {kind}")
     if kind in NON_GOAL_PURSUIT_KINDS:
@@ -93,8 +86,148 @@ def validate_goal_topology(request) -> None:
     parent_id = _field(request, "parent_id")
     if kind == "primary_goal" and parent_id:
         raise ValueError("a primary_goal cannot have a parent Goal")
-    if kind == "supporting_goal" and not parent_id:
-        raise ValueError("a supporting_goal requires a parent Goal")
+    if kind in {"supporting_goal", "system_improvement_goal"} and not parent_id:
+        raise ValueError(f"a {kind} requires a parent Goal")
+
+
+def prepare_goal_topology(store, values: dict[str, Any]) -> dict[str, Any]:
+    """Persist a complete control and causal lineage for a newly created Goal.
+
+    The control relation is a one-parent tree.  The causal relation is a DAG:
+    every child explicitly supports its parent, with optional additional
+    support edges supplied by the Director.  Historical rows are deliberately
+    not guessed at here; :func:`audit_goal_topology` makes their remediation
+    reviewable before any database migration changes them.
+    """
+
+    config = dict(values.get("config") or {})
+    values["config"] = config
+    kind = pursuit_kind({**values, "config": config})
+    parent_id = values.get("parent_id")
+    goal_id = values["goal_id"]
+    goals = store.goals()
+
+    if kind == "primary_goal":
+        if parent_id:
+            raise ValueError("a primary_goal cannot have a parent Goal")
+        roots = [goal for goal in goals if not goal.get("parent_id")]
+        if roots:
+            raise ValueError(
+                "a company already has a control root; create a child Goal or "
+                "run `company goal topology` to plan its legacy migration")
+        root_id = goal_id
+        parent_name = None
+    else:
+        if not parent_id:
+            raise ValueError(f"a {kind} requires a parent Goal")
+        if parent_id == goal_id:
+            raise ValueError("a Goal cannot be its own parent")
+        parent = store.goal(parent_id)
+        parent_name = parent.get("name") or parent_id
+        root_id = _control_root_id(store, parent_id)
+        supports = list(support_goal_ids({"config": config}))
+        if parent_id not in supports:
+            supports.append(parent_id)
+        config["supports_goal_ids"] = list(dict.fromkeys(supports))
+
+    config["pursuit_kind"] = kind
+    existing_lineage = config.get("causal_lineage")
+    existing_lineage = existing_lineage if isinstance(existing_lineage, dict) else {}
+    purpose = (existing_lineage.get("purpose") or config.get("purpose")
+               or ((config.get("alignment") or {}).get("rationale"))
+               or (f"Directly advances the company outcome '{values['name']}'."
+                   if kind == "primary_goal"
+                   else f"Enables the parent Goal '{parent_name}' ({parent_id})."))
+    after_completion = (existing_lineage.get("after_completion")
+                        or config.get("after_completion")
+                        or ("Select the next company outcome from the evidence."
+                            if kind == "primary_goal"
+                            else f"Re-observe parent Goal '{parent_name}' ({parent_id}) and choose its next bottleneck."))
+    config["causal_lineage"] = {
+        "root_goal_id": root_id,
+        "parent_goal_id": parent_id,
+        "purpose": purpose,
+        "after_completion": after_completion,
+    }
+    return values
+
+
+def _control_root_id(store, goal_id: str) -> str:
+    """Find a parent's root while rejecting corrupt control-tree cycles."""
+
+    current, seen = goal_id, set()
+    while current:
+        if current in seen:
+            raise ValueError(f"control-parent cycle detected at {current}")
+        seen.add(current)
+        goal = store.goal(current)
+        parent_id = goal.get("parent_id")
+        if not parent_id:
+            return current
+        current = parent_id
+    raise ValueError("control-parent chain has no root")
+
+
+def audit_goal_topology(store) -> dict[str, Any]:
+    """Describe current topology and a non-destructive migration plan.
+
+    This is intentionally an audit, not a repair command: legacy ancestry is
+    business context and must be chosen by the owner rather than inferred from
+    names, timestamps, or test counts.
+    """
+
+    goals = store.goals()
+    by_id = {goal["id"]: goal for goal in goals}
+    roots = [goal for goal in goals if not goal.get("parent_id")]
+    primary_roots = [goal for goal in roots if pursuit_kind(goal) == "primary_goal"]
+    defects = []
+    for goal in goals:
+        parent_id = goal.get("parent_id")
+        kind = pursuit_kind(goal)
+        lineage = (goal.get("config") or {}).get("causal_lineage") or {}
+        supports = support_goal_ids(goal)
+        if parent_id and parent_id not in by_id:
+            defects.append({"goal_id": goal["id"], "kind": "missing_parent",
+                            "parent_id": parent_id})
+            continue
+        if not parent_id and kind != "primary_goal":
+            defects.append({"goal_id": goal["id"], "kind": "disconnected_non_primary_root"})
+        if parent_id and kind == "primary_goal":
+            defects.append({"goal_id": goal["id"], "kind": "primary_with_parent",
+                            "parent_id": parent_id})
+        if parent_id and parent_id not in supports:
+            defects.append({"goal_id": goal["id"], "kind": "missing_parent_support_edge",
+                            "parent_id": parent_id})
+        if not isinstance(lineage, dict) or not lineage.get("root_goal_id"):
+            defects.append({"goal_id": goal["id"], "kind": "missing_causal_lineage"})
+        for target_id in supports:
+            if target_id not in by_id:
+                defects.append({"goal_id": goal["id"], "kind": "unknown_support_target",
+                                "target_id": target_id})
+
+    canonical_root = primary_roots[0]["id"] if len(primary_roots) == 1 else None
+    stale_roots = [goal["id"] for goal in roots
+                   if goal.get("goal_status") in {"achieved", "abandoned", "expired"}]
+    active_roots = [goal["id"] for goal in roots if goal["id"] not in stale_roots]
+    return {
+        "goal_count": len(goals),
+        "root_goal_ids": [goal["id"] for goal in roots],
+        "primary_root_goal_ids": [goal["id"] for goal in primary_roots],
+        "canonical_root_goal_id": canonical_root,
+        "defects": defects,
+        "migration_plan": {
+            "safe_first": [
+                "Back up the SQLite database and export this audit.",
+                "Choose exactly one canonical primary Goal from owner context.",
+                "Retain terminal stale roots as history or archive them; do not delete evidence.",
+                "Provide an explicit parent mapping for each remaining disconnected Goal.",
+                "Backfill pursuit_kind, causal_lineage, and a parent support edge for every mapped Goal.",
+                "Re-run this audit; only a single canonical root and zero defects is ready to enforce.",
+            ],
+            "stale_root_candidates": stale_roots,
+            "owner_mapping_required": active_roots if canonical_root else [goal["id"] for goal in roots],
+        },
+    }
 
 
 def priority_score(goal) -> float:

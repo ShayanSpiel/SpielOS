@@ -23,7 +23,7 @@ import threading
 import time
 from pathlib import Path
 
-from .bootstrap import available_departments, scaffold
+from .bootstrap import available_workgroups, scaffold
 
 SPINNER_FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 
@@ -199,23 +199,21 @@ def _verify_home(root: Path) -> tuple[bool, str]:
 
 
 def _next_steps(root: Path, hosts: dict[str, bool], minimal: bool,
-                departments: list[str]) -> tuple[list[str], dict[str, str]]:
+                workgroups: list[str]) -> tuple[list[str], dict[str, str]]:
     """Tailored follow-up commands plus short inline notes."""
     steps = [("cd " + str(root), "")]
     if hosts["opencode"]:
-        steps.append(("opencode", "then type /start to create your first Goal"))
+        steps.append(("opencode", "then select the Director agent before chatting (not Build)"))
     elif hosts["codex"]:
-        steps.append(("codex", "the Director agent and /start command are wired up"))
+        steps.append(("codex", "then select the Director agent before chatting"))
     else:
         steps.append(("curl -fsSL https://opencode.ai/install | bash",
                       "recommended host — then reopen this folder with opencode"))
-    steps.append(("PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.agents "
-                  "python3 -B -m company status", ""))
     notes: dict[str, str] = {}
     if minimal:
-        owned = ", ".join(departments) if departments else "none yet"
-        notes["mode"] = ("Fresh company — add departments any time with "
-                         f"'spielos add <id>' or 'spielos init --department' "
+        owned = ", ".join(workgroups) if workgroups else "none yet"
+        notes["mode"] = ("Fresh company — install Workgroups any time with "
+                         f"'spielos workgroup install --file <package.json>' "
                          f"(vendored now: {owned})")
     else:
         notes["mode"] = ("Full harness — make it yours in "
@@ -251,8 +249,8 @@ def _render_success(style: _Style, receipt: dict) -> None:
         row("Home", root)
         row("Files", str(receipt["files_written"]))
         row("Mode", receipt.get("mode_label", "harness"))
-        if receipt.get("departments"):
-            row("Depts", ", ".join(receipt["departments"]))
+        if receipt.get("workgroups"):
+            row("Workgroups", ", ".join(receipt["workgroups"]))
         verified = (style.green("verified") if receipt.get("verified")
                     else style.red("FAILED"))
         row("Runtime", verified)
@@ -266,7 +264,7 @@ def _render_success(style: _Style, receipt: dict) -> None:
         print()
 
     steps, notes = _next_steps(Path(root), hosts, receipt.get("minimal", False),
-                               receipt.get("departments") or [])
+                               receipt.get("workgroups") or [])
     print(style.bold("Next steps"))
     for command, note in steps:
         print(f"  {style.green('$')} {style.bold(command)}")
@@ -281,12 +279,12 @@ def _render_success(style: _Style, receipt: dict) -> None:
 
 
 def run_init(*, dir: str = ".", force: bool = False, minimal: bool = True,
-             departments: list[str] | None = None, assume_yes: bool = False,
+             workgroups: list[str] | None = None, assume_yes: bool = False,
              as_json: bool = False) -> int:
     """Entry point for ``spielos init``. Returns the process exit code.
 
     A fresh home ships the spine only — zero Workgroups. Starter
-    departments are an explicit opt-in (``--department``, ``--all-departments``
+    Workgroups are an explicit opt-in (``--workgroup``, ``--all-workgroups``
     or the interactive picker).
     """
     style = _Style()
@@ -297,9 +295,9 @@ def run_init(*, dir: str = ".", force: bool = False, minimal: bool = True,
     try:
         if interactive:
             banner(style, target)
-            if not departments and minimal:
-                departments = _ask_starter_departments(
-                    style, departments=departments)
+            if not workgroups and minimal:
+                workgroups = _ask_starter_workgroups(
+                    style, workgroups=workgroups)
             force = force or _confirm_overwrite(style, target)
 
         receipt = None
@@ -307,22 +305,22 @@ def run_init(*, dir: str = ".", force: bool = False, minimal: bool = True,
         if not quiet:
             with _Spinner(style, "Preparing") as spinner:
                 receipt = scaffold(target, force=force, minimal=minimal,
-                                   departments=departments,
+                                   workgroups=workgroups,
                                    on_phase=spinner.set_label)
         else:
             receipt = scaffold(target, force=force, minimal=minimal,
-                               departments=departments)
+                               workgroups=workgroups)
 
         hosts = _detect_hosts()
-        count = len(departments or [])
+        count = len(workgroups or [])
         if not minimal:
             mode_label = "Full harness"
         elif count:
-            mode_label = f"Fresh spine + {count} department(s)"
+            mode_label = f"Fresh spine + {count} Workgroup(s)"
         else:
             mode_label = "Fresh spine"
         receipt.update({"hosts": hosts, "minimal": minimal,
-                        "departments": departments or [],
+                        "workgroups": workgroups or [],
                         "mode_label": mode_label})
         # Verification runs in both modes; only the rendering differs.
         if as_json:
@@ -355,8 +353,8 @@ def run_init(*, dir: str = ".", force: bool = False, minimal: bool = True,
                      hint="spielos init --force   # overwrite vendored files\n"
                           "           (your .spielos/ state is never touched)")
     except ValueError as exc:
-        known = available_departments()
-        hint = (f"available departments: {', '.join(known)}"
+        known = available_workgroups()
+        hint = (f"available Workgroups: {', '.join(known)}"
                 if known else None)
         if as_json:
             print(json.dumps({"error": str(exc)}, indent=2), file=sys.stderr)
@@ -391,22 +389,22 @@ def banner(style: _Style, target: Path) -> None:
     print()
 
 
-def _ask_starter_departments(style: _Style,
-                             departments: list[str] | None) -> list[str] | None:
-    """Fresh homes start with zero departments; extras are opt-in."""
-    if departments is not None:
-        return departments
-    known = available_departments()
+def _ask_starter_workgroups(style: _Style,
+                            workgroups: list[str] | None) -> list[str] | None:
+    """Fresh homes start with zero Workgroups; extras are opt-in."""
+    if workgroups is not None:
+        return workgroups
+    known = available_workgroups()
     if not known:
         return []
-    pick = _choose(style, "Starter departments?", [
-        ("none", "completely fresh company — add departments any time (recommended)"),
-        ("choose", "vendor starter departments from the template library"),
+    pick = _choose(style, "Starter Workgroups?", [
+        ("none", "completely fresh company — add Workgroups any time (recommended)"),
+        ("choose", "vendor starter Workgroups from the template library"),
     ], default=1)
     if pick == 1:
         return []
     print(f"  {style.dim('Available: ' + ', '.join(known))}")
-    raw = _prompt(style, "Departments to vendor (comma-separated, empty skips)",
+    raw = _prompt(style, "Workgroups to vendor (comma-separated, empty skips)",
                   "")
     chosen = []
     for token in raw.replace(" ", "").split(","):
@@ -417,10 +415,10 @@ def _ask_starter_departments(style: _Style,
         elif token in known:
             chosen.append(token)
         else:
-            print(style.yellow(f"  Unknown department '{token}' — skipped."))
+            print(style.yellow(f"  Unknown Workgroup '{token}' — skipped."))
     deduped = sorted(set(chosen))
     if deduped:
-        print(f"  {style.mark_ok()} Starter departments: "
+        print(f"  {style.mark_ok()} Starter Workgroups: "
               f"{style.bold(', '.join(deduped))}")
     return deduped
 

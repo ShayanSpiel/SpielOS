@@ -17,10 +17,20 @@ The chosen folder becomes a self-contained SpielOS home. It receives the runtime
 ## Update
 
 ```sh
-pipx upgrade spielos && spielos refresh --dir /your/chosen/folder
+pipx upgrade spielos && spielos update --dir /your/chosen/folder
 ```
 
-Refresh replaces only the harness spine and adapters. It preserves the home’s strategy, assets, installed workgroups, and private `.spielos/` state.
+Update replaces only the harness spine and host adapters. It preserves the
+home’s strategy, assets, installed Workgroups, configuration, and private
+`.spielos/` state. `spielos refresh` remains a compatibility alias.
+
+To test unreleased source changes locally, install the built wheel explicitly;
+plain `pipx install spielos` installs the latest release published on PyPI:
+
+```sh
+pipx install --force /path/to/SpielOS/dist/spielos-VERSION-py3-none-any.whl
+spielos update --dir /your/chosen/folder
+```
 
 ## Workgroups and workers
 
@@ -32,11 +42,69 @@ spielos workgroup install --file workgroup.json --dir /your/chosen/folder
 spielos workgroup list
 ```
 
-The first release after the worker-owned reset deliberately ships with no starter Workgroups. Add only validated capabilities that match a real company outcome.
+Fresh homes deliberately start with no Workgroups. Install one package or all
+six bundled capabilities only when they match a real company outcome:
 
-## What is persisted
+```sh
+spielos workgroup install --all --dir /your/chosen/folder
+```
 
-Goals, runs, approvals, work orders, evidence, explicit directives, and evidence-backed reusable Memory are stored locally in `.spielos/state/`. Chat history is not product state. Strategy is source-controlled Markdown; it is changed deliberately, never inferred from a conversation.
+Owner-language aliases are translated at intake: Department means Workgroup;
+Agent and Employee mean Worker. They are not additional runtime layers. Use one
+orientation command instead of probing several catalogs:
+
+```sh
+spielos overview
+```
+
+## Artifacts, friction, and migration
+
+Generated work has one lifecycle under
+`.spielos/artifacts/<goal>/<run>/<workflow?>/{work,final}`. Agents prepare the
+workspace, finalize verified deliverables, clean declared intermediates, and
+automatically open the final folder only for owner-facing creative or content
+deliverables such as videos, images, audio, copy, documents, and decks:
+
+```sh
+spielos artifact prepare --goal GOAL_ID --run RUN_ID
+spielos artifact finalize --goal GOAL_ID --run RUN_ID --file PATH --open
+```
+
+Code, packages, archives, tests, logs, manifests, migration plans, and internal
+evidence are reported with their paths but are not opened unless the owner asks.
+
+Misleading tools, commands, instructions, contradictions, and fallbacks are
+durable friction rather than silent retries. Inspect them with `spielos friction
+list`.
+
+Migrate into a fresh home, never by treating a foreign runtime as current code:
+
+```sh
+spielos migration inspect --from /old/home
+spielos migration plan --from /old/home --out migration-plan.json
+```
+
+The plan archives foreign Goals by default, normalizes capability/executor
+aliases, quarantines unknowns, and converts one Workgroup at a time.
+
+## State, context, and memory
+
+Goals, runs, approvals, work orders, evidence, typed company-profile overlays,
+experiment learning, and reusable Workflow candidates are stored locally in
+`.spielos/state/`. Strategy Markdown is the reviewed base profile; owner-explicit
+profile overlays can supersede one typed claim without rewriting the source files.
+
+Codex `SessionStart` and `UserPromptSubmit` hooks, plus OpenCode's model-request
+hook, load a small read-only projection automatically. Initial context contains
+the company profile, top Goal state, and urgent attention. Each user message adds
+only prompt-relevant profile claims, experiment results, and Workflow instructions.
+Chat history and tool traces remain host-owned and are not copied into SpielOS.
+
+Memory writes have explicit triggers: the Goal loop records experiment learning
+only after valid cited evidence; an owner-explicit strategy correction writes a
+profile claim; a reusable Workflow correction writes a procedural observation.
+A procedural candidate hardens after an explicit update or two matching uses in
+14 days, while stale one-offs expire during consolidation. Hooks never write.
 
 ## Development
 

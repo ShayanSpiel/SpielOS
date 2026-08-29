@@ -5,7 +5,7 @@ Resolution order — deterministic first:
 1. **Vendored anchor**: if this very file lives inside a real SpielOS home
    (its checkout root contains ``.spielos/`` or ``.agents/``), that root is
    returned unconditionally. This is the historical behavior: every process
-   — runner, plugin, supervisor, cron — resolves to the same home no matter
+   — Runner, plugin, or host — resolves to the same home no matter
    what its cwd is.
 2. ``SPIELOS_HOME`` environment variable (explicit override for installed
    console-script usage).

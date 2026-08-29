@@ -1,0 +1,1 @@
+{"id":"onboarding-journey-audit","description":"Observe setup, first command, and first outcome.","evidence":["journey_observation"],"worksteps":[{"id":"map-onboarding","kind":"employee","produces":["journey_observation"]}]}

@@ -307,6 +307,9 @@ class InterpretedDepartment:
         if employee_id:
             payload["agent_id"] = employee_id
             payload["employee_id"] = employee_id
+            payload["required_user_action"] = (
+                f"{employee_id} must produce {needed} validated artifact(s) of kind "
+                f"{', '.join(step.produces) if step.produces else metric}")
         if step.produces:
             payload["accepted_evidence_kinds"] = list(step.produces)
         if step.skill_ids:
@@ -346,18 +349,6 @@ class InterpretedDepartment:
             except KeyError as error:
                 return StageResult("dispatch", {"error": str(error)}, RunStatus.FAILED, Stage.ACT)
             required = list(decision.get("required_evidence") or ["publication_receipt"])
-            if selected.unattended and selected.id == "buffer":
-                from ..connections.buffer import BufferError, dispatch
-                try:
-                    receipt = dispatch(decision.get("package") or {}, decision.get("execution_mode", "dry_run"))
-                except BufferError as error:
-                    receipt = {"ok": False, "message": str(error)}
-                if receipt.get("ok"):
-                    return StageResult("dispatch", {"publication_receipt": receipt, **decision}, next_stage=Stage.EVALUATE,
-                                       evidence=[{"kind": required[0], "source": "buffer", "validity": "business", "payload": receipt}],
-                                       message="Approved package was dispatched through direct Buffer")
-                return StageResult("dispatch", {"connection_request": receipt, **decision}, RunStatus.BLOCKED, Stage.ACT,
-                                   attention=receipt, message=receipt.get("message") or "Direct Buffer dispatch could not run")
             request = {
                 "capability": "connection_execution",
                 "connection_id": selected.id,
@@ -430,18 +421,23 @@ class InterpretedDepartment:
                           "change_one_variable": "workflow_step_output"}}
         evidence_ids = [item["id"] for item in evidence if item.get("id")]
         learnings = []
-        if not met and evidence_ids and validity in {"business", "technical_only"}:
+        if evidence_ids and validity in {"business", "technical_only"}:
+            outcome = "met" if met else "did not meet"
             learnings.append({
                 "reusable": True,
                 "claim": (f"Workflow {workflow_id or 'default'} produced {metric}={value} "
-                          f"against target {ctx.goal.operator} {ctx.goal.target}."),
+                          f"and {outcome} target {ctx.goal.operator} {ctx.goal.target}."),
                 "decision_relevance": (
-                    "Do not repeat the same workflow configuration expecting a different "
-                    "result; change one declared variable or choose another workflow."),
+                    "Reuse this observed result when selecting the same Workflow; if the "
+                    "target was missed, change one declared variable before repeating it."),
                 "evidence_ids": evidence_ids,
                 "applies_to": {"metrics": [metric],
-                               "workflows": [workflow_id] if workflow_id else []},
+                               "workflows": [workflow_id] if workflow_id else [],
+                               "steps": [str(action_result["step_id"])]
+                                        if action_result.get("step_id") else [],
+                               "workgroups": [ctx.goal.owner_id]},
                 "confidence": 0.8,
+                "verdict": "confirmed" if met else "observed",
                 "evidence": {"observed_value": value, "target": ctx.goal.target,
                              "run_id": ctx.cycle.get("id")},
             })
@@ -449,5 +445,5 @@ class InterpretedDepartment:
                            goal_status=GoalStatus.ACHIEVED if met else None,
                            evaluation=evaluation,
                            learnings=learnings,
-                           message=("Department package goal achieved" if met
-                                    else "Department package run completed; more evidence required"))
+                           message=("Workgroup package goal achieved" if met
+                                    else "Workgroup package run completed; more evidence required"))

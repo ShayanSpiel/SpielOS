@@ -265,6 +265,65 @@ class Store:
                     goal_id TEXT, claim TEXT NOT NULL, evidence_json TEXT NOT NULL,
                     confidence REAL NOT NULL, created_at TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS profile_claims (
+                    id TEXT PRIMARY KEY,
+                    namespace TEXT NOT NULL,
+                    claim_key TEXT NOT NULL,
+                    value_json TEXT NOT NULL,
+                    scope TEXT NOT NULL,
+                    goal_id TEXT,
+                    workflow_id TEXT,
+                    authority TEXT NOT NULL,
+                    source_type TEXT NOT NULL,
+                    source_ref TEXT,
+                    source_excerpt TEXT NOT NULL,
+                    supersedes_id TEXT,
+                    status TEXT NOT NULL,
+                    confidence REAL NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_profile_claims_active
+                    ON profile_claims(status, namespace, claim_key, updated_at DESC);
+                CREATE TABLE IF NOT EXISTS experiment_memories (
+                    id TEXT PRIMARY KEY,
+                    owner_id TEXT NOT NULL,
+                    goal_id TEXT NOT NULL,
+                    run_id TEXT NOT NULL,
+                    claim TEXT NOT NULL,
+                    verdict TEXT NOT NULL,
+                    context_json TEXT NOT NULL,
+                    evidence_ids_json TEXT NOT NULL,
+                    confidence REAL NOT NULL,
+                    confirmations INTEGER NOT NULL,
+                    contradictions INTEGER NOT NULL,
+                    status TEXT NOT NULL,
+                    last_confirmed_at TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_experiment_memory_active
+                    ON experiment_memories(status, owner_id, updated_at DESC);
+                CREATE TABLE IF NOT EXISTS workflow_memories (
+                    id TEXT PRIMARY KEY,
+                    workgroup_id TEXT,
+                    workflow_id TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    trigger_json TEXT NOT NULL,
+                    instructions_json TEXT NOT NULL,
+                    dependencies_json TEXT NOT NULL,
+                    evidence_ids_json TEXT NOT NULL,
+                    source_refs_json TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    occurrence_count INTEGER NOT NULL,
+                    first_seen_at TEXT NOT NULL,
+                    last_seen_at TEXT NOT NULL,
+                    expires_at TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_workflow_memory_active
+                    ON workflow_memories(status, workflow_id, updated_at DESC);
                 CREATE TABLE IF NOT EXISTS directives (
                     id TEXT PRIMARY KEY, text TEXT NOT NULL,
                     scope TEXT NOT NULL, goal_id TEXT REFERENCES goals(id),
@@ -580,7 +639,7 @@ class Store:
             rows = con.execute(f"""SELECT
                     g.id,g.name,g.owner_id,g.metric,g.operator,g.target_json,g.deadline,
                     g.parent_id,g.goal_status,
-                    json_extract(g.config_json,'$.priority') AS priority,
+                    g.config_json,json_extract(g.config_json,'$.priority') AS priority,
                     g.created_at,g.updated_at,
                     c.id AS run_id,c.sequence,c.stage,c.step,c.run_status,c.resume_at,
                     c.data_json,c.updated_at AS runtime_updated_at,r.run_type,r.evidence_validity,
@@ -620,6 +679,11 @@ class Store:
         for row in rows:
             item = dict(row)
             item["target"] = self._normalize(json.loads(item.pop("target_json")))
+            config = self._normalize(json.loads(item.pop("config_json")))
+            from .alignment import pursuit_kind, support_goal_ids
+            item["pursuit_kind"] = pursuit_kind({**item, "config": config})
+            item["supports_goal_ids"] = list(support_goal_ids({"config": config}))
+            item["causal_lineage"] = config.get("causal_lineage") or {}
             data = self._normalize(json.loads(item.pop("data_json")))
             raw_experiment = item.pop("next_experiment_json", None)
             try:
@@ -1028,14 +1092,14 @@ class Store:
     def record_dispatch_retry(self, goal_id: str, run_id: str, attempt: int, status: str,
                               *, first_error: str | None = None,
                               next_retry_at: str | None = None) -> dict:
-        """Upsert one dispatch retry attempt (Watchdog v2 retry ledger).
+        """Upsert one dispatch retry attempt.
 
         ``attempt`` is the retry sequence number; ``status`` is free-form
         (retrying/failed/succeeded/...); ``next_retry_at`` is an ISO timestamp
         of the next scheduled attempt when one exists. ``first_error`` is
         preserved from the FIRST attempt of the (goal, run) pair so the ledger
         keeps the original failure even after later attempts upsert fresh rows
-        (the live HUD surfaces the newest row's first_error).
+        (readers see the newest row's first_error).
         """
         stamp = now()
         with self.connect() as con:
@@ -1193,6 +1257,221 @@ class Store:
                 "SELECT * FROM memory ORDER BY id DESC LIMIT ?",
                 (max(1, min(int(limit), 50)),)).fetchall()
         return tuple(self._decode(row) for row in rows)
+
+    # ---- Typed company profile and operating memory -----------------
+
+    def set_profile_claim(self, *, namespace: str, claim_key: str, value: Any,
+                          scope: str = "company", goal_id: str | None = None,
+                          workflow_id: str | None = None,
+                          authority: str = "owner_explicit",
+                          source_type: str = "conversation",
+                          source_ref: str | None = None,
+                          source_excerpt: str = "", confidence: float = 1.0) -> dict:
+        """Activate one owner-scoped profile claim and supersede its predecessor.
+
+        Raw strategy documents remain the base layer.  This table stores typed,
+        auditable overlays; empirical memories never call this method.
+        """
+
+        namespace = str(namespace or "").strip()
+        claim_key = str(claim_key or "").strip()
+        if not namespace or not claim_key:
+            raise ValueError("profile namespace and key are required")
+        if scope not in {"company", "goal", "workflow"}:
+            raise ValueError("profile scope must be company, goal, or workflow")
+        if scope == "goal" and not goal_id:
+            raise ValueError("goal-scoped profile claim requires goal_id")
+        if scope == "workflow" and not workflow_id:
+            raise ValueError("workflow-scoped profile claim requires workflow_id")
+        stamp = now()
+        claim_id = f"profile-{uuid.uuid4().hex[:12]}"
+        with self.connect() as con:
+            prior = con.execute("""SELECT id FROM profile_claims
+                WHERE namespace=? AND claim_key=? AND scope=?
+                  AND COALESCE(goal_id,'')=COALESCE(?,'')
+                  AND COALESCE(workflow_id,'')=COALESCE(?,'')
+                  AND status='active'
+                ORDER BY updated_at DESC LIMIT 1""",
+                (namespace, claim_key, scope, goal_id, workflow_id)).fetchone()
+            prior_id = prior["id"] if prior else None
+            if prior_id:
+                con.execute("UPDATE profile_claims SET status='superseded',updated_at=? WHERE id=?",
+                            (stamp, prior_id))
+            con.execute("""INSERT INTO profile_claims VALUES
+                (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (
+                claim_id, namespace, claim_key, json.dumps(value), scope,
+                goal_id, workflow_id, authority, source_type, source_ref,
+                str(source_excerpt or "").strip(), prior_id, "active",
+                max(0.0, min(float(confidence), 1.0)), stamp, stamp))
+        return self.profile_claim(claim_id)
+
+    def profile_claim(self, claim_id: str) -> dict:
+        with self.connect() as con:
+            row = con.execute("SELECT * FROM profile_claims WHERE id=?", (claim_id,)).fetchone()
+        value = self._decode(row)
+        if not value:
+            raise KeyError(f"unknown profile claim: {claim_id}")
+        return value
+
+    def profile_claims(self, *, status: str = "active", goal_id: str | None = None,
+                       workflow_id: str | None = None, limit: int = 50) -> tuple[dict, ...]:
+        clauses = ["status=?"]
+        params: list[Any] = [status]
+        scope_parts = ["scope='company'"]
+        if goal_id:
+            scope_parts.append("goal_id=?")
+            params.append(goal_id)
+        if workflow_id:
+            scope_parts.append("workflow_id=?")
+            params.append(workflow_id)
+        clauses.append("(" + " OR ".join(scope_parts) + ")")
+        params.append(max(1, min(int(limit), 200)))
+        with self.connect() as con:
+            rows = con.execute(
+                f"SELECT * FROM profile_claims WHERE {' AND '.join(clauses)} "
+                "ORDER BY updated_at DESC LIMIT ?", params).fetchall()
+        return tuple(self._decode(row) for row in rows)
+
+    def record_experiment_memory(self, *, owner_id: str, goal_id: str, run_id: str,
+                                 claim: str, verdict: str, context: dict,
+                                 evidence_ids: list[str], confidence: float = 0.5) -> dict:
+        """Persist or reinforce one evidence-backed experiment learning."""
+
+        claim = str(claim or "").strip()
+        if not claim or not evidence_ids:
+            raise ValueError("experiment memory requires a claim and evidence_ids")
+        stamp = now()
+        canonical_context = json.dumps(context or {}, sort_keys=True)
+        with self.connect() as con:
+            prior = con.execute("""SELECT * FROM experiment_memories
+                WHERE owner_id=? AND claim=? AND context_json=? AND status='active'
+                ORDER BY updated_at DESC LIMIT 1""",
+                (owner_id, claim, canonical_context)).fetchone()
+            if prior:
+                confirmations = int(prior["confirmations"]) + (0 if verdict == "contradicted" else 1)
+                contradictions = int(prior["contradictions"]) + (1 if verdict == "contradicted" else 0)
+                adjusted = max(0.0, min(1.0, float(confidence)
+                                       + confirmations * 0.03 - contradictions * 0.12))
+                ids = list(dict.fromkeys([
+                    *json.loads(prior["evidence_ids_json"]), *evidence_ids]))
+                con.execute("""UPDATE experiment_memories
+                    SET verdict=?,evidence_ids_json=?,confidence=?,confirmations=?,
+                        contradictions=?,last_confirmed_at=?,updated_at=? WHERE id=?""",
+                    (verdict, json.dumps(ids), adjusted, confirmations, contradictions,
+                     stamp, stamp, prior["id"]))
+                memory_id = prior["id"]
+            else:
+                memory_id = f"learning-{uuid.uuid4().hex[:12]}"
+                con.execute("""INSERT INTO experiment_memories VALUES
+                    (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (
+                    memory_id, owner_id, goal_id, run_id, claim, verdict,
+                    canonical_context, json.dumps(list(dict.fromkeys(evidence_ids))),
+                    max(0.0, min(float(confidence), 1.0)),
+                    1 if verdict != "contradicted" else 0,
+                    1 if verdict == "contradicted" else 0,
+                    "active", stamp, stamp, stamp))
+        return self.experiment_memory(memory_id)
+
+    def experiment_memory(self, memory_id: str) -> dict:
+        with self.connect() as con:
+            row = con.execute("SELECT * FROM experiment_memories WHERE id=?", (memory_id,)).fetchone()
+        value = self._decode(row)
+        if not value:
+            raise KeyError(f"unknown experiment memory: {memory_id}")
+        return value
+
+    def experiment_memories(self, *, owner_id: str | None = None,
+                            status: str = "active", limit: int = 100) -> tuple[dict, ...]:
+        clauses, params = ["status=?"], [status]
+        if owner_id:
+            clauses.append("owner_id=?")
+            params.append(owner_id)
+        params.append(max(1, min(int(limit), 500)))
+        with self.connect() as con:
+            rows = con.execute(
+                f"SELECT * FROM experiment_memories WHERE {' AND '.join(clauses)} "
+                "ORDER BY updated_at DESC LIMIT ?", params).fetchall()
+        return tuple(self._decode(row) for row in rows)
+
+    def observe_workflow_memory(self, *, workflow_id: str, title: str,
+                                instructions: list, trigger: dict | None = None,
+                                dependencies: list | None = None,
+                                evidence_ids: list[str] | None = None,
+                                source_ref: str | None = None,
+                                workgroup_id: str | None = None,
+                                explicit_update: bool = False,
+                                observed_at: str | None = None) -> dict:
+        """Create/reinforce a procedural candidate and apply the 2-in-14 rule."""
+
+        if not workflow_id or not instructions:
+            raise ValueError("workflow memory requires workflow_id and instructions")
+        stamp = observed_at or now()
+        observed = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+        expiry = (observed + timedelta(days=14)).isoformat()
+        signature = json.dumps(instructions, sort_keys=True)
+        with self.connect() as con:
+            rows = con.execute("""SELECT * FROM workflow_memories
+                WHERE workflow_id=? AND status IN ('candidate','hardening')
+                ORDER BY updated_at DESC LIMIT 20""", (workflow_id,)).fetchall()
+            prior = next((row for row in rows
+                          if json.dumps(json.loads(row["instructions_json"]), sort_keys=True)
+                          == signature), None)
+            if prior:
+                first = datetime.fromisoformat(prior["first_seen_at"].replace("Z", "+00:00"))
+                count = int(prior["occurrence_count"]) + 1
+                status = ("hardening" if explicit_update or
+                          (count >= 2 and observed - first <= timedelta(days=14))
+                          else prior["status"])
+                sources = list(dict.fromkeys([
+                    *json.loads(prior["source_refs_json"]),
+                    *([source_ref] if source_ref else [])]))
+                evidence = list(dict.fromkeys([
+                    *json.loads(prior["evidence_ids_json"]), *(evidence_ids or [])]))
+                con.execute("""UPDATE workflow_memories SET status=?,occurrence_count=?,
+                    evidence_ids_json=?,source_refs_json=?,last_seen_at=?,expires_at=?,updated_at=?
+                    WHERE id=?""", (status, count, json.dumps(evidence), json.dumps(sources),
+                                    stamp, expiry, stamp, prior["id"]))
+                memory_id = prior["id"]
+            else:
+                memory_id = f"workflow-memory-{uuid.uuid4().hex[:12]}"
+                con.execute("""INSERT INTO workflow_memories VALUES
+                    (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (
+                    memory_id, workgroup_id, workflow_id, title,
+                    json.dumps(trigger or {}), json.dumps(instructions),
+                    json.dumps(dependencies or []), json.dumps(evidence_ids or []),
+                    json.dumps([source_ref] if source_ref else []),
+                    "hardening" if explicit_update else "candidate", 1,
+                    stamp, stamp, expiry, stamp, stamp))
+        return self.workflow_memory(memory_id)
+
+    def workflow_memory(self, memory_id: str) -> dict:
+        with self.connect() as con:
+            row = con.execute("SELECT * FROM workflow_memories WHERE id=?", (memory_id,)).fetchone()
+        value = self._decode(row)
+        if not value:
+            raise KeyError(f"unknown workflow memory: {memory_id}")
+        return value
+
+    def workflow_memories(self, *, statuses: tuple[str, ...] = ("candidate", "hardening"),
+                          limit: int = 100) -> tuple[dict, ...]:
+        marks = ",".join("?" for _ in statuses)
+        with self.connect() as con:
+            rows = con.execute(
+                f"SELECT * FROM workflow_memories WHERE status IN ({marks}) "
+                "ORDER BY updated_at DESC LIMIT ?",
+                (*statuses, max(1, min(int(limit), 500)))).fetchall()
+        return tuple(self._decode(row) for row in rows)
+
+    def consolidate_operating_memory(self, *, at: str | None = None) -> dict:
+        """Deterministically expire stale one-off procedural candidates."""
+
+        stamp = at or now()
+        with self.connect() as con:
+            expired = con.execute("""UPDATE workflow_memories
+                SET status='expired',updated_at=?
+                WHERE status='candidate' AND occurrence_count<2
+                  AND expires_at IS NOT NULL AND expires_at<?""", (stamp, stamp)).rowcount
+        return {"expired_workflow_candidates": expired, "consolidated_at": stamp}
 
     def record_directive(self, text: str, *, scope: str = "company",
                          goal_id: str | None = None) -> dict:

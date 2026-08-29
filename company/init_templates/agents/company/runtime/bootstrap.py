@@ -4,7 +4,7 @@ Creates a vendored copy of the harness spine plus the private state tree in
 a target directory (default: cwd), so the resulting repository has zero
 runtime dependency on the installed package:
 
-    .agents/company/**     runtime spine + example departments
+    .agents/company/**     runtime spine + optional Workgroups
     .agents/skills/**      skills/company + skills/website namespaces
     .spielos/state|data|artifacts/
     .spielos/.env.example  credential contract
@@ -152,9 +152,9 @@ def template_root() -> Path:
 _template_root = template_root  # backward-compatible alias
 
 
-def available_departments() -> list[str]:
-    """Department ids vendorable with ``init --minimal --department ID``."""
-    root = template_root() / "agents" / "company" / "departments"
+def available_workgroups() -> list[str]:
+    """Workgroup ids vendorable with ``init --workgroup ID``."""
+    root = template_root() / "agents" / "company" / "workgroups"
     if not root.is_dir():
         return []
     return sorted(entry.name for entry in root.iterdir()
@@ -182,13 +182,13 @@ def _copy_tree(src: Path, dst: Path, overwrite: bool = False,
 
 
 def scaffold(target: Path | None = None, *, force: bool = False,
-             minimal: bool = False, departments: list[str] | None = None,
+             minimal: bool = False, workgroups: list[str] | None = None,
              on_phase=None) -> dict:
     """Materialize a complete harness home. Returns a receipt dict.
 
     ``minimal=True`` ships the spine with an EMPTY workgroups/ folder and
-    no website skills — a single-department appliance. Pass
-    ``departments=["id", ...]`` to also vendor those from the templates.
+    no website skills. Pass ``workgroups=["id", ...]`` to vendor selected
+    Workgroups from the templates.
     ``on_phase(label)`` is called before each materialization chunk so an
     interactive driver can show progress; it is optional plumbing and
     never changes what gets written.
@@ -232,12 +232,12 @@ def scaffold(target: Path | None = None, *, force: bool = False,
         workgroups_pkg.mkdir(parents=True, exist_ok=True)
         (workgroups_pkg / "__init__.py").touch()
         written.append(str(workgroups_pkg / "__init__.py"))
-        for dept_id in departments or []:
-            src = templates / "agents" / "company" / "workgroups" / dept_id
+        for workgroup_id in workgroups or []:
+            src = templates / "agents" / "company" / "workgroups" / workgroup_id
             if not src.is_dir():
-                raise ValueError(f"template has no department '{dept_id}'")
+                raise ValueError(f"template has no Workgroup '{workgroup_id}'")
             written += _copy_tree(src, root / ".agents" / "company"
-                                  / "workgroups" / dept_id, overwrite=force)
+                                  / "workgroups" / workgroup_id, overwrite=force)
     else:
         written += _copy_tree(templates / "agents", root / ".agents",
                               overwrite=force,
@@ -300,7 +300,8 @@ def scaffold(target: Path | None = None, *, force: bool = False,
         "files_written": len(written),
         "next_steps": [
             "cd " + str(root),
-            "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.agents python3 -B -m company status",
+            "opencode",
+            "Select the Director agent before chatting (not Build).",
             "Make it yours: edit .agents/company/strategy/ (ICP, voice) and add a Workgroup.",
             "Set credentials in .spielos/.env (see .spielos/.env.example).",
         ],
@@ -332,9 +333,13 @@ _AGENTS_MD = """# Agent operating rules — harness section
 This repository runs on the SpielOS company harness: one durable loop
 (GOAL -> OBSERVE -> DECIDE -> ACT -> EVALUATE) persisted in SQLite under
 `.spielos/state/`. The runtime owns every Goal, approval, run, and evidence
-record; Departments supply business behavior only.
+record; Workgroups supply Worker-owned behavior only.
 
 Authority and full documentation: `.agents/company/README.md`.
+
+Open OpenCode or Codex and select the Director agent before chatting. The host
+injects fresh company state automatically; do not begin with a manual status
+probe.
 
 ## OpenCode commands
 
@@ -349,7 +354,7 @@ Authority and full documentation: `.agents/company/README.md`.
 ## Rules
 
 - Live external actions always park for explicit approval.
-- The Director and Department executors never edit repository files;
+- The Director and Workgroup Workers never edit repository files;
   `system-improvement` is the only editing agent, bounded by its goal.
 - Strategy authority lives in `.agents/company/strategy/`; never restate it.
 """

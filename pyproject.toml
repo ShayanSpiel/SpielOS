@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "spielos"
-description = "SpielOS: one durable Goal loop, Departments, approvals, evidence, and evals for operating AI work as a company system."
+description = "SpielOS: one durable Goal loop, Worker-owned Workgroups, approvals, evidence, and evals for operating AI work."
 readme = "README.md"
 requires-python = ">=3.11"
-license = {text = "MIT"}
+license = "MIT"
 dynamic = ["version"]
 authors = [{ name = "Shayan Spiel" }]
 keywords = ["ai-agents", "agent-harness", "company-runtime", "spielos"]
@@ -28,11 +28,11 @@ company = [
     "init_templates/**/*",
     "dot-env-example",
     "skills/**/*",
-    "departments/*/skills/**/*",
-    "departments/_shared/skills/**/*",
-    "departments/design/tools/**/*",
-    "departments/design/tokens/*.css",
+    "workgroups/**/*",
 ]
+
+[tool.setuptools.exclude-package-data]
+"*" = ["**/__pycache__/*", "**/*.pyc", "init_templates/agents/company/tests/*"]
 
 [tool.setuptools.dynamic]
 version = { attr = "company.runtime.config.VERSION" }
