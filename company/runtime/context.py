@@ -104,6 +104,14 @@ class ContextAssembler:
         if state_lines:
             sections.append((95, "Company state\n" + "\n".join(state_lines)))
 
+        if not bare_greeting and self._has_no_active_goal(state_lines):
+            sections.append((92,
+                "Fresh-home route\n"
+                "- No active Goal exists. If the owner has useful work in another project "
+                "or file set, briefly offer read-only migration planning; do not force it.\n"
+                "- A request for a plan does not authorize copying, transformation, secret "
+                "transfer, installation, deployment, or any other migration execution."))
+
         claims = ([] if bare_greeting else
                   self._matching_profile_claims(query, workflow_id=workflow_id))
         if claims:
@@ -225,6 +233,10 @@ class ContextAssembler:
                          f"{item.get('required_user_action') or item.get('message') or item.get('why_next')}")
         sources.extend(f"goal:{item['id']}" for item in (visible[:5] if status_request else relevant[:4]))
         return lines
+
+    @staticmethod
+    def _has_no_active_goal(state_lines: list[str]) -> bool:
+        return any("0 active Goal(s)" in line for line in state_lines)
 
     def _matching_profile_claims(self, query: set[str], *, workflow_id: str | None) -> list[dict]:
         claims = list(self._optional(

@@ -121,6 +121,21 @@ class ContextMemoryV2Tests(unittest.TestCase):
         self.assertNotIn("Company profile", context)
         self.assertNotIn("Persistence rule", context)
 
+    def test_fresh_home_projection_offers_planning_without_execution_authority(self):
+        projection = ContextAssembler(self.store, project_root=self.root).assemble(
+            prompt="I have an existing website in another folder", owner_id="director")
+        context = projection["context"]
+        self.assertIn("Fresh-home route", context)
+        self.assertIn("offer read-only migration planning", context)
+        self.assertIn("does not authorize copying", context)
+
+        self.store.create_goal(
+            name="Ship current site", owner_id="product",
+            metric="activation_rate", operator="ge", target=50)
+        active = ContextAssembler(self.store, project_root=self.root).assemble(
+            prompt="I have an existing website in another folder", owner_id="director")
+        self.assertNotIn("Fresh-home route", active["context"])
+
     def test_memory_summary_counts_profile_as_durable_memory(self):
         claim = self.store.set_profile_claim(
             namespace="operating_principles", claim_key="review_ux",

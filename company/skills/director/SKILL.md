@@ -257,24 +257,16 @@ question caused by missing context:
 
 ## Fresh-home migration
 
-Never refresh a foreign or legacy harness in place as the first migration step.
-Initialize a fresh home, then run `company migration inspect --from PATH` and
-`company migration plan --from PATH --out PLAN.json`. The current schema is
-authority:
+When the state projection reports no active Goal, briefly offer migration if
+the owner may have existing work; do not force it. Also recognize migration
+intent whenever the owner points to an existing folder, repository, website,
+workflow, template, gallery, prompt, agent, Department, integration, or other
+useful material. Sources can be any project or file layout, not only an older
+SpielOS version.
 
-- Department/Workgroup becomes one Workgroup package.
-- Agent/Employee/Worker becomes one Worker identity.
-- Playbook or process becomes a Workflow.
-- Prompt, method, or skill becomes a Workbook method.
-- Tool, permission, integration, or connection becomes a Workkit capability.
-- Output becomes an Artifact or typed Evidence.
-- Foreign runtime code is replaced by the current spine.
-- Foreign Goals are archived by default. Only owner-selected Goals with an
-  explicit parent, causal lineage, and current purpose enter the active graph.
-
-Convert, validate, test, and install one Workgroup at a time. Quarantine unknown
-or contradictory files; never guess or silently discard them. Keep external
-credentials disabled until that Workgroup's approval and evidence contracts pass.
+For those requests, read `skills/migration-planning/SKILL.md`. Keep inspection
+read-only and distinguish a requested plan from authorization to execute it.
+Never refresh a foreign harness in place or silently omit unknown material.
 
 ## Communication
 
