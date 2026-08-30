@@ -56,16 +56,33 @@ jobs:
           set -euo pipefail
           VERSION="${GITHUB_REF_NAME#v}"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          URL="https://files.pythonhosted.org/packages/source/s/spielos/spielos-${VERSION}.tar.gz"
-          echo "Downloading $URL"
-          curl -fsSL "$URL" -o spielos.tar.gz
-          SHA256=$(shasum -a 256 spielos.tar.gz | awk '{print $1}')
-          echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
-          echo "Computed sha256=$SHA256 for spielos-$VERSION.tar.gz"
+          python - "$VERSION" "$GITHUB_OUTPUT" <<'PY'
+          import hashlib
+          import json
+          import pathlib
+          import sys
+          import urllib.request
+
+          version, output_path = sys.argv[1:]
+          metadata_url = f"https://pypi.org/pypi/spielos/{version}/json"
+          with urllib.request.urlopen(metadata_url) as response:
+              metadata = json.load(response)
+          sdist = next(item for item in metadata["urls"] if item["packagetype"] == "sdist")
+          with urllib.request.urlopen(sdist["url"]) as response:
+              archive = response.read()
+          digest = hashlib.sha256(archive).hexdigest()
+          if digest != sdist["digests"]["sha256"]:
+              raise SystemExit("PyPI sdist checksum mismatch")
+          pathlib.Path("spielos.tar.gz").write_bytes(archive)
+          with open(output_path, "a", encoding="utf-8") as output:
+              output.write(f"url={sdist['url']}\n")
+              output.write(f"sha256={digest}\n")
+          print(f"Resolved {sdist['url']} with sha256={digest}")
+          PY
       - name: Inject computed sha256 into formula
         run: |
           set -euo pipefail
-          sed -i.bak -E "s|spielos-[0-9]+\.[0-9]+\.[0-9]+\.tar\.gz|spielos-${{ steps.dist.outputs.version }}.tar.gz|" homebrew/spielos.rb
+          sed -i.bak -E 's|^  url ".*"|  url "${{ steps.dist.outputs.url }}"|' homebrew/spielos.rb
           sed -i.bak "s|sha256 \".*\"|sha256 \"${{ steps.dist.outputs.sha256 }}\"|" homebrew/spielos.rb
           rm -f homebrew/spielos.rb.bak
           grep -q "${{ steps.dist.outputs.sha256 }}" homebrew/spielos.rb \
