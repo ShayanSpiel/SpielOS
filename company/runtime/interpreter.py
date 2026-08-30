@@ -1,6 +1,6 @@
-"""Generic Department interpreter: WorkflowSpec graphs as Lego under one loop.
+"""Generic Workgroup interpreter: WorkflowSpec graphs under one Goal loop.
 
-Departments declare package data. This interpreter runs:
+Workgroups declare package data. This interpreter runs:
   OBSERVE → count evidence + surface memory
   DECIDE  → goal met | next graph step | catalog agent shortfall
   ACT     → work order | approval | connection handoff | machine hook
@@ -153,8 +153,8 @@ def next_incomplete_step(graph: tuple[WorkflowStep, ...], evidence: list[dict],
     return None
 
 
-class InterpretedDepartment:
-    """Lego runtime for declarative Department packages."""
+class InterpretedWorkgroup:
+    """Runtime adapter for declarative Worker-owned Workgroup packages."""
 
     evidence_metrics: dict = {}
     workflow_agents: dict = {}
@@ -211,7 +211,7 @@ class InterpretedDepartment:
         step = next_incomplete_step(graph, evidence, ctx.approval_status)
 
         if step is None:
-            # Fall back to metric shortfall work order (classic evidence department).
+            # Fall back to a metric-shortfall work order.
             # Float-safe: fractional targets round UP to whole artifacts.
             needed = _shortfall(ctx.goal.target, current_value)
             payload = agent_shortfall(

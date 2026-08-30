@@ -105,8 +105,8 @@ Director's narrow OpenCode permission and turn a safe state read into a generic
 shell request.
 
 For basic orientation use `company overview` once. It is the authoritative
-single read for Goals, topology health, Workgroups/Departments,
-Workers/Agents/Employees, work orders, artifact location, and recorded friction.
+single read for Goals, topology health, Workgroups, Workers, work orders,
+artifact location, and recorded friction.
 Do not assemble that answer by probing several command families. Use
 `company goal topology` only for graph defects or migration detail.
 
@@ -124,6 +124,17 @@ Do not assemble that answer by probing several command families. Use
    describe company-profile claims, directives, experiment learning, Workflow
    memory, and legacy learning as separate durable-memory categories. Empty
    learning categories never erase populated owner-profile memory.
+   On every non-greeting user turn, semantically decide whether there is a
+   `temporary_instruction`, `profile_update`, `directive`,
+   `workflow_instruction`, `workflow_correction`, or `experiment_learning`.
+   Meaning comes from the whole turn and context, never keyword matching. When
+   present, resolve one structured candidate with `memory apply-candidate`.
+   Include scope, confidence, ambiguity, source provenance, and for Workflow
+   behavior a stable `behavior_key`, trigger, and dependencies. Direct owner
+   corrections are authoritative immediately. Diagnose the source: repair a
+   defective canonical Workflow through a bounded system improvement; write
+   Workflow Memory only when the Workflow is correct and execution behavior was
+   wrong. Keep task/run corrections temporary and do not promote ambiguity.
 2. Reuse the active Director root for company pursuit. Create it when the first
    material outcome is selected; attach production Workgroup Goals beneath it.
    Run a Workgroup independently only for a genuinely independent outcome.

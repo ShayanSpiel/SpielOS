@@ -37,7 +37,7 @@ TERMINAL = {"achieved", "abandoned", "expired"}
 SUSPENDED = {RunStatus.WAITING, RunStatus.AWAITING_APPROVAL, RunStatus.BLOCKED,
              RunStatus.FAILED, RunStatus.COMPLETED}
 
-# Map capability tokens from department attention payloads to catalog defaults.
+# Map capability tokens from Workgroup attention payloads to catalog defaults.
 # Identity-owned mapping lives in the user configuration layer
 # (runtime/config.py + config.user.json).
 CAPABILITY_EMPLOYEES = config.capability_employees()
@@ -544,7 +544,7 @@ class Runtime:
 
         Approvals are not work orders. Only blocked runs that name an employee
         (or a known capability / connection handoff) create one. Missing employee
-        or evidence kinds are filled from the Department WorkflowSpec catalog.
+        or evidence kinds are filled from the Workgroup WorkflowSpec catalog.
         """
 
         if result.run_status is not RunStatus.BLOCKED:
@@ -610,7 +610,7 @@ class Runtime:
                 if isinstance((goal.config or {}).get("content_request"), dict) else {},
             # The Interpreter places bounded, selected context in the action
             # payload. Preserve it in the persisted assignment; otherwise
-            # cross-Department Memory and Strategy only affect an audit row.
+            # cross-Workgroup Memory and Strategy only affect an audit row.
             "memory": list(source.get("memory") or ()),
             "strategy": dict(source.get("strategy") or {}),
             "strategy_context": dict(source.get("strategy") or {}),

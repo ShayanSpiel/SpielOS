@@ -122,8 +122,8 @@ class OrientationTests(unittest.TestCase):
                              "overview"])
             self.assertEqual(code, 0)
             self.assertIn("# Company overview", output.getvalue())
-            self.assertIn("Workgroups (Departments)", output.getvalue())
-            self.assertIn("Workers (Agents/Employees)", output.getvalue())
+            self.assertIn("Workgroups:", output.getvalue())
+            self.assertIn("Workers:", output.getvalue())
 
 
 class ArtifactLifecycleTests(unittest.TestCase):

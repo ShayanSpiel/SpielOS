@@ -67,6 +67,7 @@ class HostContextHookTests(unittest.TestCase):
         self.assertIn("company/strategy/focus.md", instructions)
         self.assertNotIn("`.agents/company/strategy/focus.md`", instructions)
         self.assertIn("company memory summary --json", instructions)
+        self.assertIn("company\nmemory apply-candidate", instructions)
         self.assertIn("Never say “memory is empty”", instructions)
 
     @unittest.skipUnless(shutil.which("opencode"), "OpenCode is not installed")
@@ -172,6 +173,7 @@ console.log(JSON.stringify(output.system))
             self.assertIn("without running `company status` again", instructions)
             self.assertNotIn("begin with the compact company status projection", instructions)
             self.assertIn("company memory summary --json", instructions)
+            self.assertIn("memory apply-candidate", instructions)
             self.assertIn("context unavailable", instructions)
 
         source_codex = (ROOT / ".codex" / "agents" / "director.toml").read_text()

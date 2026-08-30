@@ -1,4 +1,4 @@
-"""SpielOS company harness: durable goals, Departments, and one loop."""
+"""SpielOS: one durable Goal loop with Worker-owned Workgroups."""
 
 from .runtime import EvidenceValidity, GoalStatus, RunStatus, RunType, Stage, Runtime
 

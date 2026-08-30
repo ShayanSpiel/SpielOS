@@ -65,6 +65,7 @@ jobs:
       - name: Inject computed sha256 into formula
         run: |
           set -euo pipefail
+          sed -i.bak -E "s|spielos-[0-9]+\.[0-9]+\.[0-9]+\.tar\.gz|spielos-${{ steps.dist.outputs.version }}.tar.gz|" homebrew/spielos.rb
           sed -i.bak "s|sha256 \".*\"|sha256 \"${{ steps.dist.outputs.sha256 }}\"|" homebrew/spielos.rb
           rm -f homebrew/spielos.rb.bak
           grep -q "${{ steps.dist.outputs.sha256 }}" homebrew/spielos.rb \

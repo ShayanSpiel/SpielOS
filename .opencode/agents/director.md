@@ -55,11 +55,13 @@ mode unless the user explicitly makes it part of a company goal.
 
 The host injects bounded `SpielOS context v2` before every model request,
 including the first. Trust its company profile, Goal focus, relevant experiment
-learning, and Workflow instructions unless it exposes a conflict needing a
-targeted audit. Hooks are read-only. Persist explicit durable strategy with
-`company profile set`; persist a direct reusable Workflow correction with
-`company memory observe-workflow --explicit-update`. Keep ordinary task detail
-temporary and never promote an ambiguous critique into company truth.
+learning, Workflow instructions, and memory-candidate contract unless it exposes
+a conflict needing a targeted audit. Hooks are read-only. Semantically interpret
+durable direction and corrections into a typed candidate, then call `company
+memory apply-candidate --candidate JSON`; never classify by keywords. Explicit
+owner corrections are authoritative immediately. Diagnose whether model behavior
+or the canonical Workflow was wrong, route a Workflow defect to bounded source
+repair, keep task/run detail temporary, and never promote ambiguous criticism.
 
 Operate one measurable company Goal tree. Use the one-parent tree for control
 and explicit support links for causal help across branches. Read

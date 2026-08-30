@@ -16,6 +16,7 @@ from typing import Any
 
 from .alignment import priority_score
 from .memory import rank_experiment_memories, rank_workflow_memories
+from .memory_capture import candidate_contract
 from .paths import find_project_root
 from .service import RunnerService
 
@@ -74,7 +75,10 @@ class ContextAssembler:
 
     def assemble(self, *, prompt: str = "", boot: bool = False,
                  owner_id: str | None = None, workflow_id: str | None = None,
-                 step_id: str | None = None, token_budget: int | None = None) -> dict[str, Any]:
+                 step_id: str | None = None,
+                 trigger_context: dict | None = None,
+                 available_dependencies: list[str] | tuple[str, ...] = (),
+                 token_budget: int | None = None) -> dict[str, Any]:
         query = _terms(prompt)
         budget = max(600, int(token_budget or
                               ((BOOT_CHAR_BUDGET if boot else TURN_CHAR_BUDGET) // 4)))
@@ -135,7 +139,10 @@ class ContextAssembler:
 
         workflows = [] if bare_greeting else rank_workflow_memories(
             self._optional(self.store.workflow_memories, limit=100), prompt=prompt,
-            workflow_id=workflow_id, limit=2)
+            workflow_id=workflow_id, step_id=step_id,
+            trigger_context={**dict(trigger_context or {}),
+                             **({"step_id": step_id} if step_id else {})},
+            available_dependencies=available_dependencies, limit=2)
         if workflows:
             sources.extend(item["id"] for item in workflows)
             sections.append((80, "Reusable Workflow instructions\n" + "\n".join(
@@ -147,14 +154,19 @@ class ContextAssembler:
         if friction:
             sections.append((85, "Open harness friction\n" + "\n".join(friction)))
 
-        # This contract makes interpretation explicit while keeping hooks read-only.
+        # The host model interprets meaning; the runtime validates and persists.
         if not boot and not bare_greeting:
+            contract = candidate_contract()
             sections.append((60,
-                "Persistence rule\n"
-                "Treat task-only instructions as temporary. When the owner explicitly says "
-                "always/from now on/remember or directly updates a named Workflow, record a "
-                "typed profile or Workflow-memory update with source scope before finishing. "
-                "Do not infer a durable company fact from an ambiguous critique. Put generated "
+                "Memory/correction interpretation\n"
+                "Semantically inspect this user turn; do not classify by keywords. If it contains "
+                "durable direction, evidence-backed learning, or an explicit correction, emit one "
+                f"typed candidate using intents {', '.join(contract['intents'])} and resolve it with "
+                f"`{contract['command']}`. Include scope, confidence, ambiguity, source provenance, "
+                "and a stable behavior_key for Workflow behavior. Explicit owner corrections apply "
+                "immediately. Diagnose whether the fault is model behavior or the canonical Workflow: "
+                "repair a defective Workflow at source, never by contradictory memory. Keep task/run "
+                "instructions temporary and never promote ambiguous criticism. Put generated "
                 "work in the canonical artifact workspace, finalize only outcomes, and clean its "
                 "work folder. Auto-open final folders only for owner-facing creative/content "
                 "deliverables (video, image, audio, copy, document, or deck), never for code, "

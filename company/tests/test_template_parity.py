@@ -17,6 +17,7 @@ class TemplateParityTests(unittest.TestCase):
             "runtime/catalog.py",
             "runtime/store.py",
             "runtime/memory.py",
+            "runtime/memory_capture.py",
             "runtime/context.py",
             "runtime/loop.py",
             "runtime/interpreter.py",

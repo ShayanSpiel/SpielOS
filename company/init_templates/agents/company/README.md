@@ -58,8 +58,15 @@ Durable knowledge is separated by authority:
   reusable claim cites valid evidence and declares where it applies. Repeated
   matching outcomes reinforce it; contradictions reduce confidence.
 - Workflow Memory starts as a concise procedural candidate. A direct reusable
-  correction hardens immediately; otherwise the same instruction must appear
-  twice within 14 days. Consolidation expires stale one-off candidates.
+  correction hardens immediately; otherwise the same semantic behavior key must
+  appear twice within 14 days. Newer explicit corrections supersede the prior
+  record without deleting provenance. Trigger and dependency fields are hard
+  applicability gates. Consolidation expires stale one-off candidates.
+- The host model semantically extracts typed candidates on user turns; the
+  deterministic memory writer owns validation, scope, authority, identity,
+  deduplication, supersession, and routing. Task/run instructions remain
+  temporary, ambiguous criticism is audited but not promoted, and canonical
+  Workflow defects route to source repair rather than contradictory memory.
 - Goals, the control tree/support graph, work orders, approvals, and attention
   remain operational state—not semantic Memory.
 
@@ -70,9 +77,11 @@ Per-message context retrieves only relevant profile overlays, evidence-backed
 learning, and Workflow instructions. Both adapters are read-only, deterministic,
 and fail open. The host continues to own conversation and tool history.
 
-Agents persist explicit owner updates with `company profile set` and concise
-procedures with `company memory observe-workflow`; they can inspect the projection
-with `company context --prompt ...`. Ambiguous comments and task-only detail are
+Hosts resolve semantically extracted direction and corrections with `company
+memory apply-candidate --candidate JSON`; explicit low-level writes remain
+available through `company profile set` and `company memory observe-workflow`.
+They can inspect the projection with `company context --prompt ...`. Ambiguous
+comments and task-only detail are
 never promoted automatically.
 
 Source changes use a bounded system-improvement Goal with an explicit problem, allowed files, and acceptance commands. The executor records actual acceptance evidence before the change is complete.

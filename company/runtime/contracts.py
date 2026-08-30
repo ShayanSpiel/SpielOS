@@ -1,7 +1,7 @@
 """Declarative workflow contracts: goal validation and agent shortfall briefs.
 
-Departments declare WorkflowSpec + goal_schema. The runtime turns shortfalls
-into durable work-order briefs without each Department inventing attention JSON.
+Workgroups declare WorkflowSpec + goal_schema. The runtime turns shortfalls
+into durable work-order briefs without package-specific control loops.
 """
 
 from __future__ import annotations
@@ -109,7 +109,7 @@ def validate_goal_request(handler: GoalHandler, *, metric: str,
 
     if workflows or enum:
         allowed = set(enum) if enum else {item.id for item in workflows}
-        # Workflows listed on the Department remain valid even if schema enum lags.
+        # Workflows listed on the Workgroup remain valid even if schema enum lags.
         allowed |= {item.id for item in workflows}
         workflow_id = config.get("workflow")
         if not workflow_id:
@@ -122,7 +122,7 @@ def validate_goal_request(handler: GoalHandler, *, metric: str,
                 f"workflow '{config['workflow']}' is not supported by '{handler.id}'; "
                 f"use: {', '.join(sorted(allowed))}")
 
-    # A Department may declare the bounded Strategy context its workers need.
+    # A Workgroup may declare the bounded Strategy context its workers need.
     # Keep this opt-in and handler-owned: ordinary technical Goals must not
     # load the Strategy Kernel, while Content Goals must not silently run with
     # an empty buyer/voice context.
@@ -136,7 +136,7 @@ def validate_goal_request(handler: GoalHandler, *, metric: str,
         if not isinstance(rule, dict) or key == "workflow":
             continue
         if key not in config:
-            # required_when is enforced by Departments at ACT time; create only
+            # required_when is enforced by Workgroups at ACT time; create only
             # demands unconditionally required fields.
             if rule.get("required") and not rule.get("required_when"):
                 raise ValueError(f"config.{key} is required for '{handler.id}'")
@@ -193,7 +193,7 @@ def agent_shortfall(handler: GoalHandler, *, goal_id: str, metric: str,
     workflow = workflow_by_id(handler, workflow_id)
     employee_id = employee_for(handler, workflow)
     if not employee_id:
-        raise ValueError(f"department '{handler.id}' has no employee for workflow '{workflow_id}'")
+        raise ValueError(f"Workgroup '{handler.id}' has no Worker for Workflow '{workflow_id}'")
     needed = max(1, int(needed))
     accepts = accepted_evidence_for(handler, workflow=workflow, metric=metric,
                                     employee_id=employee_id)
@@ -223,7 +223,7 @@ def agent_shortfall(handler: GoalHandler, *, goal_id: str, metric: str,
 
 def enrich_work_order_source(handler: GoalHandler | None, goal: dict,
                              source: dict[str, Any]) -> dict[str, Any]:
-    """Fill missing employee/evidence fields from the Department catalog."""
+    """Fill missing Worker/evidence fields from the Workgroup catalog."""
 
     out = dict(source)
     if handler is None:

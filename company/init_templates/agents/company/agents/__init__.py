@@ -1,7 +1,7 @@
 """Canonical company agent catalog.
 
 Codex and OpenCode manifests are client adapters. These records are the stable
-company identities that Departments reference in durable workflow requests.
+company identities that Workgroups reference in durable Workflow requests.
 
 Built-in employees live in AGENTS. Installed Lego packages may add more under
 agents/installed/*.json; those are merged at load time (installed wins on id clash
@@ -77,10 +77,10 @@ AGENTS = {
         ),
         AgentSpec(
             id="analytics-operator",
-            description="Validates and reports company, funnel, attribution, and Department metrics.",
+            description="Validates and reports company, funnel, attribution, and Workgroup metrics.",
             skill_ids=("analytics",),
             permissions=("read_analytics", "query_posthog", "write_metric_evidence"),
-            produces=("company_scorecard", "funnel_report", "department_evidence"),
+            produces=("company_scorecard", "funnel_report", "workgroup_evidence"),
         ),
         AgentSpec(
             id="cro-optimizer",
@@ -109,21 +109,21 @@ AGENTS = {
 _INSTALLED_DIR = Path(__file__).resolve().parent / "installed"
 
 # Skills live in two namespaces under .agents/skills/: company/ (harness
-# operation: director, departments, outbound) and website/ (site-bound methods).
+# operation: Director and system improvement) and website/ (site-bound methods).
 # Resolution is recursive so callers never depend on the namespace layout.
 # Skill discovery: skills live INSIDE the thing that uses them.
 #
 #   company/skills/<id>/SKILL.md                   operator methods (director,
-#                                                  department-runner, system-improvement)
-#   company/departments/<id>/skills/<id>/SKILL.md  department-bound methods
-#   company/departments/_shared/skills/<id>/       shared by departments
+#                                                  workgroup-runner, system-improvement)
+#   company/workgroups/<id>/skills/<id>/SKILL.md   Workgroup-bound methods
+#   company/workgroups/_shared/skills/<id>/        shared by Workgroups
 #                                                  (e.g. copywriting-en/fa)
 #
 # Vendored homes may also carry the legacy .agents/skills/{company,website}/
 # layout; those roots are still scanned for backward compatibility.
 
 _PACKAGE_ROOT = Path(__file__).resolve().parents[1]
-_DEPARTMENTS_ROOT = _PACKAGE_ROOT / "departments"
+_WORKGROUPS_ROOT = _PACKAGE_ROOT / "workgroups"
 _OPERATOR_SKILLS_ROOT = _PACKAGE_ROOT / "skills"
 _LEGACY_SKILLS_ROOT = _PACKAGE_ROOT.parents[1] / ".agents" / "skills"
 
@@ -131,8 +131,8 @@ _LEGACY_SKILLS_ROOT = _PACKAGE_ROOT.parents[1] / ".agents" / "skills"
 def _skill_search_roots() -> list[Path]:
     roots = [root for root in (
         _OPERATOR_SKILLS_ROOT,
-        _DEPARTMENTS_ROOT / "_shared" / "skills",
-        *sorted(_DEPARTMENTS_ROOT.glob("*/skills")),
+        _WORKGROUPS_ROOT / "_shared" / "skills",
+        *sorted(_WORKGROUPS_ROOT.glob("*/skills")),
     ) if root.is_dir()]
     if _LEGACY_SKILLS_ROOT.is_dir():
         roots.extend(sorted(_LEGACY_SKILLS_ROOT.glob("*")))
@@ -160,9 +160,9 @@ def known_skill_ids() -> set[str]:
 
 
 def known_company_skill_ids() -> set[str]:
-    """Skill ids Departments may bind — every discovered skill.
+    """Skill ids Workgroups may bind — every discovered skill.
 
-    Departments own their methods, so the historical company/website
+    Workgroups own their methods, so the historical company/website
     namespace split no longer exists; all discoverable skills are bindable.
     """
 

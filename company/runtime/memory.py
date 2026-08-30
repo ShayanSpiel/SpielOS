@@ -35,10 +35,13 @@ def eligible_memory(learning: dict, evidence: list[dict], goal, run) -> dict | N
                for key, value in raw_dimensions.items()}
     if not any(context.values()):
         return None
-    share_scope = learning.get("share_scope") or "department"
-    audience_raw = learning.get("audience_departments") or ()
+    share_scope = learning.get("share_scope") or "workgroup"
+    audience_raw = (learning.get("audience_workgroups")
+                    or learning.get("audience_departments") or ())
     topics_raw = learning.get("topics") or ()
-    if (share_scope not in {"department", "company"}
+    if share_scope == "department":  # historical input only
+        share_scope = "workgroup"
+    if (share_scope not in {"workgroup", "company"}
             or not isinstance(audience_raw, (list, tuple))
             or not isinstance(topics_raw, (list, tuple))):
         return None
@@ -65,7 +68,7 @@ def eligible_memory(learning: dict, evidence: list[dict], goal, run) -> dict | N
             "decision_relevance": relevance,
             "applies_to": context,
             "share_scope": share_scope,
-            "audience_departments": audience if share_scope == "company" else [],
+            "audience_workgroups": audience if share_scope == "company" else [],
             "topics": topics if share_scope == "company" else [],
             "support": (dict(learning.get("evidence") or {})
                         if isinstance(learning.get("evidence") or {}, dict) else {}),
@@ -153,18 +156,55 @@ def rank_experiment_memories(memory, *, prompt: str = "", owner_id: str | None =
     return [item for _, item in ranked[:max(0, min(int(limit), 5))]]
 
 
+def _trigger_applies(trigger: dict, context: dict) -> bool:
+    for key, expected in (trigger or {}).items():
+        actual = context.get(key)
+        if isinstance(expected, list):
+            actual_values = actual if isinstance(actual, list) else [actual]
+            if not set(expected).intersection(item for item in actual_values if item is not None):
+                return False
+        elif actual != expected:
+            return False
+    return True
+
+
 def rank_workflow_memories(memory, *, prompt: str = "", workflow_id: str | None = None,
+                           step_id: str | None = None, scope: str | None = None,
+                           trigger_context: dict | None = None,
+                           available_dependencies: list[str] | tuple[str, ...] = (),
                            limit: int = 2) -> list[dict]:
+    """Rank applicable Workflow memory; trigger/dependencies are hard filters."""
+
     query = _terms(prompt)
+    trigger_context = dict(trigger_context or {})
+    if step_id:
+        trigger_context.setdefault("step_id", step_id)
+    available = set(available_dependencies or ())
     ranked = []
     for item in memory or ():
         if item.get("status") not in {"candidate", "hardening", "promoted"}:
             continue
-        score = 30 if workflow_id and item.get("workflow_id") == workflow_id else 0
+        if workflow_id and item.get("workflow_id") != workflow_id:
+            continue
+        if scope and item.get("scope", "workflow") not in {scope, "company"}:
+            continue
+        if not _trigger_applies(item.get("trigger") or {}, trigger_context):
+            continue
+        dependencies = set(item.get("dependencies") or ())
+        if dependencies and not dependencies <= available:
+            continue
+        score = 50 if workflow_id else 0
+        if step_id and (item.get("trigger") or {}).get("step_id") == step_id:
+            score += 25
+        if scope and item.get("scope") == scope:
+            score += 15
         text = " ".join((str(item.get("title") or ""), str(item.get("workflow_id") or ""),
+                         str(item.get("behavior_key") or ""),
                          " ".join(str(value) for value in (item.get("instructions") or ()))))
         score += min(30, len(query.intersection(_terms(text))) * 5)
         score += min(10, int(item.get("occurrence_count") or 0) * 3)
+        score += {"owner_explicit": 18, "owner_interpreted": 10,
+                  "observed": 0}.get(item.get("authority"), 0)
         if item.get("status") == "hardening":
             score += 5
         if score > 0:

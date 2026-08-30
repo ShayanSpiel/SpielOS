@@ -94,6 +94,23 @@ class ControlSurfaceTests(unittest.TestCase):
                              if action.dest == "runner_command")
         self.assertNotIn("wake", runner_action.choices)
 
+    def test_runtime_has_no_retired_department_model_or_dead_renderers(self):
+        company_root = Path(__file__).parents[1]
+        models = (company_root / "runtime" / "models.py").read_text()
+        interpreter = (company_root / "runtime" / "interpreter.py").read_text()
+        command = (company_root / "__main__.py").read_text()
+        registry = (company_root / "workgroups" / "registry.py").read_text()
+        self.assertNotIn("class Department", models)
+        self.assertNotIn("department_id", models + registry)
+        self.assertNotIn("InterpretedDepartment", interpreter + registry)
+        self.assertNotIn("render_departments", command)
+        self.assertNotIn("render_department_packages", command)
+
+    def test_skill_discovery_uses_workgroup_roots_only(self):
+        source = (Path(__file__).parents[1] / "agents" / "__init__.py").read_text()
+        self.assertIn("_WORKGROUPS_ROOT", source)
+        self.assertNotIn("_DEPARTMENTS_ROOT", source)
+
     def test_runner_source_contains_advancement_not_watchdog_surfaces(self):
         source = (Path(__file__).parents[1] / "runtime" / "runner.py").read_text()
         self.assertIn("def tick", source)
@@ -108,6 +125,7 @@ class ControlSurfaceTests(unittest.TestCase):
         self.assertEqual(1, source.count(question))
         self.assertIn("sleep 300; echo SPIELOS_WAKE", source)
         self.assertIn("no active Goal", source)
+        self.assertIn("memory apply-candidate", source)
 
     def test_workgroup_runner_starts_from_bounded_assignment_not_catalog(self):
         company_root = Path(__file__).parents[1]

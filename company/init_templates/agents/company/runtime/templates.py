@@ -1,4 +1,4 @@
-"""Brief → multi-step WorkflowSpec graph templates for Department install."""
+"""Brief → multi-step WorkflowSpec graph templates for Workgroup install."""
 
 from __future__ import annotations
 
@@ -81,7 +81,7 @@ def build_graph_from_brief(
     steps: list[str] | None = None,
     external_actions: list[str] | None = None,
 ) -> tuple[list[str], list[dict[str, Any]]]:
-    """Return (step_labels, graph_nodes) for a short department brief."""
+    """Return (step_labels, graph_nodes) for a short Workgroup brief."""
 
     template = (template or "artifact").lower()
     steps = [str(item) for item in (steps or []) if str(item).strip()]

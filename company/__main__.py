@@ -71,6 +71,10 @@ def build_parser():
     context.add_argument("--owner")
     context.add_argument("--workflow")
     context.add_argument("--step")
+    context.add_argument("--trigger-context", default="{}",
+                         help="JSON object used for Workflow-memory applicability")
+    context.add_argument("--dependency", action="append", default=[],
+                         help="available dependency id (repeatable)")
     context.add_argument("--token-budget", type=int)
     context.add_argument("--json", action="store_true")
     profile = commands.add_parser("profile", help="typed company-profile overlays")
@@ -102,6 +106,7 @@ def build_parser():
     workflow_list.add_argument("--json", action="store_true")
     workflow_observe = memory_commands.add_parser("observe-workflow")
     workflow_observe.add_argument("--workflow", required=True)
+    workflow_observe.add_argument("--behavior-key")
     workflow_observe.add_argument("--title", required=True)
     workflow_observe.add_argument("--instructions", required=True,
                                   help="JSON array of concise reusable steps")
@@ -111,6 +116,10 @@ def build_parser():
     workflow_observe.add_argument("--source-ref")
     workflow_observe.add_argument("--explicit-update", action="store_true")
     workflow_observe.add_argument("--json", action="store_true")
+    apply_memory = memory_commands.add_parser(
+        "apply-candidate", help="resolve one model-extracted typed memory candidate")
+    apply_memory.add_argument("--candidate", required=True, help="typed candidate JSON object")
+    apply_memory.add_argument("--json", action="store_true")
     consolidate = memory_commands.add_parser("consolidate")
     consolidate.add_argument("--json", action="store_true")
     workgroup = commands.add_parser("workgroup", help="validate and install Worker-owned Workgroup packages")
@@ -530,9 +539,14 @@ def main(argv=None):
                 output = strategy_kernel_summary(kernel)
         elif args.command == "context":
             from .runtime.context import ContextAssembler
+            trigger_context = json.loads(args.trigger_context)
+            if not isinstance(trigger_context, dict):
+                raise ValueError("--trigger-context must be a JSON object")
             output = ContextAssembler(runtime.store, project_root=PROJECT_ROOT).assemble(
                 prompt=args.prompt, boot=args.boot, owner_id=args.owner,
                 workflow_id=args.workflow, step_id=args.step,
+                trigger_context=trigger_context,
+                available_dependencies=args.dependency,
                 token_budget=args.token_budget)
             if not args.json:
                 print(output["context"])
@@ -591,9 +605,14 @@ def main(argv=None):
                     raise ValueError("--trigger must be a JSON object")
                 output = runtime.store.observe_workflow_memory(
                     workflow_id=args.workflow, title=args.title,
+                    behavior_key=args.behavior_key,
                     instructions=instructions, trigger=trigger,
                     dependencies=dependencies, workgroup_id=args.workgroup,
                     source_ref=args.source_ref, explicit_update=args.explicit_update)
+            elif args.memory_command == "apply-candidate":
+                from .runtime.memory_capture import apply_candidate
+                candidate = json.loads(args.candidate)
+                output = apply_candidate(runtime.store, candidate)
             else:
                 output = runtime.store.consolidate_operating_memory()
         elif args.command == "goal" and args.goal_command == "create":
@@ -1033,7 +1052,7 @@ def _result_message(item):
 def _render_default(args, output) -> str:
     """Human-first card render for the command that just ran.
 
-    Commands without a dedicated renderer (catalog, department install,
+    Commands without a dedicated renderer (catalog, Workgroup install,
     runner tick, tasks WORK_ORDER_ID, status --raw, ...) keep the raw JSON
     projection: they are machine views or runtime plumbing.
     """
@@ -1050,12 +1069,8 @@ def _render_default(args, output) -> str:
         return render_workers(output)
     if command in {"update", "refresh"}:
         return render_update(output)
-    if command == "departments":
-        return render_departments(output)
     if command == "strategy":
         return render_strategy(output)
-    if command == "department" and args.department_command == "list":
-        return render_department_packages(output)
     if command == "goal":
         if args.goal_command == "create":
             return render_goal_created(output)
@@ -1103,8 +1118,8 @@ def render_overview(value):
              f"`{goals['counts']['active']}` active",
              f"- Goal roots: `{len(topology['root_goal_ids'])}` · "
              f"topology defects `{topology['defect_count']}`",
-             f"- Workgroups (Departments): `{len(value['workgroups'])}`",
-             f"- Workers (Agents/Employees): `{len(value['workers'])}`",
+             f"- Workgroups: `{len(value['workgroups'])}`",
+             f"- Workers: `{len(value['workers'])}`",
              f"- Open work orders: `{len(value['work_orders'])}`",
              f"- Recorded friction: `{value['friction']['event_count']}` event(s)",
              f"- Artifact root: `{value['artifacts']['root']}`"]
@@ -1298,31 +1313,6 @@ def render_update(value):
 render_refresh = render_update
 
 
-def render_departments(items):
-    lines = [f"# Departments ({len(items)})", ""]
-    if items:
-        for item in items:
-            lines.append(f"- `{item['id']}` v{item['version']} — {item['description']}")
-    else:
-        lines.append("- None.")
-    return "\n".join(lines) + "\n"
-
-
-def render_department_packages(items):
-    lines = [f"# Department packages ({len(items)})", ""]
-    if not items:
-        lines.append("- None.")
-    for item in items:
-        line = f"- `{item['id']}` v{item['version']} — {item['description']}"
-        if item.get("lego"):
-            line += " · installable Lego package"
-        defects = item.get("package_defects") or []
-        if defects:
-            line += f"\n  package defects: {', '.join(defects)}"
-        lines.append(line)
-    return "\n".join(lines) + "\n"
-
-
 def render_strategy(value):
     """Card for the Strategy Kernel summary or a bounded context selection."""
     if "current_intent" in value:
@@ -1372,7 +1362,7 @@ def render_evals_list(value):
     for suite in items:
         criteria = suite.get("criteria") or []
         lines.append(f"- `{suite['id']}` · {suite['name']}")
-        lines.append(f"  - department `{suite['department_id']}` · payload "
+        lines.append(f"  - Workgroup `{suite['workgroup_id']}` · payload "
                      f"`{suite['payload_kind']}` · {len(criteria)} criteria · "
                      f"validity `{suite['validity']}`")
         for criterion in criteria:

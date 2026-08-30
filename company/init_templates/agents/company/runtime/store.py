@@ -324,6 +324,17 @@ class Store:
                 );
                 CREATE INDEX IF NOT EXISTS idx_workflow_memory_active
                     ON workflow_memories(status, workflow_id, updated_at DESC);
+                CREATE TABLE IF NOT EXISTS memory_candidates (
+                    id TEXT PRIMARY KEY,
+                    intent TEXT NOT NULL,
+                    scope TEXT NOT NULL,
+                    authority TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    candidate_json TEXT NOT NULL,
+                    result_json TEXT NOT NULL,
+                    source_ref TEXT,
+                    created_at TEXT NOT NULL
+                );
                 CREATE TABLE IF NOT EXISTS directives (
                     id TEXT PRIMARY KEY, text TEXT NOT NULL,
                     scope TEXT NOT NULL, goal_id TEXT REFERENCES goals(id),
@@ -432,6 +443,21 @@ class Store:
                 con.execute("ALTER TABLE change_tasks ADD COLUMN change_kind TEXT NOT NULL DEFAULT 'repair'")
             if "specification_json" not in change_columns:
                 con.execute("ALTER TABLE change_tasks ADD COLUMN specification_json TEXT NOT NULL DEFAULT '{}'")
+            workflow_memory_columns = {
+                row[1] for row in con.execute("PRAGMA table_info(workflow_memories)")
+            }
+            for column, declaration in (
+                ("behavior_key", "TEXT NOT NULL DEFAULT ''"),
+                ("scope", "TEXT NOT NULL DEFAULT 'workflow'"),
+                ("authority", "TEXT NOT NULL DEFAULT 'observed'"),
+                ("supersedes_id", "TEXT"),
+            ):
+                if column not in workflow_memory_columns:
+                    con.execute(
+                        f"ALTER TABLE workflow_memories ADD COLUMN {column} {declaration}")
+            con.execute("""UPDATE workflow_memories
+                SET behavior_key=LOWER(REPLACE(REPLACE(TRIM(title),' ','-'),'_','-'))
+                WHERE behavior_key=''""")
             work_order_columns = {
                 row[1] for row in con.execute("PRAGMA table_info(work_orders)")
             }
@@ -564,7 +590,7 @@ class Store:
         if not isinstance(value, dict):
             return "create_department" if value == "create_engine" else value
         aliases = {"engine_id": "owner_id", "engine_version": "owner_version",
-                   "engine_spec": "department_spec"}
+                   "engine_spec": "workgroup_spec", "department_spec": "workgroup_spec"}
         return {aliases.get(key, key): Store._normalize(item) for key, item in value.items()}
 
     def create_goal(self, *, name: str, owner_id: str, metric: str,
@@ -1204,7 +1230,7 @@ class Store:
 
         Current/ancestor claims sort first. ``relevant_memory`` still applies
         the metric/workflow filter before a claim may affect a decision, so a
-        Department gains cross-campaign recall without receiving arbitrary old
+        A Workgroup gains cross-campaign recall without receiving arbitrary old
         context.
         """
 
@@ -1232,7 +1258,9 @@ class Store:
             evidence = item.get("evidence") or {}
             if evidence.get("share_scope") != "company":
                 continue
-            if audience_owner_id not in set(evidence.get("audience_departments") or ()):
+            audiences = (evidence.get("audience_workgroups")
+                         or evidence.get("audience_departments") or ())
+            if audience_owner_id not in set(audiences):
                 continue
             if not requested.intersection(evidence.get("topics") or ()):
                 continue
@@ -1399,50 +1427,117 @@ class Store:
                                 evidence_ids: list[str] | None = None,
                                 source_ref: str | None = None,
                                 workgroup_id: str | None = None,
+                                behavior_key: str | None = None,
+                                scope: str = "workflow",
+                                authority: str = "observed",
                                 explicit_update: bool = False,
                                 observed_at: str | None = None) -> dict:
-        """Create/reinforce a procedural candidate and apply the 2-in-14 rule."""
+        """Create/reinforce procedural memory by stable behavior identity.
+
+        The model supplies the semantic ``behavior_key``. Deterministic storage
+        owns identity, reinforcement, authority, supersession, and provenance.
+        """
 
         if not workflow_id or not instructions:
             raise ValueError("workflow memory requires workflow_id and instructions")
+        if scope not in {"workflow", "company"}:
+            raise ValueError("workflow memory scope must be workflow or company")
+        key = str(behavior_key or title or "").strip().lower().replace("_", "-").replace(" ", "-")
+        key = "-".join(part for part in key.split("-") if part)
+        if not key:
+            raise ValueError("workflow memory requires behavior_key or title")
         stamp = observed_at or now()
         observed = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
         expiry = (observed + timedelta(days=14)).isoformat()
-        signature = json.dumps(instructions, sort_keys=True)
+        trigger_json = json.dumps(trigger or {}, sort_keys=True)
+        instruction_json = json.dumps(instructions)
         with self.connect() as con:
-            rows = con.execute("""SELECT * FROM workflow_memories
-                WHERE workflow_id=? AND status IN ('candidate','hardening')
-                ORDER BY updated_at DESC LIMIT 20""", (workflow_id,)).fetchall()
-            prior = next((row for row in rows
-                          if json.dumps(json.loads(row["instructions_json"]), sort_keys=True)
-                          == signature), None)
+            prior = con.execute("""SELECT * FROM workflow_memories
+                WHERE workflow_id=? AND behavior_key=? AND scope=?
+                  AND trigger_json=? AND status IN ('candidate','hardening','promoted')
+                ORDER BY updated_at DESC LIMIT 1""",
+                (workflow_id, key, scope, trigger_json)).fetchone()
             if prior:
                 first = datetime.fromisoformat(prior["first_seen_at"].replace("Z", "+00:00"))
-                count = int(prior["occurrence_count"]) + 1
-                status = ("hardening" if explicit_update or
-                          (count >= 2 and observed - first <= timedelta(days=14))
-                          else prior["status"])
-                sources = list(dict.fromkeys([
-                    *json.loads(prior["source_refs_json"]),
-                    *([source_ref] if source_ref else [])]))
-                evidence = list(dict.fromkeys([
-                    *json.loads(prior["evidence_ids_json"]), *(evidence_ids or [])]))
-                con.execute("""UPDATE workflow_memories SET status=?,occurrence_count=?,
-                    evidence_ids_json=?,source_refs_json=?,last_seen_at=?,expires_at=?,updated_at=?
-                    WHERE id=?""", (status, count, json.dumps(evidence), json.dumps(sources),
-                                    stamp, expiry, stamp, prior["id"]))
-                memory_id = prior["id"]
+                changed = json.loads(prior["instructions_json"]) != instructions
+                if explicit_update and changed:
+                    con.execute("UPDATE workflow_memories SET status='superseded',updated_at=? WHERE id=?",
+                                (stamp, prior["id"]))
+                    memory_id = f"workflow-memory-{uuid.uuid4().hex[:12]}"
+                    con.execute("""INSERT INTO workflow_memories (
+                        id,workgroup_id,workflow_id,title,trigger_json,instructions_json,
+                        dependencies_json,evidence_ids_json,source_refs_json,status,
+                        occurrence_count,first_seen_at,last_seen_at,expires_at,created_at,
+                        updated_at,behavior_key,scope,authority,supersedes_id)
+                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (
+                        memory_id, workgroup_id, workflow_id, title, trigger_json,
+                        instruction_json, json.dumps(dependencies or []),
+                        json.dumps(evidence_ids or []),
+                        json.dumps([source_ref] if source_ref else []), "hardening", 1,
+                        stamp, stamp, expiry, stamp, stamp, key, scope,
+                        "owner_explicit", prior["id"]))
+                else:
+                    count = int(prior["occurrence_count"]) + 1
+                    status = ("hardening" if explicit_update or
+                              (count >= 2 and observed - first <= timedelta(days=14))
+                              else prior["status"])
+                    sources = list(dict.fromkeys([
+                        *json.loads(prior["source_refs_json"]),
+                        *([source_ref] if source_ref else [])]))
+                    evidence = list(dict.fromkeys([
+                        *json.loads(prior["evidence_ids_json"]), *(evidence_ids or [])]))
+                    resolved_authority = ("owner_explicit" if explicit_update
+                                          else prior["authority"] or authority)
+                    con.execute("""UPDATE workflow_memories SET title=?,instructions_json=?,
+                        dependencies_json=?,status=?,occurrence_count=?,evidence_ids_json=?,
+                        source_refs_json=?,authority=?,last_seen_at=?,expires_at=?,updated_at=?
+                        WHERE id=?""", (
+                        title, instruction_json, json.dumps(dependencies or []), status,
+                        count, json.dumps(evidence), json.dumps(sources), resolved_authority,
+                        stamp, expiry, stamp, prior["id"]))
+                    memory_id = prior["id"]
             else:
                 memory_id = f"workflow-memory-{uuid.uuid4().hex[:12]}"
-                con.execute("""INSERT INTO workflow_memories VALUES
-                    (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (
+                con.execute("""INSERT INTO workflow_memories (
+                    id,workgroup_id,workflow_id,title,trigger_json,instructions_json,
+                    dependencies_json,evidence_ids_json,source_refs_json,status,
+                    occurrence_count,first_seen_at,last_seen_at,expires_at,created_at,
+                    updated_at,behavior_key,scope,authority,supersedes_id)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (
                     memory_id, workgroup_id, workflow_id, title,
-                    json.dumps(trigger or {}), json.dumps(instructions),
+                    trigger_json, instruction_json,
                     json.dumps(dependencies or []), json.dumps(evidence_ids or []),
                     json.dumps([source_ref] if source_ref else []),
                     "hardening" if explicit_update else "candidate", 1,
-                    stamp, stamp, expiry, stamp, stamp))
+                    stamp, stamp, expiry, stamp, stamp, key, scope,
+                    "owner_explicit" if explicit_update else authority, None))
         return self.workflow_memory(memory_id)
+
+    def record_memory_candidate(self, *, candidate: dict, status: str,
+                                result: dict, source_ref: str | None = None) -> dict:
+        """Keep provenance for every applied, temporary, routed, or rejected candidate."""
+
+        candidate_id = f"memory-candidate-{uuid.uuid4().hex[:12]}"
+        stamp = now()
+        authority = "owner_explicit" if candidate.get("explicit") is True else "interpreted"
+        with self.connect() as con:
+            con.execute("""INSERT INTO memory_candidates
+                (id,intent,scope,authority,status,candidate_json,result_json,source_ref,created_at)
+                VALUES (?,?,?,?,?,?,?,?,?)""", (
+                candidate_id, str(candidate.get("intent") or ""),
+                str(candidate.get("scope") or ""), authority, status,
+                json.dumps(candidate), json.dumps(result, default=str), source_ref, stamp))
+        with self.connect() as con:
+            row = con.execute("SELECT * FROM memory_candidates WHERE id=?",
+                              (candidate_id,)).fetchone()
+        return self._decode(row)
+
+    def memory_candidates(self, *, limit: int = 100) -> tuple[dict, ...]:
+        with self.connect() as con:
+            rows = con.execute(
+                "SELECT * FROM memory_candidates ORDER BY created_at DESC LIMIT ?",
+                (max(1, min(int(limit), 500)),)).fetchall()
+        return tuple(self._decode(row) for row in rows)
 
     def workflow_memory(self, memory_id: str) -> dict:
         with self.connect() as con:

@@ -70,6 +70,24 @@ class ContextMemoryV2Tests(unittest.TestCase):
         self.assertEqual(1, receipt["expired_workflow_candidates"])
         self.assertEqual("expired", self.store.workflow_memory(stale["id"])["status"])
 
+    def test_projection_applies_workflow_trigger_and_dependencies(self):
+        memory = self.store.observe_workflow_memory(
+            workflow_id="invoice-posting", behavior_key="exchange-rate-check",
+            title="Exchange rate check", instructions=["Verify exchange rate"],
+            trigger={"currency": "foreign"}, dependencies=["exchange-rate"],
+            explicit_update=True)
+        hidden = ContextAssembler(self.store, project_root=self.root).assemble(
+            prompt="post invoice", workflow_id="invoice-posting",
+            trigger_context={"currency": "domestic"},
+            available_dependencies=["exchange-rate"])
+        visible = ContextAssembler(self.store, project_root=self.root).assemble(
+            prompt="post invoice", workflow_id="invoice-posting",
+            trigger_context={"currency": "foreign"},
+            available_dependencies=["exchange-rate"])
+
+        self.assertNotIn(memory["id"], hidden["sources"])
+        self.assertIn(memory["id"], visible["sources"])
+
     def test_projection_is_bounded_relevant_and_hook_readable(self):
         self.store.create_goal(
             name="Increase qualified replies", owner_id="growth",

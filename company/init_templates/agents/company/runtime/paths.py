@@ -109,7 +109,7 @@ def skills_root(project_root: Path | None = None) -> Path:
     """The skills namespace root: ``<project_root>/.agents/skills``.
 
     Kept for backward compatibility with vendored homes using the legacy
-    layout. Product-repo checkouts resolve department-owned skills through
+    layout. Product-repo checkouts resolve Workgroup-owned skills through
     :mod:`company.agents` instead.
     """
     root = project_root or find_project_root()

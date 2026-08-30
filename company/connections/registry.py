@@ -1,4 +1,4 @@
-"""Host-first logical Connections used by Department workflows."""
+"""Host-first logical Connections used by Workgroup workflows."""
 
 from ..runtime.models import ConnectionSpec
 

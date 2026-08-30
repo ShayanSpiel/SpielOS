@@ -1,4 +1,4 @@
-"""Small, stable contract for the one company loop and its Departments."""
+"""Small, stable contract for the one Goal loop and Worker-owned Workgroups."""
 
 from __future__ import annotations
 
@@ -153,7 +153,7 @@ class WorkflowStep:
       employee   — open a durable work order for an employee
       approval   — park until runtime approval key "execute"
       connection — host/connection handoff that must record evidence
-      machine    — optional pure code hook on the Department
+      machine    — optional pure code hook on the Workgroup adapter
     """
 
     id: str
@@ -167,7 +167,7 @@ class WorkflowStep:
 
 @dataclass(frozen=True)
 class WorkflowSpec:
-    """A named playbook inside a Department; never a second runtime loop.
+    """A named playbook inside a Workgroup; never a second runtime loop.
 
     `steps` remains the human-readable playbook labels.
     `graph` is the optional executable Lego chain; when empty the interpreter
@@ -255,20 +255,19 @@ class GoalHandler:
         raise NotImplementedError
 
 
-class Department(GoalHandler):
-    """Human-facing business unit plugged into the one company runtime.
+class WorkgroupHandlerBase(GoalHandler):
+    """Internal loop adapter for one declarative Workgroup package.
 
-    A clean Lego department package declares:
+    A Workgroup package declares:
       - workflows (WorkflowSpec + optional graph)
       - agent_ids / workflow_agents
       - evidence_metrics (metric → accepted evidence kinds)
       - goal_schema (metrics + config enums)
 
-    Execution is supplied by runtime.interpreter.InterpretedDepartment unless
-    a Department overrides stages for a special path (e.g. live email send).
+    Execution is supplied by ``runtime.interpreter.InterpretedWorkgroup``.
     """
 
-    department_id = ""
+    workgroup_id = ""
     workflows: tuple[WorkflowSpec, ...] = ()
     agent_ids: tuple[str, ...] = ()
     evidence_metrics: dict = {}

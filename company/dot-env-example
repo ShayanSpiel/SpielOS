@@ -5,7 +5,7 @@
 # Cartesia, and ElevenLabs are deterministic fallbacks. All five keys must be
 # present and non-empty for `node scripts/tts-providers.js --check` to pass.
 # The narration persona is pinned once in
-# .agents/company/departments/design/templates/video/narration.json
+# .agents/company/workgroups/design/templates/video/narration.json
 # (`voice_selection`) and enforced by scripts/tts-gemini.js + scripts/mix-audio.js.
 GEMINI_API_KEY=
 MISTRAL_API_KEY=

@@ -1,12 +1,12 @@
-"""Discover fresh Workgroup packages without executable Departments."""
+"""Discover declarative Worker-owned Workgroup packages."""
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
 
-from ..runtime.interpreter import InterpretedDepartment
-from ..runtime.models import Department, WorkgroupSpec, WorkerSpec, WorkflowSpec, WorkflowStep
+from ..runtime.interpreter import InterpretedWorkgroup
+from ..runtime.models import WorkgroupHandlerBase, WorkgroupSpec, WorkerSpec, WorkflowSpec, WorkflowStep
 
 ROOT = Path(__file__).resolve().parent
 
@@ -47,12 +47,12 @@ def _group(folder: Path) -> WorkgroupSpec:
                          {key: tuple(items) for key, items in (value.get("evidence_metrics") or {}).items()})
 
 
-class WorkgroupHandler(InterpretedDepartment, Department):
+class WorkgroupHandler(InterpretedWorkgroup, WorkgroupHandlerBase):
     """Loop adapter: a Workgroup routes execution to its Worker workflows."""
 
     def __init__(self, workgroup: WorkgroupSpec):
         self.workgroup = workgroup
-        self.id = self.department_id = workgroup.id
+        self.id = self.workgroup_id = workgroup.id
         self.version = workgroup.version
         self.description = workgroup.description
         self.agent_ids = tuple(worker.id for worker in workgroup.workers)

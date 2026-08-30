@@ -102,9 +102,14 @@ Chat history and tool traces remain host-owned and are not copied into SpielOS.
 
 Memory writes have explicit triggers: the Goal loop records experiment learning
 only after valid cited evidence; an owner-explicit strategy correction writes a
-profile claim; a reusable Workflow correction writes a procedural observation.
-A procedural candidate hardens after an explicit update or two matching uses in
-14 days, while stale one-offs expire during consolidation. Hooks never write.
+profile claim; and every user turn carries a typed memory-candidate contract.
+The host model interprets semantic intent while deterministic runtime code owns
+scope, authority, identity, deduplication, supersession, provenance, and
+retrieval. Explicit owner Workflow corrections apply immediately, task-only
+instructions stay temporary, and a canonical Workflow defect routes to a
+bounded source repair instead of contradictory memory. Other procedural
+candidates harden after two matching behavior keys in 14 days; stale one-offs
+expire during consolidation. Hooks remain read-only.
 
 ## Development
 
