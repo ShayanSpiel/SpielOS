@@ -51,7 +51,7 @@ def recommended_next_action(goal, goal_status: str) -> str:
                 "continue the campaign, or escalate the outcome to the Director.")
     if owner_id == "director":
         return ("Review the outcome and decide the next goal: resume orchestration "
-                "or open a new Workgroup Goal.")
+                "or open a new Department Goal.")
     workflow = config.get("workflow")
     if workflow:
         return (f"Review the {workflow} outcome and either continue with the next "

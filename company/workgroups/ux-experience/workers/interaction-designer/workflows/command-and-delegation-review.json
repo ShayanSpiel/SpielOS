@@ -1,1 +1,0 @@
-{"id":"command-and-delegation-review","description":"Improve command clarity and delegation feedback.","evidence":["ux_recommendation"],"worksteps":[{"id":"review-commands","kind":"employee","requires":["journey_observation"],"produces":["ux_recommendation"]}]}

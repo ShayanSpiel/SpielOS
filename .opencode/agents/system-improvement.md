@@ -1,5 +1,5 @@
 ---
-description: Executes approved bounded Workgroup or runtime improvements with acceptance tests and version evidence
+description: Executes approved bounded Department or runtime improvements with acceptance tests and version evidence
 mode: subagent
 permissions:
   - action: shell

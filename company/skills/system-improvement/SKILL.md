@@ -1,6 +1,6 @@
 ---
 name: system-improvement
-description: Execute a bounded SpielOS runtime or Workgroup repair created by the Director, with allowed-file scope, acceptance tests, versioning, and return to the originating Goal.
+description: Execute a bounded SpielOS runtime or Department repair created by the Director, with allowed-file scope, acceptance tests, versioning, and return to the originating Goal.
 ---
 
 # System Improvement
@@ -24,7 +24,7 @@ acceptance commands, version before, and target version.
 The business run remains suspended or contaminated during this work. Never
 silently resume it with different business variables.
 
-For a new Workgroup package, require its purpose, metrics, Workers, Worker-owned
+For a new Department package, require its purpose, metrics, Agents, Agent-owned
 Workflows, declared evidence, and exact allowed paths. Validate the package
 before editing and prove catalog discovery plus a clean-home install before
 recording version `1.0.0` or later.

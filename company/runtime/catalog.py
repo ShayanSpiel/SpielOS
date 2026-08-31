@@ -3,7 +3,11 @@
 from pathlib import Path
 
 from . import config as runtime_config
-from .registry import workgroups as installed_workgroups
+from ..agents import agents as installed_agents
+from ..connections import connections as installed_connections
+from ..evals import suite_spec as eval_suite_spec, suites as installed_eval_suites
+from .package import package_spec, validate_package
+from .registry import departments as installed_departments
 from .strategy import strategy_kernel_summary
 
 COMPANY_ROOT = Path(__file__).resolve().parents[1]
@@ -26,42 +30,31 @@ def _skills():
 
 
 def catalog():
-    workgroups = []
-    for _, handler in sorted(installed_workgroups().items()):
-        group = handler.workgroup
-        workgroups.append({
-            "id": group.id,
-            "version": group.version,
-            "description": group.description,
-            "metrics": list(group.metrics),
-            "workers": [{
-                "id": worker.id,
-                "description": worker.description,
-                "workbook": list(worker.skill_ids),
-                "workkit": list(worker.permissions),
-                "produces": list(worker.produces),
-                "workflows": [_workflow_summary(item) for item in worker.workflows],
-            } for worker in group.workers],
-        })
+    departments = []
+    for _, department in sorted(installed_departments().items()):
+        package = package_spec(department)
+        package["package_defects"] = validate_package(department)
+        package["lego"] = not package["package_defects"]
+        departments.append(package)
     return {
         "vocabulary": {
-            "canonical": {"capability": "Workgroup", "executor": "Worker"},
-            "input_aliases": {
-                "department": "Workgroup",
-                "agent": "Worker",
-                "employee": "Worker",
-            },
-            "rule": "Aliases are translated at intake; they never create parallel runtime models.",
+            "canonical": ["Goal", "Department", "Workflow", "Agent",
+                          "Skill", "Connection", "Artifact"],
+            "rule": "These are the only public company building blocks.",
         },
         "runtime": {
             "version": runtime_config.VERSION,
             "loop": ["GOAL", "OBSERVE", "DECIDE", "ACT", "EVALUATE"],
             "controls": ["director", "system-improvement"],
-            "execution_runtime": "worker-workflow-interpreter",
+            "department_runtime": "interpreter",
             "goal_authority": ".spielos/state/company.sqlite",
             "strategy_kernel": strategy_kernel_summary(),
         },
-        "workgroups": workgroups,
+        "departments": departments,
+        "agents": [vars(item) for _, item in sorted(installed_agents().items())],
+        "skills": _skills(),
+        "connections": [vars(item) for _, item in sorted(installed_connections().items())],
+        "evals": [eval_suite_spec(item) for _, item in sorted(installed_eval_suites().items())],
         "artifact_authority": ".spielos/artifacts/",
     }
 
@@ -75,15 +68,6 @@ def company_overview(runtime, *, project_root: str | Path | None = None) -> dict
     package = catalog()
     snapshot = runtime.company_snapshot(5)
     topology = runtime.topology_audit()
-    workers = []
-    for group in package["workgroups"]:
-        for worker in group["workers"]:
-            workers.append({
-                "id": worker["id"],
-                "workgroup_id": group["id"],
-                "workflows": [item["id"] for item in worker["workflows"]],
-                "produces": worker["produces"],
-            })
     return {
         "schema_version": 1,
         "runtime": package["runtime"],
@@ -99,8 +83,11 @@ def company_overview(runtime, *, project_root: str | Path | None = None) -> dict
                 "defects": topology["defects"],
             },
         },
-        "workgroups": package["workgroups"],
-        "workers": workers,
+        "departments": package["departments"],
+        "agents": package["agents"],
+        "skills": package["skills"],
+        "connections": package["connections"],
+        "evals": package["evals"],
         "work_orders": snapshot.get("work_orders") or [],
         "attention": snapshot.get("attention") or [],
         "friction": friction_summary(project_root=root),
@@ -112,14 +99,4 @@ def company_overview(runtime, *, project_root: str | Path | None = None) -> dict
             "inspect": "company migration inspect --from PATH",
             "plan": "company migration plan --from PATH --out migration-plan.json",
         },
-    }
-
-
-def _workflow_summary(item):
-    return {
-        "id": item.id,
-        "description": item.description,
-        "steps": [node.id for node in item.graph] or list(item.steps),
-        "workbook": list(item.skill_ids),
-        "workkit": list(item.connection_ids),
     }

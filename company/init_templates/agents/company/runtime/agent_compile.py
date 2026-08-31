@@ -1,13 +1,13 @@
-"""Compile a Workgroup Workflow into a first-class Worker.
+"""Compile a Department Workflow into a first-class Agent.
 
-Given a Workgroup and one of its Workflows, generates the three host
+Given a Department and one of its Workflows, generates the three host
 adapter artifacts from the single WorkflowSpec catalog:
 
     .opencode/agents/<name>.md            OpenCode agent definition
     .codex/agents/<name>.toml             Codex agent definition
-    .agents/company/agents/installed/<name>.json   employee roster entry
+    .agents/company/agents/installed/<name>.json   Agent roster entry
 
-The compiled Worker is scoped to exactly that Workgroup + Workflow: it may
+The compiled Agent is scoped to exactly that Department + Workflow: it may
 only produce the workflow's declared evidence kinds, only uses its declared
 skills and connections, never edits repository files, and has no Director
 routing. Approvals still park through the runtime.
@@ -21,17 +21,17 @@ import json
 import re
 from pathlib import Path
 
-from .registry import workgroups
+from .registry import departments
 
 
-def _workflow(workgroup_id: str, workflow_id: str):
-    dept = workgroups().get(workgroup_id)
+def _workflow(department_id: str, workflow_id: str):
+    dept = departments().get(department_id)
     if dept is None:
-        raise ValueError(f"no such Workgroup: {workgroup_id}")
+        raise ValueError(f"no such Department: {department_id}")
     for spec in dept.workflows:
         if spec.id == workflow_id:
             return dept, spec
-    raise ValueError(f"Workgroup '{workgroup_id}' has no Workflow '{workflow_id}'; "
+    raise ValueError(f"Department '{department_id}' has no Workflow '{workflow_id}'; "
                      f"known: {', '.join(w.id for w in dept.workflows)}")
 
 
@@ -39,14 +39,14 @@ def _clean(value) -> str:
     return str(value or "").strip()
 
 
-def compile_agent(workgroup_id: str, workflow_id: str, name: str | None = None,
+def compile_agent(department_id: str, workflow_id: str, name: str | None = None,
                   *, force: bool = False,
                   home: str | Path | None = None) -> dict:
     from .paths import selected_project_root, validate_home_destination
 
     root = validate_home_destination(selected_project_root(home))
-    dept, spec = _workflow(workgroup_id, workflow_id)
-    agent_name = name or f"{workgroup_id}-{_slug(spec.id)}"
+    dept, spec = _workflow(department_id, workflow_id)
+    agent_name = name or f"{department_id}-{_slug(spec.id)}"
 
     skills = [_clean(s) for s in (spec.skill_ids or ())]
     connections = [_clean(c) for c in (spec.connection_ids or ())]
@@ -55,20 +55,20 @@ def compile_agent(workgroup_id: str, workflow_id: str, name: str | None = None,
 
     purpose = _clean(getattr(spec, "description", "") or spec.id)
 
-    opencode_path = _render_opencode(root, agent_name, workgroup_id,
+    opencode_path = _render_opencode(root, agent_name, department_id,
                                      workflow_id, purpose, skills,
                                      evidence_kinds, stages, force)
-    codex_path = _render_codex(root, agent_name, workgroup_id, workflow_id,
+    codex_path = _render_codex(root, agent_name, department_id, workflow_id,
                                purpose, skills, evidence_kinds, stages, force)
-    roster_path = _render_roster(root, agent_name, workgroup_id,
+    roster_path = _render_roster(root, agent_name, department_id,
                                  workflow_id, skills, connections,
                                  evidence_kinds, force)
 
     return {
         "agent": agent_name,
-        "scope": {"workgroup": workgroup_id, "workflow": workflow_id},
+        "scope": {"department": department_id, "workflow": workflow_id},
         "files": [opencode_path, codex_path, roster_path],
-        "note": ("first-class worker: runs only this workflow; approvals still "
+        "note": ("first-class Agent: runs only this Workflow; approvals still "
                  "park; no Director routing"),
     }
 
@@ -77,7 +77,7 @@ def _slug(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
 
 
-def _render_opencode(root: Path, name: str, workgroup_id: str, workflow_id: str,
+def _render_opencode(root: Path, name: str, department_id: str, workflow_id: str,
                      purpose: str, skills: list[str], kinds: list[str],
                      stages: list[str], force: bool) -> str:
     path = root / ".opencode" / "agents" / f"{name}.md"
@@ -88,7 +88,7 @@ def _render_opencode(root: Path, name: str, workgroup_id: str, workflow_id: str,
     kind_list = ", ".join(f"`{k}`" for k in kinds) or "the workflow's declared kinds"
     stage_list = " → ".join(stages) or spec_stages_fallback(workflow_id)
     path.write_text(f"""---
-description: First-class {name} Worker ({workgroup_id}/{workflow_id}). Runs only this Workgroup's Workflow.
+description: First-class {name} Agent ({department_id}/{workflow_id}). Runs only this Department's Workflow.
 mode: primary
 temperature: 0.2
 permissions:
@@ -97,13 +97,13 @@ permissions:
 ---
 
 You are **{name}** — the first-class executor of the `{workflow_id}`
-Workflow inside the `{workgroup_id}` Workgroup of this SpielOS harness.
+Workflow inside the `{department_id}` Department of this SpielOS company.
 You are NOT the Director. You do not route goals, create companies, or touch
-other Workgroups.
+other Departments.
 
 ## Scope (hard boundary)
 
-- Workgroup: `{workgroup_id}` · Workflow: `{workflow_id}`
+- Department: `{department_id}` · Workflow: `{workflow_id}`
 - Stages: {stage_list}
 - Evidence kinds you may produce: {kind_list}
 - Skills to follow: {skill_list}
@@ -126,7 +126,7 @@ def spec_stages_fallback(workflow_id: str) -> str:
     return workflow_id
 
 
-def _render_codex(root: Path, name: str, workgroup_id: str, workflow_id: str,
+def _render_codex(root: Path, name: str, department_id: str, workflow_id: str,
                   purpose: str, skills: list[str], kinds: list[str],
                   stages: list[str], force: bool) -> str:
     path = root / ".codex" / "agents" / f"{name}.toml"
@@ -135,26 +135,26 @@ def _render_codex(root: Path, name: str, workgroup_id: str, workflow_id: str,
     path.parent.mkdir(parents=True, exist_ok=True)
     skill_list = ", ".join(skills) or ""
     kind_list = ", ".join(kinds)
-    path.write_text(f"""# First-class {name} Worker — scope: {workgroup_id}/{workflow_id}
+    path.write_text(f"""# First-class {name} Agent — scope: {department_id}/{workflow_id}
 # Generated by `spielos agent compile`. Do not hand-edit scope fields.
 name = "{name}"
-description = "First-class executor of the {workflow_id} Workflow in the {workgroup_id} Workgroup."
+description = "First-class executor of the {workflow_id} Workflow in the {department_id} Department."
 developer_instructions = '''
 You operate as {name}: execute only the {workflow_id} workflow of the
-{workgroup_id} Workgroup. Follow the persisted company work-order contract,
+{department_id} Department. Follow the persisted company work-order contract,
 record honest evidence, park live external actions for approval, never edit
-repository files, and never touch other Workgroups' Goals.
+repository files, and never touch other Departments' Goals.
 '''
-# Hard scope: workgroup={workgroup_id} workflow={workflow_id}
+# Hard scope: department={department_id} workflow={workflow_id}
 # Evidence kinds: {kind_list}
 # Skills: {skill_list}
-# This worker never edits repository files and never approves its own live actions;
+# This Agent never edits repository files and never approves its own live actions;
 # approvals park in the runtime regardless of host.
 """)
     return str(path)
 
 
-def _render_roster(root: Path, name: str, workgroup_id: str, workflow_id: str,
+def _render_roster(root: Path, name: str, department_id: str, workflow_id: str,
                    skills: list[str], connections: list[str],
                    kinds: list[str], force: bool) -> str:
     roster_dir = root / ".agents" / "company" / "agents" / "installed"
@@ -165,7 +165,7 @@ def _render_roster(root: Path, name: str, workgroup_id: str, workflow_id: str,
     payload = {
         "id": name,
         "first_class": True,
-        "workgroup_id": workgroup_id,
+        "department_id": department_id,
         "workflow_ids": [workflow_id],
         "skill_ids": skills,
         "permissions": ["read_strategy", "write_evidence", *(

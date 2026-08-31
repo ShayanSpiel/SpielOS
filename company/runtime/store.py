@@ -306,6 +306,7 @@ class Store:
                     ON experiment_memories(status, owner_id, updated_at DESC);
                 CREATE TABLE IF NOT EXISTS workflow_memories (
                     id TEXT PRIMARY KEY,
+                    department_id TEXT,
                     workgroup_id TEXT,
                     workflow_id TEXT NOT NULL,
                     title TEXT NOT NULL,
@@ -406,7 +407,8 @@ class Store:
                     id TEXT PRIMARY KEY,
                     goal_id TEXT NOT NULL REFERENCES goals(id),
                     run_id TEXT NOT NULL REFERENCES runs(id),
-                    employee_id TEXT NOT NULL,
+                    agent_id TEXT NOT NULL,
+                    employee_id TEXT,
                     workflow_id TEXT,
                     step_id TEXT,
                     needed INTEGER NOT NULL DEFAULT 1,
@@ -447,6 +449,7 @@ class Store:
                 row[1] for row in con.execute("PRAGMA table_info(workflow_memories)")
             }
             for column, declaration in (
+                ("department_id", "TEXT"),
                 ("behavior_key", "TEXT NOT NULL DEFAULT ''"),
                 ("scope", "TEXT NOT NULL DEFAULT 'workflow'"),
                 ("authority", "TEXT NOT NULL DEFAULT 'observed'"),
@@ -455,12 +458,20 @@ class Store:
                 if column not in workflow_memory_columns:
                     con.execute(
                         f"ALTER TABLE workflow_memories ADD COLUMN {column} {declaration}")
+            if "workgroup_id" in workflow_memory_columns:
+                con.execute("""UPDATE workflow_memories
+                    SET department_id=workgroup_id
+                    WHERE department_id IS NULL AND workgroup_id IS NOT NULL""")
             con.execute("""UPDATE workflow_memories
                 SET behavior_key=LOWER(REPLACE(REPLACE(TRIM(title),' ','-'),'_','-'))
                 WHERE behavior_key=''""")
             work_order_columns = {
                 row[1] for row in con.execute("PRAGMA table_info(work_orders)")
             }
+            if "agent_id" not in work_order_columns:
+                con.execute("ALTER TABLE work_orders ADD COLUMN agent_id TEXT")
+                con.execute(
+                    "UPDATE work_orders SET agent_id=employee_id WHERE agent_id IS NULL")
             if "claimed_by" not in work_order_columns:
                 con.execute("ALTER TABLE work_orders ADD COLUMN claimed_by TEXT")
             if "claimed_at" not in work_order_columns:
@@ -579,6 +590,12 @@ class Store:
         for key in tuple(out):
             if key.endswith("_json"):
                 out[key[:-5]] = Store._normalize(json.loads(out.pop(key)))
+        if not out.get("agent_id") and out.get("employee_id"):
+            out["agent_id"] = out["employee_id"]
+        out.pop("employee_id", None)
+        if not out.get("department_id") and out.get("workgroup_id"):
+            out["department_id"] = out["workgroup_id"]
+        out.pop("workgroup_id", None)
         return out
 
     @staticmethod
@@ -590,7 +607,10 @@ class Store:
         if not isinstance(value, dict):
             return "create_department" if value == "create_engine" else value
         aliases = {"engine_id": "owner_id", "engine_version": "owner_version",
-                   "engine_spec": "workgroup_spec", "department_spec": "workgroup_spec"}
+                   "engine_spec": "department_spec", "workgroup_spec": "department_spec",
+                   "worker_id": "agent_id", "employee_id": "agent_id",
+                   "workgroup_id": "department_id",
+                   "audience_workgroups": "audience_departments"}
         return {aliases.get(key, key): Store._normalize(item) for key, item in value.items()}
 
     def create_goal(self, *, name: str, owner_id: str, metric: str,
@@ -1230,7 +1250,7 @@ class Store:
 
         Current/ancestor claims sort first. ``relevant_memory`` still applies
         the metric/workflow filter before a claim may affect a decision, so a
-        A Workgroup gains cross-campaign recall without receiving arbitrary old
+        A Department gains cross-campaign recall without receiving arbitrary old
         context.
         """
 
@@ -1258,8 +1278,8 @@ class Store:
             evidence = item.get("evidence") or {}
             if evidence.get("share_scope") != "company":
                 continue
-            audiences = (evidence.get("audience_workgroups")
-                         or evidence.get("audience_departments") or ())
+            audiences = (evidence.get("audience_departments")
+                         or evidence.get("audience_workgroups") or ())
             if audience_owner_id not in set(audiences):
                 continue
             if not requested.intersection(evidence.get("topics") or ()):
@@ -1426,7 +1446,7 @@ class Store:
                                 dependencies: list | None = None,
                                 evidence_ids: list[str] | None = None,
                                 source_ref: str | None = None,
-                                workgroup_id: str | None = None,
+                                department_id: str | None = None,
                                 behavior_key: str | None = None,
                                 scope: str = "workflow",
                                 authority: str = "observed",
@@ -1465,12 +1485,12 @@ class Store:
                                 (stamp, prior["id"]))
                     memory_id = f"workflow-memory-{uuid.uuid4().hex[:12]}"
                     con.execute("""INSERT INTO workflow_memories (
-                        id,workgroup_id,workflow_id,title,trigger_json,instructions_json,
+                        id,department_id,workgroup_id,workflow_id,title,trigger_json,instructions_json,
                         dependencies_json,evidence_ids_json,source_refs_json,status,
                         occurrence_count,first_seen_at,last_seen_at,expires_at,created_at,
                         updated_at,behavior_key,scope,authority,supersedes_id)
-                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (
-                        memory_id, workgroup_id, workflow_id, title, trigger_json,
+                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (
+                        memory_id, department_id, None, workflow_id, title, trigger_json,
                         instruction_json, json.dumps(dependencies or []),
                         json.dumps(evidence_ids or []),
                         json.dumps([source_ref] if source_ref else []), "hardening", 1,
@@ -1499,12 +1519,12 @@ class Store:
             else:
                 memory_id = f"workflow-memory-{uuid.uuid4().hex[:12]}"
                 con.execute("""INSERT INTO workflow_memories (
-                    id,workgroup_id,workflow_id,title,trigger_json,instructions_json,
+                    id,department_id,workgroup_id,workflow_id,title,trigger_json,instructions_json,
                     dependencies_json,evidence_ids_json,source_refs_json,status,
                     occurrence_count,first_seen_at,last_seen_at,expires_at,created_at,
                     updated_at,behavior_key,scope,authority,supersedes_id)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (
-                    memory_id, workgroup_id, workflow_id, title,
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (
+                    memory_id, department_id, None, workflow_id, title,
                     trigger_json, instruction_json,
                     json.dumps(dependencies or []), json.dumps(evidence_ids or []),
                     json.dumps([source_ref] if source_ref else []),
@@ -1650,14 +1670,14 @@ class Store:
             return None
         return {"holder": row[0], "expires_at": row[1]}
 
-    def open_work_order(self, *, goal_id: str, run_id: str, employee_id: str,
+    def open_work_order(self, *, goal_id: str, run_id: str, agent_id: str,
                         needed: int = 1, accepts_evidence: list | None = None,
                         workflow_id: str | None = None, step_id: str | None = None,
                         brief: dict | None = None) -> dict:
-        """Create or refresh one open employee assignment for a goal run.
+        """Create or refresh one open Agent assignment for a Goal run.
 
-        Idempotent per (goal_id, run_id, employee_id) while status is open so
-        re-persisting a blocked ACT does not duplicate work for the same employee.
+        Idempotent per (goal_id, run_id, agent_id) while status is open so
+        re-persisting a blocked ACT does not duplicate work for the same Agent.
         """
 
         accepts = list(accepts_evidence or [])
@@ -1666,12 +1686,12 @@ class Store:
         stamp = now()
         with self.connect() as con:
             row = con.execute("""SELECT * FROM work_orders
-                WHERE goal_id=? AND run_id=? AND employee_id=?
+                WHERE goal_id=? AND run_id=? AND agent_id=?
                   AND COALESCE(workflow_id,'')=COALESCE(?,'')
                   AND COALESCE(step_id,'')=COALESCE(?,'')
                   AND status IN ('open','claimed')
                 ORDER BY created_at DESC LIMIT 1""", (
-                    goal_id, run_id, employee_id, workflow_id, step_id)).fetchone()
+                    goal_id, run_id, agent_id, workflow_id, step_id)).fetchone()
             if row:
                 con.execute("""UPDATE work_orders SET needed=?,accepts_evidence_json=?,
                     workflow_id=COALESCE(?,workflow_id),step_id=COALESCE(?,step_id),
@@ -1682,16 +1702,17 @@ class Store:
             else:
                 order_id = f"work-{uuid.uuid4().hex[:12]}"
                 con.execute("""INSERT INTO work_orders(
-                    id,goal_id,run_id,employee_id,workflow_id,step_id,needed,
+                    id,goal_id,run_id,agent_id,employee_id,workflow_id,step_id,needed,
                     accepts_evidence_json,brief_json,status,claimed_by,claimed_at,
                     result_evidence_ids_json,created_at,updated_at)
-                    VALUES (?,?,?,?,?,?,?,?,?,'open',NULL,NULL,'[]',?,?)""", (
-                    order_id, goal_id, run_id, employee_id, workflow_id, step_id, needed,
+                    VALUES (?,?,?,?,?,?,?,?,?,?,'open',NULL,NULL,'[]',?,?)""", (
+                    order_id, goal_id, run_id, agent_id, agent_id,
+                    workflow_id, step_id, needed,
                     json.dumps(accepts), json.dumps(brief), stamp, stamp))
                 con.execute(
                     "INSERT INTO events(goal_id,cycle_id,kind,payload_json,created_at) VALUES (?,?,?,?,?)",
                     (goal_id, run_id, "work_order.opened",
-                     json.dumps({"work_order_id": order_id, "employee_id": employee_id,
+                     json.dumps({"work_order_id": order_id, "agent_id": agent_id,
                                  "needed": needed, "accepts_evidence": accepts}), stamp))
         return self.work_order(order_id)
 
@@ -1734,7 +1755,7 @@ class Store:
             item = self._decode(row)
             if item["status"] == "open":
                 item["why_next"] = (
-                    f"open — {item['employee_id']} must produce "
+                    f"open — {item['agent_id']} must produce "
                     f"{item['needed']} accepted artifact(s); then `company retry {item['goal_id']}`")
             elif item["status"] == "claimed":
                 item["why_next"] = (
@@ -1743,23 +1764,23 @@ class Store:
             elif item["status"] == "done":
                 item["why_next"] = "done — accepted evidence recorded; retry the goal if still blocked"
             else:
-                item["why_next"] = f"{item['status']} — no further employee action"
+                item["why_next"] = f"{item['status']} — no further Agent action"
             values.append(item)
         return values
 
-    def claim_work_order(self, work_order_id: str, worker_id: str) -> dict:
-        """Atomically assign one open work order to exactly one host worker."""
+    def claim_work_order(self, work_order_id: str, agent_id: str) -> dict:
+        """Atomically assign one open work order to exactly one host Agent."""
 
-        worker_id = str(worker_id or "").strip()
-        if not worker_id:
-            raise ValueError("worker_id is required")
+        agent_id = str(agent_id or "").strip()
+        if not agent_id:
+            raise ValueError("agent_id is required")
         stamp = now()
         with self.connect() as con:
             current = con.execute(
                 "SELECT * FROM work_orders WHERE id=?", (work_order_id,)).fetchone()
             if current is None:
                 raise KeyError(f"unknown work order: {work_order_id}")
-            if current["status"] == "claimed" and current["claimed_by"] == worker_id:
+            if current["status"] == "claimed" and current["claimed_by"] == agent_id:
                 return self._decode(current)
             if current["status"] != "open":
                 owner = current["claimed_by"] or current["status"]
@@ -1767,19 +1788,19 @@ class Store:
             changed = con.execute("""UPDATE work_orders
                 SET status='claimed',claimed_by=?,claimed_at=?,updated_at=?
                 WHERE id=? AND status='open'""",
-                (worker_id, stamp, stamp, work_order_id)).rowcount
+                (agent_id, stamp, stamp, work_order_id)).rowcount
             if changed != 1:
-                raise RuntimeError("work order was claimed by another worker")
+                raise RuntimeError("work order was claimed by another Agent")
             row = con.execute(
                 "SELECT * FROM work_orders WHERE id=?", (work_order_id,)).fetchone()
             con.execute(
                 "INSERT INTO events(goal_id,cycle_id,kind,payload_json,created_at) VALUES (?,?,?,?,?)",
                 (row["goal_id"], row["run_id"], "work_order.claimed",
-                 json.dumps({"work_order_id": work_order_id, "worker_id": worker_id}), stamp))
+                 json.dumps({"work_order_id": work_order_id, "agent_id": agent_id}), stamp))
         return self._decode(row)
 
     def complete_work_order(self, work_order_id: str, evidence_ids: list | None = None,
-                            worker_id: str | None = None) -> dict:
+                            agent_id: str | None = None) -> dict:
         stamp = now()
         with self.connect() as con:
             current = con.execute("SELECT * FROM work_orders WHERE id=?", (work_order_id,)).fetchone()
@@ -1790,16 +1811,16 @@ class Store:
                     return self._decode(current)
                 if current["status"] != "claimed":
                     raise RuntimeError(f"work order cannot complete from {current['status']}")
-            if current["status"] == "claimed" and current["claimed_by"] != worker_id:
+            if current["status"] == "claimed" and current["claimed_by"] != agent_id:
                 raise RuntimeError(
-                    f"work order is claimed by {current['claimed_by']}; {worker_id!r} cannot complete it")
+                    f"work order is claimed by {current['claimed_by']}; {agent_id!r} cannot complete it")
             con.execute("""UPDATE work_orders SET status='done',result_evidence_ids_json=?,
                 updated_at=? WHERE id=? AND status='open'""",
                         (json.dumps(list(evidence_ids or [])), stamp, work_order_id))
             if current["status"] == "claimed":
                 con.execute("""UPDATE work_orders SET status='done',result_evidence_ids_json=?,
                     updated_at=? WHERE id=? AND status='claimed' AND claimed_by=?""",
-                    (json.dumps(list(evidence_ids or [])), stamp, work_order_id, worker_id))
+                    (json.dumps(list(evidence_ids or [])), stamp, work_order_id, agent_id))
             row = con.execute("SELECT * FROM work_orders WHERE id=?", (work_order_id,)).fetchone()
         value = self._decode(row)
         self.event(value["goal_id"], value["run_id"], "work_order.done",
@@ -1840,5 +1861,5 @@ class Store:
             if len(matched) >= int(order.get("needed") or 1):
                 completed.append(self.complete_work_order(
                     order["id"], [item["id"] for item in matched[: int(order["needed"])]],
-                    worker_id=order.get("claimed_by")))
+                    agent_id=order.get("claimed_by")))
         return completed

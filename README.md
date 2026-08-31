@@ -1,6 +1,6 @@
-# SpielOS — Worker-owned AI Company Operating System
+# SpielOS — Agent-owned AI Company Operating System
 
-SpielOS is an open-source local harness for running durable company work with AI: one Director owns the Goal loop, workers complete bounded workflows, and every approval, hand-off, and result is persisted on disk.
+SpielOS is an open-source local harness for running durable company work with AI: one Director owns the Goal loop, agents complete bounded workflows, and every approval, hand-off, and result is persisted on disk.
 
 ```
 GOAL → OBSERVE → DECIDE → ACT → EVALUATE
@@ -12,7 +12,7 @@ GOAL → OBSERVE → DECIDE → ACT → EVALUATE
 pipx install spielos && spielos init --dir /your/chosen/folder
 ```
 
-The chosen folder becomes a self-contained SpielOS home. It receives the runtime, worker host adapters for Codex and OpenCode, empty private state, and no pre-installed workgroups.
+The chosen folder becomes a self-contained SpielOS home. It receives the runtime, agent host adapters for Codex and OpenCode, empty private state, and no pre-installed departments.
 
 ## Update
 
@@ -21,7 +21,7 @@ pipx upgrade spielos && spielos update --dir /your/chosen/folder
 ```
 
 Update replaces only the harness spine and host adapters. It preserves the
-home’s strategy, assets, installed Workgroups, configuration, and private
+home’s strategy, assets, installed Departments, configuration, and private
 `.spielos/` state. `spielos refresh` remains a compatibility alias.
 
 To test unreleased source changes locally, install the built wheel explicitly;
@@ -32,26 +32,26 @@ pipx install --force /path/to/SpielOS/dist/spielos-VERSION-py3-none-any.whl
 spielos update --dir /your/chosen/folder
 ```
 
-## Workgroups and workers
+## Departments and agents
 
-A Workgroup is an installable, worker-owned capability. Its workers own narrowly-scoped workflows and can only produce their declared evidence. The Director routes work through durable work orders; workers never own the company loop or approve external actions.
-
-```sh
-spielos workgroup validate --file workgroup.json
-spielos workgroup install --file workgroup.json --dir /your/chosen/folder
-spielos workgroup list
-```
-
-Fresh homes deliberately start with no Workgroups. Install one package or all
-six bundled capabilities only when they match a real company outcome:
+A Department is an installable, Agent-owned capability. Its agents own narrowly-scoped workflows and can only produce their declared evidence. The Director routes work through durable work orders; agents never own the company loop or approve external actions.
 
 ```sh
-spielos workgroup install --all --dir /your/chosen/folder
+spielos department validate --file department.json
+spielos department install --file department.json --dir /your/chosen/folder
+spielos department list
 ```
 
-Owner-language aliases are translated at intake: Department means Workgroup;
-Agent and Employee mean Worker. They are not additional runtime layers. Use one
-orientation command instead of probing several catalogs:
+Fresh homes deliberately start with no Departments. Install one package or all
+seven bundled capabilities only when they match a real company outcome:
+
+```sh
+spielos department install --all --dir /your/chosen/folder
+```
+
+The public architecture has one name per layer: Goal, Department, Workflow,
+Agent, Skill, Connection, and Artifact. Use one orientation command instead of
+probing several catalogs:
 
 ```sh
 spielos overview
@@ -85,7 +85,7 @@ spielos migration plan --from /old/home --out migration-plan.json
 ```
 
 The plan archives foreign Goals by default, normalizes capability/executor
-aliases, quarantines unknowns, and converts one Workgroup at a time.
+aliases, quarantines unknowns, and converts one Department at a time.
 
 ## State, context, and memory
 

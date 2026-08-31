@@ -10,20 +10,22 @@ from typing import Any
 
 
 NORMALIZATION = {
-    "department": "workgroup",
-    "workgroup": "workgroup",
-    "agent": "worker",
-    "employee": "worker",
-    "worker": "worker",
+    "department": "department",
+    "workgroup": "department",
+    "agent": "agent",
+    "employee": "agent",
+    "worker": "agent",
     "playbook": "workflow",
     "workflow": "workflow",
-    "prompt": "workbook_method",
-    "method": "workbook_method",
-    "skill": "workbook_method",
-    "tool": "workkit_capability",
-    "permission": "workkit_capability",
-    "connection": "workkit_capability",
-    "output": "artifact_or_evidence",
+    "prompt": "skill",
+    "method": "skill",
+    "workbook": "skill",
+    "skill": "skill",
+    "tool": "connection",
+    "workkit": "connection",
+    "connection": "connection",
+    "output": "artifact",
+    "evidence": "artifact",
 }
 
 
@@ -33,7 +35,7 @@ POLICIES = {
     "history": "preserve immutable runs, evidence, approvals, decisions, and artifact references",
     "external_actions": "disable credentials and require explicit approval during migration tests",
     "unknown_files": "quarantine; never guess or silently discard",
-    "installation": "convert, validate, test, and install one Workgroup atomically at a time",
+    "installation": "convert, validate, test, and install one Department atomically at a time",
     "application": "migrate site code separately from the harness; preserve source history and verify build plus critical user flows",
 }
 
@@ -153,7 +155,7 @@ def _classify(path: Path) -> dict[str, str]:
     elif "templates" in parts:
         target, action = "template_asset", "preserve_and_validate_with_owner"
     elif name == "skill.md" or "skills" in parts or "prompt" in name or "method" in name:
-        target, action = "workbook_method", "convert_and_review"
+        target, action = "skill", "convert_and_review"
     elif "strategy" in parts:
         target, action = "strategy_context", "merge_current_kernel_then_review"
     elif "assets" in parts:
@@ -163,17 +165,17 @@ def _classify(path: Path) -> dict[str, str]:
     elif "workflow" in name or "playbook" in name or "worksteps" in text:
         target, action = "workflow", "convert_and_validate"
     elif name in {"department.py", "workgroup.json"}:
-        target, action = "workgroup", "convert_and_validate"
+        target, action = "department", "convert_and_validate"
     elif under("agents", "installed") or "workers" in parts or name == "worker.json":
-        target, action = "worker", "normalize_identity"
+        target, action = "agent", "normalize_identity"
     elif "worker" in name or "employee" in name:
-        target, action = "worker", "normalize_identity"
+        target, action = "agent", "normalize_identity"
     elif "workgroup" in name or "department" in name:
-        target, action = "workgroup", "convert_and_validate"
+        target, action = "department", "convert_and_validate"
     elif any(token in name for token in ("connection", "integration", "permission", "tool")):
-        target, action = "workkit_capability", "review_authority_and_credentials"
+        target, action = "connection", "review_authority_and_credentials"
     elif any(token in name for token in ("artifact", "output", "evidence")):
-        target, action = "artifact_or_evidence", "preserve_and_hash_verify"
+        target, action = "artifact", "preserve_and_hash_verify"
     else:
         target, action = "unknown", "quarantine_for_owner_review"
     return {"path": str(path), "target_type": target, "action": action}
@@ -185,15 +187,15 @@ def inspect_source(source: str | Path) -> dict[str, Any]:
         raise ValueError(f"migration source does not exist: {root}")
     files = _known_files(root)
     base = root.parent if root.is_file() else root
-    legacy_root = base / ".agents/company/departments"
-    if not legacy_root.is_dir():
-        legacy_root = base / "company/departments"
+    department_root = base / ".agents/company/departments"
+    if not department_root.is_dir():
+        department_root = base / "company/departments"
     workgroup_root = base / ".agents/company/workgroups"
     if not workgroup_root.is_dir():
         workgroup_root = base / "company/workgroups"
-    legacy = sorted(path.name for path in legacy_root.iterdir()
-                    if path.is_dir() and not path.name.startswith(("_", "."))) if legacy_root.is_dir() else []
-    current = sorted(path.name for path in workgroup_root.iterdir()
+    departments = sorted(path.name for path in department_root.iterdir()
+                         if path.is_dir() and not path.name.startswith(("_", "."))) if department_root.is_dir() else []
+    retired_workgroups = sorted(path.name for path in workgroup_root.iterdir()
                      if path.is_dir() and (path / "workgroup.json").is_file()) if workgroup_root.is_dir() else []
     state = base / ".spielos/state/company.sqlite"
     application = _application_inventory(base)
@@ -204,8 +206,8 @@ def inspect_source(source: str | Path) -> dict[str, Any]:
         "fingerprint": _fingerprint(root, files),
         "inventory": {
             "recognized_files": len(files),
-            "legacy_departments": legacy,
-            "current_workgroups": current,
+            "departments": departments,
+            "retired_workgroups": retired_workgroups,
             "has_operational_state": state.is_file(),
             "operational_state_bytes": state.stat().st_size if state.is_file() else 0,
             "application": application,
@@ -221,14 +223,14 @@ def migration_plan(source: str | Path) -> dict[str, Any]:
     inventory = inspection["inventory"]
     units = [
         {"source_id": identifier, "source_type": "department",
-         "target_type": "workgroup", "target_id": identifier,
-         "status": "needs_conversion_and_acceptance"}
-        for identifier in inventory["legacy_departments"]]
+         "target_type": "department", "target_id": identifier,
+         "status": "needs_validation_and_acceptance"}
+        for identifier in inventory["departments"]]
     units += [
         {"source_id": identifier, "source_type": "workgroup",
-         "target_type": "workgroup", "target_id": identifier,
-         "status": "needs_validation_and_acceptance"}
-        for identifier in inventory["current_workgroups"]]
+         "target_type": "department", "target_id": identifier,
+         "status": "needs_conversion_and_acceptance"}
+        for identifier in inventory["retired_workgroups"]]
     quarantined = [item for item in inventory["file_assessments"]
                    if item["target_type"] == "unknown"]
     application = inventory["application"]
@@ -244,7 +246,7 @@ def migration_plan(source: str | Path) -> dict[str, Any]:
     return {
         "schema_version": 1,
         "inspection": inspection,
-        "execution_policy": "one_workgroup_at_a_time",
+        "execution_policy": "one_department_at_a_time",
         "units": units,
         "site_unit": site_unit,
         "quarantined_files": quarantined,
@@ -255,7 +257,7 @@ def migration_plan(source: str | Path) -> dict[str, Any]:
             "runtime spine is installed fresh from the current release",
             "website source is migrated separately without copying the foreign harness",
             "website build, tests, and critical user flows pass in the destination",
-            "each Workgroup validates before installation",
+            "each Department validates before installation",
             "external credentials remain disabled during acceptance",
             "artifacts and historical evidence are hash-verified",
             "only owner-selected Goals enter the new rooted Goal graph",

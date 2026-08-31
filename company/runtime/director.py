@@ -392,7 +392,7 @@ def _system_intervention_lineage(goal, child, proposal):
         "non_goals": list(proposal.get("non_goals") or (
             "Change the parent business goal",
             "Change controlled business variables",
-            "Redesign unrelated runtime or Workgroup architecture",
+            "Redesign unrelated runtime or Department architecture",
         )),
     }
 

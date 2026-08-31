@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>SpielOS Observatory</title>
+  <style>
+    :root{
+      color-scheme:dark;--ink:#f4f2ed;--muted:#969c9f;--faint:#5d6468;
+      --bg:#0b0d0e;--panel:#111416;--panel2:#171b1d;--panel3:#1d2224;
+      --line:#2b3235;--line2:#3a4346;--mint:#72e3b1;--blue:#7ea8ff;
+      --amber:#f2bd61;--red:#ff716d;--violet:#bd8cff;--cyan:#65d7e5;
+      --radius:14px;--shadow:0 18px 60px rgba(0,0,0,.34);
+    }
+    *{box-sizing:border-box} html,body{height:100%}
+    body{margin:0;overflow:hidden;background:var(--bg);color:var(--ink);font:13px/1.45 Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    button,input{font:inherit;color:inherit}.app{height:100%;display:grid;grid-template-rows:64px minmax(0,1fr)}
+    header{display:flex;align-items:center;gap:18px;padding:0 18px;border-bottom:1px solid var(--line);background:rgba(15,18,19,.94);backdrop-filter:blur(18px);z-index:10}
+    .brand{display:flex;align-items:center;gap:11px;min-width:225px}.sigil{width:30px;height:30px;border:1px solid #557064;border-radius:9px;display:grid;place-items:center;background:linear-gradient(145deg,#1d2c26,#111716);box-shadow:inset 0 0 20px rgba(114,227,177,.08)}
+    .sigil:before{content:"";width:10px;height:10px;border:2px solid var(--mint);border-radius:50%;box-shadow:0 0 16px rgba(114,227,177,.7)}
+    .brand strong{display:block;font-size:14px;letter-spacing:.02em}.brand small{color:var(--muted);font-size:10px;letter-spacing:.12em;text-transform:uppercase}
+    .live{display:flex;align-items:center;gap:7px;color:var(--mint);font-size:11px;white-space:nowrap}.live i{width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 12px currentColor;animation:pulse 1.6s infinite}@keyframes pulse{50%{opacity:.35}}
+    .search{position:relative;flex:1;max-width:440px}.search input{width:100%;height:36px;border:1px solid var(--line);background:#0d1011;border-radius:9px;padding:0 38px 0 34px;outline:none}.search input:focus{border-color:#527264;box-shadow:0 0 0 3px rgba(114,227,177,.08)}.search:before{content:"⌕";position:absolute;left:12px;top:6px;color:var(--muted);font-size:18px}.search kbd{position:absolute;right:9px;top:8px;border:1px solid var(--line2);border-radius:5px;color:var(--faint);padding:1px 5px;font-size:9px}
+    .modes{display:flex;gap:3px;padding:3px;border:1px solid var(--line);background:#0d1011;border-radius:10px}.mode{border:0;background:transparent;color:var(--muted);padding:6px 9px;border-radius:7px;cursor:pointer;font-size:11px}.mode:hover{color:var(--ink)}.mode.active{background:var(--panel3);color:var(--ink);box-shadow:0 1px 6px rgba(0,0,0,.3)}
+    .shell{display:grid;grid-template-columns:264px minmax(0,1fr) 330px;min-height:0}.side,.inspect{background:var(--panel);min-height:0;overflow:auto}.side{border-right:1px solid var(--line)}.inspect{border-left:1px solid var(--line)}
+    .side section,.inspect section{padding:16px;border-bottom:1px solid var(--line)}.eyebrow{font-size:9px;text-transform:uppercase;letter-spacing:.16em;color:var(--muted);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
+    .health{display:flex;gap:14px;align-items:center}.ring{--score:0;width:74px;height:74px;border-radius:50%;background:conic-gradient(var(--mint) calc(var(--score)*1%),var(--line) 0);position:relative;display:grid;place-items:center}.ring:after{content:"";position:absolute;inset:7px;border-radius:50%;background:var(--panel)}.ring strong{position:relative;z-index:1;font-size:20px}.health-copy b{display:block;font-size:14px}.health-copy span{display:block;color:var(--muted);font-size:11px;margin-top:3px}
+    .metrics{display:grid;grid-template-columns:1fr 1fr;gap:7px}.metric{padding:9px 10px;border:1px solid var(--line);border-radius:9px;background:var(--panel2)}.metric b{font-size:17px;display:block;line-height:1.1}.metric span{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+    .loop{display:flex;align-items:center;gap:3px}.stage{min-width:0;flex:1;text-align:center;padding:7px 2px;border:1px solid var(--line);background:var(--panel2);border-radius:7px;color:var(--faint);font-size:8px;letter-spacing:.06em;position:relative}.stage.active{color:var(--mint);border-color:#3c735d;background:#15241e}.stage .count{display:block;font-size:12px;font-weight:700;letter-spacing:0}.stage:not(:last-child):after{content:"";position:absolute;right:-4px;top:50%;width:4px;height:1px;background:var(--line2)}
+    .layer-list{display:flex;flex-direction:column;gap:2px}.layer-row{width:100%;display:grid;grid-template-columns:8px 1fr auto;align-items:center;gap:8px;border:0;background:transparent;padding:7px 5px;border-radius:7px;color:var(--muted);cursor:pointer;text-align:left}.layer-row:hover{background:var(--panel2);color:var(--ink)}.layer-row i{width:6px;height:6px;border-radius:2px;background:var(--layer-color,var(--faint))}.layer-row small{font-size:9px;color:var(--faint)}
+    .center{min-width:0;min-height:0;position:relative;background:var(--bg);overflow:hidden}.canvas{position:absolute;inset:0;overflow:hidden;background-image:radial-gradient(circle at 1px 1px,rgba(255,255,255,.055) 1px,transparent 0);background-size:22px 22px}.canvas:after{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at 50% 42%,transparent 20%,rgba(7,9,10,.46) 100%)}
+    svg{width:100%;height:100%;display:block;position:relative;z-index:1;cursor:grab}svg.dragging{cursor:grabbing}.edge{fill:none;stroke:#3a4447;stroke-width:1.15;vector-effect:non-scaling-stroke;opacity:.64}.edge.supports{stroke:var(--violet);stroke-dasharray:5 5;opacity:.9}.edge.currently_at{stroke:var(--mint);stroke-width:2;filter:drop-shadow(0 0 4px rgba(114,227,177,.3))}.edge.precedes,.edge.advances_to,.edge.continues{stroke:var(--blue);stroke-dasharray:3 4}.edge.duplicates,.edge.legacy_alias{stroke:var(--amber);stroke-dasharray:2 5}.edge.dim{opacity:.06}
+    .arch-row{fill:rgba(17,20,22,.7);stroke:#242a2d;stroke-width:1}.arch-label{fill:#7b8488;font-size:11px;font-weight:650;letter-spacing:.08em;text-transform:uppercase}.arch-desc{fill:#50585c;font-size:9px}.node{cursor:pointer}.node rect{fill:#15191b;stroke:#3b4448;stroke-width:1.2;rx:9;vector-effect:non-scaling-stroke}.node:hover rect,.node.selected rect{stroke:#dce6e1;filter:drop-shadow(0 8px 18px rgba(0,0,0,.45))}.node.live rect{stroke:var(--mint);filter:drop-shadow(0 0 8px rgba(114,227,177,.16))}.node.warning rect,.node.blocked rect{stroke:var(--amber)}.node.critical rect,.node.failed rect{stroke:var(--red)}.node.achieved rect,.node.healthy rect{stroke:#4f8d71}.node.ignored rect,.node.empty rect{stroke:#444b4e;stroke-dasharray:4 3;opacity:.72}.node text{pointer-events:none;user-select:none}.node .title{fill:#eef1ef;font-size:11px;font-weight:650}.node .sub{fill:#879094;font-size:8.8px}.node .kind{fill:#60696d;font-size:7.5px;letter-spacing:.09em;text-transform:uppercase}.node .pulse{fill:var(--mint);filter:drop-shadow(0 0 4px var(--mint))}.node.dim{opacity:.08}
+    .toolbar{position:absolute;left:16px;top:16px;z-index:4;display:flex;gap:6px}.tool{height:30px;min-width:30px;border:1px solid var(--line);background:rgba(17,20,22,.9);border-radius:8px;cursor:pointer;color:var(--muted);box-shadow:0 6px 20px rgba(0,0,0,.2)}.tool:hover{color:var(--ink);border-color:var(--line2)}
+    .canvas-note{position:absolute;right:16px;top:16px;z-index:4;border:1px solid var(--line);border-radius:9px;padding:8px 11px;background:rgba(17,20,22,.9);color:var(--muted);font-size:10px;max-width:340px}.canvas-note b{color:var(--ink)}
+    .legend{position:absolute;left:16px;bottom:14px;z-index:4;display:flex;gap:11px;align-items:center;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:rgba(17,20,22,.9);color:var(--muted);font-size:9px}.legend i{width:14px;height:2px;background:var(--line2);display:inline-block;margin-right:4px;vertical-align:middle}.legend .dag{background:repeating-linear-gradient(90deg,var(--violet) 0 4px,transparent 4px 7px)}.legend .live-line{background:var(--mint)}
+    .empty-state{position:absolute;inset:0;display:none;place-items:center;z-index:3;color:var(--muted)}
+    .inspect-head{padding:17px 16px 14px;border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(17,20,22,.96);backdrop-filter:blur(12px);z-index:3}.inspect-head .type{color:var(--mint);font-size:9px;text-transform:uppercase;letter-spacing:.15em}.inspect-head h2{font-size:16px;line-height:1.25;margin:7px 0 5px}.inspect-head p{color:var(--muted);font-size:11px;margin:0;word-break:break-word}.status-line{display:flex;gap:6px;margin-top:11px;flex-wrap:wrap}.pill{padding:3px 7px;border:1px solid var(--line2);border-radius:999px;font-size:9px;color:var(--muted)}.pill.live-pill{border-color:#3f765f;color:var(--mint)}
+    .relations{display:flex;flex-direction:column;gap:5px}.relation{display:grid;grid-template-columns:1fr auto;gap:8px;border:1px solid var(--line);background:var(--panel2);border-radius:8px;padding:8px 9px;cursor:pointer;text-align:left}.relation:hover{border-color:var(--line2)}.relation b{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.relation span{font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+    .meta-grid{display:grid;grid-template-columns:90px 1fr;gap:7px 9px;font-size:10px}.meta-grid dt{color:var(--muted)}.meta-grid dd{margin:0;word-break:break-word;white-space:pre-wrap}.source-link{color:var(--cyan);word-break:break-all;font:10px ui-monospace,SFMono-Regular,Menlo,monospace}
+    .finding-list{display:flex;flex-direction:column;gap:7px}.finding{border:1px solid var(--line);border-left:3px solid var(--amber);background:var(--panel2);border-radius:8px;padding:9px 9px 9px 10px;cursor:pointer}.finding.error,.finding.critical{border-left-color:var(--red)}.finding.info{border-left-color:var(--blue)}.finding:hover{border-color:var(--line2)}.finding b{font-size:10px;display:block}.finding p{font-size:9px;color:var(--muted);margin:4px 0 0}.finding .sev{text-transform:uppercase;letter-spacing:.1em;font-size:7px;color:var(--amber);float:right}.finding.error .sev,.finding.critical .sev{color:var(--red)}
+    .activity{display:flex;flex-direction:column}.event{display:grid;grid-template-columns:7px 1fr;gap:9px;padding:8px 0;border-bottom:1px solid var(--line)}.event i{width:6px;height:6px;margin-top:5px;border-radius:50%;background:var(--blue)}.event b{font-size:10px;display:block}.event span{font-size:9px;color:var(--muted);display:block}.event time{font-size:8px;color:var(--faint)}
+    .load-error{padding:12px;border:1px solid #6e3434;background:#291718;color:#ffaaa6;border-radius:9px;font-size:11px}
+    @media(max-width:1100px){.shell{grid-template-columns:230px minmax(0,1fr)}.inspect{position:absolute;right:0;top:64px;bottom:0;width:330px;z-index:8;box-shadow:var(--shadow);transform:translateX(100%);transition:.2s}.inspect.open{transform:none}.modes .mode:nth-child(n+5){display:none}}
+    @media(max-width:760px){header{gap:8px}.brand{min-width:auto}.brand div{display:none}.side{display:none}.shell{grid-template-columns:1fr}.search{display:none}.modes{overflow:auto}.canvas-note{display:none}}
+  </style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand"><span class="sigil"></span><div><strong>SpielOS Observatory</strong><small>Living architecture</small></div></div>
+    <span class="live"><i></i><span id="liveText">connecting</span></span>
+    <div class="search"><input id="search" autocomplete="off" placeholder="Find a Goal, Agent, Workflow, module…"><kbd>⌘ K</kbd></div>
+    <nav class="modes" aria-label="Graph mode">
+      <button class="mode active" data-mode="living">Living</button>
+      <button class="mode" data-mode="goals">Goal tree + DAG</button>
+      <button class="mode" data-mode="architecture">Architecture</button>
+      <button class="mode" data-mode="coherence">Coherence</button>
+      <button class="mode" data-mode="code">Code</button>
+      <button class="mode" data-mode="everything">Everything</button>
+    </nav>
+  </header>
+  <div class="shell">
+    <aside class="side">
+      <section>
+        <div class="eyebrow"><span>System coherence</span><span id="healthState">—</span></div>
+        <div class="health"><div class="ring" id="healthRing"><strong id="healthScore">—</strong></div><div class="health-copy"><b id="healthLabel">Reading system</b><span id="healthFindings">—</span></div></div>
+      </section>
+      <section><div class="eyebrow">Live signal</div><div class="metrics" id="metrics"></div></section>
+      <section><div class="eyebrow">Goal loop</div><div class="loop" id="loop"></div></section>
+      <section><div class="eyebrow"><span>Architecture layers</span><span id="visibleCount">—</span></div><div class="layer-list" id="layers"></div></section>
+      <section><div class="eyebrow"><span>Coherence findings</span><span id="findingCount">—</span></div><div class="finding-list" id="findings"></div></section>
+    </aside>
+    <main class="center">
+      <div class="canvas">
+        <svg id="svg" aria-label="SpielOS architecture graph"><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#4b565a"></path></marker></defs><g id="viewport"><g id="rows"></g><g id="edges"></g><g id="nodes"></g></g></svg>
+        <div class="toolbar"><button class="tool" id="zoomIn" title="Zoom in">＋</button><button class="tool" id="zoomOut" title="Zoom out">−</button><button class="tool" id="fit" title="Fit graph">⌗</button></div>
+        <div class="canvas-note" id="canvasNote"><b>Living view</b> · current state and the architecture carrying it</div>
+        <div class="legend"><span><i class="live-line"></i>live state</span><span><i class="dag"></i>causal support</span><span><i></i>structural relation</span></div>
+        <div class="empty-state" id="emptyState">No nodes match this view.</div>
+      </div>
+    </main>
+    <aside class="inspect" id="inspect">
+      <div class="inspect-head"><div class="type" id="inspectType">System</div><h2 id="inspectTitle">Absolute observability</h2><p id="inspectSub">Select any entity or relation to inspect its authority, state, and connections.</p><div class="status-line" id="inspectStatus"></div></div>
+      <section><div class="eyebrow">Relations</div><div class="relations" id="relations"><span style="color:var(--muted);font-size:10px">Select a node to trace inbound and outbound relations.</span></div></section>
+      <section><div class="eyebrow">Details</div><dl class="meta-grid" id="meta"></dl></section>
+      <section><div class="eyebrow">Source authority</div><div class="source-link" id="source">Live graph projection from SQLite, Strategy, package registries, and artifacts.</div></section>
+      <section><div class="eyebrow">Recent activity</div><div class="activity" id="activity"></div></section>
+    </aside>
+  </div>
+</div>
+<script>
+(() => {
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const svg = $("svg"), viewport = $("viewport"), rowsG = $("rows"), edgesG = $("edges"), nodesG = $("nodes");
+  const NS = "http://www.w3.org/2000/svg";
+  const colors = {input:"#65d7e5",strategy:"#bd8cff",control:"#7ea8ff",runtime:"#72e3b1",capability:"#f2bd61",execution:"#e6d17b",workflow:"#75c9c0",method:"#9ca8ff",knowledge:"#d18fbd",state:"#8da1a7",code:"#70828a"};
+  const state = {data:null,mode:"living",query:"",selected:null,tx:40,ty:40,scale:.8,drag:false,lastPositions:new Map(),first:true,error:null};
+  const structuralLiving = new Set(["host_adapter","strategy_kernel","strategy_layer","control","loop_stage","department","agent","workflow","memory_layer","memory_category","state_authority","artifact_authority","ignored_paths"]);
+  const architectureKinds = new Set(["host_adapter","host_hook","host_agent","host_command","strategy_kernel","strategy_layer","strategy_section","control","loop_stage","department","agent","workflow","workflow_step","skill","connection","evidence_kind","memory_layer","memory_category","state_authority","state_table","artifact_authority","ignored_paths"]);
+  const goalKinds = new Set(["goal","run","control","loop_stage","work_order","evidence","artifact_manifest"]);
+  const el = (tag,attrs={},text="") => {const item=document.createElementNS(NS,tag);Object.entries(attrs).forEach(([k,v])=>item.setAttribute(k,v));if(text)item.textContent=text;return item};
+  const esc = value => String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+  const compact = value => {if(value===null||value===undefined||value==="")return "—";if(typeof value==="object")return JSON.stringify(value,null,2);return String(value)};
+  const age = iso => {if(!iso)return "";const s=Math.max(0,(Date.now()-new Date(iso).getTime())/1000);if(s<60)return `${Math.floor(s)}s ago`;if(s<3600)return `${Math.floor(s/60)}m ago`;if(s<86400)return `${Math.floor(s/3600)}h ago`;return `${Math.floor(s/86400)}d ago`};
+
+  function isVisible(node){
+    const q=state.query.trim().toLowerCase(); if(q && !node.search.includes(q)) return false;
+    if(state.mode==="everything") return true;
+    if(state.mode==="code") return node.kind==="code_module";
+    if(state.mode==="architecture") return architectureKinds.has(node.kind);
+    if(state.mode==="goals") return goalKinds.has(node.kind);
+    if(state.mode==="coherence"){
+      const ids=new Set(state.data.findings.flatMap(f=>f.node_ids||[]));
+      if(ids.has(node.id)) return true;
+      return state.data.edges.some(e=>(ids.has(e.source)&&e.target===node.id)||(ids.has(e.target)&&e.source===node.id));
+    }
+    return node.live || structuralLiving.has(node.kind);
+  }
+
+  function currentGraph(){
+    const visible=state.data.nodes.filter(isVisible), ids=new Set(visible.map(n=>n.id));
+    return {nodes:visible,edges:state.data.edges.filter(e=>ids.has(e.source)&&ids.has(e.target))};
+  }
+
+  function architectureLayout(nodes){
+    const byLayer=new Map(state.data.layers.map(l=>[l.id,[]]));nodes.forEach(n=>(byLayer.get(n.layer)||byLayer.set(n.layer,[]).get(n.layer)).push(n));
+    const positions=new Map(), rows=[];let y=20;const width=Math.max(1200,svg.clientWidth/state.scale-80);const nodeW=210,gap=18,left=175;
+    state.data.layers.forEach(layer=>{
+      const items=(byLayer.get(layer.id)||[]).sort((a,b)=>Number(b.live)-Number(a.live)||a.label.localeCompare(b.label));if(!items.length)return;
+      const perRow=Math.max(1,Math.floor((width-left-40)/(nodeW+gap)));const lines=Math.ceil(items.length/perRow);const height=Math.max(116,lines*86+30);
+      rows.push({...layer,y,height,width});items.forEach((node,index)=>{const col=index%perRow,row=Math.floor(index/perRow);positions.set(node.id,{x:left+col*(nodeW+gap),y:y+25+row*86,w:nodeW,h:58})});y+=height+12;
+    });return {positions,rows,bounds:{x:0,y:0,w:width,h:y+20}};
+  }
+
+  function goalLayout(nodes){
+    const positions=new Map(),rows=[];const goals=nodes.filter(n=>n.kind==="goal"),goalIds=new Set(goals.map(n=>n.id));
+    const children=new Map();goals.forEach(n=>{const parent=n.meta.parent_id&&`goal:${n.meta.parent_id}`;if(parent&&goalIds.has(parent)){if(!children.has(parent))children.set(parent,[]);children.get(parent).push(n.id)}});
+    const roots=goals.filter(n=>{const p=n.meta.parent_id&&`goal:${n.meta.parent_id}`;return !p||!goalIds.has(p)}).sort((a,b)=>a.label.localeCompare(b.label));let cursor=0;const nodeW=226,rowH=82,colW=270;
+    function visit(id,depth){const kids=(children.get(id)||[]).sort();let y;if(!kids.length){y=80+cursor++*rowH}else{const ys=kids.map(k=>visit(k,depth+1));y=(ys[0]+ys.at(-1))/2}positions.set(id,{x:45+depth*colW,y,w:nodeW,h:60});return y}
+    roots.forEach(root=>visit(root.id,0));
+    const loose=nodes.filter(n=>n.kind!=="goal"&&n.kind!=="loop_stage"&&n.kind!=="control");loose.forEach((n,i)=>{const goal=n.meta.goal_id&&`goal:${n.meta.goal_id}`,p=positions.get(goal);positions.set(n.id,p?{x:p.x+22,y:p.y+66+(i%2)*52,w:204,h:44}:{x:45+(i%5)*230,y:cursor*rowH+160+Math.floor(i/5)*60,w:204,h:44})});
+    const stages=nodes.filter(n=>n.kind==="loop_stage").sort((a,b)=>(a.meta.order||0)-(b.meta.order||0));stages.forEach((n,i)=>positions.set(n.id,{x:45+i*170,y:12,w:150,h:42}));
+    nodes.filter(n=>n.kind==="control").forEach((n,i)=>positions.set(n.id,{x:930+i*220,y:12,w:200,h:42}));
+    const maxDepth=Math.max(1,...[...positions.values()].map(p=>p.x+p.w));const maxY=Math.max(400,...[...positions.values()].map(p=>p.y+p.h));
+    return {positions,rows,bounds:{x:0,y:0,w:maxDepth+80,h:maxY+80}};
+  }
+
+  function render(){
+    if(!state.data)return;const graph=currentGraph();const layout=state.mode==="goals"?goalLayout(graph.nodes):architectureLayout(graph.nodes);state.lastPositions=layout.positions;
+    rowsG.innerHTML="";edgesG.innerHTML="";nodesG.innerHTML="";$("emptyState").style.display=graph.nodes.length?"none":"grid";$("visibleCount").textContent=`${graph.nodes.length} shown`;
+    layout.rows.forEach(row=>{rowsG.append(el("rect",{class:"arch-row",x:8,y:row.y,width:row.width-16,height:row.height,rx:12}));rowsG.append(el("text",{class:"arch-label",x:23,y:row.y+24},row.label));rowsG.append(el("text",{class:"arch-desc",x:23,y:row.y+41},`${row.count} total · ${row.description.slice(0,55)}`))});
+    const selected=state.selected;graph.edges.forEach(edge=>{const a=layout.positions.get(edge.source),b=layout.positions.get(edge.target);if(!a||!b)return;const sx=a.x+a.w,sy=a.y+a.h/2,tx=b.x,ty=b.y+b.h/2;const backward=tx<sx;const d=backward?`M${a.x+a.w/2},${a.y+a.h} C${a.x+a.w/2},${Math.max(a.y,b.y)+90} ${b.x+b.w/2},${Math.max(a.y,b.y)+90} ${b.x+b.w/2},${b.y}`:`M${sx},${sy} C${sx+Math.max(35,(tx-sx)*.45)},${sy} ${tx-Math.max(35,(tx-sx)*.45)},${ty} ${tx},${ty}`;const dim=selected&&edge.source!==selected&&edge.target!==selected;const path=el("path",{class:`edge ${edge.relation}${dim?" dim":""}`,d,"marker-end":"url(#arrow)"});path.addEventListener("click",()=>selectEdge(edge));edgesG.append(path)});
+    graph.nodes.forEach(node=>{const p=layout.positions.get(node.id);if(!p)return;const g=el("g",{class:`node ${node.status||""} ${node.live?"live":""} ${selected===node.id?"selected":""}`,transform:`translate(${p.x},${p.y})`,"data-id":node.id});g.append(el("rect",{width:p.w,height:p.h}));g.append(el("text",{class:"kind",x:11,y:13},node.kind.replaceAll("_"," ").slice(0,29)));g.append(el("text",{class:"title",x:11,y:p.h>48?31:27},node.label.slice(0,p.w>210?31:25)));if(p.h>48)g.append(el("text",{class:"sub",x:11,y:47},String(node.subtitle||node.status).slice(0,38)));if(node.live)g.append(el("circle",{class:"pulse",cx:p.w-11,cy:11,r:3}));g.addEventListener("click",event=>{event.stopPropagation();selectNode(node.id)});nodesG.append(g)});
+    applyTransform();if(state.first){state.first=false;requestAnimationFrame(()=>fit(layout.bounds))}
+  }
+
+  function applyTransform(){viewport.setAttribute("transform",`translate(${state.tx},${state.ty}) scale(${state.scale})`)}
+  function fit(bounds=null){if(!state.data)return;const graph=currentGraph(),lay=bounds?{bounds}:state.mode==="goals"?goalLayout(graph.nodes):architectureLayout(graph.nodes);const b=lay.bounds,w=svg.clientWidth,h=svg.clientHeight;state.scale=Math.max(.12,Math.min(1.08,(w-50)/b.w,(h-50)/b.h));state.tx=(w-b.w*state.scale)/2;state.ty=(h-b.h*state.scale)/2;applyTransform()}
+  function zoom(factor,cx=svg.clientWidth/2,cy=svg.clientHeight/2){const old=state.scale;state.scale=Math.max(.12,Math.min(2.4,state.scale*factor));state.tx=cx-(cx-state.tx)*(state.scale/old);state.ty=cy-(cy-state.ty)*(state.scale/old);applyTransform()}
+
+  function selectNode(id){state.selected=id;const node=state.data.nodes.find(n=>n.id===id);if(!node)return;render();$("inspect").classList.add("open");$("inspectType").textContent=node.kind.replaceAll("_"," ");$("inspectTitle").textContent=node.label;$("inspectSub").textContent=node.subtitle||node.id;$("inspectStatus").innerHTML=`<span class="pill ${node.live?"live-pill":""}">${esc(node.status)}</span>${node.live?'<span class="pill live-pill">live now</span>':""}<span class="pill">${esc(node.layer)}</span>`;$("source").textContent=node.source||state.data.source.authority;renderMeta({id:node.id,...node.meta});renderRelations(id);renderActivity(id)}
+  function selectEdge(edge){state.selected=null;$("inspect").classList.add("open");$("inspectType").textContent="relation";$("inspectTitle").textContent=edge.label;$("inspectSub").textContent=`${edge.source} → ${edge.target}`;$("inspectStatus").innerHTML=`<span class="pill">${esc(edge.status)}</span><span class="pill">${esc(edge.relation)}</span>`;renderMeta(edge.meta);$("relations").innerHTML=`<button class="relation" data-node="${esc(edge.source)}"><b>${esc(labelFor(edge.source))}</b><span>source</span></button><button class="relation" data-node="${esc(edge.target)}"><b>${esc(labelFor(edge.target))}</b><span>target</span></button>`;bindRelationButtons();$("source").textContent="Derived relation from the source authorities shown on its connected nodes."}
+  function renderMeta(meta){const pairs=Object.entries(meta||{}).filter(([,v])=>v!==null&&v!==undefined&&v!==""&&!(Array.isArray(v)&&!v.length)&&!(typeof v==="object"&&!Array.isArray(v)&&!Object.keys(v).length));$("meta").innerHTML=pairs.length?pairs.map(([k,v])=>`<dt>${esc(k.replaceAll("_"," "))}</dt><dd>${esc(compact(v))}</dd>`).join(""):"<dt>State</dt><dd>No additional payload.</dd>"}
+  function labelFor(id){return state.data.nodes.find(n=>n.id===id)?.label||id}
+  function renderRelations(id){const relations=state.data.edges.filter(e=>e.source===id||e.target===id);$("relations").innerHTML=relations.length?relations.slice(0,80).map(e=>{const outbound=e.source===id,target=outbound?e.target:e.source;return `<button class="relation" data-node="${esc(target)}"><b>${esc(labelFor(target))}</b><span>${esc(outbound?e.relation:`${e.relation} ←`)}</span></button>`}).join(""):"<span style='color:var(--muted);font-size:10px'>No recorded relations.</span>";bindRelationButtons()}
+  function bindRelationButtons(){document.querySelectorAll(".relation[data-node]").forEach(btn=>btn.onclick=()=>focusNode(btn.dataset.node))}
+  function focusNode(id){const node=state.data.nodes.find(n=>n.id===id);if(!node)return;if(!isVisible(node)){state.mode="everything";document.querySelectorAll(".mode").forEach(b=>b.classList.toggle("active",b.dataset.mode==="everything"));state.first=true;render()}selectNode(id);const p=state.lastPositions.get(id);if(p){state.tx=svg.clientWidth/2-(p.x+p.w/2)*state.scale;state.ty=svg.clientHeight/2-(p.y+p.h/2)*state.scale;applyTransform()}}
+  function renderActivity(id=null){const node=id&&state.data.nodes.find(n=>n.id===id);const goalId=node?.kind==="goal"?node.meta.id:node?.meta?.goal_id;let events=state.data.activity;if(goalId)events=events.filter(e=>e.goal_id===goalId);$("activity").innerHTML=events.slice(0,18).map(e=>`<div class="event"><i></i><div><b>${esc(e.kind)}</b><span>${esc(e.goal_name||e.goal_id||"")}</span><time>${esc(age(e.created_at))}</time></div></div>`).join("")||"<span style='color:var(--muted);font-size:10px'>No matching activity.</span>"}
+
+  function renderChrome(){const d=state.data,h=d.health,m=d.metrics;$("liveText").textContent=`live · ${age(d.generated_at)}`;$("healthRing").style.setProperty("--score",h.score);$("healthScore").textContent=h.score;$("healthLabel").textContent=h.status[0].toUpperCase()+h.status.slice(1);const total=Object.values(h.findings).reduce((a,b)=>a+b,0);$("healthFindings").textContent=`${total} findings · ${m.relations} relations`;$("healthState").textContent=h.status;$("healthState").style.color=h.status==="healthy"?"var(--mint)":h.status==="degraded"?"var(--amber)":"var(--red)";
+    const departments=m.departments||0,agents=m.agents||0;const cards=[[m.goals_active,"Active goals"],[m.goals_blocked,"Blocked"],[m.work_orders_open,"Assignments"],[m.attention,"Attention"],[departments,"Departments"],[m.workflows,"Workflows"],[agents,"Agents"],[m.artifacts,"Artifacts"]];$("metrics").innerHTML=cards.map(([v,l])=>`<div class="metric"><b>${v}</b><span>${l}</span></div>`).join("");
+    $("loop").innerHTML=d.loop.stages.map(stage=>`<div class="stage ${(d.loop.active_by_stage[stage]||0)>0?"active":""}">${stage}<span class="count">${d.loop.active_by_stage[stage]||0}</span></div>`).join("");
+    $("layers").innerHTML=d.layers.map(l=>`<button class="layer-row" data-layer="${l.id}" style="--layer-color:${colors[l.id]}"><i></i><span>${esc(l.label)}</span><small>${l.count}</small></button>`).join("");document.querySelectorAll(".layer-row").forEach(b=>b.onclick=()=>{state.query="";$("search").value="";const matches=d.nodes.filter(n=>n.layer===b.dataset.layer);if(matches.length)focusNode(matches[0].id)});
+    $("findingCount").textContent=d.findings.length;$("findings").innerHTML=d.findings.slice(0,30).map(f=>`<div class="finding ${f.severity}" data-finding="${f.id}"><span class="sev">${esc(f.severity)}</span><b>${esc(f.title)}</b><p>${esc(f.detail)}</p></div>`).join("")||"<span style='color:var(--muted);font-size:10px'>No coherence defects detected.</span>";document.querySelectorAll("[data-finding]").forEach(item=>item.onclick=()=>{const f=d.findings.find(x=>x.id===item.dataset.finding);if(f?.node_ids?.[0])focusNode(f.node_ids[0]);renderMeta({severity:f.severity,kind:f.kind,detail:f.detail,suggestion:f.suggestion})});renderActivity(state.selected)}
+
+  const notes={living:"current state and the architecture carrying it",goals:"control tree plus dashed causal-support DAG",architecture:"real layers, capabilities, agents, workflows, methods, memory, and state",coherence:"defects, ignored relations, redundancy, and one-hop context",code:"local Python modules and import relations",everything:"the complete source-backed relation graph"};
+  async function refresh(){try{const response=await fetch("/api/snapshot",{cache:"no-store"});const data=await response.json();if(!response.ok||data.error)throw new Error(data.detail||data.error||`HTTP ${response.status}`);state.data=data;state.error=null;renderChrome();render()}catch(error){state.error=error;$("liveText").textContent="connection lost";$("relations").innerHTML=`<div class="load-error">${esc(error.message)}</div>`}}
+
+  document.querySelectorAll(".mode").forEach(button=>button.addEventListener("click",()=>{document.querySelectorAll(".mode").forEach(b=>b.classList.remove("active"));button.classList.add("active");state.mode=button.dataset.mode;state.selected=null;state.first=true;$("canvasNote").innerHTML=`<b>${esc(button.textContent)}</b> · ${esc(notes[state.mode])}`;render()}));
+  $("search").addEventListener("input",event=>{state.query=event.target.value;render()});window.addEventListener("keydown",event=>{if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==="k"){event.preventDefault();$("search").focus();$("search").select()}if(event.key==="Escape"){$("inspect").classList.remove("open");state.selected=null;render()}});
+  $("zoomIn").onclick=()=>zoom(1.18);$("zoomOut").onclick=()=>zoom(.84);$("fit").onclick=()=>fit();svg.addEventListener("wheel",event=>{event.preventDefault();const r=svg.getBoundingClientRect();zoom(event.deltaY<0?1.1:.9,event.clientX-r.left,event.clientY-r.top)},{passive:false});svg.addEventListener("pointerdown",event=>{if(event.target.closest?.(".node"))return;state.drag=true;state.sx=event.clientX;state.sy=event.clientY;state.ox=state.tx;state.oy=state.ty;svg.setPointerCapture(event.pointerId);svg.classList.add("dragging")});svg.addEventListener("pointermove",event=>{if(!state.drag)return;state.tx=state.ox+event.clientX-state.sx;state.ty=state.oy+event.clientY-state.sy;applyTransform()});svg.addEventListener("pointerup",()=>{state.drag=false;svg.classList.remove("dragging")});svg.addEventListener("click",event=>{if(event.target===svg){state.selected=null;$("inspect").classList.remove("open");render()}});window.addEventListener("resize",()=>render());
+  refresh();setInterval(refresh,2000);
+})();
+</script>
+</body>
+</html>

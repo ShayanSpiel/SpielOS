@@ -1,1 +1,0 @@
-{"id":"feedback-investigator","description":"Normalizes feedback, reproduces the issue, and verifies resolution evidence.","workbook":["feedback-triage"],"workkit":[],"produces":["feedback_resolution"]}

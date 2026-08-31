@@ -1,0 +1,117 @@
+<!doctype html>
+<!--
+  Flat canvas composition — ARCHETYPE: single-fact (Threads/social image).
+  Research map (shortform-template-research-20260817): one clear powerful
+  message beats a carousel for focus (Sendible 2025-08-26); the first lines
+  are the hook window on Threads (Socialync 2026-05-14); images are the
+  strongest static Threads surface (Buffer 2026-02-10 / 2026-03). The
+  archetype is ONE bold claim/fact in the title band, one supporting line,
+  and the journey signature. Flat only, semantic tokens, boxicons only, no
+  card-with-arrows layouts. The journey line is the video-style signature:
+  smooth bezier wave in the empty bottom band, dashed route + solid traveled
+  fill, nodes riding ON the path, flat bullseye at the end.
+-->
+<html lang="en" data-theme="gruvbox-dark">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>SpielOS content template</title>
+  <link rel="stylesheet" href="/.agents/company/departments/design/system/production.css">
+  <link rel="stylesheet" href="/.agents/company/departments/design/system/journey-signature.css">
+  <link rel="stylesheet" href="/node_modules/boxicons/css/boxicons.min.css">
+  <style>
+    body { container-type: size; display: grid; place-items: center; }
+    .canvas { position: relative; width: 100%; height: 100%; display: grid; grid-template-rows: auto 1fr auto; place-items: center; overflow: hidden; background: radial-gradient(circle at 50% 44%, var(--primary-soft), transparent 46%), var(--background); }
+    .grid { position: absolute; inset: 0; opacity: .03; background-image: linear-gradient(var(--foreground) 1px, transparent 1px), linear-gradient(90deg, var(--foreground) 1px, transparent 1px); background-size: 5cqw 5cqw; }
+    header, main, footer { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; }
+    header { margin-top: 5cqh; }
+    .eyebrow { color: var(--primary); font: 600 clamp(13px, 2.1cqw, 30px)/1 var(--font-mono); letter-spacing: .14em; text-transform: uppercase; }
+    main { gap: 3cqh; }
+    /* The single fact: one bold statement, thin primary rule, one support line. */
+    .fact-band { text-align: center; }
+    h1 { max-width: 15ch; margin: 0; text-align: center; color: var(--foreground-strong); font-size: clamp(44px, 8cqw, 128px); font-weight: 800; line-height: .98; letter-spacing: -.045em; }
+    h1 .accent { color: var(--primary); }
+    .fact-rule { width: clamp(48px, 6cqw, 96px); height: clamp(4px, .5cqw, 7px); margin: 2.2cqh auto 0; border-radius: 999px; background: var(--primary); }
+    .template-hook { max-width: none; margin: 2.2cqh 0 0; text-align: center; color: var(--muted-foreground); font: 500 clamp(18px, 2.2cqw, 28px)/1.3 var(--font-sans); }
+    footer { margin-bottom: 6cqh; color: var(--muted-foreground); font: 500 clamp(20px, 1.7cqw, 26px)/1 var(--font-mono); }
+    @container (aspect-ratio > 8/5) {
+      header { margin-top: 4cqh; }
+      main { flex-direction: row; gap: 5cqw; }
+      h1 { max-width: 11ch; font-size: clamp(44px, 6.4cqw, 100px); }
+      footer { margin-bottom: 6cqh; }
+    }
+    @container (aspect-ratio <= 4/5) {
+      header { margin-top: 6cqh; }
+      h1 { font-size: clamp(50px, 10.4cqw, 108px); }
+      footer { margin-bottom: 7cqh; }
+    }
+  </style>
+</head>
+<body>
+<div class="canvas">
+  <div class="grid"></div>
+
+  <!-- Journey signature — bottom band wave, portrait and landscape variants.
+       Portrait: gentle S-wave below the hook, above the footer.
+       Landscape: lower band wave under the centered fact. -->
+  <svg class="journey-svg journey-portrait" viewBox="0 0 1080 1350" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+    <path class="journey-path" d="M20,1140 C180,920 340,1180 500,1010 C660,840 820,1140 980,970 C1010,940 1035,930 1045,930"/>
+    <path class="journey-path-fill" d="M20,1140 C180,920 340,1180 500,1010"/>
+    <g class="journey-node" transform="translate(500,1010)"><circle class="node-ring" r="16"/><circle class="node-dot" r="7"/></g>
+    <g class="journey-node" transform="translate(980,970)"><circle class="node-ring" r="16"/><circle class="node-dot" r="7"/></g>
+    <g class="journey-goal" transform="translate(1045,930)">
+      <circle class="goal-ring" r="30"/><circle class="goal-ring-inner" r="17"/><circle class="goal-core" r="6"/>
+    </g>
+  </svg>
+  <svg class="journey-svg journey-landscape" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+    <path class="journey-path" d="M20,800 C200,660 400,820 600,720 C800,620 1000,800 1200,700 C1300,650 1450,720 1560,700"/>
+    <path class="journey-path-fill" d="M20,800 C200,660 400,820 600,720"/>
+    <g class="journey-node" transform="translate(600,720)"><circle class="node-ring" r="16"/><circle class="node-dot" r="7"/></g>
+    <g class="journey-node" transform="translate(1200,700)"><circle class="node-ring" r="16"/><circle class="node-dot" r="7"/></g>
+    <g class="journey-goal" transform="translate(1560,700)">
+      <circle class="goal-ring" r="30"/><circle class="goal-ring-inner" r="17"/><circle class="goal-core" r="6"/>
+    </g>
+  </svg>
+
+  <header>
+    <div class="eyebrow" id="template-eyebrow">Campaign context required</div>
+  </header>
+
+  <main>
+    <div class="fact-band">
+      <h1 class="canvas-title" id="template-title">Campaign fact required</h1>
+      <div class="fact-rule"></div>
+      <p class="template-hook" id="template-hook">One supporting line from the shared campaign Artifact.</p>
+    </div>
+  </main>
+
+  <footer><span class="brand-lockup"><img src="/public/assets/favicons/favicon.svg" alt="">spielos.xyz</span></footer>
+</div>
+<script>
+  (function () {
+    function applyRendition(order) {
+      if (!order || !order.design || !Array.isArray(order.design.title_lines)) {
+        document.documentElement.dataset.templateReady = 'error';
+        throw new Error('A typed campaign rendition is required');
+      }
+      var design = order.design;
+      document.documentElement.dataset.theme = design.theme;
+      document.body.dataset.layout = design.layout;
+      document.body.dataset.campaignId = order.campaign_id;
+      document.body.dataset.batchId = order.batch_id;
+      document.body.dataset.itemId = order.item_id;
+      document.body.dataset.contentId = order.content_id;
+      document.getElementById('template-eyebrow').textContent = design.eyebrow;
+      document.getElementById('template-hook').textContent = design.supporting_text;
+      document.getElementById('template-title').innerHTML = design.title_lines.map(function (line, index) {
+          var text = line.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          return index === design.accent_line ? '<span class="accent">' + text + '</span>' : text;
+      }).join('<br>');
+      document.title = 'SpielOS — ' + design.title_lines.join(' ');
+      document.documentElement.dataset.templateReady = 'true';
+    }
+    window.__applyCampaignRendition = applyRendition;
+    document.documentElement.dataset.templateReady = 'waiting';
+  }());
+</script>
+</body>
+</html>

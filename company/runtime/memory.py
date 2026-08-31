@@ -27,21 +27,24 @@ def eligible_memory(learning: dict, evidence: list[dict], goal, run) -> dict | N
     requested = list(dict.fromkeys(
         item for item in raw_ids if isinstance(item, str) and item))
     dimensions = ("metrics", "workflows", "steps", "icps", "offers", "channels",
-                  "artifacts", "workgroups")
+                  "artifacts", "departments")
     raw_dimensions = {key: applies_to.get(key) or () for key in dimensions}
+    # Read retired records, but always write the canonical Department shape.
+    raw_dimensions["departments"] = (
+        applies_to.get("departments") or applies_to.get("workgroups") or ())
     if any(not isinstance(value, (list, tuple)) for value in raw_dimensions.values()):
         return None
     context = {key: [str(item) for item in value if item]
                for key, value in raw_dimensions.items()}
     if not any(context.values()):
         return None
-    share_scope = learning.get("share_scope") or "workgroup"
-    audience_raw = (learning.get("audience_workgroups")
-                    or learning.get("audience_departments") or ())
+    share_scope = learning.get("share_scope") or "department"
+    audience_raw = (learning.get("audience_departments")
+                    or learning.get("audience_workgroups") or ())
     topics_raw = learning.get("topics") or ()
-    if share_scope == "department":  # historical input only
-        share_scope = "workgroup"
-    if (share_scope not in {"workgroup", "company"}
+    if share_scope == "workgroup":  # retired persisted input
+        share_scope = "department"
+    if (share_scope not in {"department", "company"}
             or not isinstance(audience_raw, (list, tuple))
             or not isinstance(topics_raw, (list, tuple))):
         return None
@@ -68,7 +71,7 @@ def eligible_memory(learning: dict, evidence: list[dict], goal, run) -> dict | N
             "decision_relevance": relevance,
             "applies_to": context,
             "share_scope": share_scope,
-            "audience_workgroups": audience if share_scope == "company" else [],
+            "audience_departments": audience if share_scope == "company" else [],
             "topics": topics if share_scope == "company" else [],
             "support": (dict(learning.get("evidence") or {})
                         if isinstance(learning.get("evidence") or {}, dict) else {}),

@@ -58,11 +58,11 @@ artifact manifest, or tracked file.
 
 ## Translate into current abstractions
 
-- Department becomes a Workgroup package.
-- Agent or Employee becomes a Worker.
+- Department or Workgroup becomes a Department package.
+- Agent, Employee, or Worker becomes an Agent.
 - Playbook or process becomes a Workflow.
-- Prompt, method, or skill becomes a workbook method.
-- Tool, permission, integration, or connection becomes a Workkit capability.
+- Prompt, method, or skill becomes a Skill.
+- Tool, permission, integration, Workkit, or connection becomes a Connection.
 - Output becomes an Artifact and, when evaluative, typed Evidence.
 - A website or application remains a separate application migration unit.
 - Foreign runtime files are replaced by the current spine, never merged into it.
@@ -73,14 +73,14 @@ and historical Goal records—and record that exclusion in acceptance.
 
 ## Improve, do not blindly copy
 
-For each proposed Workgroup, establish purpose, boundaries, relevant metrics,
-version, provenance, Workers, Worker-owned Workflows, methods, capabilities,
+For each proposed Department, establish purpose, boundaries, relevant metrics,
+version, provenance, Agents, Agent-owned Workflows, Skills, Connections,
 artifacts, evidence, and approvals. Consolidate genuine duplication only while
 retaining source traceability. Resolve contradictions deliberately. Split roles
 when responsibilities or permissions differ.
 
-For each Workflow, define accountable Worker, trigger, preconditions, inputs,
-ordered worksteps, methods, capabilities, artifacts, evidence, approvals,
+For each Workflow, define accountable Agent, trigger, preconditions, inputs,
+ordered worksteps, Skills, Connections, artifacts, evidence, approvals,
 failure behavior, and upstream/downstream relationships. Preserve valuable
 domain detail, examples, tone, templates, galleries, and assets.
 
@@ -101,7 +101,7 @@ always remains a separate external approval.
 ## Execution shape
 
 When execution is authorized, use a fresh destination and transform one
-Workgroup at a time. Validate each unit before activating the next. Keep the
+Department at a time. Validate each unit before activating the next. Keep the
 application as its own unit. Produce conversion receipts that map every source
 file to destination files and decisions. Stop on missing source identity,
 unresolved secrets, unexplained omissions, contradictions, or failed evidence.

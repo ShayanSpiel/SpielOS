@@ -1,1 +1,0 @@
-{"id":"scenario-validator","description":"Executes a declared scenario and checks its evidence chain.","workbook":["scenario-validation"],"workkit":[],"produces":["validation_report"]}

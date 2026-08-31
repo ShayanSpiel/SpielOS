@@ -1,4 +1,4 @@
-"""Small, stable contract for the one Goal loop and Worker-owned Workgroups."""
+"""Small, stable contract for the one Goal loop and its Departments."""
 
 from __future__ import annotations
 
@@ -150,15 +150,15 @@ class WorkflowStep:
     """One Lego node inside a WorkflowSpec graph.
 
     kind:
-      employee   — open a durable work order for an employee
+      agent      — open a durable work order for an Agent
       approval   — park until runtime approval key "execute"
       connection — host/connection handoff that must record evidence
-      machine    — optional pure code hook on the Workgroup adapter
+      machine    — optional pure code hook on the Department
     """
 
     id: str
-    kind: str = "employee"
-    employee_id: str | None = None
+    kind: str = "agent"
+    agent_id: str | None = None
     produces: tuple[str, ...] = ()
     requires: tuple[str, ...] = ()
     skill_ids: tuple[str, ...] = ()
@@ -167,11 +167,11 @@ class WorkflowStep:
 
 @dataclass(frozen=True)
 class WorkflowSpec:
-    """A named playbook inside a Workgroup; never a second runtime loop.
+    """A named playbook inside a Department; never a second runtime loop.
 
     `steps` remains the human-readable playbook labels.
     `graph` is the optional executable Lego chain; when empty the interpreter
-    synthesizes one employee shortfall from agents + evidence_sources.
+    synthesizes one Agent shortfall from agent_ids + evidence_sources.
     """
 
     id: str
@@ -194,32 +194,6 @@ class AgentSpec:
     skill_ids: tuple[str, ...]
     permissions: tuple[str, ...]
     produces: tuple[str, ...]
-
-
-@dataclass(frozen=True)
-class WorkerSpec(AgentSpec):
-    """A Worker owns executable workflows inside one Workgroup.
-
-    ``AgentSpec`` remains the compatibility name for older installed rosters.
-    New package code should use WorkerSpec: an identity, its workbook methods,
-    its workkit permissions, and the workflows for which it is the lead.
-    """
-
-    workgroup_id: str = ""
-    workflows: tuple[WorkflowSpec, ...] = ()
-
-
-@dataclass(frozen=True)
-class WorkgroupSpec:
-    """Human-facing grouping and routing metadata; never an executor itself."""
-
-    id: str
-    version: str
-    description: str
-    workers: tuple[WorkerSpec, ...]
-    metrics: tuple[str, ...] = ()
-    config_schema: dict[str, Any] = field(default_factory=dict)
-    evidence_metrics: dict[str, tuple[str, ...]] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -255,19 +229,20 @@ class GoalHandler:
         raise NotImplementedError
 
 
-class WorkgroupHandlerBase(GoalHandler):
-    """Internal loop adapter for one declarative Workgroup package.
+class Department(GoalHandler):
+    """Durable business capability plugged into the one company runtime.
 
-    A Workgroup package declares:
+    A portable Department declares:
       - workflows (WorkflowSpec + optional graph)
       - agent_ids / workflow_agents
       - evidence_metrics (metric → accepted evidence kinds)
       - goal_schema (metrics + config enums)
 
-    Execution is supplied by ``runtime.interpreter.InterpretedWorkgroup``.
+    Execution is supplied by ``runtime.interpreter.InterpretedDepartment``
+    unless the Department owns a proven special path.
     """
 
-    workgroup_id = ""
+    department_id = ""
     workflows: tuple[WorkflowSpec, ...] = ()
     agent_ids: tuple[str, ...] = ()
     evidence_metrics: dict = {}

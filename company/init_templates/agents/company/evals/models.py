@@ -1,8 +1,8 @@
 """Core model for the reusable LLM-as-judge evals Lego piece.
 
-An eval suite is a reusable harness building block for a Workgroup,
+An eval suite is a reusable harness building block for a Department,
 Workflow, mechanical gate, Connection, or Artifact: abstract, registered, and
-duplicatable across Workgroups. One suite encodes a quality standard for one
+duplicatable across Departments. One suite encodes a quality standard for one
 kind of payload (e.g. campaign copy, outbound email sample) and a judge
 produces a structured EvalReport that can gate a machine step.
 
@@ -43,12 +43,12 @@ class EvalCriterion:
 
 @dataclass(frozen=True)
 class EvalSuite:
-    """One named eval standard for one payload kind of one Workgroup."""
+    """One named eval standard for one payload kind of one Department."""
 
     id: str
     name: str
     scope: str
-    workgroup_id: str
+    department_id: str
     payload_kind: str  # e.g. "campaign_manifest", "email_sample"
     criteria: tuple[EvalCriterion, ...]
     thresholds: dict[str, Any] = field(default_factory=dict)
@@ -60,8 +60,8 @@ class EvalSuite:
     payload_id_selector: Callable[[dict[str, Any]], str] | None = None
 
     def __post_init__(self) -> None:
-        if not self.id or not self.scope or not self.workgroup_id or not self.payload_kind:
-            raise ValueError("suite needs id, scope, workgroup_id, and payload_kind")
+        if not self.id or not self.scope or not self.department_id or not self.payload_kind:
+            raise ValueError("suite needs id, scope, department_id, and payload_kind")
         if not self.criteria:
             raise ValueError(f"suite {self.id} needs at least one criterion")
         ids = [criterion.id for criterion in self.criteria]
@@ -147,7 +147,7 @@ def suite_spec(suite: EvalSuite) -> dict[str, Any]:
         "id": suite.id,
         "name": suite.name,
         "scope": suite.scope,
-        "workgroup_id": suite.workgroup_id,
+        "department_id": suite.department_id,
         "payload_kind": suite.payload_kind,
         "description": suite.description,
         "validity": suite.validity,

@@ -1,0 +1,119 @@
+/*
+ * Design Department production stylesheet — the render context contract.
+ *
+ * Tokens are vendored here so the Department is portable. A host website may
+ * override them, but rendering never depends on an unrelated repository.
+ *
+ * NOTE (2026-08-12, gate failure): @import MUST precede every other rule —
+ * Chromium silently drops an @import that follows @font-face/:root rules,
+ * which meant NO token resolved in-render and titles fell back to Times.
+ * Custom properties resolve at use time, so `--font-outfit` may be declared
+ * after the token import; it still feeds `--font-sans` when elements compute
+ * `font-family`.
+ *
+ * Fonts: the website's `src/assets/fonts/fonts.css` declares its @font-face
+ * blocks with `/assets/...` URL prefixes that only exist after an Astro build
+ * (the woff2 files live in `public/assets/fonts/`). In a repo-root render
+ * context those URLs 404, which previously fell back to a system font. The
+ * Design Department therefore declares the SAME family names, variable weight
+ * ranges, and file sources itself, with paths that resolve from the repo
+ * root. There is no second display font and no system-font fallback for
+ * titles.
+ */
+@font-face {
+  font-family: "Outfit";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/public/assets/fonts/outfit-latin.woff2") format("woff2");
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url("/public/assets/fonts/jetbrains-latin.woff2") format("woff2");
+}
+@font-face {
+  font-family: "boxicons";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("/public/assets/fonts/boxicons.woff2") format("woff2");
+}
+:root {
+  --font-outfit: "Outfit";
+  --font-jetbrains-mono: "JetBrains Mono";
+  --font-iransansx: "IRANSansX";
+  --font-sans: var(--font-outfit), sans-serif;
+  --font-mono: var(--font-jetbrains-mono), monospace;
+  --font-size-base: 16px;
+  --font-size-2xl: 2rem;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --gruvbox-dark-fg0: #fbf1c7;
+  --gruvbox-dark-fg1: #ebdbb2;
+  --gruvbox-dark-fg2: #d5c4a1;
+  --gruvbox-dark-fg3: #bdae93;
+  --gruvbox-dark-fg4: #a89984;
+  --gruvbox-dark-red: #fb4934;
+  --gruvbox-dark-green: #b8bb26;
+  --gruvbox-dark-yellow: #fabd2f;
+  --gruvbox-dark-blue: #83a598;
+  --gruvbox-dark-purple: #d3869b;
+  --gruvbox-dark-aqua: #8ec07c;
+  --gruvbox-dark-orange: #fe8019;
+  --background: #1d2021;
+  --panel: #282828;
+  --panel-raised: #32302f;
+  --panel-strong: #3c3836;
+  --foreground: var(--gruvbox-dark-fg1);
+  --foreground-strong: var(--gruvbox-dark-fg0);
+  --foreground-muted: var(--gruvbox-dark-fg4);
+  --muted-foreground: var(--gruvbox-dark-fg4);
+  --primary: var(--gruvbox-dark-yellow);
+  --primary-foreground: #1d2021;
+  --primary-soft: #504945;
+  --accent: var(--gruvbox-dark-aqua);
+  --accent-soft: #3c4a3e;
+  --purple: var(--gruvbox-dark-purple);
+  --purple-soft: #4a3842;
+  --info: var(--gruvbox-dark-blue);
+  --success: var(--gruvbox-dark-green);
+  --success-soft: #3b442e;
+  --warning: var(--gruvbox-dark-yellow);
+  --warning-soft: #4d4530;
+  --destructive: var(--gruvbox-dark-red);
+  --border: #504945;
+  --border-strong: #665c54;
+}
+
+/* Legacy token aliases at the `[data-theme="gruvbox-dark"]` scope — the video
+   templates predate the namespaced palette (--gruvbox-dark-*) and reference
+   the old bare names (--fg0, --fg4, --red, --aqua, …). Bind them to the raw
+   palette values so colors + `--font`/`--mono` stacks resolve exactly as the
+   original flat tokens did. Templates pin data-theme="gruvbox-dark". */
+[data-theme="gruvbox-dark"] {
+  --fg0: var(--gruvbox-dark-fg0);
+  --fg1: var(--gruvbox-dark-fg1);
+  --fg2: var(--gruvbox-dark-fg2);
+  --fg3: var(--gruvbox-dark-fg3);
+  --fg4: var(--gruvbox-dark-fg4);
+  --fg: var(--gruvbox-dark-fg1);
+  --red: var(--gruvbox-dark-red);
+  --green: var(--gruvbox-dark-green);
+  --yellow: var(--gruvbox-dark-yellow);
+  --blue: var(--gruvbox-dark-blue);
+  --purple: var(--gruvbox-dark-purple);
+  --aqua: var(--gruvbox-dark-aqua);
+  --orange: var(--gruvbox-dark-orange);
+  --font: var(--font-sans);
+  --mono: var(--font-mono);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+body { background: var(--background); color: var(--foreground); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+.brand-lockup { display: inline-flex; align-items: center; justify-content: center; gap: .6em; color: var(--foreground-strong); font-family: var(--font-sans); font-weight: 700; letter-spacing: -.02em; }
+.brand-lockup img { width: 1.65em; height: 1.65em; object-fit: contain; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; } }

@@ -1,0 +1,165 @@
+<!doctype html>
+<!--
+  Flat canvas composition (owner contract №6): one connected journey line
+  whose vertices ARE the department stations (nodes can never sit off the
+  line), running behind a central LOOP symbol — GOAL → OBSERVE → DECIDE →
+  ACT → EVALUATE — with the goal bullseye at the loop's core, and a centered
+  bold Outfit 800 title. No cards, no arrows-between-boxes, no website
+  screenshot layout.
+-->
+<html lang="en" data-theme="gruvbox-dark">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>SpielOS content template</title>
+  <link rel="stylesheet" href="/.agents/company/departments/design/system/production.css">
+  <link rel="stylesheet" href="/node_modules/boxicons/css/boxicons.min.css">
+  <style>
+    body { container-type: size; display: grid; place-items: center; }
+    .canvas { position: relative; width: 100%; height: 100%; display: grid; grid-template-rows: auto 1fr auto; place-items: center; overflow: hidden; background: radial-gradient(circle at 50% 44%, var(--primary-soft), transparent 46%), var(--background); }
+    .grid { position: absolute; inset: 0; opacity: .05; background-image: linear-gradient(var(--foreground) 1px, transparent 1px), linear-gradient(90deg, var(--foreground) 1px, transparent 1px); background-size: 5cqw 5cqw; }
+    .journey-svg { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
+    .signature-path, .signature-fill { fill: none; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+    .signature-path { stroke: var(--foreground-muted); stroke-width: 3; opacity: .5; }
+    .signature-fill { stroke: var(--primary); stroke-width: 4; }
+    header, main, footer { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; }
+    header { margin-top: 6cqh; }
+    .eyebrow { color: var(--primary); font: 600 clamp(13px, 2.1cqw, 30px)/1 var(--font-mono); letter-spacing: .14em; text-transform: uppercase; }
+    main { gap: 3.5cqh; }
+    .loop-symbol { position: relative; width: clamp(120px, 17cqw, 260px); aspect-ratio: 1; border-radius: var(--radius-md); }
+    .loop-ring { position: absolute; inset: 0; border: clamp(3px, .6cqw, 7px) solid var(--primary); border-radius: inherit; opacity: .9; }
+    .loop-ring-inner { position: absolute; inset: 16%; border: clamp(2px, .4cqw, 5px) solid var(--primary); border-radius: inherit; opacity: .55; }
+    .loop-arrow { position: absolute; color: var(--primary); font-size: clamp(14px, 2.4cqw, 34px); }
+    .loop-arrow.a1 { top: -1.1em; left: 50%; margin-left: -.5em; }
+    .loop-arrow.a2 { right: -1.1em; top: 50%; margin-top: -.5em; transform: rotate(90deg); }
+    .loop-arrow.a3 { bottom: -1.1em; left: 50%; margin-left: -.5em; transform: rotate(180deg); }
+    .loop-arrow.a4 { left: -1.1em; top: 50%; margin-top: -.5em; transform: rotate(270deg); }
+    .loop-phase { position: absolute; color: var(--muted-foreground); font: 700 clamp(11px, 1.5cqw, 22px)/1 var(--font-mono); letter-spacing: .08em; }
+    .loop-phase.p1 { top: -2.6em; left: 50%; transform: translateX(-50%); color: var(--foreground-strong); }
+    .loop-phase.p2 { right: -3.4em; top: 20%; }
+    .loop-phase.p3 { bottom: -2.6em; left: 50%; transform: translateX(-50%); }
+    .loop-phase.p4 { left: -3.4em; top: 20%; }
+    .loop-phase.p5 { top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--primary); font-size: clamp(8px, 1.1cqw, 15px); letter-spacing: .22em; }
+    .social-goal { position: absolute; inset: 34%; border-radius: var(--radius-md); border: 2px solid var(--primary); background: var(--background); display: grid; place-items: center; }
+    .social-goal::before { content: ""; width: 52%; aspect-ratio: 1; border-radius: inherit; background: var(--primary); }
+    h1 { max-width: 14ch; margin: 0; text-align: center; color: var(--foreground-strong); font-size: clamp(40px, 7.2cqw, 116px); font-weight: 800; line-height: .98; letter-spacing: -.045em; }
+    h1 .accent { color: var(--primary); }
+    .template-hook { max-width: 42ch; margin: 0; text-align: center; color: var(--muted-foreground); font: 500 clamp(18px, 2.1cqw, 32px)/1.25 var(--font-sans); }
+    footer { margin-bottom: 5cqh; color: var(--muted-foreground); font: 500 clamp(20px, 1.7cqw, 26px)/1 var(--font-mono); }
+    /* Stations: HTML dots placed at the exact path vertices (the line is
+       drawn through them), so a node can never drift off the line. */
+    .station { position: absolute; z-index: 2; width: clamp(10px, 1.4cqw, 18px); height: clamp(10px, 1.4cqw, 18px); border-radius: var(--radius-md); background: var(--primary); box-shadow: 0 0 0 clamp(2px, .4cqw, 5px) var(--primary-soft); transform: translate(-50%, -50%); }
+    .station::after { content: attr(data-label); position: absolute; left: 150%; top: 50%; transform: translateY(-50%); white-space: nowrap; color: var(--foreground-muted); font: 600 clamp(11px, 1.3cqw, 20px)/1 var(--font-mono); letter-spacing: .05em; }
+    .station.s1 { left: 10%; top: 72%; }
+    .station.s2 { left: 30%; top: 62%; }
+    .station.s3 { left: 50%; top: 52%; }
+    .station.s4 { left: 70%; top: 62%; }
+    .station.s5 { left: 90%; top: 72%; }
+    /* Portrait path is hidden by default; shown in portrait orientation.
+       The landscape path is hidden there instead. */
+    .journey-svg .portrait-path { display: none; }
+    @media (orientation: portrait) {
+      .journey-svg .landscape-path { display: none; }
+      .journey-svg .portrait-path { display: block; }
+    }
+    @container (aspect-ratio > 8/5) {
+      header { margin-top: 4cqh; }
+      main { flex-direction: row; gap: 5cqw; }
+      .loop-symbol { width: clamp(120px, 13cqw, 210px); }
+      h1 { max-width: 11ch; font-size: clamp(40px, 6cqw, 92px); }
+    }
+    @container (aspect-ratio <= 4/5) {
+      header { margin-top: 8cqh; }
+      .loop-symbol { width: clamp(130px, 22cqw, 230px); }
+      h1 { font-size: clamp(44px, 9.4cqw, 96px); }
+      .loop-phase.p2 { right: -2.2em; }
+      .loop-phase.p4 { left: -2.2em; }
+      footer { margin-bottom: 7cqh; }
+      /* Portrait journey: descending diagonal; the line is drawn through
+         these same vertices, so nodes stay on it here too. */
+      .station.s1 { left: 72%; top: 8%; }
+      .station.s2 { left: 64%; top: 26%; }
+      .station.s3 { left: 52%; top: 44%; }
+      .station.s4 { left: 42%; top: 62%; }
+      .station.s5 { left: 32%; top: 80%; }
+      .station::after { left: auto; right: 150%; }
+    }
+  </style>
+</head>
+<body>
+<div class="canvas">
+  <div class="grid"></div>
+
+  <!-- Connected journey line: the path is drawn THROUGH the five department
+       stations (vertices) and runs behind the loop; the first half is the
+       completed solid primary stroke, the route ahead is muted. A portrait
+       variant descends diagonally and is shown in portrait orientation. -->
+  <svg class="journey-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+    <path class="signature-path landscape-path" d="M-4,74 L10,72 L20,66 L30,62 L40,56 L50,52 L60,56 L70,62 L80,66 L90,72 L104,74"/>
+    <path class="signature-fill landscape-path" d="M-4,74 L10,72 L20,66 L30,62 L40,56 L50,52"/>
+    <path class="signature-path portrait-path" d="M72,-4 L70,8 L66,17 L64,26 L58,35 L52,44 L48,53 L42,62 L36,71 L32,80 L30,104"/>
+    <path class="signature-fill portrait-path" d="M72,-4 L70,8 L66,17 L64,26 L58,35 L52,44"/>
+  </svg>
+
+  <header>
+    <div class="eyebrow" id="template-eyebrow">Campaign context required</div>
+  </header>
+
+  <main>
+    <div class="loop-symbol" id="loop-symbol" aria-label="Runtime loop">
+      <div class="loop-ring"></div>
+      <div class="loop-ring-inner"></div>
+      <span class="loop-phase p1">GOAL</span>
+      <span class="loop-phase p2">OBSERVE</span>
+      <span class="loop-phase p3">DECIDE</span>
+      <span class="loop-phase p4">ACT</span>
+      <span class="loop-phase p5">EVALUATE</span>
+      <i class="bx bx-chevron-right loop-arrow a1"></i>
+      <i class="bx bx-chevron-right loop-arrow a2"></i>
+      <i class="bx bx-chevron-right loop-arrow a3"></i>
+      <i class="bx bx-chevron-right loop-arrow a4"></i>
+      <div class="social-goal" aria-label="Goal"></div>
+    </div>
+    <h1 class="canvas-title" id="template-title">Campaign title required</h1>
+    <p class="template-hook" id="template-hook">Design renders only from the shared campaign Artifact.</p>
+  </main>
+
+  <span class="station s1" data-label="Outbound"></span>
+  <span class="station s2" data-label="Content"></span>
+  <span class="station s3" data-label="Design"></span>
+  <span class="station s4" data-label="Analytics"></span>
+  <span class="station s5" data-label="SEO"></span>
+
+  <footer><span class="brand-lockup"><img src="/public/assets/favicons/favicon.svg" alt="">spielos.xyz</span></footer>
+</div>
+<script>
+  (function () {
+    function applyRendition(order) {
+      if (!order || !order.design || !Array.isArray(order.design.title_lines)) {
+        document.documentElement.dataset.templateReady = 'error';
+        throw new Error('A typed campaign rendition is required');
+      }
+      var design = order.design;
+      document.documentElement.dataset.theme = design.theme;
+      document.body.dataset.layout = design.layout;
+      document.body.dataset.campaignId = order.campaign_id;
+      document.body.dataset.batchId = order.batch_id;
+      document.body.dataset.itemId = order.item_id;
+      document.body.dataset.contentId = order.content_id;
+      document.getElementById('template-eyebrow').textContent = design.eyebrow;
+      document.getElementById('template-hook').textContent = design.supporting_text;
+      document.getElementById('template-title').innerHTML = design.title_lines.map(function (line, index) {
+          var text = line.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          return index === design.accent_line ? '<span class="accent">' + text + '</span>' : text;
+      }).join('<br>');
+      document.querySelectorAll('.station').forEach(function (station, index) {
+        station.dataset.label = (design.station_labels || [])[index] || station.dataset.label;
+      });
+      document.title = 'SpielOS — ' + design.title_lines.join(' ');
+      document.documentElement.dataset.templateReady = 'true';
+    }
+    window.__applyCampaignRendition = applyRendition;
+    document.documentElement.dataset.templateReady = 'waiting';
+  }());
+</script>
+</body>
+</html>

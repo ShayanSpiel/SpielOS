@@ -23,16 +23,28 @@ def build_parser():
                         help="print the spielos version and exit")
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("catalog")
+    departments_parser = commands.add_parser("departments", help="list installed Departments")
+    departments_parser.add_argument("--json", action="store_true")
     overview = commands.add_parser(
-        "overview", help="one view of Goals, Workgroups, Workers, assignments, and health")
+        "overview", help="one view of Goals, Departments, Agents, assignments, and health")
     overview.add_argument("--json", action="store_true")
+    observatory = commands.add_parser(
+        "observatory", help="live visual map of architecture, activity, and coherence")
+    observatory.add_argument(
+        "--snapshot", action="store_true",
+        help="print one read-only observability snapshot instead of serving the UI")
+    observatory.add_argument("--host", default="127.0.0.1")
+    observatory.add_argument("--port", type=int, default=8765)
+    observatory.add_argument(
+        "--no-open", action="store_true", help="serve without opening a browser window")
+    observatory.add_argument("--json", action="store_true")
     init = commands.add_parser("init", help="scaffold a self-contained harness home (see README)")
     init.add_argument("--dir", default=".", help="target directory (default: cwd)")
     init.add_argument("--force", action="store_true", help="overwrite existing files")
-    init.add_argument("--all-workgroups", action="store_true",
-                      help="vendor every bundled Workgroup")
-    init.add_argument("--workgroup", action="append", default=[],
-                      help="vendor this Workgroup from templates (repeatable)")
+    init.add_argument("--all-departments", action="store_true",
+                      help="vendor every bundled Department")
+    init.add_argument("--department", action="append", default=[],
+                      help="vendor this Department from templates (repeatable)")
     init.add_argument("-y", "--yes", action="store_true",
                       help="non-interactive: accept defaults, never prompt")
     init.add_argument("--json", action="store_true",
@@ -46,16 +58,21 @@ def build_parser():
     refresh.add_argument("--force", action="store_true", default=True)
     refresh.add_argument("--dir", help="exact SpielOS home to update (default: current/nearest home)")
     refresh.add_argument("--json", action="store_true")
-    agent = commands.add_parser("agent", help="first-class worker operations")
+    add_cmd = commands.add_parser(
+        "add", help="install a Department bundle (.sdep), bundle directory, or built-in id")
+    add_cmd.add_argument("source")
+    add_cmd.add_argument("--force", action="store_true")
+    add_cmd.add_argument("--dir", help="exact SpielOS home to modify")
+    agent = commands.add_parser("agent", help="first-class Agent operations")
     agent_commands = agent.add_subparsers(dest="agent_command", required=True)
     agent_list = agent_commands.add_parser(
-        "list", help="list every Worker (Agent/Employee input is translated here)")
+        "list", help="list every bounded Agent")
     agent_list.add_argument("--json", action="store_true")
     compile_cmd = agent_commands.add_parser("compile",
-        help="compile a Workgroup workflow into a first-class Worker")
-    compile_cmd.add_argument("workgroup", help="Workgroup id")
-    compile_cmd.add_argument("--workflow", required=True, help="workflow id inside the Workgroup")
-    compile_cmd.add_argument("--name", help="Worker name (default: <workgroup>-<workflow>)")
+        help="compile a Department Workflow into a first-class Agent")
+    compile_cmd.add_argument("department", help="Department id")
+    compile_cmd.add_argument("--workflow", required=True, help="Workflow id inside the Department")
+    compile_cmd.add_argument("--name", help="Agent name (default: <department>-<workflow>)")
     compile_cmd.add_argument("--force", action="store_true")
     compile_cmd.add_argument("--dir", help="exact SpielOS home to modify (default: current/nearest home)")
     strategy = commands.add_parser("strategy", help="show the read-only Strategy Kernel")
@@ -112,7 +129,7 @@ def build_parser():
                                   help="JSON array of concise reusable steps")
     workflow_observe.add_argument("--trigger", default="{}")
     workflow_observe.add_argument("--dependencies", default="[]")
-    workflow_observe.add_argument("--workgroup")
+    workflow_observe.add_argument("--department")
     workflow_observe.add_argument("--source-ref")
     workflow_observe.add_argument("--explicit-update", action="store_true")
     workflow_observe.add_argument("--json", action="store_true")
@@ -122,18 +139,21 @@ def build_parser():
     apply_memory.add_argument("--json", action="store_true")
     consolidate = memory_commands.add_parser("consolidate")
     consolidate.add_argument("--json", action="store_true")
-    workgroup = commands.add_parser("workgroup", help="validate and install Worker-owned Workgroup packages")
-    workgroup_commands = workgroup.add_subparsers(dest="workgroup_command", required=True)
+    department = commands.add_parser(
+        "department", help="validate, install, list, and export portable Department packages")
+    department_commands = department.add_subparsers(dest="department_command", required=True)
     for name in ("validate", "install"):
-        item = workgroup_commands.add_parser(name)
-        item.add_argument("--spec", help="Workgroup JSON object")
-        item.add_argument("--file", help="path to Workgroup JSON file")
+        item = department_commands.add_parser(name)
+        item.add_argument("--spec", help="Department JSON object")
+        item.add_argument("--file", help="path to Department JSON file")
+        item.add_argument("--id", help="override/default Department id")
         if name == "install":
             item.add_argument("--force", action="store_true")
-            item.add_argument("--all", action="store_true",
-                              help="install every bundled starter Workgroup")
-            item.add_argument("--dir", help="exact SpielOS home to modify (default: source checkout/current home)")
-    workgroup_commands.add_parser("list")
+            item.add_argument("--dir", help="exact SpielOS home to modify")
+    department_commands.add_parser("list").add_argument("--json", action="store_true")
+    department_export = department_commands.add_parser("export")
+    department_export.add_argument("id", help="Department id")
+    department_export.add_argument("--out", default=".")
     artifact = commands.add_parser(
         "artifact", help="prepare, finalize, clean, and present canonical outcomes")
     artifact_commands = artifact.add_subparsers(dest="artifact_command", required=True)
@@ -299,15 +319,15 @@ def build_parser():
     dispatch_list.add_argument("--goal")
     dispatch_list.add_argument("--limit", type=int, default=20)
     dispatch_list.add_argument("--json", action="store_true")
-    tasks = commands.add_parser("tasks", help="list durable employee work orders")
+    tasks = commands.add_parser("tasks", help="list durable Agent work orders")
     tasks.add_argument("work_order_id", nargs="?")
     tasks.add_argument("--status", choices=("active", "open", "claimed", "done", "cancelled"),
                        default="active")
     tasks.add_argument("--goal")
     tasks.add_argument("--limit", type=int, default=50)
     tasks.add_argument("--json", action="store_true")
-    tasks.add_argument("--claim", metavar="WORKER_ID")
-    tasks.add_argument("--complete", metavar="WORKER_ID")
+    tasks.add_argument("--claim", metavar="AGENT_ID")
+    tasks.add_argument("--complete", metavar="AGENT_ID")
     tasks.add_argument("--evidence", default="[]",
                        help="JSON array of {kind,source?,payload?,validity?}")
     evals = commands.add_parser("eval", help="reusable LLM-as-judge eval suites")
@@ -342,12 +362,12 @@ def _runtime_mode(args) -> str | None:
     read: query-only snapshot. write: an explicit mutating command.
     """
 
-    if args.command in {"catalog", "strategy", "init", "update", "refresh", "agent",
-                        "workgroup", "artifact", "friction", "migration"}:
+    if args.command in {"catalog", "departments", "strategy", "init", "update", "refresh",
+                        "add", "agent", "department", "artifact", "friction", "migration"}:
         return None
     if args.command == "runner" and args.runner_command in {"status", "start", "stop", "enable"}:
         return None
-    if args.command in {"status", "context", "overview"}:
+    if args.command in {"status", "context", "overview", "observatory"}:
         return "read"
     if args.command == "report":
         return "read"
@@ -408,10 +428,20 @@ def main(argv=None):
         if args.command == "init":
             from .runtime.onboard import run_init
             return run_init(dir=args.dir, force=args.force,
-                            minimal=not args.all_workgroups,
-                            workgroups=args.workgroup or None,
+                            minimal=not args.all_departments,
+                            departments=args.department or None,
                             assume_yes=args.yes, as_json=args.json)
-        if args.command == "artifact":
+        if args.command == "observatory":
+            from .runtime.observability import collect_snapshot, serve_observatory
+
+            if args.snapshot:
+                output = collect_snapshot(runtime, project_root=PROJECT_ROOT)
+            else:
+                serve_observatory(
+                    runtime, project_root=PROJECT_ROOT, host=args.host, port=args.port,
+                    open_browser=not args.no_open)
+                return 0
+        elif args.command == "artifact":
             from .runtime.artifacts import (
                 finalize_workspace, list_artifacts, prepare_workspace,
                 present_artifact)
@@ -455,48 +485,44 @@ def main(argv=None):
                 output["plan_path"] = str(destination)
         elif args.command == "agent" and args.agent_command == "list":
             from .runtime.catalog import catalog
-            output = [{"id": worker["id"], "workgroup_id": group["id"],
-                       "workflows": [flow["id"] for flow in worker["workflows"]],
-                       "produces": worker["produces"]}
-                      for group in catalog()["workgroups"]
-                      for worker in group["workers"]]
-        elif args.command == "workgroup":
-            from .runtime.workgroup_install import install_workgroup, validate_workgroup_spec
-            if args.workgroup_command == "list":
-                from .runtime.registry import workgroups
-                output = [{"id": group.id, "workers": list(group.agent_ids),
-                           "workflows": [flow.id for flow in group.workflows]}
-                          for group in workgroups().values()]
+            output = catalog()["agents"]
+        elif args.command in {"departments", "department"}:
+            from .runtime.registry import departments
+            if args.command == "departments" or args.department_command == "list":
+                output = [{"id": item.id, "version": item.version,
+                           "agents": list(item.agent_ids),
+                           "workflows": [flow.id for flow in item.workflows]}
+                          for item in departments().values()]
+            elif args.department_command == "export":
+                from .runtime.export import export_department
+                output = export_department(args.id, Path(args.out).expanduser())
             else:
+                from .runtime.install import (
+                    install_department, normalize_department_spec, validate_department_spec)
                 payload = (json.loads(Path(args.file).read_text()) if args.file else
                            json.loads(args.spec) if args.spec else None)
-                if args.workgroup_command == "install" and args.all:
-                    from .runtime.workgroup_install import bundled_workgroup_specs
-                    from .runtime.paths import package_vendored_root, selected_project_root, validate_home_destination
-                    selected = validate_home_destination(selected_project_root(args.dir))
-                    company_home = selected / ".agents" / "company"
-                    root = (selected / "company" / "workgroups" if not company_home.is_dir()
-                            and package_vendored_root() == selected else company_home / "workgroups")
-                    if not root.parent.is_dir():
-                        raise ValueError(f"no harness home at {selected}; run `spielos init --dir {selected}` first")
-                    output = [install_workgroup(spec, root=root, force=args.force)
-                              for spec in bundled_workgroup_specs()]
-                    print(json.dumps(output, indent=2))
-                    return 0
                 if not isinstance(payload, dict):
                     raise ValueError("provide --spec JSON or --file path")
-                defects = validate_workgroup_spec(payload)
-                if args.workgroup_command == "validate":
-                    output = {"ok": not defects, "defects": defects}
+                normalized = normalize_department_spec(payload, default_id=args.id)
+                defects = validate_department_spec(normalized)
+                if args.department_command == "validate":
+                    output = {"ok": not defects, "defects": defects,
+                              "package": normalized}
                 else:
-                    from .runtime.paths import package_vendored_root, selected_project_root, validate_home_destination
-                    selected = validate_home_destination(selected_project_root(args.dir))
-                    company_home = selected / ".agents" / "company"
-                    root = (selected / "company" / "workgroups" if not company_home.is_dir()
-                            and package_vendored_root() == selected else company_home / "workgroups")
-                    if not root.parent.is_dir():
-                        raise ValueError(f"no harness home at {selected}; run `spielos init --dir {selected}` first")
-                    output = install_workgroup(payload, root=root, force=args.force)
+                    if args.dir:
+                        from .runtime.paths import selected_project_root, validate_home_destination
+                        home = validate_home_destination(selected_project_root(args.dir))
+                        output = install_department(
+                            normalized, force=args.force,
+                            root=home / ".agents/company/departments",
+                            agents_root=home / ".agents/company/agents/installed")
+                    else:
+                        output = install_department(normalized, force=args.force)
+            print(json.dumps(output, indent=2))
+            return 0
+        elif args.command == "add":
+            from .runtime.export import add_department
+            output = add_department(args.source, force=args.force, target=args.dir)
             print(json.dumps(output, indent=2))
             return 0
         elif args.command in {"update", "refresh"}:
@@ -509,7 +535,7 @@ def main(argv=None):
             return 0
         elif args.command == "agent" and args.agent_command == "compile":
             from .runtime.agent_compile import compile_agent
-            receipt = compile_agent(args.workgroup, args.workflow,
+            receipt = compile_agent(args.department, args.workflow,
                                     args.name, force=args.force, home=args.dir)
             print(json.dumps(receipt, indent=2))
             return 0
@@ -607,7 +633,7 @@ def main(argv=None):
                     workflow_id=args.workflow, title=args.title,
                     behavior_key=args.behavior_key,
                     instructions=instructions, trigger=trigger,
-                    dependencies=dependencies, workgroup_id=args.workgroup,
+                    dependencies=dependencies, department_id=args.department,
                     source_ref=args.source_ref, explicit_update=args.explicit_update)
             elif args.memory_command == "apply-candidate":
                 from .runtime.memory_capture import apply_candidate
@@ -901,7 +927,7 @@ def _goal_hierarchy_lines(items):
 def _work_order_line(item):
     accepts = ", ".join(item.get("accepts_evidence") or []) or "capability handoff"
     goal_name = item.get("goal_name") or item.get("goal_id")
-    line = (f"- `{item['id']}` · {item['employee_id']} · {goal_name} (`{item['goal_id']}`) · "
+    line = (f"- `{item['id']}` · {item['agent_id']} · {goal_name} (`{item['goal_id']}`) · "
             f"need {item['needed']} × [{accepts}]")
     if item.get("why_next"):
         line += f"\n  {item['why_next']}"
@@ -1052,7 +1078,7 @@ def _result_message(item):
 def _render_default(args, output) -> str:
     """Human-first card render for the command that just ran.
 
-    Commands without a dedicated renderer (catalog, Workgroup install,
+    Commands without a dedicated renderer (catalog, Department install,
     runner tick, tasks WORK_ORDER_ID, status --raw, ...) keep the raw JSON
     projection: they are machine views or runtime plumbing.
     """
@@ -1066,7 +1092,7 @@ def _render_default(args, output) -> str:
     if command == "migration":
         return render_migration(args, output)
     if command == "agent" and args.agent_command == "list":
-        return render_workers(output)
+        return render_agents(output)
     if command in {"update", "refresh"}:
         return render_update(output)
     if command == "strategy":
@@ -1118,8 +1144,9 @@ def render_overview(value):
              f"`{goals['counts']['active']}` active",
              f"- Goal roots: `{len(topology['root_goal_ids'])}` · "
              f"topology defects `{topology['defect_count']}`",
-             f"- Workgroups: `{len(value['workgroups'])}`",
-             f"- Workers: `{len(value['workers'])}`",
+             f"- Departments: `{len(value['departments'])}`",
+             f"- Agents: `{len(value['agents'])}`",
+             f"- Skills: `{len(value['skills'])}` · Connections: `{len(value['connections'])}`",
              f"- Open work orders: `{len(value['work_orders'])}`",
              f"- Recorded friction: `{value['friction']['event_count']}` event(s)",
              f"- Artifact root: `{value['artifacts']['root']}`"]
@@ -1129,11 +1156,12 @@ def render_overview(value):
                   f"- {focus['name']} (`{focus['id']}`) · "
                   f"`{focus['goal_status']}/{focus['run_status']}`",
                   f"- {focus.get('why_next') or 'No next action recorded.'}"]
-    if value["workgroups"]:
-        lines += ["", "## Workgroups and Workers"]
-        for group in value["workgroups"]:
-            names = ", ".join(worker["id"] for worker in group["workers"]) or "none"
-            lines.append(f"- `{group['id']}` — {names}")
+    if value["departments"]:
+        lines += ["", "## Departments and Agents"]
+        for department in value["departments"]:
+            names = ", ".join(department["agent_ids"]) or "none"
+            health = "healthy" if department.get("lego") else "invalid"
+            lines.append(f"- `{department['id']}` — {names} · `{health}`")
     if topology["defect_count"]:
         lines += ["", "## Topology health",
                   "- The Goal graph is not migration-ready; run `company goal topology`."]
@@ -1158,12 +1186,12 @@ def render_goal_topology(value):
     return "\n".join(lines) + "\n"
 
 
-def render_workers(items):
-    lines = [f"# Workers ({len(items)})", "",
-             "Agent and Employee are accepted owner-language aliases for Worker."]
+def render_agents(items):
+    lines = [f"# Agents ({len(items)})", ""]
     for item in items:
-        workflows = ", ".join(item["workflows"]) or "no workflows"
-        lines.append(f"- `{item['id']}` · Workgroup `{item['workgroup_id']}` · {workflows}")
+        skills = ", ".join(item.get("skill_ids") or ()) or "no Skills"
+        outputs = ", ".join(item.get("produces") or ()) or "no declared outputs"
+        lines.append(f"- `{item['id']}` · Skills: {skills} · Produces: {outputs}")
     if not items:
         lines.append("- None installed.")
     return "\n".join(lines) + "\n"
@@ -1211,8 +1239,8 @@ def render_migration(args, value):
     lines = [f"# Migration {args.migration_command}", "",
              f"- Source: `{inspection['source']}`",
              f"- Detected version: `{inspection['detected_version'] or 'unknown'}`",
-             f"- Legacy Departments to normalize: `{len(inventory['legacy_departments'])}`",
-             f"- Current Workgroups to validate: `{len(inventory['current_workgroups'])}`",
+             f"- Departments found: `{len(inventory['departments'])}`",
+             f"- Retired Workgroups to convert: `{len(inventory['retired_workgroups'])}`",
              f"- Operational state present: `{inventory['has_operational_state']}`",
              f"- Source fingerprint: `{inspection['fingerprint']}`"]
     if args.migration_command == "plan":
@@ -1303,7 +1331,7 @@ def render_update(value):
     """Card for `spielos update` after installing a newer release."""
     lines = ["# SpielOS home updated", "",
              f"- Updated files: `{value.get('refreshed_files', 0)}`",
-             "- Preserved: strategy, assets, Workgroups, installed workers, "
+             "- Preserved: strategy, assets, Departments, installed Agents, "
              "config.user.json, .spielos/ state"]
     lines += ["", "Reopen OpenCode or Codex, select the Director, and continue; "
               "fresh company state is injected automatically."]
@@ -1362,7 +1390,7 @@ def render_evals_list(value):
     for suite in items:
         criteria = suite.get("criteria") or []
         lines.append(f"- `{suite['id']}` · {suite['name']}")
-        lines.append(f"  - Workgroup `{suite['workgroup_id']}` · payload "
+        lines.append(f"  - Department `{suite['department_id']}` · payload "
                      f"`{suite['payload_kind']}` · {len(criteria)} criteria · "
                      f"validity `{suite['validity']}`")
         for criterion in criteria:

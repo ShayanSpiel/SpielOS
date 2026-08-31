@@ -1,1 +1,0 @@
-{"id":"validate-real-workflow","description":"Run one real workflow from assignment through evidence return.","evidence":["validation_report"],"worksteps":[{"id":"run-scenario","kind":"employee","produces":["scenario_receipt"]},{"id":"validate-evidence","kind":"employee","requires":["scenario_receipt"],"produces":["validation_report"]}]}

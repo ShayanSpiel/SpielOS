@@ -1,4 +1,4 @@
-"""Reusable evals (LLM-as-judge) for Workgroup quality gates.
+"""Reusable evals (LLM-as-judge) for Department quality gates.
 
 One eval suite encodes a quality standard for one payload kind; a judge
 supplies structured verdicts; the engine computes an EvalReport that machine

@@ -1,6 +1,0 @@
-interface:
-  display_name: "Workgroup Runner"
-  short_description: "Run one Workgroup against a Goal"
-  default_prompt: "Use $workgroup-runner to execute one Workgroup's persisted work orders and report evidence."
-policy:
-  allow_implicit_invocation: true

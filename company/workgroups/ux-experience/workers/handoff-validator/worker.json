@@ -1,1 +1,0 @@
-{"id":"handoff-validator","description":"Validates a worker hand-off is clear, bounded, and recoverable.","workbook":["handoff-validation"],"workkit":[],"produces":["handoff_validation"]}

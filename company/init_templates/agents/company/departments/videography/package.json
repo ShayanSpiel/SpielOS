@@ -1,0 +1,114 @@
+{
+  "id": "videography",
+  "department_id": "videography",
+  "version": "1.0.0",
+  "description": "Records authentic, human-paced browser demos of delivered Client Delivery workflows and renders them into showcase MP4s via the four-module resolve/author/record/render pipeline under scripts/videography.",
+  "agent_ids": [
+    "videography-operator",
+    "videography-specialist"
+  ],
+  "workflow_agents": {
+    "record_demo": "videography-specialist"
+  },
+  "evidence_metrics": {
+    "showcase_videos": [
+      "showcase_video"
+    ]
+  },
+  "metrics": [
+    "showcase_videos"
+  ],
+  "config_schema": {
+    "required_count": {
+      "type": "integer"
+    },
+    "workflow": {
+      "enum": [
+        "record_demo"
+      ]
+    }
+  },
+  "workflows": [
+    {
+      "id": "record_demo",
+      "description": "Resolve a delivered order, author/select a humanistic scenario, run a real humanized browser session, render the capture to MP4, and file evidence.",
+      "steps": [
+        "author_scenario",
+        "record_render"
+      ],
+      "agents": [
+        "videography-specialist",
+        "videography-operator"
+      ],
+      "skills": [
+        "videography"
+      ],
+      "approvals": [],
+      "evidence": [
+        "showcase_video"
+      ],
+      "connections": [],
+      "graph": [
+        {
+          "id": "author_scenario",
+          "kind": "agent",
+          "agent_id": "videography-specialist",
+          "produces": [
+            "demo_scenario"
+          ],
+          "requires": [],
+          "skill_ids": [
+            "videography"
+          ],
+          "connection_ids": []
+        },
+        {
+          "id": "record_render",
+          "kind": "agent",
+          "agent_id": "videography-operator",
+          "produces": [
+            "showcase_video"
+          ],
+          "requires": [
+            "demo_scenario"
+          ],
+          "skill_ids": [
+            "videography"
+          ],
+          "connection_ids": []
+        }
+      ]
+    }
+  ],
+  "template": null,
+  "agents": [
+    {
+      "id": "videography-operator",
+      "description": "Runs the humanized recorder and renders showcase videos from real browser sessions.",
+      "skill_ids": [
+        "videography"
+      ],
+      "permissions": [
+        "read_strategy",
+        "write_evidence"
+      ],
+      "produces": [
+        "showcase_video"
+      ]
+    },
+    {
+      "id": "videography-specialist",
+      "description": "Authors and validates humanistic demo scenarios from Client Delivery order records.",
+      "skill_ids": [
+        "videography"
+      ],
+      "permissions": [
+        "read_strategy",
+        "write_evidence"
+      ],
+      "produces": [
+        "demo_scenario"
+      ]
+    }
+  ]
+}

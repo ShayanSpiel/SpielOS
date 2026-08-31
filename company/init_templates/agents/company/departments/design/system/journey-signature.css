@@ -1,0 +1,32 @@
+/*
+ * journey-signature.css — the shared static journey signature for SpielOS
+ * social templates. It mirrors the video brand-motion.css design language:
+ * one smooth wandering goal line, dashed muted route ahead, solid primary
+ * traveled fill, nodes that ride ON the path, and the route ends at a flat
+ * bullseye. Static only: no motion, no hit flashes, no labels on nodes.
+ *
+ * Placement is per-template: each social template supplies its own portrait
+ * and landscape <path> elements positioned in empty margins (edge, corner,
+ * or bottom band) so the signature never cuts through descriptions. The
+ * shared rules below handle the look; the template handles the geometry.
+ */
+.journey-svg { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
+.journey-landscape { display: none; }
+.journey-portrait { display: block; }
+
+.journey-path { fill: none; stroke: var(--foreground-muted); stroke-width: 2.5; stroke-linecap: round; stroke-dasharray: 10 8; opacity: .5; }
+.journey-path-fill { fill: none; stroke: var(--primary); stroke-width: 3.5; stroke-linecap: round; opacity: .95; }
+
+.journey-node { opacity: .95; }
+.journey-node .node-ring { fill: none; stroke: var(--primary); stroke-width: 1.5; opacity: .3; }
+.journey-node .node-dot { fill: var(--primary); }
+
+.journey-goal { opacity: .95; }
+.journey-goal .goal-ring { fill: var(--background); stroke: var(--primary); stroke-width: 3; }
+.journey-goal .goal-ring-inner { fill: none; stroke: var(--primary); stroke-width: 2; opacity: .82; }
+.journey-goal .goal-core { fill: var(--primary); }
+
+@media (orientation: landscape) {
+  .journey-landscape { display: block; }
+  .journey-portrait { display: none; }
+}

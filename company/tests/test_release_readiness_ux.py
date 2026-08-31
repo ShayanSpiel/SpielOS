@@ -41,7 +41,7 @@ class OrientationTests(unittest.TestCase):
 
             receipt = refresh_home(target=home)
 
-            self.assertEqual(8, len(receipt["removed_retired_host_agents"]))
+            self.assertEqual(2, len(receipt["removed_retired_host_agents"]))
             self.assertEqual(
                 len(RETIRED_HARNESS_FILES),
                 len(receipt["removed_retired_harness_files"]))
@@ -122,8 +122,8 @@ class OrientationTests(unittest.TestCase):
                              "overview"])
             self.assertEqual(code, 0)
             self.assertIn("# Company overview", output.getvalue())
-            self.assertIn("Workgroups:", output.getvalue())
-            self.assertIn("Workers:", output.getvalue())
+            self.assertIn("Departments:", output.getvalue())
+            self.assertIn("Agents:", output.getvalue())
 
 
 class ArtifactLifecycleTests(unittest.TestCase):
@@ -230,10 +230,10 @@ class MigrationPolicyTests(unittest.TestCase):
             plan = migration_plan(root)
 
             self.assertEqual("6.2.6", inspection["detected_version"])
-            self.assertEqual(["outbound"], inspection["inventory"]["legacy_departments"])
+            self.assertEqual(["outbound"], inspection["inventory"]["departments"])
             self.assertTrue(inspection["inventory"]["has_operational_state"])
             self.assertEqual("archive_then_selectively_promote", plan["state_action"])
-            self.assertEqual("needs_conversion_and_acceptance", plan["units"][0]["status"])
+            self.assertEqual("needs_validation_and_acceptance", plan["units"][0]["status"])
             self.assertIn("never import", inspection["policies"]["foreign_runtime"])
 
     def test_classification_uses_path_context_not_misleading_filenames(self):
