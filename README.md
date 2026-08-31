@@ -57,6 +57,18 @@ probing several catalogs:
 spielos overview
 ```
 
+Open the live, read-only organism view with:
+
+```sh
+spielos observatory
+```
+
+The Observatory layers the Goal tree and support graph, current loop stage,
+Resolution work, Workflows, WorkOrders, Agents, Evidence, Memory, and source
+contracts on one navigable canvas. Its coherence view surfaces blocked,
+disconnected, redundant, unused, and compatibility-only state without mixing
+historical records into the clean-core authority.
+
 ## Artifacts, friction, and migration
 
 Generated work has one lifecycle under

@@ -1,1 +1,5 @@
-"""Business Departments used by the one company runtime."""
+"""Business capability packages."""
+
+from .core import DepartmentManifest
+
+__all__ = ["DepartmentManifest"]

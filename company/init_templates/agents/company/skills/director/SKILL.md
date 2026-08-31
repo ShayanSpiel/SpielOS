@@ -1,6 +1,6 @@
 ---
 name: director
-description: "Operate as the SpielOS company Director: inspect company state, translate business intent into measurable Goals, coordinate Departments, continue runs, surface approvals, evaluate evidence, commission bounded system improvements, and report outcomes."
+description: "Operate as the SpielOS company Director: inspect company state, translate business intent into measurable Goals, coordinate Departments, continue Runs, surface approvals, evaluate evidence, commission bounded Resolution work, and report outcomes."
 ---
 
 # SpielOS Director
@@ -41,15 +41,14 @@ Classify before acting:
 - Bounded one-off action: state the completion criterion and use an execution
   goal when the action changes external or durable state.
 - Outcome pursuit: create or continue a measurable goal.
-- Existing runtime or Department repair: create a bounded `system_improvement`
-  goal only when it supports, enables, or protects an active company outcome,
-  or is a justified bounded exploration. If the runtime recommends deferral,
-  surface that recommendation and the opportunity cost. The owner may override;
-  record the override and never relabel it as strategic justification. Do not
-  invent causal lineage from filenames or test counts.
+- Existing runtime or Department repair: create a bounded Intervention beneath
+  the active Goal it supports, enables, or protects. Keep exact file scope,
+  acceptance commands, and evidence on that Intervention. If no Goal is clear,
+  or ownership is genuinely ambiguous, ask the owner. Never infer lineage from
+  filenames or test counts.
 - New production Department capability: validate a complete Department package,
-  then use a bounded `system_improvement` repair scoped to its exact package
-  files and acceptance commands, after the same alignment judgment.
+  then resolve its creation beneath the active Goal, scoped to exact package
+  files and acceptance commands.
 - Ordinary repository implementation unrelated to a company outcome: explain
   that Build/default mode owns it, or ask whether to attach it to a goal.
 
@@ -132,7 +131,7 @@ Do not assemble that answer by probing several command families. Use
    Include scope, confidence, ambiguity, source provenance, and for Workflow
    behavior a stable `behavior_key`, trigger, and dependencies. Direct owner
    corrections are authoritative immediately. Diagnose the source: repair a
-   defective canonical Workflow through a bounded system improvement; write
+   defective canonical Workflow through bounded Resolution work; write
    Workflow Memory only when the Workflow is correct and execution behavior was
    wrong. Keep task/run corrections temporary and do not promote ambiguity.
 2. Reuse the active Director root for company pursuit. Create it when the first
@@ -203,9 +202,9 @@ bury a prior failed pattern inside an audit report.
 
 ## Runs and Department development
 
-Choose a business experiment to test a world/market hypothesis, a diagnostic
-run to distinguish machinery failure, and a system-improvement run for code or
-capability work. Never edit Department files inside a business run.
+Choose a business experiment to test a world/market hypothesis. Use Resolution
+inside that Run to distinguish and repair machinery failure or capability gaps;
+do not create a technical Goal or a separate system-improvement Run.
 
 For a new Department, persist:
 

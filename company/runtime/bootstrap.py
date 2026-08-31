@@ -185,7 +185,8 @@ def scaffold(target: Path | None = None, *, force: bool = False,
              on_phase=None) -> dict:
     """Materialize a complete harness home. Returns a receipt dict.
 
-    ``minimal=True`` ships the spine with an empty ``departments/`` package.
+    ``minimal=True`` ships the Department contract without bundled production
+    Departments.
     Pass ``departments=["id", ...]`` to vendor selected Departments from
     the templates.
     ``on_phase(label)`` is called before each materialization chunk so an
@@ -223,7 +224,7 @@ def scaffold(target: Path | None = None, *, force: bool = False,
                               overwrite=force,
                               skip=lambda rel: (
                                   (rel.startswith("company/departments/")
-                                   and rel != "company/departments/__init__.py")
+                                   and rel.count("/") > 2)
                                   or preserve_user_layer(rel)))
         departments_pkg = root / ".agents" / "company" / "departments"
         departments_pkg.mkdir(parents=True, exist_ok=True)
@@ -352,6 +353,6 @@ probe.
 
 - Live external actions always park for explicit approval.
 - The Director and Department Agents never edit repository files;
-  `system-improvement` is the only editing agent, bounded by its goal.
+  `system-improvement` executes bounded Resolution work beneath an active Goal.
 - Strategy authority lives in `.agents/company/strategy/`; never restate it.
 """

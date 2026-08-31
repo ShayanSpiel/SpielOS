@@ -8,7 +8,7 @@ from pathlib import Path
 
 from .runtime.models import GoalStatus
 from .runtime.runner import Runner
-from .runtime.loop import Runtime
+from .runtime import LegacyRuntime as Runtime
 from .runtime.paths import find_project_root
 from .runtime.service import RunnerService
 
@@ -1240,7 +1240,7 @@ def render_migration(args, value):
              f"- Source: `{inspection['source']}`",
              f"- Detected version: `{inspection['detected_version'] or 'unknown'}`",
              f"- Departments found: `{len(inventory['departments'])}`",
-             f"- Retired Workgroups to convert: `{len(inventory['retired_workgroups'])}`",
+             f"- Legacy capability packages to convert: `{len(inventory['retired_workgroups'])}`",
              f"- Operational state present: `{inventory['has_operational_state']}`",
              f"- Source fingerprint: `{inspection['fingerprint']}`"]
     if args.migration_command == "plan":

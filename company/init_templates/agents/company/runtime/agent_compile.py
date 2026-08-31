@@ -116,7 +116,7 @@ other Departments.
    receipts, or metrics. Invalid or technical-only evidence cannot support a
    business conclusion.
 3. Live external actions park for explicit approval. Never auto-approve.
-4. Never edit repository files; system-improvement is the only editing agent.
+4. Never edit repository files; the bounded Resolution agent owns repairs.
 5. Report outcomes plainly: what ran, what was produced, what is blocked.
 """)
     return str(path)

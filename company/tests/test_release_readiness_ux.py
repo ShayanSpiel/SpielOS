@@ -18,13 +18,27 @@ from company.runtime.migration import inspect_source, migration_plan
 from company.runtime.bootstrap import scaffold
 from company.runtime.export import (
     RETIRED_HARNESS_FILES, RETIRED_HOST_AGENTS, refresh_home)
+from company.runtime.config import VERSION
 
 
 class OrientationTests(unittest.TestCase):
+    def test_release_metadata_and_trusted_publish_workflow_are_aligned(self):
+        root = Path(__file__).parents[2]
+        package = json.loads((root / "package.json").read_text())
+        workflow = (root / ".github/workflows/publish.yml").read_text()
+
+        self.assertEqual("8.0.0", VERSION)
+        self.assertEqual(VERSION, package["version"])
+        self.assertIn("npm@^11.5.1", workflow)
+        self.assertNotIn("NPM_TOKEN", workflow)
+        self.assertFalse((root / ".github/workflows/npm-only.yml").exists())
+
     def test_update_prunes_only_known_legacy_host_agents(self):
         with tempfile.TemporaryDirectory() as directory:
             home = Path(directory) / "home"
             scaffold(home, minimal=True)
+            self.assertTrue(
+                (home / ".agents/company/departments/core.py").is_file())
             for host, filenames in RETIRED_HOST_AGENTS.items():
                 agents = home / f".{host}" / "agents"
                 agents.mkdir(parents=True, exist_ok=True)

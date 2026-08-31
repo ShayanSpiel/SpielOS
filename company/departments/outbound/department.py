@@ -15,7 +15,7 @@ BESPOKE_STAGE_EXCEPTIONS = {
 class OutboundDepartment(EmailWorkflow, Department):
     id = "outbound"
     department_id = "outbound"
-    version = "3.2.1"
+    version = "3.3.0"
     description = "Finds and researches qualified prospects, prepares email or social outreach, and measures buyer outcomes."
     deprecated = False
     agent_ids = ("lead-researcher", "social-researcher", "outreach-writer")
@@ -31,7 +31,19 @@ class OutboundDepartment(EmailWorkflow, Department):
         WorkflowSpec("email-outreach", "Compose, validate, approve, send, and measure personalized email.",
                      ("select", "compose", "validate", "approve", "send", "measure"),
                      ("lead-researcher", "outreach-writer"), ("outbound-email", "copywriting"),
-                     ("send",), ("provider_events", "reply", "booked_call"), ("email-delivery",)),
+                     ("send",), ("provider_events", "reply", "booked_call"),
+                     ("email-delivery", "cal-booking", "attio"),
+                     graph=(
+                         WorkflowStep("send", "connection", "outreach-writer",
+                                      produces=("provider_events",),
+                                      skill_ids=("outbound-email",),
+                                      connection_ids=("email-delivery",)),
+                         WorkflowStep("measure", "agent", "lead-researcher",
+                                      requires=("provider_events",),
+                                      produces=("reply", "booked_call"),
+                                      skill_ids=("outbound-email",),
+                                      connection_ids=("email-delivery", "cal-booking", "attio")),
+                     )),
         WorkflowSpec("social-lead-research", "Research qualified LinkedIn and X prospects from authorized public sources.",
                      ("discover", "qualify", "research", "validate", "record"),
                      ("social-researcher",), ("outbound-email", "outbound"), (),

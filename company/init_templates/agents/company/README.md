@@ -6,7 +6,9 @@ SpielOS has one durable company loop:
 GOAL → OBSERVE → DECIDE → ACT → EVALUATE
 ```
 
-The runtime owns Goals, runs, approvals, evidence, work orders, notifications, and evaluation. Chat hosts are clients; closing a session does not discard company state.
+The Goal runtime owns the adaptive control loop and scheduler. Goals, Resolution,
+Workflows, WorkOrders, Evidence, and Memory own their persistence over one SQLite
+database. Chat hosts are clients; closing a session does not discard state.
 
 ## Vocabulary
 
@@ -15,23 +17,37 @@ The runtime owns Goals, runs, approvals, evidence, work orders, notifications, a
 | Goal | Measurable company outcome owned by the runtime |
 | Department | Installable Agent-owned capability |
 | Workflow | Bounded playbook inside a Department |
-| Agent | Executor that performs one declared workflow |
+| WorkOrder | Durable exact unit of work created by Resolution |
+| Agent | Replaceable executor that performs a WorkOrder |
 | Skill | Reusable method an Agent follows |
 | Connection | Authorized access to an external or local system |
 | Artifact | Output or evidence from a run |
 
 ## Universal vocabulary
 
-The terms above are the only public layers. The runtime owns the loop; a Department supplies a capability; an Agent executes its assigned Workflow; Skills and Connections are declared inputs; Artifacts are the durable outputs.
+The terms above are the public layers. The runtime owns the Goal loop; Resolution
+owns execution; a Department supplies capability; an Agent executes a WorkOrder;
+Skills and Connections are declared inputs; Artifacts are durable outputs.
 
 Legacy vocabulary is accepted only at migration and persisted-state boundaries;
 new prompts, packages, commands, and output use the canonical terms above.
 `company overview` returns Goals, topology health,
 Departments, Agents, assignments, artifacts, and friction in one read.
 
+`company observatory` opens the read-only living-system view. The default canvas
+places the Goal tree and support DAG above the active loop, Resolution work, and
+the source-owned architecture layers. Focused views expose Workflows, Memory,
+Evidence, code dependencies, and coherence findings. When a persisted home has
+not yet migrated, the observer labels its historical state as an isolated
+compatibility boundary; it never merges those records into clean-core state.
+
 ## Pursuit semantics and alignment
 
-A primary Goal is a durable measurable outcome. A supporting Goal is an active bottleneck. A system-improvement Goal is a bounded technical change that enables or protects an active outcome. A run, batch, task, and guardrail are not Goals. Technical acceptance proves only technical readiness, never market success.
+A Goal is one measurable outcome. `parent_id` forms the human organizational
+tree; `supports` edges form a separate acyclic causal graph. There are no Goal
+subclasses. Each Run is one adaptive OBSERVE → DECIDE → ACT → EVALUATE
+iteration. ACT creates an Intervention; execution, creation, repair, retry, and
+validation stay inside that Intervention's Resolution cycle.
 
 ## Department contract
 
@@ -84,7 +100,10 @@ They can inspect the projection with `company context --prompt ...`. Ambiguous
 comments and task-only detail are
 never promoted automatically.
 
-Source changes use a bounded system-improvement Goal with an explicit problem, allowed files, and acceptance commands. The executor records actual acceptance evidence before the change is complete.
+Repairs and source changes are Resolution work beneath the active Goal they
+serve. They retain Goal → Run → Intervention lineage and actual acceptance
+evidence. If no relevant Goal is clear—or several are genuinely ambiguous—the
+runtime asks the owner instead of inventing a technical Goal.
 
 ## Artifact contract
 
@@ -105,7 +124,7 @@ A missing or misleading tool, command, instruction, contradiction, duplicate,
 unexpected result shape, or required fallback is recorded with `company friction
 report`. The Director tells the owner what was expected, what happened, and the
 safe fallback before continuing. Repeated fingerprints remain visible in
-`company overview`; they are system-improvement evidence, not hidden retries.
+`company overview`; they are Resolution evidence, not hidden retries.
 
 ## Migration contract
 
@@ -113,10 +132,9 @@ Migration starts in a fresh home with `company migration inspect --from PATH`
 and `company migration plan --from PATH --out PLAN.json`. The current runtime
 schema is authority. Foreign runtime code is replaced, unknown files are
 quarantined, historical state is archived, and only owner-selected Goals with
-explicit lineage enter the new active graph. Department and Workgroup normalize
-to Department; Agent, Employee, and Worker normalize to Agent; playbooks become
-Workflows; methods and prompts become Skills; tools, permissions, integrations,
-and Workkits become Connections; outputs become Artifacts or Evidence. Each Department is converted,
+explicit lineage enter the new active graph. Foreign capability, executor,
+playbook, method, access, and output aliases normalize at this boundary to
+Department, Agent, Workflow, Skill, Connection, Artifact, or Evidence. Each Department is converted,
 validated, tested, and installed atomically with external credentials disabled.
 
 ## Home lifecycle

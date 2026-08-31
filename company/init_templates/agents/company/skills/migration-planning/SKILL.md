@@ -58,11 +58,11 @@ artifact manifest, or tracked file.
 
 ## Translate into current abstractions
 
-- Department or Workgroup becomes a Department package.
-- Agent, Employee, or Worker becomes an Agent.
+- A foreign capability package becomes a Department package.
+- A foreign executor identity becomes an Agent.
 - Playbook or process becomes a Workflow.
 - Prompt, method, or skill becomes a Skill.
-- Tool, permission, integration, Workkit, or connection becomes a Connection.
+- A foreign tool, permission, integration, or access bundle becomes a Connection.
 - Output becomes an Artifact and, when evaluative, typed Evidence.
 - A website or application remains a separate application migration unit.
 - Foreign runtime files are replaced by the current spine, never merged into it.

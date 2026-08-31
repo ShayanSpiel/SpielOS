@@ -236,5 +236,5 @@ listed; not deliverability-verified → **never** Bounced/suppressed or Invalid.
 Bounce events auto-suppress in the master; a bounced address never re-enters
 the queue.
 
-Lead file flow: staging drops → bounded lead-research workflow → master workbook
+Lead file flow: staging drops → bounded lead-research Workflow → canonical lead table
 (`/Users/shayan/Desktop/Spiel Logos/Outbound/SPIELOS_MASTER_LEADS_v4.xlsx (sheet "Master Leads")`). Sources are tagged for cohort diagnosis.

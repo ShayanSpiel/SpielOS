@@ -1,4 +1,9 @@
-"""SQLite is the runtime authority; chat sessions are only clients."""
+"""Legacy-home persistence adapter.
+
+Clean-core domain persistence lives in subsystem repositories over
+``state.Database``. This adapter reads historical homes for compatibility and
+bounded migration; new architecture code must not depend on it.
+"""
 
 from __future__ import annotations
 

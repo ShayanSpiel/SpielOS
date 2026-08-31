@@ -23,7 +23,7 @@ include = ["company*"]
 exclude = ["company.tests*", "company.init_templates*"]
 
 [tool.setuptools.package-data]
-"*" = ["*.json", "*.md", "*.css", "*.html", ".env.example"]
+"*" = ["*.json", "*.md", "*.css", "*.html", "*.woff2", ".env.example"]
 company = [
     "init_templates/**/*",
     "dot-env-example",

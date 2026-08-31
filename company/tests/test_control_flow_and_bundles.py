@@ -42,7 +42,7 @@ class DepartmentBundleTests(unittest.TestCase):
             set(receipt["skills"]),
         )
         self.assertEqual(
-            {"email-delivery", "web-research"},
+            {"attio", "cal-booking", "email-delivery", "web-research"},
             set(receipt["connections"]),
         )
 

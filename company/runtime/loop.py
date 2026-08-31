@@ -1,4 +1,8 @@
-"""The single GOAL -> OBSERVE -> DECIDE -> ACT -> EVALUATE loop."""
+"""Legacy-home command adapter.
+
+New code uses :mod:`company.runtime.engine`. Existing commands keep this adapter
+so installed homes can operate while their historical tables are migrated.
+"""
 
 from __future__ import annotations
 

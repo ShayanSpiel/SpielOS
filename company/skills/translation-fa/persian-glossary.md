@@ -35,7 +35,6 @@ These are official product names or UI concepts. They must appear identically ac
 | Market Research Lead | رهبر تحقیق بازار | | |
 | Business Intelligence Analyst | تحلیلگر هوش تجاری | | |
 | Employee (plural) | کارمندها | کارمندا ❌, کارمندان ❌ | کارمندا is not a word. کارمندان is a mixed plural — pick کارمندها everywhere. |
-| Worker | کارمند | کارگر ❌ | کارگر means manual laborer. |
 | Building block | اجزای سازنده / بلوک سازنده | بلوک ساختن ❌ | بلوک ساختن is a verb phrase, not a noun. |
 | Credentials | اعتبارنامه / کلید | مدارک ❌ | مدارک means documents. |
 | Source material | منبع / منابع | لایه‌ی مواد خام ❌, مواد خام ❌ | In product copy, use منبع/منابع. |
@@ -69,7 +68,6 @@ These words are banned in all SpielOS Persian copy unless the glossary explicitl
 | چارچوب مهار عامل | Unnecessarily complex calque. |
 | سازوکار عامل‌محور | Same. |
 | کارمندا | Not a Persian word. |
-| کارگر (for software worker) | Means manual laborer. |
 | سشن (for session) | Transliteration that sounds unnatural. |
 | بلوک ساختن (for building block) | Verb phrase, not a noun. |
 | مدارک (for credentials) | Means documents. |

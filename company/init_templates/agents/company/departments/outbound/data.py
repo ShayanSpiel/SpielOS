@@ -12,7 +12,7 @@ records, prepared batches, and historical campaign knowledge:
   submissions  — durable per-lead submission registry (lead_id keyed):
                  in_flight before the first provider attempt, resolved to
                  accepted / failed / submitted_unknown on the outcome, with a
-                 12h cooldown so no worker or generation re-submits a lead
+                 12h cooldown so no execution or generation re-submits a lead
                  whose submission is recent
   knowledge    — per-variable experiment history (verdicts, trials)
   actions      — append-only per-lead action ledger (channel-neutral)
@@ -57,7 +57,7 @@ def _locked(method):
     """Serialize access to the shared sqlite3 connection.
 
     The connection is opened with check_same_thread=False so the
-    async-dispatch worker thread can record actions on a store opened by the
+    async-dispatch thread can record actions on a store opened by the
     daemon/tick thread. The (re-entrant) lock keeps concurrent
     execute/commit sequences from interleaving on the shared connection;
     re-entrancy keeps nested public calls (e.g. latest_batch -> get_batch)
@@ -411,7 +411,7 @@ class OutboundStore:
     @_locked
     def mark_batch_executed(self, batch_id: str) -> None:
         """Release the batch's lead claims (executed=1). Idempotent — safe to
-        call from every send-path exit, including worker failure."""
+        call from every send-path exit, including execution failure."""
         self.db.execute(
             "UPDATE batches SET executed=1, updated_at=? WHERE id=?",
             (utc_now(), batch_id))
@@ -436,7 +436,7 @@ class OutboundStore:
     # failed, or submitted_unknown (a hung-cap response where the provider
     # may have accepted without a local success). A row that is in_flight,
     # accepted, or submitted_unknown inside the cooldown window blocks
-    # re-submission by any worker or generation; failed rows and rows older
+    # re-submission by any execution or generation; failed rows and rows older
     # than the cooldown are claimable again.
 
     SUBMISSION_ACTIVE_STATUSES = ("in_flight", "accepted", "submitted_unknown")
@@ -453,7 +453,7 @@ class OutboundStore:
         entry), or {"claimed": False, "submission": {...}} when an active
         entry (in_flight/accepted/submitted_unknown within cooldown) already
         exists — the caller must skip. Cross-process atomic (BEGIN
-        IMMEDIATE) so two workers can never both claim the same lead.
+        IMMEDIATE) so two concurrent executions can never both claim the same lead.
         """
         now_iso = now or utc_now()
         self.db.execute("BEGIN IMMEDIATE")
@@ -466,7 +466,7 @@ class OutboundStore:
                 # End the read transaction before returning: BEGIN IMMEDIATE was
                 # taken above and every exit path must commit or roll back so
                 # the shared check_same_thread=False connection never leaks an
-                # open transaction that breaks the next worker's BEGIN IMMEDIATE.
+                # open transaction that breaks the next execution's BEGIN IMMEDIATE.
                 self.db.rollback()
                 return {"claimed": False,
                         "submission": self._submission(row)}

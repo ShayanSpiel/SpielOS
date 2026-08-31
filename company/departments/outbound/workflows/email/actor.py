@@ -13,7 +13,7 @@ honored, sent-log + provider dedupe, transient retries with backoff, quota
 errors switch providers, every send is recorded in the sent log, the action
 ledger, and the durable per-lead submission registry (in_flight before the
 first attempt; resolved to accepted/failed/submitted_unknown; a 12h cooldown
-blocks re-submission by any worker or generation).
+blocks re-submission by any execution or generation).
 """
 
 import threading
@@ -30,7 +30,7 @@ FAILED_RETRY_SECONDS = 300  # grace before a failed background dispatch retries
 # per-lead submission registry keeps an in_flight marker from the moment a
 # provider attempt starts until its outcome is recorded. A lead whose entry
 # is in_flight/accepted/submitted_unknown inside this window is never
-# submitted again by any worker, generation, or goal.
+# submitted again by any execution, generation, or Goal.
 SUBMISSION_COOLDOWN_SECONDS = 12 * 3600  # 12 hours
 STATUS_IN_FLIGHT = "in_flight"
 STATUS_ACCEPTED = "accepted"
@@ -207,7 +207,7 @@ def is_pending(ctx, batch_id: str) -> bool:
 
 def _failed_within_grace(result: dict) -> bool:
     """A failed dispatch file is retryable only after FAILED_RETRY_SECONDS
-    have elapsed since it completed, so a fresh worker failure is parked
+    have elapsed since it completed, so a fresh execution failure is parked
     (run WAITING, re-ticked) instead of being hot-looped. A record without a
     usable completed_at is treated as immediately retryable."""
     from .....runtime.async_dispatch import failed_age_seconds
@@ -249,7 +249,7 @@ def execute(ctx, batch: dict, dry: bool = False) -> dict:
                 return {"dispatched": True, "batch_id": batch_id,
                         "note": "background execution failed; retrying after grace",
                         "error": result.get("error")}
-            # Grace elapsed: a failed worker is retryable, not terminal.
+            # Grace elapsed: a failed execution is retryable, not terminal.
             # Preserve the error evidence, clear the file, and fall through
             # to a fresh dispatch below.
             previous_error = result.get("error")
@@ -363,7 +363,7 @@ def _execute_emails_inner(ctx, store, batch_id: str, batch: dict) -> dict:
             })
             outbound.save_sent_log(log)
             # Provider-side truth becomes locally visible in the registry
-            # too — the acceptance may predate this worker's own attempt.
+            # too — the acceptance may predate this execution's own attempt.
             if store is not None:
                 store.record_submission(
                     c["lead_id"], c["email"], provider,
@@ -376,7 +376,7 @@ def _execute_emails_inner(ctx, store, batch_id: str, batch: dict) -> dict:
         # Idempotency repair: claim the lead in the durable submission
         # registry BEFORE the first provider attempt. An active entry
         # (in_flight/accepted/submitted_unknown inside the cooldown) means
-        # another worker or generation already holds this lead — skip it.
+        # another execution or generation already holds this lead — skip it.
         if store is not None:
             claim = store.claim_or_active(
                 c["lead_id"], c["email"], provider,

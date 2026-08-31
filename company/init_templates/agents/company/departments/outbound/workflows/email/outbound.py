@@ -83,7 +83,7 @@ def load_sent_log() -> dict:
 
 def save_sent_log(log: dict):
     """Atomic write (unique tmp + rename) — a torn file must never reach the
-    next reader, and concurrent workers never collide on one shared temp path.
+    next reader, and concurrent executions never collide on one shared temp path.
     The temp file is unique per writer (same directory, so os.replace stays
     atomic) and is cleaned up if the write fails."""
     fd, tmp = tempfile.mkstemp(

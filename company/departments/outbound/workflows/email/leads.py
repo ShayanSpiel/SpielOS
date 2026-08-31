@@ -143,7 +143,7 @@ def _score(row: dict) -> tuple:
 
 def reclassify(path: str = None) -> dict:
     """Rewrite send_recommendation + icp_confidence + qualification_rationale
-    for every row in the master workbook using the current deterministic
+    for every row in the canonical lead table using the current deterministic
     rules. Idempotent; safe to re-run after rule changes."""
     path = path or config.DATABASE_PATH
     wb = openpyxl.load_workbook(path)
@@ -228,7 +228,7 @@ def merge(path: str) -> None:
 
 
 def ingest(path: str) -> None:
-    """Validate, dedupe, append new rows to the master workbook."""
+    """Validate, dedupe, append new rows to the canonical lead table."""
     wb = openpyxl.load_workbook(config.DATABASE_PATH)
     ws = wb[SHEET_NAME]
     master = set()

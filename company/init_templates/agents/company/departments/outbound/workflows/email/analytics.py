@@ -62,10 +62,10 @@ COLLECT_DEADLINE_SECONDS = 40.0
 def _bounded_call(fn, timeout: float, *args, **kwargs):
     """Run fn on a daemon thread with a hard timeout.
 
-    Returns (result, timed_out). A timed-out worker is abandoned (daemon
+    Returns (result, timed_out). A timed-out thread is abandoned (daemon
     thread — same pattern as runtime.loop._bounded_sync): the caller treats
     the call as failed and moves on, so one stalled provider endpoint can
-    never wedge the serial watch loop. Exceptions from the worker propagate
+    never wedge the serial watch loop. Exceptions from the thread propagate
     to the caller exactly as a direct call would.
     """
     result: dict = {}
@@ -76,10 +76,10 @@ def _bounded_call(fn, timeout: float, *args, **kwargs):
         except Exception as exc:  # propagate to the caller
             result["error"] = exc
 
-    worker = threading.Thread(target=_run, daemon=True)
-    worker.start()
-    worker.join(timeout=timeout)
-    if worker.is_alive():
+    thread = threading.Thread(target=_run, daemon=True)
+    thread.start()
+    thread.join(timeout=timeout)
+    if thread.is_alive():
         return None, True
     if "error" in result:
         raise result["error"]

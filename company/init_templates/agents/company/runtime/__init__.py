@@ -1,6 +1,12 @@
-"""One durable company loop and its internal controls."""
+"""Canonical clean Goal runtime plus the bounded legacy-home adapter."""
 
-from .loop import Runtime
+from .loop import Runtime as LegacyRuntime
+from .engine import Decision, Evaluation, GoalRuntime, GoalStage
 from .models import EvidenceValidity, GoalStatus, RunStatus, RunType, Stage
 
-__all__ = ["EvidenceValidity", "GoalStatus", "RunStatus", "RunType", "Stage", "Runtime"]
+Runtime = GoalRuntime
+
+__all__ = [
+    "Decision", "Evaluation", "EvidenceValidity", "GoalRuntime", "GoalStage",
+    "GoalStatus", "LegacyRuntime", "RunStatus", "RunType", "Stage", "Runtime",
+]
