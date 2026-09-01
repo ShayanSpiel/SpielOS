@@ -1,7 +1,11 @@
-"""Explicit registry for reusable evaluation suites."""
+"""Eval suite registry with Department auto-discovery."""
 
 from __future__ import annotations
 
+import importlib
+import pkgutil
+
+from .. import departments as department_package
 from .models import EvalSuite
 
 _REGISTRY: dict[str, EvalSuite] = {}
@@ -18,10 +22,22 @@ def register_suite(suite: EvalSuite) -> None:
 
 
 def discover_suites() -> dict[str, EvalSuite]:
-    """Return suites explicitly registered by runtime or Workgroup code."""
+    """Discover suites colocated at ``departments/<id>/evals.py``."""
     global _DISCOVERED
     if _DISCOVERED:
         return _REGISTRY
+    for module_info in pkgutil.iter_modules(department_package.__path__):
+        if module_info.name.startswith("_"):
+            continue
+        module_name = f"{department_package.__name__}.{module_info.name}.evals"
+        try:
+            module = importlib.import_module(module_name)
+        except ModuleNotFoundError as error:
+            if error.name == module_name:
+                continue
+            raise
+        for suite in tuple(getattr(module, "EVAL_SUITES", ()) or ()):
+            register_suite(suite)
     _DISCOVERED = True
     return _REGISTRY
 

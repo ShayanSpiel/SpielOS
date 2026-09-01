@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<!--
+  Canonical Design Department source template — ARCHETYPE: storyboard.
+  Research map (shortform-template-research-20260817): scene cuts boost
+  attention with short, visually simple scenes (JAMS 2026-03-26); numbered
+  build steps act as a time contract / payoff moments (Blitzcut 2026-06-06);
+  anti-fatigue requires rotating formulas per item (Eliro 2026-03-28). The
+  archetype is a three-frame storyboard progression (Problem -> Turn ->
+  Result) with a numbered rail, each frame a simple centered statement.
+
+  Measured scene schedule key: scene_timing.e in narration.json. Until
+  tts-gemini.js writes it (speech first, then scenes) the frame stays dark —
+  never a hardcoded window.
+-->
+<html lang="en" data-theme="gruvbox-dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SpielOS — Storyboard</title>
+<link rel="stylesheet" href="/.agents/company/departments/design/system/production.css">
+<link rel="stylesheet" href="/.agents/company/departments/design/templates/video/brand-motion.css">
+<link rel="stylesheet" href="/node_modules/boxicons/css/boxicons.min.css">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: var(--background); }
+
+:root {
+  --bg0_h: var(--background); --bg0: var(--panel); --bg0_s: var(--panel-raised); --bg1: var(--panel-strong);
+  --bg2: var(--border-strong); --fg0: var(--foreground-strong); --fg1: var(--foreground); --fg3: var(--foreground-muted); --fg4: var(--muted-foreground);
+  --blue: var(--primary); --green: var(--success); --yellow: var(--warning); --red: var(--destructive); --aqua: var(--accent);
+  --font: var(--font-sans); --mono: var(--font-mono);
+}
+
+/* Fonts (Outfit / JetBrains Mono / boxicons) and tokens come from the
+   production design system (production.css), exactly like the website. */
+i.bx, i.bxl, i.bxs { font-family: "boxicons" !important; font-style: normal; font-weight: normal; font-variant: normal; text-transform: none; line-height: 1; -webkit-font-smoothing: antialiased; }
+
+body { font-family: var(--font); color: var(--fg1); -webkit-font-smoothing: antialiased; }
+
+/* ═══ SCENE SYSTEM ═══ */
+.scene { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; opacity: 0; pointer-events: none; z-index: 10; }
+.scene.active { opacity: 1; pointer-events: auto; }
+
+/* ═══ BACKGROUND ═══ */
+.bg-grid { position: absolute; inset: 0; opacity: 0; background-image: linear-gradient(var(--fg1) 1px, transparent 1px), linear-gradient(90deg, var(--fg1) 1px, transparent 1px); background-size: 64px 64px; transition: opacity 1s ease; }
+.bg-grid.show { opacity: 0.03; }
+.glow { position: absolute; border-radius: 50%; pointer-events: none; filter: blur(90px); }
+.glow-1 { width: 46vw; height: 46vw; top: 4%; left: -10%; background: var(--primary); opacity: 0; animation: drift 22s ease-in-out infinite; }
+.glow-2 { width: 38vw; height: 38vw; bottom: 4%; right: -8%; background: var(--purple); opacity: 0; animation: drift 28s ease-in-out infinite reverse; }
+@keyframes drift { 0%,100% { transform: translate(0,0) scale(1); } 33% { transform: translate(40px,-25px) scale(1.08); } 66% { transform: translate(-30px,20px) scale(0.95); } }
+
+/* ═══ TEXT REVEAL ═══ */
+.r { opacity: 0; transform: translateY(22px); filter: blur(3px); transition: opacity 0.6s cubic-bezier(0.16,1,0.3,1), transform 0.6s cubic-bezier(0.16,1,0.3,1), filter 0.4s cubic-bezier(0.16,1,0.3,1); }
+.r.show { opacity: 1; transform: translateY(0); filter: blur(0); }
+.d1 { transition-delay: 0.07s; } .d2 { transition-delay: 0.14s; } .d3 { transition-delay: 0.21s; }
+
+/* ═══ STORYBOARD RAIL — the numbered time contract (01/02/03/CTA) ═══ */
+.rail { position: absolute; inset-inline: 0; bottom: 14cqh; z-index: 30; display: flex; align-items: center; justify-content: center; gap: clamp(10px, 1.6vw, 20px); }
+.rail-dot { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: clamp(0.7rem, 1.2vw, 0.95rem); font-weight: 600; letter-spacing: 0.08em; color: var(--fg3); opacity: 0.55; transition: opacity 0.4s ease, color 0.4s ease; }
+.rail-dot .rail-num { display: grid; place-items: center; width: clamp(22px, 3vw, 34px); height: clamp(22px, 3vw, 34px); border-radius: var(--radius-md); border: 1px solid var(--border-strong); background: var(--panel); color: var(--fg3); transition: background 0.4s ease, color 0.4s ease, border-color 0.4s ease; }
+.rail-dot.active { opacity: 1; color: var(--fg0); }
+.rail-dot.active .rail-num { background: var(--primary); border-color: var(--primary); color: var(--primary-foreground); }
+.rail-dot.done { opacity: 0.9; color: var(--fg4); }
+.rail-dot.done .rail-num { border-color: var(--primary-soft); color: var(--primary); }
+
+/* ═══ S1: FRAME 01 — PROBLEM ═══ */
+.frame { text-align: center; padding: 0 8%; z-index: 10; }
+.frame-badge { display: inline-flex; align-items: center; gap: 10px; margin-bottom: 1.4rem; padding: 8px 20px; border: 1px solid var(--border-strong); border-radius: var(--radius-md); background: var(--panel); font-family: var(--mono); font-size: clamp(0.75rem, 1.3vw, 1rem); font-weight: 700; letter-spacing: 0.14em; color: var(--fg4); }
+.frame-badge i { color: var(--primary); font-size: clamp(16px, 2vw, 22px); }
+.frame-badge.warn i { color: var(--red); }
+.frame-main { font-size: clamp(3rem, 8vw, 5.5rem); font-weight: 800; color: var(--fg0); line-height: 1.08; letter-spacing: -0.04em; }
+.frame-main .accent { color: var(--primary); }
+.frame-main .contrast { color: var(--red); }
+.frame-sub { font-size: clamp(1rem, 2vw, 1.4rem); color: var(--fg4); margin-top: 1.2rem; line-height: 1.5; font-weight: 400; max-width: 34ch; margin-inline: auto; }
+
+/* ═══ S4: CTA ═══ */
+.cta { z-index: 10; text-align: center; }
+.cta-badge { display: inline-flex; align-items: center; gap: 8px; padding: 8px 20px; border: 1px solid var(--border-strong); border-radius: 999px; background: var(--panel); font-size: clamp(0.8rem, 1.3vw, 1rem); font-weight: 500; color: var(--fg4); margin-bottom: 1.4rem; }
+.cta-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); animation: pulse 2s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+.cta-title { font-size: clamp(3rem, 8vw, 5.5rem); font-weight: 800; color: var(--fg0); letter-spacing: -0.04em; line-height: 1.05; }
+.cta-title .accent { color: var(--primary); }
+.cta-line { display: block; }
+.cta-url { margin-top: 1.5rem; display: inline-flex; align-items: center; gap: 12px; padding: clamp(12px, 2vw, 18px) clamp(24px, 3.5vw, 40px); border: 1px solid var(--primary); border-radius: var(--radius-md); background: var(--primary-soft); font-family: var(--mono); font-size: clamp(1rem, 2vw, 1.35rem); font-weight: 600; color: var(--fg0); }
+.cta-url .p { color: var(--primary); font-weight: 700; }
+
+/* ═══ THUMBNAIL STILL TITLE (owner order 2026-08-13) ═══ */
+.thumb-title { display: none; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 60; max-width: 82%; padding: clamp(18px, 3vw, 34px) clamp(28px, 4.5vw, 56px); border-radius: var(--radius-md); background: rgba(40, 40, 40, 0.72); backdrop-filter: blur(6px); border: 1px solid var(--border-strong); font-family: var(--font); font-weight: 800; font-size: clamp(3.2rem, 7.5vw, 6.5rem); line-height: 1.02; letter-spacing: -0.04em; color: var(--fg0); text-align: center; }
+.thumb-title.show { display: block; }
+
+/* ═══ RESPONSIVE — PORTRAIT ═══ */
+@media (orientation: portrait) {
+  .journey-portrait .journey-path { stroke-width: 4; stroke-dasharray: 18 14; }
+  .journey-portrait .journey-path-fill { stroke-width: 5; }
+  .rail { bottom: 13cqh; gap: 14px; }
+  .rail-dot { flex-direction: column; gap: 6px; font-size: 0.95rem; }
+  .frame { width: 92%; padding: 0; }
+  .frame-badge { font-size: 1.1rem; padding: 12px 26px; }
+  .frame-main { font-size: clamp(4.5rem, 11vw, 6.5rem); line-height: 1.02; }
+  .frame-sub { max-width: 30ch; margin: 2rem auto 0; font-size: 1.6rem; }
+  .cta { width: 92%; }
+  .cta-badge { font-size: 1.2rem; padding: 12px 26px; }
+  .cta-title { font-size: clamp(4.5rem, 11vw, 6.5rem); line-height: 1.02; }
+  .cta-url { font-size: clamp(1.4rem, 3.2vw, 1.8rem); padding: 20px 34px; }
+}
+</style>
+</head>
+<body>
+
+<div class="bg-grid" id="bg-grid"></div>
+<div class="glow glow-1" id="glow-1"></div>
+<div class="glow glow-2" id="glow-2"></div>
+
+<!-- ═══ JOURNEY LINE SVG (shared motion layer in brand-motion.css) ═══ -->
+<svg class="journey-svg journey-landscape" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+  <path id="journey-bg" class="journey-path" d="M120,540 C280,280 420,780 620,420 C820,60 960,820 1140,380 C1320,100 1500,720 1680,540 L1800,540"/>
+  <path id="journey-fill" class="journey-path-fill" d="M120,540 C280,280 420,780 620,420 C820,60 960,820 1140,380 C1320,100 1500,720 1680,540 L1800,540"/>
+  <g class="journey-station" id="st1" transform="translate(120,540)"><g class="station-scale"><circle class="station-ring" cx="0" cy="0" r="14"/><circle r="7" style="fill:var(--red)"/></g></g>
+  <g class="journey-station" id="st2" transform="translate(620,420)"><g class="station-scale"><circle class="station-ring" cx="0" cy="0" r="14"/><circle r="7" style="fill:var(--primary)"/></g></g>
+  <g class="journey-station" id="st3" transform="translate(1140,380)"><g class="station-scale"><circle class="station-ring" cx="0" cy="0" r="14"/><circle r="7" style="fill:var(--primary)"/></g></g>
+  <g class="journey-station" id="st4" transform="translate(1600,540)"><g class="station-scale"><circle class="station-ring" cx="0" cy="0" r="14"/><circle r="7" style="fill:var(--success)"/></g></g>
+  <g class="journey-goal" id="journey-goal" transform="translate(1800,540)">
+    <g class="goal-mark"><circle class="goal-ring" r="28"/><circle class="goal-ring-inner" r="16"/><circle class="goal-core" r="5"/></g>
+  </g>
+</svg>
+
+<svg class="journey-svg journey-portrait" viewBox="0 0 1080 1920" preserveAspectRatio="none" aria-hidden="true">
+  <path id="portrait-journey-bg" class="journey-path" d="M-180,1080 C80,590 270,1390 480,830 C670,300 760,1450 980,960"/>
+  <path id="portrait-journey-fill" class="journey-path-fill" d="M-180,1080 C80,590 270,1390 480,830 C670,300 760,1450 980,960"/>
+  <g class="journey-station" id="pst1" transform="translate(-180,1080)"><g class="station-scale"><circle class="station-ring" cx="0" cy="0" r="14"/><circle r="7" style="fill:var(--red)"/></g></g>
+  <g class="journey-station" id="pst2" transform="translate(480,830)"><g class="station-scale"><circle class="station-ring" cx="0" cy="0" r="14"/><circle r="7" style="fill:var(--primary)"/></g></g>
+  <g class="journey-station" id="pst3" transform="translate(760,650)"><g class="station-scale"><circle class="station-ring" cx="0" cy="0" r="14"/><circle r="7" style="fill:var(--primary)"/></g></g>
+  <g class="journey-station" id="pst4" transform="translate(920,900)"><g class="station-scale"><circle class="station-ring" cx="0" cy="0" r="14"/><circle r="7" style="fill:var(--success)"/></g></g>
+  <g class="journey-goal" id="portrait-goal" transform="translate(980,960)">
+    <circle class="goal-ring" r="46"/><circle class="goal-ring-inner" r="27"/><circle class="goal-core" r="8"/>
+  </g>
+</svg>
+
+<!-- Thumbnail still title — populated ONLY by render-video.js --still. -->
+<div class="thumb-title" id="thumb-title"></div>
+
+<div class="video-brand-footer"><span class="brand-lockup"><img src="/public/assets/favicons/favicon.svg" alt="">spielos.xyz</span></div>
+
+<!-- Storyboard rail — the numbered time contract across every frame -->
+<div class="rail" id="rail">
+  <span class="rail-dot" id="rail0"><span class="rail-num">01</span><span>Problem</span></span>
+  <span class="rail-dot" id="rail1"><span class="rail-num">02</span><span>Turn</span></span>
+  <span class="rail-dot" id="rail2"><span class="rail-num">03</span><span>Result</span></span>
+  <span class="rail-dot" id="rail3"><span class="rail-num">CTA</span><span>Go</span></span>
+</div>
+
+<!-- S1: FRAME 01 — PROBLEM -->
+<div class="scene" id="s1">
+  <div class="frame">
+    <div class="frame-badge warn r" id="f0"><i class="bx bx-error"></i> FRAME 01 · PROBLEM</div>
+    <div class="frame-main r" id="f1">Work moves between <span class="contrast">tools</span> by hand.</div>
+    <div class="frame-sub r d1" id="f2">Context gets lost in the copy-paste.</div>
+  </div>
+</div>
+
+<!-- S2: FRAME 02 — TURN -->
+<div class="scene" id="s2">
+  <div class="frame">
+    <div class="frame-badge r" id="t0"><i class="bx bx-link"></i> FRAME 02 · TURN</div>
+    <div class="frame-main r" id="t1">One <span class="accent">workflow</span> carries the context.</div>
+    <div class="frame-sub r d1" id="t2">Roles, evals, and review stay attached.</div>
+  </div>
+</div>
+
+<!-- S3: FRAME 03 — RESULT -->
+<div class="scene" id="s3">
+  <div class="frame">
+    <div class="frame-badge r" id="r0"><i class="bx bx-check-square"></i> FRAME 03 · RESULT</div>
+    <div class="frame-main r" id="r1">It runs. <span class="accent">You judge.</span></div>
+    <div class="frame-sub r d1" id="r2">The department executes the goal you set.</div>
+  </div>
+</div>
+
+<!-- S4: CTA -->
+<div class="scene" id="s4">
+  <div class="cta">
+    <div class="cta-badge r" id="ct0"><span class="cta-dot"></span> AI agent implementation</div>
+    <div class="cta-title r d1" id="ct1"><span class="cta-line">Storyboard your workflow.</span><span class="cta-line accent">Then run it.</span></div>
+    <div class="cta-url r d2" id="ct2"><span class="p">$</span> spielos.xyz/services</div>
+  </div>
+</div>
+
+<script>
+window.__t=0;window.__fps=30;window.__duration=15;
+window.__setFrame=function(f,fps){window.__fps=fps||30;window.__t=f/window.__fps};
+
+/* Measured scene schedule (owner contract: speech first, then scenes).
+   Archetype key "e" in narration.json; doesn't exist yet, so the frame
+   stays dark until a measured schedule is written — never a hardcoded
+   window. */
+window.__timing=null;
+window.__timingError=false;
+fetch('/.agents/company/departments/design/templates/video/narration.json')
+  .then(function(r){return r.json()})
+  .then(function(d){
+    var tm=(d.scene_timing&&d.scene_timing.e)||null;
+    if(tm&&tm.voice&&tm.scenes&&tm.scenes.length) window.__timing=tm; else window.__timingError=true;
+  })
+  .catch(function(){window.__timingError=true});
+
+window.__setStillTitle=function(text){
+  var el=document.getElementById('thumb-title');
+  if(!el)return;
+  el.textContent=text||'';
+  el.classList.toggle('show', !!(text&&text.trim()));
+};
+
+function act(id){document.querySelectorAll('.scene').forEach(function(s){s.classList.toggle('active',s.id===id)})}
+function tog(id,v){var e=document.getElementById(id);if(e)e.classList.toggle('show',v)}
+
+/* Journey line setup */
+var pathFill=document.getElementById('journey-fill');
+var pathBg=document.getElementById('journey-bg');
+var pathLen=pathFill.getTotalLength();
+if(!pathLen||pathLen<1)pathLen=1200;
+pathFill.style.setProperty('--path-len',pathLen);
+pathFill.style.strokeDasharray=pathLen;
+pathFill.style.strokeDashoffset=pathLen;
+var portraitFill=document.getElementById('portrait-journey-fill');
+var portraitBg=document.getElementById('portrait-journey-bg');
+var portraitLen=portraitFill.getTotalLength();
+if(!portraitLen||portraitLen<1)portraitLen=1200;
+portraitFill.style.setProperty('--path-len',portraitLen);
+portraitFill.style.strokeDasharray=portraitLen;
+portraitFill.style.strokeDashoffset=portraitLen;
+
+/* Stations ride the path: st1..st4 ↔ scenes 1..4, goal at the line end. */
+var stationDefs=[
+  {land:'st1',port:'pst1',scene:1,color:'#cc241d'},
+  {land:'st2',port:'pst2',scene:2,color:'#458588'},
+  {land:'st3',port:'pst3',scene:3,color:'#458588'},
+  {land:'st4',port:'pst4',scene:4,color:'#98971a'}
+];
+var lineEnd=14,placed=false,fired={};
+
+function placeStations(){
+  var sc=window.__timing.scenes;
+  lineEnd=sc[sc.length-1].end;
+  stationDefs.forEach(function(sd){
+    var frac=Math.min(sc[sd.scene].start/lineEnd,1);
+    var lp=pathFill.getPointAtLength(frac*pathLen);
+    document.getElementById(sd.land).setAttribute('transform','translate('+lp.x.toFixed(1)+','+lp.y.toFixed(1)+')');
+    var pp=portraitFill.getPointAtLength(frac*portraitLen);
+    document.getElementById(sd.port).setAttribute('transform','translate('+pp.x.toFixed(1)+','+pp.y.toFixed(1)+')');
+    sd.frac=frac;
+  });
+  placed=true;
+}
+
+function tick(){
+  var t=window.__t;
+  if(!window.__timing){ requestAnimationFrame(tick); return; }
+  if(!placed) placeStations();
+  var sc=window.__timing.scenes;
+
+  document.getElementById('bg-grid').classList.toggle('show',t>0.3);
+  var g1=document.getElementById('glow-1'),g2=document.getElementById('glow-2');
+  if(g1)g1.style.opacity=t>7?Math.min((t-7)*0.15,0.16):0;
+  if(g2)g2.style.opacity=t>7.5?Math.min((t-7.5)*0.12,0.13):0;
+
+  var progress=Math.min(t/lineEnd,1);
+  pathBg.classList.toggle('show',t>.3);
+  pathFill.style.strokeDashoffset=pathLen*(1-progress);
+  portraitBg.classList.toggle('show',t>.3);
+  portraitFill.style.strokeDashoffset=portraitLen*(1-progress);
+
+  stationDefs.forEach(function(sd){
+    if(!fired[sd.land]&&progress>=sd.frac){
+      fired[sd.land]=true;
+      var el=document.getElementById(sd.land);
+      el.classList.add('show');
+      var ring=el.querySelector('.station-ring');
+      if(ring)ring.classList.add('hit');
+      var pel=document.getElementById(sd.port);
+      pel.classList.add('show');
+      var pring=pel.querySelector('.station-ring');
+      if(pring)pring.classList.add('hit');
+    }
+  });
+  var goalReached=progress>=1;
+  document.getElementById('journey-goal').classList.toggle('show',goalReached);
+  document.getElementById('portrait-goal').classList.toggle('show',goalReached);
+
+  var idx=-1;
+  for(var i=0;i<sc.length;i++){
+    if(t>=sc[i].start&&(i===sc.length-1||t<sc[i+1].start)){idx=i;break;}
+  }
+  var s0=idx>=0?sc[idx].start:0;
+
+  /* Storyboard rail: current frame active, finished frames done. */
+  for(var ri=0;ri<4;ri++){
+    var railEl=document.getElementById('rail'+ri);
+    if(railEl){
+      railEl.classList.toggle('done',idx>ri);
+      railEl.classList.toggle('active',idx===ri);
+    }
+  }
+
+  if(idx===0){act('s1');tog('f0',t>s0+0.15);tog('f1',t>s0+0.4);tog('f2',t>s0+0.9)}
+  if(idx===1){act('s2');tog('t0',t>s0+0.15);tog('t1',t>s0+0.4);tog('t2',t>s0+0.9)}
+  if(idx===2){act('s3');tog('r0',t>s0+0.15);tog('r1',t>s0+0.4);tog('r2',t>s0+0.9)}
+  if(idx===3){act('s4');tog('ct0',t>s0+0.05);tog('ct1',t>s0+0.2);tog('ct2',t>s0+0.45)}
+  if(idx<0)act('none');
+
+  requestAnimationFrame(tick);
+}
+tick();
+</script>
+</body>
+</html>

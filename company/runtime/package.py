@@ -1,4 +1,4 @@
-"""Workgroup package shape: serializable blocks the Director can install."""
+"""Department package shape: serializable Lego blocks the Director can install."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from typing import Any
 
 from ..agents import agents as installed_agents, known_skill_ids
 from ..connections import connections as installed_connections
-from .models import WorkgroupHandlerBase, WorkflowSpec, WorkflowStep
+from .models import Department, WorkflowSpec, WorkflowStep
 
 
 def _step(item: WorkflowStep | str) -> dict[str, Any]:
@@ -16,7 +16,7 @@ def _step(item: WorkflowStep | str) -> dict[str, Any]:
     return {
         "id": item.id,
         "kind": item.kind,
-        "employee_id": item.employee_id,
+        "agent_id": item.agent_id,
         "produces": list(item.produces),
         "requires": list(item.requires),
         "skill_ids": list(item.skill_ids),
@@ -38,39 +38,39 @@ def _workflow(item: WorkflowSpec) -> dict[str, Any]:
     }
 
 
-def package_spec(workgroup: WorkgroupHandlerBase) -> dict[str, Any]:
-    """Stable installable description of one Workgroup package."""
+def package_spec(department: Department) -> dict[str, Any]:
+    """Stable installable description of one Department package."""
 
-    schema = getattr(workgroup, "goal_schema", None) or {}
+    schema = getattr(department, "goal_schema", None) or {}
     return {
-        "id": workgroup.workgroup_id or workgroup.id,
-        "version": getattr(workgroup, "version", "0.0.0"),
-        "description": getattr(workgroup, "description", ""),
-        "agent_ids": list(getattr(workgroup, "agent_ids", ()) or ()),
-        "workflow_agents": dict(getattr(workgroup, "workflow_agents", None) or {}),
+        "id": department.department_id or department.id,
+        "version": getattr(department, "version", "0.0.0"),
+        "description": getattr(department, "description", ""),
+        "agent_ids": list(getattr(department, "agent_ids", ()) or ()),
+        "workflow_agents": dict(getattr(department, "workflow_agents", None) or {}),
         "evidence_metrics": {
             key: list(value)
-            for key, value in (getattr(workgroup, "evidence_metrics", None) or {}).items()
+            for key, value in (getattr(department, "evidence_metrics", None) or {}).items()
         },
         "metrics": list(schema.get("metrics") or []),
         "config_schema": dict(schema.get("config") or {}),
-        "workflows": [_workflow(item) for item in getattr(workgroup, "workflows", ()) or ()],
+        "workflows": [_workflow(item) for item in getattr(department, "workflows", ()) or ()],
     }
 
 
-def validate_package(workgroup: WorkgroupHandlerBase) -> list[str]:
+def validate_package(department: Department) -> list[str]:
     """Return package defects (empty list means installable Lego package)."""
 
     defects = []
-    workgroup_id = workgroup.workgroup_id or workgroup.id
-    if not workgroup_id:
-        defects.append("missing Workgroup id")
-    if not getattr(workgroup, "description", ""):
+    department_id = department.department_id or department.id
+    if not department_id:
+        defects.append("missing Department id")
+    if not getattr(department, "description", ""):
         defects.append("missing description")
-    workflows = tuple(getattr(workgroup, "workflows", ()) or ())
+    workflows = tuple(getattr(department, "workflows", ()) or ())
     if not workflows:
         defects.append("no workflows declared")
-    agents = set(getattr(workgroup, "agent_ids", ()) or ())
+    agents = set(getattr(department, "agent_ids", ()) or ())
     known_agents = set(installed_agents()) | agents
     known_skills = set(known_skill_ids())
     known_connections = set(installed_connections())
@@ -94,13 +94,13 @@ def validate_package(workgroup: WorkgroupHandlerBase) -> list[str]:
             if node.id in step_ids:
                 defects.append(f"workflow {workflow.id} has duplicate step id {node.id}")
             step_ids.add(node.id)
-            if node.kind not in {"employee", "approval", "connection", "machine"}:
+            if node.kind not in {"agent", "approval", "connection", "machine"}:
                 defects.append(f"workflow {workflow.id} step {node.id} has unknown kind {node.kind}")
-            if node.kind == "employee" and not (node.employee_id or workflow.agent_ids or agents):
-                defects.append(f"workflow {workflow.id} step {node.id} has no employee")
-            if node.employee_id and node.employee_id not in known_agents:
+            if node.kind == "agent" and not (node.agent_id or workflow.agent_ids or agents):
+                defects.append(f"workflow {workflow.id} step {node.id} has no Agent")
+            if node.agent_id and node.agent_id not in known_agents:
                 defects.append(
-                    f"workflow {workflow.id} step {node.id} references unknown agent {node.employee_id}")
+                    f"workflow {workflow.id} step {node.id} references unknown Agent {node.agent_id}")
             for skill_id in node.skill_ids:
                 if skill_id not in known_skills:
                     defects.append(
@@ -119,8 +119,8 @@ def validate_package(workgroup: WorkgroupHandlerBase) -> list[str]:
                     defects.append(
                         f"workflow {workflow.id} step {node.id} requires {kind} "
                         "with no producer or declared handoff")
-    metrics = list((getattr(workgroup, "goal_schema", None) or {}).get("metrics") or [])
-    evidence = getattr(workgroup, "evidence_metrics", None) or {}
+    metrics = list((getattr(department, "goal_schema", None) or {}).get("metrics") or [])
+    evidence = getattr(department, "evidence_metrics", None) or {}
     for metric in metrics:
         if metric not in evidence and not any(workflow.evidence_sources for workflow in workflows):
             defects.append(f"metric {metric} has no accepted evidence kinds")

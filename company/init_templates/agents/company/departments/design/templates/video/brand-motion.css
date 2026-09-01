@@ -1,0 +1,49 @@
+/* brand-motion.css — the shared flat motion/brand layer for SpielOS video.
+   One wandering goal line is the branded signature across motion: completed
+   travel is a solid primary (teal) stroke, the route ahead is muted and
+   dashed, and the route ends at a simple flat bullseye. The fixed brand
+   footer keeps the official logo and the centered canonical URL in the safe
+   area. Flat only: no 3D, device mockups, glassmorphism, or spectacle
+   gradients. Scenario templates link this and keep only per-scenario
+   overrides.
+
+   Node pulses (owner contract №4): stations sit ON the journey line and fire
+   a subtle one-shot ring flash exactly when the line reaches the node —
+   triggered by the templates' tick() adding .hit once per station. There is
+   NO infinite ring animation on the stations. */
+.journey-svg { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 5; pointer-events: none; }
+.journey-portrait { display: none; }
+.journey-path { fill: none; stroke: var(--foreground-muted); stroke-width: 2; stroke-linecap: round; stroke-dasharray: 10 8; opacity: 0; transition: opacity .8s ease; }
+.journey-path.show { opacity: .45; }
+.journey-path-fill { fill: none; stroke: var(--primary); stroke-width: 2.5; stroke-linecap: round; stroke-dasharray: var(--path-len, 10000); stroke-dashoffset: var(--path-len, 10000); transition: stroke-dashoffset .1s linear; }
+.journey-goal { opacity: .45; transition: opacity .45s ease; }
+.journey-goal.show { opacity: 1; }
+.goal-ring { fill: var(--background); stroke: var(--primary); stroke-width: 3; }
+.goal-ring-inner { fill: none; stroke: var(--primary); stroke-width: 2; opacity: .82; }
+.goal-core { fill: var(--primary); }
+
+/* Station nodes ride ON the path: the template ticks place each station's
+   <g> at path.getPointAtLength(stationProgress) every frame, so a node can
+   never drift off the line. The ring is invisible until the node fires. */
+.journey-station { opacity: 0; transition: opacity .4s ease; }
+.journey-station.show { opacity: 1; }
+.journey-station .station-scale { transform-box: fill-box; transform-origin: center; transform: scale(0); transition: transform .4s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.journey-station.show .station-scale { transform: scale(1); }
+.station-ring { fill: none; stroke: var(--primary); stroke-width: 2; opacity: 0; transform-box: fill-box; transform-origin: center; }
+/* One-shot hit flash fired ONCE when the line reaches the node (subtle). */
+.station-ring.hit { opacity: 1; animation: nodeHit .55s ease-out 1; }
+@keyframes nodeHit {
+  0%   { opacity: .85; transform: scale(.4); }
+  60%  { opacity: .45; transform: scale(1.35); }
+  100% { opacity: 0;   transform: scale(1.8); }
+}
+
+.video-brand-footer { position: absolute; inset-inline: 0; bottom: 3.5cqh; z-index: 40; display: flex; justify-content: center; color: var(--foreground-muted); font-size: clamp(var(--font-size-base), 1.55cqw, var(--font-size-2xl)); }
+@media (orientation: portrait) {
+  .journey-landscape { display: none; }
+  .journey-portrait { display: block; }
+  .video-brand-footer { bottom: 4cqh; font-size: 2.5rem; }
+  .video-brand-footer .brand-lockup { gap: .5em; }
+  .video-brand-footer .brand-lockup img { width: 1.6em; height: 1.6em; }
+}
+@media (prefers-reduced-motion: reduce) { .journey-path, .journey-path-fill, .journey-goal, .journey-station, .journey-station .station-scale, .station-ring { transition-duration: 1ms !important; animation-duration: 1ms !important; } }

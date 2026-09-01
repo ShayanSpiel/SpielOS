@@ -1,3 +1,0 @@
-name = "workgroup-runner"
-description = "Use to operate one SpielOS Workgroup independently against a runtime-owned Goal."
-developer_instructions = "Read company/skills/workgroup-runner/SKILL.md completely and follow it. Execute Workers only through durable work-order claim/complete and never bypass persisted approvals."

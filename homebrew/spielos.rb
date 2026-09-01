@@ -7,7 +7,7 @@
 class Spielos < Formula
   include Language::Python::Virtualenv
 
-  desc "AI company operating system with durable goals, Workgroups, and approvals"
+  desc "AI company operating system with durable Goals, Departments, and approvals"
   homepage "https://spielos.xyz"
   # Content-addressed source sdist published by PyPI.
   url "https://files.pythonhosted.org/packages/a8/7b/9f7488f07a1f8f6a9d5a7d6dfeef80ca0b37d3d3b3a6fc337caf74f54c9c/spielos-7.3.0.tar.gz"

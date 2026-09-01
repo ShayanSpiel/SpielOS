@@ -1,4 +1,8 @@
-"""The single GOAL -> OBSERVE -> DECIDE -> ACT -> EVALUATE loop."""
+"""Legacy-home command adapter.
+
+New code uses :mod:`company.runtime.engine`. Existing commands keep this adapter
+so installed homes can operate while their historical tables are migrated.
+"""
 
 from __future__ import annotations
 
@@ -37,10 +41,10 @@ TERMINAL = {"achieved", "abandoned", "expired"}
 SUSPENDED = {RunStatus.WAITING, RunStatus.AWAITING_APPROVAL, RunStatus.BLOCKED,
              RunStatus.FAILED, RunStatus.COMPLETED}
 
-# Map capability tokens from Workgroup attention payloads to catalog defaults.
+# Map capability tokens from Department attention payloads to catalog defaults.
 # Identity-owned mapping lives in the user configuration layer
 # (runtime/config.py + config.user.json).
-CAPABILITY_EMPLOYEES = config.capability_employees()
+CAPABILITY_AGENTS = config.capability_agents()
 CAPABILITY_WORKFLOWS = config.capability_workflows()
 
 logger = logging.getLogger("company.runtime.loop")
@@ -540,11 +544,11 @@ class Runtime:
         return allowed
 
     def _maybe_open_work_order(self, goal, cycle, result):
-        """Persist a durable employee assignment when a run parks on agent work.
+        """Persist a durable Agent assignment when a run parks on Agent work.
 
-        Approvals are not work orders. Only blocked runs that name an employee
-        (or a known capability / connection handoff) create one. Missing employee
-        or evidence kinds are filled from the Workgroup WorkflowSpec catalog.
+        Approvals are not work orders. Only blocked runs that name an Agent
+        (or a known capability / Connection handoff) create one. Missing Agent
+        or evidence kinds are filled from the Department Workflow catalog.
         """
 
         if result.run_status is not RunStatus.BLOCKED:
@@ -558,14 +562,14 @@ class Runtime:
 
         if source.get("capability") in CAPABILITY_WORKFLOWS and not source.get("workflow_id"):
             source["workflow_id"] = CAPABILITY_WORKFLOWS[source["capability"]]
-        if source.get("capability") in CAPABILITY_EMPLOYEES and not source.get("agent_id"):
-            source["agent_id"] = CAPABILITY_EMPLOYEES[source["capability"]]
+        if source.get("capability") in CAPABILITY_AGENTS and not source.get("agent_id"):
+            source["agent_id"] = CAPABILITY_AGENTS[source["capability"]]
         if connection_request is not None:
-            source.setdefault("agent_id", connection_request.get("employee_id") or "publisher")
+            source.setdefault("agent_id", connection_request.get("agent_id") or "publisher")
             if connection_request.get("required_evidence") and not source.get("accepted_evidence_kinds"):
                 source["accepted_evidence_kinds"] = [connection_request["required_evidence"]]
 
-        # A blocked machine gate is a validation failure, not an employee
+        # A blocked machine gate is a validation failure, not an Agent
         # assignment. Do not let catalog enrichment turn a missing ICP or
         # failed editorial check into a generic strategist work order.
         if source.get("action") == "run_machine_step" and connection_request is None \
@@ -576,8 +580,8 @@ class Runtime:
         goal_row = {"metric": goal.metric, "config": goal.config, "owner_id": goal.owner_id}
         source = enrich_work_order_source(handler, goal_row, source)
 
-        employee_id = source.get("agent_id") or source.get("employee_id")
-        if not employee_id:
+        agent_id = source.get("agent_id") or source.get("employee_id")
+        if not agent_id:
             return None
 
         accepts = list(source.get("accepted_evidence_kinds") or source.get("accepts_evidence") or [])
@@ -598,25 +602,25 @@ class Runtime:
             "workflow_id": source.get("workflow_id") or goal.config.get("workflow"),
             "step_id": source.get("step_id") or result.step,
             "required_user_action": source.get("required_user_action") or (
-                f"{employee_id} must produce {needed} validated artifact(s)"),
+                f"{agent_id} must produce {needed} validated artifact(s)"),
             "next_trigger": source.get("next_trigger") or f"company retry {goal.id}",
             "connection_request": connection_request,
             "accepted_evidence_kinds": accepts,
             # Preserve the complete bounded request in the durable assignment.
-            # A worker must not have to infer the ICP from the goal name or
+            # An Agent must not have to infer the ICP from the Goal name or
             # rediscover it from an unrelated local file.
             "goal_config": dict(goal.config or {}),
             "content_request": dict((goal.config or {}).get("content_request") or {})
                 if isinstance((goal.config or {}).get("content_request"), dict) else {},
             # The Interpreter places bounded, selected context in the action
             # payload. Preserve it in the persisted assignment; otherwise
-            # cross-Workgroup Memory and Strategy only affect an audit row.
+            # cross-Department Memory and Strategy only affect an audit row.
             "memory": list(source.get("memory") or ()),
             "strategy": dict(source.get("strategy") or {}),
             "strategy_context": dict(source.get("strategy") or {}),
         }
         return self.store.open_work_order(
-            goal_id=goal.id, run_id=cycle["id"], employee_id=employee_id,
+            goal_id=goal.id, run_id=cycle["id"], agent_id=agent_id,
             needed=needed, accepts_evidence=accepts,
             workflow_id=brief["workflow_id"],
             step_id=source.get("step_id") or result.step, brief=brief)
@@ -647,14 +651,14 @@ class Runtime:
         if work_order:
             payload["work_order_id"] = work_order["id"]
             payload["work_order"] = {
-                "id": work_order["id"], "employee_id": work_order["employee_id"],
+                "id": work_order["id"], "agent_id": work_order["agent_id"],
                 "needed": work_order["needed"],
                 "accepts_evidence": work_order.get("accepts_evidence") or [],
                 "status": work_order["status"],
             }
             if not payload.get("required_user_action"):
                 payload["required_user_action"] = (
-                    f"{work_order['employee_id']} must produce "
+                    f"{work_order['agent_id']} must produce "
                     f"{work_order['needed']} accepted artifact(s)")
             if not payload.get("next_trigger"):
                 payload["next_trigger"] = f"company retry {goal.id}"
@@ -930,7 +934,7 @@ class Runtime:
         for order in self.store.work_orders(status="active", goal_id=goal_id, run_id=cycle["id"], limit=100):
             if not (order.get("accepts_evidence") or []):
                 self.store.complete_work_order(
-                    order["id"], [], worker_id=order.get("claimed_by"))
+                    order["id"], [], agent_id=order.get("claimed_by"))
         self.store.update_cycle(cycle["id"], stage="OBSERVE", step="collect",
                                 run_status="idle", resume_at=None, data={})
         self.store.resolve_actionable_notifications(goal_id, cycle["id"])
@@ -1005,23 +1009,23 @@ class Runtime:
                                     resume_at=now_iso(), data=cycle["data"])
         return self.status(goal_id)
 
-    def claim_work_order(self, work_order_id: str, worker_id: str) -> dict:
+    def claim_work_order(self, work_order_id: str, agent_id: str) -> dict:
         """Claim one assignment without changing its Goal or run state."""
 
-        order = self.store.claim_work_order(work_order_id, worker_id)
+        order = self.store.claim_work_order(work_order_id, agent_id)
         goal = self.store.goal(order["goal_id"])
         if goal["goal_status"] != "active":
             raise RuntimeError(f"work order goal is {goal['goal_status']}, not active")
         return order
 
-    def complete_work_order(self, work_order_id: str, worker_id: str,
+    def complete_work_order(self, work_order_id: str, agent_id: str,
                             evidence: list[dict]) -> dict:
         """Validate linked evidence, close one claimed assignment, and resume its Goal."""
 
         order = self.store.work_order(work_order_id)
-        if order["status"] != "claimed" or order.get("claimed_by") != worker_id:
+        if order["status"] != "claimed" or order.get("claimed_by") != agent_id:
             owner = order.get("claimed_by") or order["status"]
-            raise RuntimeError(f"work order must be claimed by {worker_id!r} (current: {owner})")
+            raise RuntimeError(f"work order must be claimed by {agent_id!r} (current: {owner})")
         accepts = set(order.get("accepts_evidence") or [])
         records = [dict(item) for item in (evidence or [])]
         accepted = [item for item in records if not accepts or item.get("kind") in accepts]
@@ -1041,7 +1045,7 @@ class Runtime:
                 raise ValueError("each evidence item needs kind")
             state = self.add_evidence(
                 order["goal_id"], kind=kind,
-                source=str(item.get("source") or worker_id),
+                source=str(item.get("source") or agent_id),
                 payload=dict(item.get("payload") or {}),
                 validity=item.get("validity"), work_order_id=work_order_id)
             linked = [value for value in state["evidence"]
@@ -1050,7 +1054,7 @@ class Runtime:
 
         completed = self.store.complete_work_order(
             work_order_id, evidence_ids[:needed] if needed else evidence_ids,
-            worker_id=worker_id)
+            agent_id=agent_id)
         cycle = self.store.cycle(order["goal_id"])
         if cycle["run_status"] in {"blocked", "failed"}:
             self.retry(order["goal_id"])

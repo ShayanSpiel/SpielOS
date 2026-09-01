@@ -4,8 +4,7 @@ Creates a vendored copy of the harness spine plus the private state tree in
 a target directory (default: cwd), so the resulting repository has zero
 runtime dependency on the installed package:
 
-    .agents/company/**     runtime spine + optional Workgroups
-    .agents/skills/**      skills/company + skills/website namespaces
+    .agents/company/**     runtime spine + optional Departments
     .spielos/state|data|artifacts/
     .spielos/.env.example  credential contract
     .opencode/**           host adapter (plugin, commands, agents)
@@ -152,9 +151,9 @@ def template_root() -> Path:
 _template_root = template_root  # backward-compatible alias
 
 
-def available_workgroups() -> list[str]:
-    """Workgroup ids vendorable with ``init --workgroup ID``."""
-    root = template_root() / "agents" / "company" / "workgroups"
+def available_departments() -> list[str]:
+    """Department ids vendorable with ``init --department ID``."""
+    root = template_root() / "agents" / "company" / "departments"
     if not root.is_dir():
         return []
     return sorted(entry.name for entry in root.iterdir()
@@ -182,13 +181,14 @@ def _copy_tree(src: Path, dst: Path, overwrite: bool = False,
 
 
 def scaffold(target: Path | None = None, *, force: bool = False,
-             minimal: bool = False, workgroups: list[str] | None = None,
+             minimal: bool = False, departments: list[str] | None = None,
              on_phase=None) -> dict:
     """Materialize a complete harness home. Returns a receipt dict.
 
-    ``minimal=True`` ships the spine with an EMPTY workgroups/ folder and
-    no website skills. Pass ``workgroups=["id", ...]`` to vendor selected
-    Workgroups from the templates.
+    ``minimal=True`` ships the Department contract without bundled production
+    Departments.
+    Pass ``departments=["id", ...]`` to vendor selected Departments from
+    the templates.
     ``on_phase(label)`` is called before each materialization chunk so an
     interactive driver can show progress; it is optional plumbing and
     never changes what gets written.
@@ -211,7 +211,7 @@ def scaffold(target: Path | None = None, *, force: bool = False,
     preserved_user_prefixes = (
         "company/strategy/",
         "company/assets/",
-        "company/workgroups/",
+        "company/departments/",
         "company/agents/installed/",
     ) if existing_home else ()
 
@@ -223,21 +223,19 @@ def scaffold(target: Path | None = None, *, force: bool = False,
         written += _copy_tree(templates / "agents", root / ".agents",
                               overwrite=force,
                               skip=lambda rel: (
-                                  (rel.startswith("company/workgroups/")
-                                   and rel not in {"company/workgroups/__init__.py",
-                                                   "company/workgroups/registry.py"})
-                                  or rel.startswith("skills/website/")
+                                  (rel.startswith("company/departments/")
+                                   and rel.count("/") > 2)
                                   or preserve_user_layer(rel)))
-        workgroups_pkg = root / ".agents" / "company" / "workgroups"
-        workgroups_pkg.mkdir(parents=True, exist_ok=True)
-        (workgroups_pkg / "__init__.py").touch()
-        written.append(str(workgroups_pkg / "__init__.py"))
-        for workgroup_id in workgroups or []:
-            src = templates / "agents" / "company" / "workgroups" / workgroup_id
+        departments_pkg = root / ".agents" / "company" / "departments"
+        departments_pkg.mkdir(parents=True, exist_ok=True)
+        (departments_pkg / "__init__.py").touch()
+        written.append(str(departments_pkg / "__init__.py"))
+        for department_id in departments or []:
+            src = templates / "agents" / "company" / "departments" / department_id
             if not src.is_dir():
-                raise ValueError(f"template has no Workgroup '{workgroup_id}'")
+                raise ValueError(f"template has no Department '{department_id}'")
             written += _copy_tree(src, root / ".agents" / "company"
-                                  / "workgroups" / workgroup_id, overwrite=force)
+                                  / "departments" / department_id, overwrite=force)
     else:
         written += _copy_tree(templates / "agents", root / ".agents",
                               overwrite=force,
@@ -302,7 +300,7 @@ def scaffold(target: Path | None = None, *, force: bool = False,
             "cd " + str(root),
             "opencode",
             "Select the Director agent before chatting (not Build).",
-            "Make it yours: edit .agents/company/strategy/ (ICP, voice) and add a Workgroup.",
+            "Make it yours: edit .agents/company/strategy/ and add a Department.",
             "Set credentials in .spielos/.env (see .spielos/.env.example).",
         ],
     }
@@ -333,7 +331,7 @@ _AGENTS_MD = """# Agent operating rules — harness section
 This repository runs on the SpielOS company harness: one durable loop
 (GOAL -> OBSERVE -> DECIDE -> ACT -> EVALUATE) persisted in SQLite under
 `.spielos/state/`. The runtime owns every Goal, approval, run, and evidence
-record; Workgroups supply Worker-owned behavior only.
+record; Departments supply Agent-owned behavior only.
 
 Authority and full documentation: `.agents/company/README.md`.
 
@@ -354,7 +352,7 @@ probe.
 ## Rules
 
 - Live external actions always park for explicit approval.
-- The Director and Workgroup Workers never edit repository files;
-  `system-improvement` is the only editing agent, bounded by its goal.
+- The Director and Department Agents never edit repository files;
+  `system-improvement` executes bounded Resolution work beneath an active Goal.
 - Strategy authority lives in `.agents/company/strategy/`; never restate it.
 """

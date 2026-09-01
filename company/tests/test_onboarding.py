@@ -38,7 +38,7 @@ class OnboardingTests(unittest.TestCase):
         self.assertNotIn("Workgroup", rendered)
         self.assertNotIn(".env", rendered)
 
-    def test_interactive_init_does_not_ask_for_starter_workgroups(self):
+    def test_interactive_init_does_not_ask_for_starter_departments(self):
         receipt = {
             "root": "/tmp/new-company",
             "files_written": 1,
@@ -56,7 +56,7 @@ class OnboardingTests(unittest.TestCase):
             result = onboard.run_init(dir="/tmp/new-company")
 
         self.assertEqual(0, result)
-        self.assertIsNone(scaffold.call_args.kwargs["workgroups"])
+        self.assertIsNone(scaffold.call_args.kwargs["departments"])
 
     def test_init_prints_stable_install_and_director_handoff(self):
         receipt = {

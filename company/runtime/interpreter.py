@@ -1,6 +1,6 @@
-"""Generic Workgroup interpreter: WorkflowSpec graphs under one Goal loop.
+"""Generic Department interpreter: WorkflowSpec graphs under one Goal loop.
 
-Workgroups declare package data. This interpreter runs:
+Departments declare package data. This interpreter runs:
   OBSERVE → count evidence + surface memory
   DECIDE  → goal met | next graph step | catalog agent shortfall
   ACT     → work order | approval | connection handoff | machine hook
@@ -15,7 +15,7 @@ import math
 from typing import Any
 
 from ..connections import connection as resolve_connection
-from .contracts import agent_shortfall, employee_for, workflow_by_id
+from .contracts import agent_for, agent_shortfall, workflow_by_id
 from .models import GoalStatus, RunStatus, Stage, StageResult, WorkflowSpec, WorkflowStep
 from .memory import apply_memory, relevant_memory
 from .truth import countable_evidence, derive_evaluation_validity, is_business_outcome
@@ -80,10 +80,10 @@ def _memory_view(memory) -> list[dict[str, Any]]:
 
 
 def _strategy_view(strategy) -> dict[str, Any]:
-    """The bounded strategy context that an employee may actually use.
+    """The bounded strategy context that an Agent may actually use.
 
     The runtime owns selection; this projection deliberately keeps the
-    work-order contract explicit instead of asking an employee to rediscover
+    work-order contract explicit instead of asking an Agent to rediscover
     strategy from local files.
     """
     value = dict(strategy or {})
@@ -95,20 +95,20 @@ def _strategy_view(strategy) -> dict[str, Any]:
 
 
 def synthesize_graph(handler, workflow: WorkflowSpec | None, metric: str) -> tuple[WorkflowStep, ...]:
-    """One employee step from catalog fields when a workflow has no explicit graph."""
+    """One Agent step from catalog fields when a Workflow has no explicit graph."""
 
     if workflow is None:
         return ()
     if workflow.graph:
         return workflow.graph
-    employee_id = employee_for(handler, workflow)
+    agent_id = agent_for(handler, workflow)
     produces = tuple((getattr(handler, "evidence_metrics", None) or {}).get(metric) or ())
     if not produces:
         produces = tuple(workflow.evidence_sources)
     return (WorkflowStep(
         id=workflow.steps[-1] if workflow.steps else "produce",
-        kind="employee",
-        employee_id=employee_id,
+        kind="agent",
+        agent_id=agent_id,
         produces=produces,
         skill_ids=tuple(workflow.skill_ids),
         connection_ids=tuple(workflow.connection_ids),
@@ -148,13 +148,13 @@ def next_incomplete_step(graph: tuple[WorkflowStep, ...], evidence: list[dict],
             if _kinds_present(evidence, node.produces) >= 1:
                 continue
             return node
-        if node.kind in {"employee", "connection"}:
+        if node.kind in {"agent", "connection"}:
             return node
     return None
 
 
-class InterpretedWorkgroup:
-    """Runtime adapter for declarative Worker-owned Workgroup packages."""
+class InterpretedDepartment:
+    """Runtime adapter for declarative Department packages."""
 
     evidence_metrics: dict = {}
     workflow_agents: dict = {}
@@ -177,7 +177,7 @@ class InterpretedWorkgroup:
             "graph": [node.id for node in graph],
             "current_step": None if current is None else {
                 "id": current.id, "kind": current.kind,
-                "employee_id": current.employee_id,
+                "agent_id": current.agent_id,
                 "produces": list(current.produces),
                 "requires": list(current.requires),
             },
@@ -295,20 +295,19 @@ class InterpretedWorkgroup:
                                          "evidence_ids": _evidence_ids(evidence, step.requires),
                                          "payload": payload}, memory))
 
-        # employee step
+        # Agent step
         needed = _shortfall(ctx.goal.target, current_value)
         if step.produces:
             have = _kinds_present(evidence, step.produces)
             needed = max(1, 1 - have)
-        employee_id = step.employee_id or employee_for(self, workflow)
+        agent_id = step.agent_id or agent_for(self, workflow)
         payload = agent_shortfall(
             self, goal_id=ctx.goal.id, metric=metric, needed=needed,
             workflow_id=workflow_id, config=ctx.goal.config)
-        if employee_id:
-            payload["agent_id"] = employee_id
-            payload["employee_id"] = employee_id
+        if agent_id:
+            payload["agent_id"] = agent_id
             payload["required_user_action"] = (
-                f"{employee_id} must produce {needed} validated artifact(s) of kind "
+                f"{agent_id} must produce {needed} validated artifact(s) of kind "
                 f"{', '.join(step.produces) if step.produces else metric}")
         if step.produces:
             payload["accepted_evidence_kinds"] = list(step.produces)
@@ -317,12 +316,12 @@ class InterpretedWorkgroup:
         payload["step_id"] = step.id
         payload["action"] = "request_agent"
         # These are not merely audit decoration: the exact bounded context is
-        # copied into the durable work order below so the employee can apply it.
+        # copied into the durable work order below so the Agent can apply it.
         payload["memory"] = list(observation.get("memory") or ())
         payload["strategy"] = dict(observation.get("strategy") or {})
         return StageResult("choose_intervention", payload,
                            decision=apply_memory({"type": "request_agent",
-                                     "rationale": f"Workflow step `{step.id}` needs employee output",
+                                     "rationale": f"Workflow step `{step.id}` needs Agent output",
                                      "evidence_ids": _evidence_ids(
                                          evidence, tuple(step.requires) + tuple(step.produces)),
                                      "payload": payload}, memory))
@@ -357,7 +356,7 @@ class InterpretedWorkgroup:
                 "execution_mode": decision.get("execution_mode", "dry_run"),
                 "package": decision.get("package") or {},
                 "required_evidence": required[0] if required else "publication_receipt",
-                "employee_id": "publisher",
+                "agent_id": "publisher",
                 "accepted_evidence_kinds": required,
                 "required_user_action": (
                     f"Use the available {selected.id} Connection and record its receipt"),
@@ -386,10 +385,10 @@ class InterpretedWorkgroup:
                                message=result.get("message") or "Machine step completed")
 
         if action == "request_agent":
-            employee = decision.get("agent_id") or decision.get("employee_id") or "employee"
+            agent = decision.get("agent_id") or decision.get("employee_id") or "Agent"
             return StageResult("request_agent", decision, RunStatus.BLOCKED, Stage.ACT,
                                message=decision.get("required_user_action") or (
-                                   f"{employee} must produce {decision.get('needed')} validated artifact(s)"),
+                                   f"{agent} must produce {decision.get('needed')} validated artifact(s)"),
                                attention=decision)
 
         return StageResult("collect_artifacts", decision, next_stage=Stage.EVALUATE)
@@ -421,7 +420,10 @@ class InterpretedWorkgroup:
                           "change_one_variable": "workflow_step_output"}}
         evidence_ids = [item["id"] for item in evidence if item.get("id")]
         learnings = []
-        if evidence_ids and validity in {"business", "technical_only"}:
+        # Department outcome Memory must be supported by business-valid
+        # evidence. Technical artifacts remain traceable Evidence but cannot
+        # become reusable business claims.
+        if evidence_ids and validity == "business":
             outcome = "met" if met else "did not meet"
             learnings.append({
                 "reusable": True,
@@ -435,7 +437,7 @@ class InterpretedWorkgroup:
                                "workflows": [workflow_id] if workflow_id else [],
                                "steps": [str(action_result["step_id"])]
                                         if action_result.get("step_id") else [],
-                               "workgroups": [ctx.goal.owner_id]},
+                               "departments": [ctx.goal.owner_id]},
                 "confidence": 0.8,
                 "verdict": "confirmed" if met else "observed",
                 "evidence": {"observed_value": value, "target": ctx.goal.target,
@@ -445,5 +447,5 @@ class InterpretedWorkgroup:
                            goal_status=GoalStatus.ACHIEVED if met else None,
                            evaluation=evaluation,
                            learnings=learnings,
-                           message=("Workgroup package goal achieved" if met
-                                    else "Workgroup package run completed; more evidence required"))
+                           message=("Department package goal achieved" if met
+                                    else "Department package run completed; more evidence required"))

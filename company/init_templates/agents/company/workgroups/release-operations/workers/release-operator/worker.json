@@ -1,1 +1,0 @@
-{"id":"release-operator","description":"Builds a release candidate and verifies its package and upgrade path.","workbook":["release-operations"],"workkit":[],"produces":["release_receipt"]}

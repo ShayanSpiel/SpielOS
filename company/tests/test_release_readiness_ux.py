@@ -18,13 +18,27 @@ from company.runtime.migration import inspect_source, migration_plan
 from company.runtime.bootstrap import scaffold
 from company.runtime.export import (
     RETIRED_HARNESS_FILES, RETIRED_HOST_AGENTS, refresh_home)
+from company.runtime.config import VERSION
 
 
 class OrientationTests(unittest.TestCase):
+    def test_release_metadata_and_trusted_publish_workflow_are_aligned(self):
+        root = Path(__file__).parents[2]
+        package = json.loads((root / "package.json").read_text())
+        workflow = (root / ".github/workflows/publish.yml").read_text()
+
+        self.assertEqual("8.0.0", VERSION)
+        self.assertEqual(VERSION, package["version"])
+        self.assertIn("npm@^11.5.1", workflow)
+        self.assertNotIn("NPM_TOKEN", workflow)
+        self.assertFalse((root / ".github/workflows/npm-only.yml").exists())
+
     def test_update_prunes_only_known_legacy_host_agents(self):
         with tempfile.TemporaryDirectory() as directory:
             home = Path(directory) / "home"
             scaffold(home, minimal=True)
+            self.assertTrue(
+                (home / ".agents/company/departments/core.py").is_file())
             for host, filenames in RETIRED_HOST_AGENTS.items():
                 agents = home / f".{host}" / "agents"
                 agents.mkdir(parents=True, exist_ok=True)
@@ -41,7 +55,7 @@ class OrientationTests(unittest.TestCase):
 
             receipt = refresh_home(target=home)
 
-            self.assertEqual(8, len(receipt["removed_retired_host_agents"]))
+            self.assertEqual(2, len(receipt["removed_retired_host_agents"]))
             self.assertEqual(
                 len(RETIRED_HARNESS_FILES),
                 len(receipt["removed_retired_harness_files"]))
@@ -122,8 +136,8 @@ class OrientationTests(unittest.TestCase):
                              "overview"])
             self.assertEqual(code, 0)
             self.assertIn("# Company overview", output.getvalue())
-            self.assertIn("Workgroups:", output.getvalue())
-            self.assertIn("Workers:", output.getvalue())
+            self.assertIn("Departments:", output.getvalue())
+            self.assertIn("Agents:", output.getvalue())
 
 
 class ArtifactLifecycleTests(unittest.TestCase):
@@ -230,10 +244,10 @@ class MigrationPolicyTests(unittest.TestCase):
             plan = migration_plan(root)
 
             self.assertEqual("6.2.6", inspection["detected_version"])
-            self.assertEqual(["outbound"], inspection["inventory"]["legacy_departments"])
+            self.assertEqual(["outbound"], inspection["inventory"]["departments"])
             self.assertTrue(inspection["inventory"]["has_operational_state"])
             self.assertEqual("archive_then_selectively_promote", plan["state_action"])
-            self.assertEqual("needs_conversion_and_acceptance", plan["units"][0]["status"])
+            self.assertEqual("needs_validation_and_acceptance", plan["units"][0]["status"])
             self.assertIn("never import", inspection["policies"]["foreign_runtime"])
 
     def test_classification_uses_path_context_not_misleading_filenames(self):

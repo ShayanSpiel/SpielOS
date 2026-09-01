@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "spielos"
-description = "SpielOS: one durable Goal loop, Worker-owned Workgroups, approvals, evidence, and evals for operating AI work."
+description = "SpielOS: one durable Goal loop, portable Agent-owned Departments, approvals, evidence, and evals for operating AI work."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
@@ -23,12 +23,12 @@ include = ["company*"]
 exclude = ["company.tests*", "company.init_templates*"]
 
 [tool.setuptools.package-data]
-"*" = ["*.json", "*.md", "*.css", "*.html", ".env.example"]
+"*" = ["*.json", "*.md", "*.css", "*.html", "*.woff2", ".env.example"]
 company = [
     "init_templates/**/*",
     "dot-env-example",
     "skills/**/*",
-    "workgroups/**/*",
+    "departments/**/*",
 ]
 
 [tool.setuptools.exclude-package-data]

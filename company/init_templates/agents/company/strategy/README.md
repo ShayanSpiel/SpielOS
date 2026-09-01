@@ -12,7 +12,7 @@ serves, how it is positioned, and how company outcomes are measured.
 - `measurement.md` — company evidence and metric rules.
 - `operating-thesis.md` — the product/company/content evidence flywheel.
 
-Workgroups and Workbook methods reference these files. They must not restate them.
+Departments and Skills reference these files. They must not restate them.
 Goals, deadlines, runs, and results do not belong here; they live in the
 company runtime state under `.spielos/state/`.
 

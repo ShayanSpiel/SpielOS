@@ -1,0 +1,263 @@
+"""The clean adaptive Goal loop and restart-safe scheduler boundary."""
+
+from __future__ import annotations
+
+import json
+import uuid
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from enum import Enum
+from pathlib import Path
+from typing import Any, Protocol
+
+from ..agents.core import AgentExecutor
+from ..context import GoalContext
+from ..evidence import EvidenceRepository
+from ..goals import Goal, GoalRepository
+from ..memory import MemoryRepository
+from ..resolution import ResolutionCycle, ResolutionOutcome
+from ..resolution.core import InterventionRepository
+from ..state import Database
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+class GoalStage(str, Enum):
+    OBSERVE = "OBSERVE"
+    DECIDE = "DECIDE"
+    ACT = "ACT"
+    EVALUATE = "EVALUATE"
+
+
+@dataclass(frozen=True)
+class Decision:
+    kind: str
+    description: str
+    workflow_id: str | None = None
+    context: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class Evaluation:
+    goal_complete: bool
+    metrics: dict[str, Any] = field(default_factory=dict)
+    summary: str = ""
+    strategy_learning: str | None = None
+    evidence_ids: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class GoalRun:
+    id: str
+    goal_id: str
+    sequence: int
+    stage: GoalStage
+    status: str
+    observation: dict | None = None
+    decision: Decision | None = None
+    evaluation: Evaluation | None = None
+
+
+class GoalController(Protocol):
+    def observe(self, context: GoalContext) -> dict: ...
+    def decide(self, context: GoalContext, observation: dict) -> Decision: ...
+    def evaluate(self, context: GoalContext, decision: Decision,
+                 evidence: tuple) -> Evaluation: ...
+
+
+class RunRepository:
+    def __init__(self, database: Database):
+        self.database = database
+
+    def create(self, goal_id: str) -> GoalRun:
+        with self.database.connect() as connection:
+            sequence = connection.execute(
+                "SELECT COALESCE(MAX(sequence),0)+1 FROM core_runs WHERE goal_id=?",
+                (goal_id,),
+            ).fetchone()[0]
+            run_id = f"run-{uuid.uuid4().hex[:12]}"
+            stamp = _now()
+            connection.execute("""INSERT INTO core_runs
+                VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                (run_id, goal_id, sequence, GoalStage.OBSERVE.value, "ready",
+                 None, None, None, stamp, stamp))
+        return self.get(run_id)
+
+    def get(self, run_id: str) -> GoalRun:
+        with self.database.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM core_runs WHERE id=?", (run_id,)
+            ).fetchone()
+        if row is None:
+            raise KeyError(f"unknown run: {run_id}")
+        decision_data = json.loads(row["decision_json"]) if row["decision_json"] else None
+        evaluation_data = json.loads(row["evaluation_json"]) if row["evaluation_json"] else None
+        return GoalRun(
+            row["id"], row["goal_id"], row["sequence"], GoalStage(row["stage"]),
+            row["status"],
+            json.loads(row["observation_json"]) if row["observation_json"] else None,
+            Decision(**decision_data) if decision_data else None,
+            Evaluation(**{**evaluation_data,
+                          "evidence_ids": tuple(evaluation_data.get("evidence_ids") or ())})
+            if evaluation_data else None,
+        )
+
+    def current(self, goal_id: str) -> GoalRun:
+        with self.database.connect() as connection:
+            row = connection.execute("""SELECT id FROM core_runs WHERE goal_id=?
+                ORDER BY sequence DESC LIMIT 1""", (goal_id,)).fetchone()
+        if row is None:
+            raise KeyError(f"goal has no run: {goal_id}")
+        return self.get(row[0])
+
+    def update(self, run_id: str, *, stage: GoalStage | None = None,
+               status: str | None = None, observation=None, decision=None,
+               evaluation=None) -> GoalRun:
+        current = self.get(run_id)
+        values = {
+            "stage": (stage or current.stage).value,
+            "status": status or current.status,
+            "observation": current.observation if observation is None else observation,
+            "decision": current.decision if decision is None else decision,
+            "evaluation": current.evaluation if evaluation is None else evaluation,
+        }
+        def encode(value):
+            if value is None:
+                return None
+            if hasattr(value, "__dict__"):
+                value = value.__dict__
+            return json.dumps(value)
+        with self.database.connect() as connection:
+            connection.execute("""UPDATE core_runs SET stage=?,status=?,
+                observation_json=?,decision_json=?,evaluation_json=?,updated_at=? WHERE id=?""",
+                (values["stage"], values["status"], encode(values["observation"]),
+                 encode(values["decision"]), encode(values["evaluation"]), _now(), run_id))
+        return self.get(run_id)
+
+    def ready(self) -> list[GoalRun]:
+        with self.database.connect() as connection:
+            ids = [row[0] for row in connection.execute("""SELECT r.id
+                FROM core_runs r JOIN core_goals g ON g.id=r.goal_id
+                WHERE g.status='active' AND r.status IN ('ready','running')
+                  AND r.sequence=(SELECT MAX(r2.sequence) FROM core_runs r2
+                                  WHERE r2.goal_id=r.goal_id)
+                ORDER BY r.updated_at,r.id""")]
+        return [self.get(item) for item in ids]
+
+
+class GoalRuntime:
+    """Composes isolated repositories; owns only Goal control and scheduling."""
+
+    def __init__(self, path: str | Path, controller: GoalController,
+                 executor: AgentExecutor, *, agents=None, max_local_iterations: int = 50):
+        self.database = Database(path)
+        self.controller = controller
+        self.goals = GoalRepository(self.database)
+        self.runs = RunRepository(self.database)
+        self.evidence = EvidenceRepository(self.database)
+        self.memory = MemoryRepository(self.database, self.evidence)
+        self.resolution = ResolutionCycle(
+            self.database, executor, agents=agents,
+            max_local_iterations=max_local_iterations)
+        self.interventions = InterventionRepository(self.database)
+
+    def create_goal(self, name: str, metric: str, operator: str, target: Any, *,
+                    parent_id: str | None = None, goal_id: str | None = None) -> Goal:
+        goal = self.goals.create(name, metric, operator, target,
+                                 parent_id=parent_id, goal_id=goal_id)
+        self.runs.create(goal.id)
+        return goal
+
+    def advance(self, goal_id: str) -> dict:
+        goal = self.goals.get(goal_id)
+        run = self.runs.current(goal_id)
+        if goal.status != "active" or run.status == "complete":
+            return self.status(goal_id)
+        context = self._context(goal, run)
+        if run.stage == GoalStage.OBSERVE:
+            observation = self.controller.observe(context)
+            self.runs.update(run.id, stage=GoalStage.DECIDE, status="running",
+                             observation=observation)
+        elif run.stage == GoalStage.DECIDE:
+            decision = self.controller.decide(context, run.observation or {})
+            if not isinstance(decision, Decision):
+                raise TypeError("GoalController.decide must return Decision")
+            self.runs.update(run.id, stage=GoalStage.ACT, status="running",
+                             decision=decision)
+        elif run.stage == GoalStage.ACT:
+            if run.decision is None:
+                raise RuntimeError("ACT requires a persisted Goal decision")
+            intervention = self.interventions.active_for_run(run.id)
+            if intervention is None:
+                intervention_context = dict(run.decision.context)
+                if run.decision.workflow_id:
+                    intervention_context["workflow_id"] = run.decision.workflow_id
+                intervention = self.interventions.create(
+                    goal_id=goal.id, run_id=run.id, kind=run.decision.kind,
+                    description=run.decision.description, context=intervention_context)
+            result = self.resolution.resolve(intervention.id)
+            if result.outcome == ResolutionOutcome.RETURN_TO_GOAL:
+                self.runs.update(run.id, stage=GoalStage.EVALUATE, status="running")
+            elif result.outcome == ResolutionOutcome.ESCALATE_TO_GOAL:
+                self.runs.update(run.id, stage=GoalStage.OBSERVE, status="ready",
+                                 observation={})
+            else:
+                self.runs.update(run.id, stage=GoalStage.ACT, status="waiting")
+        else:
+            if run.decision is None:
+                raise RuntimeError("EVALUATE requires a persisted Goal decision")
+            evidence = tuple(self.evidence.for_run(run.id))
+            evaluation = self.controller.evaluate(context, run.decision, evidence)
+            if not isinstance(evaluation, Evaluation):
+                raise TypeError("GoalController.evaluate must return Evaluation")
+            if evaluation.strategy_learning and not evaluation.evidence_ids:
+                raise ValueError("strategy learning requires evidence from this Run")
+            self.runs.update(run.id, status="complete", evaluation=evaluation)
+            if evaluation.strategy_learning:
+                self.memory.remember(
+                    "strategy", evaluation.strategy_learning,
+                    evidence_ids=evaluation.evidence_ids, goal_id=goal.id, run_id=run.id)
+            if evaluation.goal_complete:
+                self.goals.set_status(goal.id, "complete")
+            else:
+                self.runs.create(goal.id)
+        return self.status(goal_id)
+
+    def resume(self, goal_id: str) -> dict:
+        run = self.runs.current(goal_id)
+        if run.status == "waiting":
+            self.runs.update(run.id, status="ready")
+        return self.advance(goal_id)
+
+    def tick(self, max_advances: int = 100) -> dict:
+        advanced = []
+        for _ in range(max_advances):
+            ready = self.runs.ready()
+            if not ready:
+                break
+            progress = False
+            for run in ready:
+                before = (run.stage, run.status, run.sequence)
+                state = self.advance(run.goal_id)
+                current = self.runs.current(run.goal_id)
+                after = (current.stage, current.status, current.sequence)
+                if after != before:
+                    progress = True
+                    advanced.append(state)
+            if not progress:
+                break
+        return {"advanced": advanced, "quiescent": not self.runs.ready()}
+
+    def status(self, goal_id: str) -> dict:
+        goal = self.goals.get(goal_id)
+        run = self.runs.current(goal_id)
+        intervention = self.interventions.active_for_run(run.id)
+        return {"goal": goal, "run": run, "intervention": intervention,
+                "evidence": self.evidence.for_run(run.id)}
+
+    def _context(self, goal: Goal, run: GoalRun) -> GoalContext:
+        return GoalContext(
+            goal, run.id, tuple(self.evidence.for_run(run.id)),
+            tuple(self.memory.relevant(goal_id=goal.id)))

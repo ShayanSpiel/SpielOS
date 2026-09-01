@@ -1,10 +1,16 @@
-"""Host-first logical Connections used by Workgroup workflows."""
+"""Host-first logical Connections used by Department Workflows."""
 
 from ..runtime.models import ConnectionSpec
 
 
 _CONNECTIONS = {
     item.id: item for item in (
+        ConnectionSpec(
+            "buffer",
+            "Direct Buffer GraphQL publishing for approved content packages.",
+            ("create_draft", "schedule", "publish", "verify", "metrics", "delete"),
+            ("direct",), True, ("BUFFER_API_KEY",),
+        ),
         ConnectionSpec(
             "posthog",
             "Product and funnel analytics through the active host Connection.",

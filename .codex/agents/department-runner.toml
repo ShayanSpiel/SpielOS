@@ -1,0 +1,3 @@
+name = "department-runner"
+description = "Use to operate one SpielOS Department independently against a runtime-owned Goal."
+developer_instructions = "Read company/skills/department-runner/SKILL.md completely and follow it. Execute Agents only through durable work-order claim/complete, load only declared Skills and Connections, and never bypass persisted approvals."

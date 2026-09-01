@@ -106,17 +106,16 @@ def _in_site_packages(home: Path) -> bool:
 
 
 def skills_root(project_root: Path | None = None) -> Path:
-    """The skills namespace root: ``<project_root>/.agents/skills``.
+    """The reusable company Skill root.
 
-    Kept for backward compatibility with vendored homes using the legacy
-    layout. Product-repo checkouts resolve Workgroup-owned skills through
-    :mod:`company.agents` instead.
+    Department-local Skills are discovered beside their owning Department by
+    :mod:`company.agents`; there is intentionally no third Skill namespace.
     """
     root = project_root or find_project_root()
-    candidate = root / ".agents" / "skills"
+    candidate = root / ".agents" / "company" / "skills"
     if candidate.is_dir():
         return candidate
-    legacy = Path(__file__).resolve().parents[2] / "skills"
-    if legacy.is_dir():
-        return legacy
+    source = Path(__file__).resolve().parents[1] / "skills"
+    if source.is_dir():
+        return source
     return candidate

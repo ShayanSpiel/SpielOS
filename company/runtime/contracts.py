@@ -1,6 +1,6 @@
 """Declarative workflow contracts: goal validation and agent shortfall briefs.
 
-Workgroups declare WorkflowSpec + goal_schema. The runtime turns shortfalls
+Departments declare WorkflowSpec + goal_schema. The runtime turns shortfalls
 into durable work-order briefs without package-specific control loops.
 """
 
@@ -12,14 +12,9 @@ from ..agents import agents as installed_agents
 from .models import GoalHandler, WorkflowSpec
 
 
-def _worker(handler: GoalHandler, employee_id: str | None):
-    """Resolve a Worker from its Workgroup before consulting legacy rosters."""
-    group = getattr(handler, "workgroup", None)
-    if group and employee_id:
-        for worker in group.workers:
-            if worker.id == employee_id:
-                return worker
-    return installed_agents().get(employee_id) if employee_id else None
+def _agent(handler: GoalHandler, agent_id: str | None):
+    """Resolve one bounded Agent identity from the canonical roster."""
+    return installed_agents().get(agent_id) if agent_id else None
 
 
 def approval_interaction(goal: Any, result: Any) -> dict[str, Any]:
@@ -109,7 +104,7 @@ def validate_goal_request(handler: GoalHandler, *, metric: str,
 
     if workflows or enum:
         allowed = set(enum) if enum else {item.id for item in workflows}
-        # Workflows listed on the Workgroup remain valid even if schema enum lags.
+        # Workflows listed on the Department remain valid even if schema enum lags.
         allowed |= {item.id for item in workflows}
         workflow_id = config.get("workflow")
         if not workflow_id:
@@ -122,7 +117,7 @@ def validate_goal_request(handler: GoalHandler, *, metric: str,
                 f"workflow '{config['workflow']}' is not supported by '{handler.id}'; "
                 f"use: {', '.join(sorted(allowed))}")
 
-    # A Workgroup may declare the bounded Strategy context its workers need.
+    # A Department may declare the bounded Strategy context its Agents need.
     # Keep this opt-in and handler-owned: ordinary technical Goals must not
     # load the Strategy Kernel, while Content Goals must not silently run with
     # an empty buyer/voice context.
@@ -136,7 +131,7 @@ def validate_goal_request(handler: GoalHandler, *, metric: str,
         if not isinstance(rule, dict) or key == "workflow":
             continue
         if key not in config:
-            # required_when is enforced by Workgroups at ACT time; create only
+            # required_when is enforced by Departments at ACT time; create only
             # demands unconditionally required fields.
             if rule.get("required") and not rule.get("required_when"):
                 raise ValueError(f"config.{key} is required for '{handler.id}'")
@@ -149,7 +144,7 @@ def validate_goal_request(handler: GoalHandler, *, metric: str,
 
 
 def accepted_evidence_for(handler: GoalHandler, *, workflow: WorkflowSpec | None,
-                          metric: str | None, employee_id: str | None) -> list[str]:
+                          metric: str | None, agent_id: str | None) -> list[str]:
     """Prefer metric-specific kinds, then workflow sources, then agent produces."""
 
     metric = metric or ""
@@ -161,7 +156,7 @@ def accepted_evidence_for(handler: GoalHandler, *, workflow: WorkflowSpec | None
     else:
         kinds = []
 
-    agent = _worker(handler, employee_id)
+    agent = _agent(handler, agent_id)
     if agent and kinds:
         produces = set(agent.produces)
         narrowed = [kind for kind in kinds if kind in produces]
@@ -172,7 +167,7 @@ def accepted_evidence_for(handler: GoalHandler, *, workflow: WorkflowSpec | None
     return kinds
 
 
-def employee_for(handler: GoalHandler, workflow: WorkflowSpec | None) -> str | None:
+def agent_for(handler: GoalHandler, workflow: WorkflowSpec | None) -> str | None:
     if workflow:
         mapping = getattr(handler, "workflow_agents", None) or {}
         if workflow.id in mapping:
@@ -191,29 +186,28 @@ def agent_shortfall(handler: GoalHandler, *, goal_id: str, metric: str,
     config = config or {}
     workflow_id = workflow_id or config.get("workflow")
     workflow = workflow_by_id(handler, workflow_id)
-    employee_id = employee_for(handler, workflow)
-    if not employee_id:
-        raise ValueError(f"Workgroup '{handler.id}' has no Worker for Workflow '{workflow_id}'")
+    agent_id = agent_for(handler, workflow)
+    if not agent_id:
+        raise ValueError(f"Department '{handler.id}' has no Agent for Workflow '{workflow_id}'")
     needed = max(1, int(needed))
     accepts = accepted_evidence_for(handler, workflow=workflow, metric=metric,
-                                    employee_id=employee_id)
+                                    agent_id=agent_id)
     skills = list(workflow.skill_ids) if workflow and workflow.skill_ids else []
     if not skills:
-        agent = _worker(handler, employee_id)
+        agent = _agent(handler, agent_id)
         skills = list(agent.skill_ids) if agent else []
     connections = list(workflow.connection_ids) if workflow else []
     return {
         "action": "request_agent",
         "workflow_id": workflow.id if workflow else workflow_id,
-        "agent_id": employee_id,
-        "employee_id": employee_id,
+        "agent_id": agent_id,
         "skill_ids": skills,
         "connection_ids": connections,
         "needed": needed,
         "accepted_evidence_kinds": accepts,
         "metric": metric,
         "required_user_action": (
-            f"{employee_id} must produce {needed} validated artifact(s)"
+            f"{agent_id} must produce {needed} validated artifact(s)"
             + (f" of kind {', '.join(accepts)}" if accepts else "")),
         "next_trigger": f"company retry {goal_id}",
         "completion_evidence": (
@@ -223,7 +217,7 @@ def agent_shortfall(handler: GoalHandler, *, goal_id: str, metric: str,
 
 def enrich_work_order_source(handler: GoalHandler | None, goal: dict,
                              source: dict[str, Any]) -> dict[str, Any]:
-    """Fill missing Worker/evidence fields from the Workgroup catalog."""
+    """Fill missing Agent/evidence fields from the Department catalog."""
 
     out = dict(source)
     if handler is None:
@@ -233,15 +227,15 @@ def enrich_work_order_source(handler: GoalHandler | None, goal: dict,
         workflow = workflow_by_id(handler, workflow_id)
     except ValueError:
         workflow = None
-    employee_id = out.get("agent_id") or out.get("employee_id") or employee_for(handler, workflow)
-    if employee_id:
-        out.setdefault("agent_id", employee_id)
-        out.setdefault("employee_id", employee_id)
+    agent_id = out.get("agent_id") or out.get("employee_id") or agent_for(handler, workflow)
+    if agent_id:
+        out["agent_id"] = agent_id
+        out.pop("employee_id", None)
     if not out.get("accepted_evidence_kinds") and not out.get("accepts_evidence"):
         accepts = accepted_evidence_for(
             handler, workflow=workflow,
             metric=out.get("metric") or goal.get("metric"),
-            employee_id=employee_id)
+            agent_id=agent_id)
         if accepts:
             out["accepted_evidence_kinds"] = accepts
     if workflow:

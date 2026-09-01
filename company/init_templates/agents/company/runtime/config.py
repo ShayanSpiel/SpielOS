@@ -21,7 +21,7 @@ COMPANY_ROOT = Path(__file__).resolve().parents[1]
 USER_CONFIG_PATH = COMPANY_ROOT / "config.user.json"
 
 # Runtime version: defined once here; every other module imports it.
-VERSION = "7.3.0"
+VERSION = "8.0.0"
 
 # Generic defaults. Values mirror the current SpielOS deployment so behavior
 # is unchanged whether or not config.user.json exists.
@@ -38,8 +38,8 @@ GENERIC_DEFAULTS: dict = {
         "all_children_achieved", "achieved_children",
         "reply_rate", "sales", "booked_calls",
     ],
-    # Attention capability -> catalog Worker/Workflow mapping.
-    "capability_employees": {"lead_research": "lead-researcher"},
+    # Attention capability -> catalog Agent/Workflow mapping.
+    "capability_agents": {"lead_research": "lead-researcher"},
     "capability_workflows": {"lead_research": "lead-research"},
     # Resource-conflict channel groups: owners that share one exclusive
     # channel and cannot run concurrently. Single source consumed by the
@@ -88,8 +88,11 @@ def director_metrics() -> tuple:
     return tuple(get("director_metrics") or ())
 
 
-def capability_employees() -> dict:
-    return dict(get("capability_employees") or {})
+def capability_agents() -> dict:
+    value = get("capability_agents")
+    if value is None:  # read retired user configuration without re-emitting it
+        value = get("capability_employees")
+    return dict(value or {})
 
 
 def capability_workflows() -> dict:

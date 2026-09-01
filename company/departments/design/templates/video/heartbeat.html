@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<!--
+  Canonical Design Department source template — ARCHETYPE: heartbeat.
+  VIDEO composition, round 2 (change-8a73ee327b, owner feedback 2026-08-19):
+
+  CENTERED COMPOSITION — the whole lab is a HORIZONTALLY CENTERED column:
+    1) animated inline ECG pulse (primary, smooth looping draw + lub-dub
+       beat pulse, soft primary glow) — centered
+    2) NORTH STAR in the ACTUAL website style (src/components/live/
+       LiveStatus.astro): bx-bullseye icon-xl in a 40px rounded-md
+       bg-primary-soft text-primary tile + uppercase tracking-widest primary
+       kicker + bold foreground-strong goal + muted metric line — centered
+    3) THE BIG GOAL LINE = the ACTUAL website OperatingLoop
+       (src/components/architecture/OperatingLoop.astro): GOAL → OBSERVE →
+       DECIDE → ACT → EVALUATE, no card wrapper, no card background. Site
+       node treatment: 44px rounded-md border bg-panel-raised, first three
+       nodes border-primary text-primary with 24px primary-soft glow, last
+       two border-border text-muted-foreground; labels text-xs semibold
+       (foreground-strong / foreground-muted); connector = 2px border-strong
+       track at 10–90% + primary→accent gradient progress to 50%
+       (inset-inline-end 50%), exactly as the site loop rail.
+    4) ONE muted secondary line — centered
+    5) flat detail-icon row (Runs / Decisions / Evidence / Approvals, no
+       tiles) — centered; icons follow site LiveStats glyph choices.
+  Vertical: band top (titles, centered — "everything to center"), lab fills
+  the frame to ~88cqh so there is no 200px+ dead bottom band; balanced
+  'intentional spacing' throughout.
+
+  The right-side journey signature keeps the SAME family wandering curve but
+  is translated +40x/+20y so the centered titles/lab never collide with it.
+  Kept: headline band per scene (centered), final CTA scene, element IDs
+  (northstar, row-run, hbeat-stats, stat0-3, div1-2), scene_timing.i
+  measured-schedule contract, prefers-reduced-motion.
+
+  Measured scene schedule key: scene_timing.i in narration.json. Until
+  tts-gemini.js writes it (speech first, then scenes) the frame stays dark —
+  never a hardcoded window.
+-->
+<html lang="en" data-theme="gruvbox-dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SpielOS — Heartbeat</title>
+<link rel="stylesheet" href="/.agents/company/departments/design/system/production.css">
+<link rel="stylesheet" href="/.agents/company/departments/design/templates/video/brand-motion.css">
+<link rel="stylesheet" href="/node_modules/boxicons/css/boxicons.min.css">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: var(--background); }
+
+:root {
+  --bg0_h: var(--background); --bg0: var(--panel); --bg0_s: var(--panel-raised); --bg1: var(--panel-strong);
+  --bg2: var(--border-strong); --fg0: var(--foreground-strong); --fg1: var(--foreground); --fg3: var(--foreground-muted); --fg4: var(--muted-foreground);
+  --blue: var(--primary); --green: var(--success); --yellow: var(--warning); --red: var(--destructive); --aqua: var(--accent);
+  --font: var(--font-sans); --mono: var(--font-mono);
+  --loop-node: clamp(42px, 3.6cqw, 54px);
+}
+i.bx, i.bxl, i.bxs { font-family: "boxicons" !important; font-style: normal; font-weight: normal; font-variant: normal; text-transform: none; line-height: 1; -webkit-font-smoothing: antialiased; }
+body { font-family: var(--font); color: var(--fg1); -webkit-font-smoothing: antialiased; }
+
+/* ═══ SCENE SYSTEM ═══ */
+.scene { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; opacity: 0; pointer-events: none; z-index: 10; }
+.scene.active { opacity: 1; pointer-events: auto; }
+
+/* ═══ BACKGROUND ═══ */
+.bg-grid { position: absolute; inset: 0; opacity: 0; background-image: linear-gradient(var(--fg1) 1px, transparent 1px), linear-gradient(90deg, var(--fg1) 1px, transparent 1px); background-size: 64px 64px; transition: opacity 1s ease; }
+.bg-grid.show { opacity: 0.03; }
+
+/* ═══ TEXT REVEAL ═══ */
+.r { opacity: 0; transform: translateY(22px); filter: blur(3px); transition: opacity 0.6s cubic-bezier(0.16,1,0.3,1), transform 0.6s cubic-bezier(0.16,1,0.3,1), filter 0.4s cubic-bezier(0.16,1,0.3,1); }
+.r.show { opacity: 1; transform: translateY(0); filter: blur(0); }
+.d1 { transition-delay: 0.07s; } .d2 { transition-delay: 0.14s; } .d3 { transition-delay: 0.21s; }
+
+/* ═══ HEADLINE BAND — centered over the frame (round 2: everything center) ═══ */
+.band { position: absolute; left: 50%; top: 6cqh; width: 46cqw; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; text-align: center; z-index: 10; }
+.band-badge { display: inline-flex; align-items: center; gap: 10px; margin-bottom: 1.1cqh; padding: 0.9cqh 1.4cqw; border: 1px solid var(--border-strong); border-radius: var(--radius-md); background: var(--panel); font-family: var(--font); font-size: clamp(0.75rem, 1.05vw, 1rem); font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--fg4); }
+.band-badge i { color: var(--primary); font-size: clamp(16px, 1.6vw, 22px); }
+.band-main { font-family: var(--font); font-size: clamp(2.3rem, 3.6vw, 3.5rem); font-weight: 800; color: var(--fg0); line-height: 1.06; letter-spacing: -0.04em; }
+.band-main .accent { color: var(--primary); }
+.band-sub { font-family: var(--font); font-size: clamp(1rem, 1.5vw, 1.4rem); color: var(--fg3); margin-top: 1.2cqh; line-height: 1.5; font-weight: 400; max-width: 40ch; }
+
+/* ═══ HEARTBEAT LAB — ONE centered vertical stack, NO cards ═══
+   Every row shares the same center axis (left:50% translateX(-50%));
+   nothing is left-hugging or right-pushed. A soft primary radial glow sits
+   behind the stack (flat color, no panel, no border). */
+.lab-glow { position: absolute; left: 50%; top: 50%; width: 56cqw; height: 78cqh; transform: translate(-50%, -50%); background: radial-gradient(closest-side, var(--primary-soft), transparent 72%); opacity: .35; z-index: 5; pointer-events: none; }
+.lab { position: absolute; left: 50%; top: 35cqh; width: 38cqw; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; text-align: center; z-index: 20; }
+
+.hbeat-hero { display: flex; flex-direction: column; align-items: center; gap: 3cqh; width: 100%; opacity: 0; transform: translateY(10px); transition: opacity 0.6s ease, transform 0.6s ease; }
+.hbeat-hero.show { opacity: 1; transform: translateY(0); }
+
+/* Inline heartbeat icon — compact ECG/pulse line in primary, no box, with a
+   smooth looping stroke-draw + lub-dub beat pulse + soft primary glow. */
+.hbeat-pulse { display: block; width: clamp(140px, 13cqw, 200px); height: auto; overflow: visible; filter: drop-shadow(0 0 7px var(--primary-soft)); animation: hb-beat 3s cubic-bezier(.4,0,.2,1) infinite; }
+.hbeat-ecg-base { fill: none; stroke: var(--fg4); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; opacity: .3; }
+.hbeat-ecg { fill: none; stroke: var(--primary); stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: var(--ecg-len, 280); stroke-dashoffset: var(--ecg-len, 280); animation: hb-draw 3s infinite; }
+@keyframes hb-draw {
+  0%   { stroke-dashoffset: var(--ecg-len, 280); animation-timing-function: cubic-bezier(.65,0,.35,1); }
+  40%  { stroke-dashoffset: 0; animation-timing-function: cubic-bezier(.4,0,.2,1); }
+  70%  { stroke-dashoffset: 0; animation-timing-function: ease-in; }
+  82%  { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: var(--ecg-len, 280); }
+}
+@keyframes hb-beat {
+  0%, 100% { transform: scale(1); }
+  46%      { transform: scale(1); }
+  54%      { transform: scale(1.06); }
+  60%      { transform: scale(.995); }
+  66%      { transform: scale(1.03); }
+  72%      { transform: scale(1); }
+}
+
+/* ── NORTH STAR — ACTUAL website icon style (LiveStatus.astro on /live):
+   bx-bullseye icon-xl in 40px rounded-md bg-primary-soft tile, uppercase
+   tracking-widest primary kicker, bold foreground-strong goal,
+   muted metric line. No custom boxed variant, no invented icon. ── */
+.ns-block { display: flex; flex-direction: column; align-items: center; text-align: center; gap: .7cqh; width: 100%; }
+.ns-tile { display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: var(--radius-md); background: var(--primary-soft); color: var(--primary); }
+.ns-tile i { font-size: 20px; } /* equals the site's icon-xl */
+.ns-kicker { font-family: var(--font); font-size: clamp(10px, .85vw, 12px); font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--primary); }
+.hbeat-goal { font-family: var(--font); font-size: clamp(1.5rem, 2.4vw, 2.3rem); font-weight: 800; color: var(--fg0); letter-spacing: -0.02em; line-height: 1.08; }
+.ns-metric { font-family: var(--font); font-size: clamp(13px, 1.05vw, 16px); font-weight: 500; color: var(--fg4); }
+
+/* ── THE BIG GOAL LINE — ACTUAL website OperatingLoop treatment
+   (src/components/architecture/OperatingLoop.astro), WITHOUT any card
+   wrapper and WITHOUT a card background. Nodes + labels + 2px track
+   (border-strong base, primary→accent gradient progress to 50%) exactly
+   like the site loop rail. ── */
+.hbeat-loop { position: relative; width: 100%; margin-top: 2.6cqh; }
+.loop-rail { position: relative; display: flex; justify-content: space-between; align-items: flex-start; }
+.loop-rail::before, .loop-rail::after { content: ""; position: absolute; top: calc(var(--loop-node) / 2 - 1px); inset-inline-start: 10%; inset-inline-end: 10%; height: 2px; border-radius: var(--radius-md); z-index: 0; }
+.loop-rail::before { background: var(--border-strong); }
+.loop-rail::after { inset-inline-end: 50%; background: linear-gradient(to right, var(--primary), var(--accent)); }
+.loop-station { display: flex; flex-direction: column; align-items: center; gap: .7cqh; }
+.loop-node { position: relative; z-index: 2; display: flex; align-items: center; justify-content: center; width: var(--loop-node); height: var(--loop-node); border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--panel-raised); color: var(--muted-foreground); }
+.loop-node.on { border-color: var(--primary); color: var(--primary); box-shadow: 0 0 24px var(--primary-soft); }
+.loop-node i { font-size: 20px; }
+.loop-label { font-family: var(--font); font-size: clamp(10px, .8vw, 12px); font-weight: 600; letter-spacing: .02em; color: var(--fg3); }
+.loop-label.on { color: var(--fg0); }
+
+/* ONE muted secondary line — centered. */
+.hbeat-run { opacity: 0; transform: translateY(10px); transition: opacity 0.6s ease, transform 0.6s ease; }
+.hbeat-run.show { opacity: 1; transform: translateY(0); }
+.hbeat-secondary { font-family: var(--font); font-size: clamp(.95rem, 1.25vw, 1.1rem); font-weight: 500; color: var(--fg3); line-height: 1.5; }
+
+/* Hairline separators keep the open bands structured (allowed; no cards). */
+.hbeat-divider { width: 100%; height: 1px; background: var(--border); opacity: 0.55; margin: 2.2cqh 0; }
+
+/* Flat detail record — icon + label row. NO tiles, no soft squares,
+   centered, evenly spaced. Icons follow site LiveStats glyph choices. */
+.hbeat-stats { display: flex; align-items: center; justify-content: center; gap: clamp(24px, 3cqw, 44px); margin-top: 1cqh; opacity: 0; transform: translateY(10px); transition: opacity 0.6s ease, transform 0.6s ease; }
+.hbeat-stats.show { opacity: 1; transform: translateY(0); }
+.hbeat-stat { display: inline-flex; align-items: center; gap: 0.6cqw; }
+.hbeat-stat i { font-size: clamp(20px, 1.7vw, 26px); }
+.hbeat-stat .l { font-family: var(--font); font-size: clamp(.68rem, .9vw, .85rem); font-weight: 600; letter-spacing: .05em; color: var(--fg4); text-transform: uppercase; }
+.hbeat-stat.c1 i { color: var(--primary); }
+.hbeat-stat.c2 i { color: var(--accent); }
+.hbeat-stat.c3 i { color: var(--purple); }
+.hbeat-stat.c4 i { color: var(--success); }
+
+/* ═══ CTA (final scene) ═══ */
+.cta { margin: auto; z-index: 30; text-align: center; width: 88%; }
+.cta-badge { display: inline-flex; align-items: center; gap: 8px; padding: 0.8cqh 1.4cqw; border: 1px solid var(--border-strong); border-radius: 999px; background: var(--panel); font-family: var(--font); font-size: clamp(0.72rem, 1vw, 0.95rem); font-weight: 500; color: var(--fg4); margin-bottom: 1.4cqh; }
+.cta-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); animation: pulse 2s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+.cta-title { font-family: var(--font); font-size: clamp(2.4rem, 5vw, 4rem); font-weight: 800; color: var(--fg0); letter-spacing: -0.04em; line-height: 1.05; }
+.cta-title .accent { color: var(--primary); }
+.cta-line { display: block; }
+.cta-url { margin-top: 1.3rem; display: inline-flex; align-items: center; gap: 12px; padding: clamp(12px, 1.5vw, 18px) clamp(22px, 2.8vw, 36px); border: 1px solid var(--primary); border-radius: var(--radius-md); background: var(--primary); font-family: var(--font); font-size: clamp(0.9rem, 1.5vw, 1.2rem); font-weight: 600; color: var(--primary-foreground); box-shadow: 0 10px 30px rgba(0,0,0,0.35); }
+.cta-url .p { color: var(--primary-foreground); font-weight: 700; opacity: .85; }
+
+/* ═══ THUMBNAIL STILL TITLE ═══ */
+.thumb-title { display: none; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 60; max-width: 82%; padding: clamp(18px, 3vw, 34px) clamp(28px, 4.5vw, 56px); border-radius: var(--radius-md); background: rgba(40, 40, 40, 0.72); backdrop-filter: blur(6px); border: 1px solid var(--border-strong); font-family: var(--font); font-weight: 800; font-size: clamp(3.2rem, 7.5vw, 6.5rem); line-height: 1.02; letter-spacing: -0.04em; color: var(--fg0); text-align: center; }
+.thumb-title.show { display: block; }
+
+/* ═══ RESPONSIVE — PORTRAIT (1080x1920) ═══ */
+@media (orientation: portrait) {
+  :root { --loop-node: clamp(48px, 4.8cqw, 60px); }
+  .journey-portrait .journey-path { stroke-width: 4; stroke-dasharray: 18 14; }
+  .journey-portrait .journey-path-fill { stroke-width: 5; }
+  .band { left: 50%; top: 5cqh; width: 76cqw; }
+  .band-badge { font-size: 1rem; padding: 1cqh 2.6cqw; }
+  .band-main { font-size: clamp(2.6rem, 7cqw, 3.8rem); }
+  .band-sub { font-size: 1.3rem; margin-top: 1.6cqh; }
+  .lab-glow { width: 74cqw; height: 62cqh; }
+  .lab { left: 50%; top: 27cqh; width: 66cqw; }
+  .hbeat-hero { gap: 5cqh; }
+  .hbeat-pulse { width: clamp(200px, 28cqw, 300px); }
+  .ns-block { gap: 2cqh; }
+  .ns-tile { width: 52px; height: 52px; }
+  .ns-tile i { font-size: 26px; }
+  .ns-kicker { font-size: clamp(12px, 1.1cqw, 16px); }
+  .hbeat-goal { font-size: clamp(2rem, 6cqw, 2.8rem); }
+  .ns-metric { font-size: 1.25rem; }
+  .hbeat-loop { margin-top: 5cqh; }
+  .loop-station { gap: 1cqh; }
+  .loop-node i { font-size: 28px; }
+  .loop-label { font-size: clamp(13px, 1.6cqw, 16px); }
+  .hbeat-secondary { font-size: 1.35rem; }
+  .hbeat-divider { margin: 3.4cqh 0; }
+  .hbeat-stats { gap: clamp(30px, 4cqw, 56px); }
+  .hbeat-stat { gap: 0.9cqw; }
+  .hbeat-stat i { font-size: clamp(26px, 3.4cqw, 34px); }
+  .hbeat-stat .l { font-size: 1rem; }
+  .cta-badge { font-size: 1.1rem; padding: 1cqh 2.6cqw; }
+  .cta-title { font-size: clamp(3rem, 8.5cqw, 4.6rem); }
+  .cta-url { font-size: clamp(1.3rem, 2.8cqw, 1.7rem); padding: 20px 34px; }
+}
+
+/* Faded stations after ring hit — completed travel reads as clean stroke */
+.journey-station.hit { opacity: 0 !important; transition: opacity 0.4s ease 0.3s !important; }
+
+/* Reduced motion: ECG fully drawn, no loop, no pulse. */
+@media (prefers-reduced-motion: reduce) {
+  .hbeat-pulse, .hbeat-ecg { animation: none !important; }
+  .hbeat-ecg { stroke-dashoffset: 0; }
+}
+</style>
+</head>
+<body>
+
+<div class="bg-grid" id="bg-grid"></div>
+
+<!-- ═══ JOURNEY LINE — right side (landscape), right edge (portrait). The
+     centered lab column stays LEFT/clear of this line. Same family wandering
+     curve; in round 2 the landscape path is translated +40x/+20y only so the
+     centered titles and lab never collide with the signature. ═══ -->
+<svg class="journey-svg journey-landscape" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+  <path id="journey-bg" class="journey-path" d="M1310,110 C1430,260 1190,400 1330,560 C1470,720 1250,850 1390,980 C1480,1040 1660,990 1820,970"/>
+  <path id="journey-fill" class="journey-path-fill" d="M1310,110 C1430,260 1190,400 1330,560 C1470,720 1250,850 1390,980 C1480,1040 1660,990 1820,970"/>
+  <g class="journey-station" id="st1" transform="translate(1310,110)"><g class="station-scale"><circle class="station-ring" cx="0" cy="0" r="14"/><circle r="7" style="fill:var(--primary)"/></g></g>
+  <g class="journey-station" id="st2" transform="translate(1330,560)"><g class="station-scale"><circle class="station-ring" cx="0" cy="0" r="14"/><circle r="7" style="fill:var(--primary)"/></g></g>
+  <g class="journey-station" id="st3" transform="translate(1390,980)"><g class="station-scale"><circle class="station-ring" cx="0" cy="0" r="14"/><circle r="7" style="fill:var(--primary)"/></g></g>
+  <g class="journey-goal" id="journey-goal" transform="translate(1820,970)">
+    <g class="goal-mark"><circle class="goal-ring" r="30"/><circle class="goal-ring-inner" r="17"/><circle class="goal-core" r="6"/></g>
+  </g>
+</svg>
+
+<svg class="journey-svg journey-portrait" viewBox="0 0 1080 1920" preserveAspectRatio="none" aria-hidden="true">
+  <path id="portrait-journey-bg" class="journey-path" d="M975,80 C905,230 1030,360 955,520 C880,680 1010,820 935,980 C860,1140 990,1280 920,1440 C860,1580 970,1720 940,1850"/>
+  <path id="portrait-journey-fill" class="journey-path-fill" d="M975,80 C905,230 1030,360 955,520 C880,680 1010,820 935,980 C860,1140 990,1280 920,1440 C860,1580 970,1720 940,1850"/>
+  <g class="journey-station" id="pst1" transform="translate(975,80)"><g class="station-scale"><circle class="station-ring" cx="0" cy="0" r="14"/><circle r="7" style="fill:var(--primary)"/></g></g>
+  <g class="journey-station" id="pst2" transform="translate(955,520)"><g class="station-scale"><circle class="station-ring" cx="0" cy="0" r="14"/><circle r="7" style="fill:var(--primary)"/></g></g>
+  <g class="journey-station" id="pst3" transform="translate(935,980)"><g class="station-scale"><circle class="station-ring" cx="0" cy="0" r="14"/><circle r="7" style="fill:var(--primary)"/></g></g>
+  <g class="journey-goal" id="portrait-goal" transform="translate(940,1850)">
+    <circle class="goal-ring" r="46"/><circle class="goal-ring-inner" r="27"/><circle class="goal-core" r="8"/>
+  </g>
+</svg>
+
+<!-- Thumbnail still title — populated ONLY by render-video.js --still. -->
+<div class="thumb-title" id="thumb-title"></div>
+
+<div class="video-brand-footer"><span class="brand-lockup"><img src="/public/assets/favicons/favicon.svg" alt="">spielos.xyz</span></div>
+
+<!-- ═══ HEARTBEAT LAB — ONE centered vertical stack, NO cards.
+     Every row shares the same center axis; nothing is left-hugging or
+     right-pushed. ═══ -->
+<div class="lab-glow"></div>
+<div class="lab" id="hbeat">
+  <!-- NORTH STAR: animated ECG icon + website-style north star + the loop
+       line (the big goal line in actual OperatingLoop treatment) -->
+  <div class="hbeat-hero" id="northstar">
+    <svg class="hbeat-pulse" viewBox="0 0 200 60" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+      <path class="hbeat-ecg-base" d="M6,34 H60 L66,28 L70,34 L76,38 L80,14 L86,38 L92,26 L96,34 H194"/>
+      <path class="hbeat-ecg" id="ecg" d="M6,34 H60 L66,28 L70,34 L76,38 L80,14 L86,38 L92,26 L96,34 H194"/>
+    </svg>
+
+    <div class="ns-block">
+      <span class="ns-tile" aria-hidden="true"><i class="bx bx-bullseye icon-xl"></i></span>
+      <span class="ns-kicker">North star</span>
+      <div class="hbeat-goal" id="star-title">Reply rate above 30%</div>
+      <span class="ns-metric">Booked calls ≥ 3</span>
+    </div>
+
+    <div class="hbeat-loop" id="loop-line" role="img" aria-label="GOAL, OBSERVE, DECIDE, ACT, EVALUATE">
+      <div class="loop-rail">
+        <div class="loop-station"><div class="loop-node on"><i class="bx bx-bullseye"></i></div><span class="loop-label on">Goal</span></div>
+        <div class="loop-station"><div class="loop-node on"><i class="bx bx-search"></i></div><span class="loop-label on">Observe</span></div>
+        <div class="loop-station"><div class="loop-node on"><i class="bx bx-task"></i></div><span class="loop-label on">Decide</span></div>
+        <div class="loop-station"><div class="loop-node"><i class="bx bx-play"></i></div><span class="loop-label">Act</span></div>
+        <div class="loop-station"><div class="loop-node"><i class="bx bx-check-square"></i></div><span class="loop-label">Evaluate</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="hbeat-divider" id="div1"></div>
+
+  <!-- HEARTBEAT run — ONE muted secondary line (no chip; CTA scene invites) -->
+  <div class="hbeat-run" id="row-run">
+    <div class="hbeat-secondary" id="run-title">Three booked calls a day · Updated after every run</div>
+  </div>
+
+  <div class="hbeat-divider" id="div2"></div>
+
+  <!-- THE RECORD — flat detail icons, no tiles, evenly spaced, centered row -->
+  <div class="hbeat-stats" id="hbeat-stats">
+    <div class="hbeat-stat c1" id="stat0"><i class="bx bx-run"></i><span class="l">Runs</span></div>
+    <div class="hbeat-stat c2" id="stat1"><i class="bx bx-task"></i><span class="l">Decisions</span></div>
+    <div class="hbeat-stat c3" id="stat2"><i class="bx bx-file"></i><span class="l">Evidence</span></div>
+    <div class="hbeat-stat c4" id="stat3"><i class="bx bx-check-shield"></i><span class="l">Approvals</span></div>
+  </div>
+</div>
+
+<!-- S1: HEADLINE + NORTH STAR -->
+<div class="scene" id="s1">
+  <div class="band">
+    <div class="band-badge r" id="h0"><i class="bx bx-bullseye"></i> ONE CARD, LIVE</div>
+    <div class="band-main r" id="h1">Your work, <span class="accent">live on one card.</span></div>
+    <div class="band-sub r d1" id="h2">The goal. The run. The record.</div>
+  </div>
+</div>
+
+<!-- S2: RUN ROW -->
+<div class="scene" id="s2">
+  <div class="band">
+    <div class="band-main r" id="g1">Pick the goal. <span class="accent">It runs.</span></div>
+    <div class="band-sub r d1" id="g2">You watch the numbers move.</div>
+  </div>
+</div>
+
+<!-- S3: RECORD -->
+<div class="scene" id="s3">
+  <div class="band">
+    <div class="band-main r" id="w1">No more <span class="accent">asking for updates.</span></div>
+    <div class="band-sub r d1" id="w2">Runs, decisions, records — in one place.</div>
+  </div>
+</div>
+
+<!-- S4: CTA -->
+<div class="scene" id="s4">
+  <div class="cta">
+    <div class="cta-badge r" id="ct0"><span class="cta-dot"></span> AI agent implementation</div>
+    <div class="cta-title r d1" id="ct1"><span class="cta-line">Stop chasing</span><span class="cta-line accent">updates.</span></div>
+    <div class="cta-url r d2" id="ct2"><span class="p">$</span> spielos.xyz/services</div>
+  </div>
+</div>
+
+<script>
+window.__t=0;window.__fps=30;window.__duration=15;
+window.__setFrame=function(f,fps){window.__fps=fps||30;window.__t=f/window.__fps};
+
+/* Measured scene schedule (owner contract: speech first, then scenes).
+   Archetype key "i" in narration.json; doesn't exist yet, so the frame
+   stays dark until a measured schedule is written — never a hardcoded
+   window. */
+window.__timing=null;
+window.__timingError=false;
+fetch('/.agents/company/departments/design/templates/video/narration.json')
+  .then(function(r){return r.json()})
+  .then(function(d){
+    var tm=(d.scene_timing&&d.scene_timing.i)||null;
+    if(tm&&tm.voice&&tm.scenes&&tm.scenes.length) window.__timing=tm; else window.__timingError=true;
+  })
+  .catch(function(){window.__timingError=true});
+
+window.__setStillTitle=function(text){
+  var el=document.getElementById('thumb-title');
+  if(!el)return;
+  el.textContent=text||'';
+  el.classList.toggle('show', !!(text&&text.trim()));
+};
+
+function act(id){document.querySelectorAll('.scene').forEach(function(s){s.classList.toggle('active',s.id===id)})}
+function tog(id,v){var e=document.getElementById(id);if(e)e.classList.toggle('show',v)}
+
+/* Journey line setup */
+var pathFill=document.getElementById('journey-fill');
+var pathBg=document.getElementById('journey-bg');
+var pathLen=pathFill.getTotalLength();
+if(!pathLen||pathLen<1)pathLen=1200;
+pathFill.style.setProperty('--path-len',pathLen);
+pathFill.style.strokeDasharray=pathLen;
+pathFill.style.strokeDashoffset=pathLen;
+var portraitFill=document.getElementById('portrait-journey-fill');
+var portraitBg=document.getElementById('portrait-journey-bg');
+var portraitLen=portraitFill.getTotalLength();
+if(!portraitLen||portraitLen<1)portraitLen=1200;
+portraitFill.style.setProperty('--path-len',portraitLen);
+portraitFill.style.strokeDasharray=portraitLen;
+portraitFill.style.strokeDashoffset=portraitLen;
+
+/* ECG inline icon: measure the pulse so the looping stroke-draw uses the
+   exact dash length (CSS falls back to 280 while JS is unavailable). */
+(function(){
+  var ecg=document.getElementById('ecg');
+  if(ecg){
+    try{ var len=ecg.getTotalLength(); if(len>0) ecg.style.setProperty('--ecg-len',len); }
+    catch(e){ /* keep CSS default */ }
+  }
+})();
+
+/* Stations ride the path: st1..st3 ↔ scenes 1..3, goal at the line end.
+   A 4-scene schedule has no scene 4, so the goal mark carries the last leg. */
+var stationDefs=[
+  {land:'st1',port:'pst1',scene:1,color:'#458588'},
+  {land:'st2',port:'pst2',scene:2,color:'#458588'},
+  {land:'st3',port:'pst3',scene:3,color:'#458588'}
+];
+var lineEnd=14,placed=false,fired={},lastStationFrac=0.68;
+
+function placeStations(){
+  var sc=window.__timing.scenes;
+  lineEnd=sc[sc.length-1].end;
+  stationDefs.forEach(function(sd){
+    var frac=Math.min(sc[sd.scene].start/lineEnd,1);
+    var lp=pathFill.getPointAtLength(frac*pathLen);
+    document.getElementById(sd.land).setAttribute('transform','translate('+lp.x.toFixed(1)+','+lp.y.toFixed(1)+')');
+    var pp=portraitFill.getPointAtLength(frac*portraitLen);
+    document.getElementById(sd.port).setAttribute('transform','translate('+pp.x.toFixed(1)+','+pp.y.toFixed(1)+')');
+    sd.frac=frac;
+    if(frac>lastStationFrac)lastStationFrac=frac;
+  });
+  placed=true;
+}
+
+function setCard(idx){
+  /* Band-by-band fill: S1 north star, S2 run row, S3 record, S4 dim. */
+  tog('northstar', idx>=0);
+  tog('div1', idx>=0);
+  tog('row-run', idx>=1);
+  tog('div2', idx>=1);
+  var recordShown=idx>=2;
+  var grid=document.getElementById('hbeat-stats');
+  if(grid)grid.classList.toggle('show',recordShown);
+  for(var i=0;i<4;i++){
+    var st=document.getElementById('stat'+i);
+    if(st)st.classList.toggle('show',recordShown);
+  }
+  var lab=document.getElementById('hbeat');
+  if(lab)lab.style.opacity=idx===3?'0':'1';
+}
+
+function tick(){
+  var t=window.__t;
+  if(!window.__timing){ requestAnimationFrame(tick); return; }
+  if(!placed) placeStations();
+  var sc=window.__timing.scenes;
+
+  document.getElementById('bg-grid').classList.toggle('show',t>0.3);
+
+  var progress=Math.min(t/lineEnd,1);
+  /* Completed travel is solid primary; the route ahead stays muted and
+     dashed. The fill never crosses the last milestone — the whole run from
+     the last station to the bullseye reads as the route ahead. */
+  var fillProgress=Math.min(progress,lastStationFrac);
+  pathBg.classList.toggle('show',t>.3);
+  pathFill.style.strokeDashoffset=pathLen*(1-fillProgress);
+  portraitBg.classList.toggle('show',t>.3);
+  portraitFill.style.strokeDashoffset=portraitLen*(1-fillProgress);
+
+  stationDefs.forEach(function(sd){
+    if(!fired[sd.land]&&progress>=sd.frac){
+      fired[sd.land]=true;
+      var el=document.getElementById(sd.land);
+      el.classList.add('show');
+      var ring=el.querySelector('.station-ring');
+      if(ring)ring.classList.add('hit');
+      var pel=document.getElementById(sd.port);
+      pel.classList.add('show');
+      var pring=pel.querySelector('.station-ring');
+      if(pring)pring.classList.add('hit');
+    }
+  });
+  var goalReached=progress>=1;
+  document.getElementById('journey-goal').classList.toggle('show',goalReached);
+  document.getElementById('portrait-goal').classList.toggle('show',goalReached);
+
+  var idx=-1;
+  for(var i=0;i<sc.length;i++){
+    if(t>=sc[i].start&&(i===sc.length-1||t<sc[i+1].start)){idx=i;break;}
+  }
+  var s0=idx>=0?sc[idx].start:0;
+  setCard(idx);
+
+  if(idx===0){act('s1');tog('h0',t>s0+0.15);tog('h1',t>s0+0.4);tog('h2',t>s0+0.9)}
+  if(idx===1){act('s2');tog('g1',t>s0+0.3);tog('g2',t>s0+0.8)}
+  if(idx===2){act('s3');tog('w1',t>s0+0.3);tog('w2',t>s0+0.8)}
+  if(idx===3){act('s4');tog('ct0',t>s0+0.05);tog('ct1',t>s0+0.2);tog('ct2',t>s0+0.45)}
+  if(idx<0)act('none');
+
+  requestAnimationFrame(tick);
+}
+tick();
+</script>
+</body>
+</html>

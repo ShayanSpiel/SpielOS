@@ -1,0 +1,23 @@
+{
+  "task": {
+    "audience": null,
+    "goal": null,
+    "idea": null,
+    "mode": null
+  },
+  "state": {
+    "facts": [],
+    "observations": [],
+    "inferences": [],
+    "unknowns": []
+  },
+  "evidence": [],
+  "source": [],
+  "output": {
+    "artifact": null,
+    "platform": null,
+    "medium": null,
+    "length": null
+  },
+  "constraints": []
+}

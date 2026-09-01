@@ -6,43 +6,59 @@ SpielOS has one durable company loop:
 GOAL → OBSERVE → DECIDE → ACT → EVALUATE
 ```
 
-The runtime owns Goals, runs, approvals, evidence, work orders, notifications, and evaluation. Chat hosts are clients; closing a session does not discard company state.
+The Goal runtime owns the adaptive control loop and scheduler. Goals, Resolution,
+Workflows, WorkOrders, Evidence, and Memory own their persistence over one SQLite
+database. Chat hosts are clients; closing a session does not discard state.
 
 ## Vocabulary
 
 | Term | Meaning |
 |---|---|
 | Goal | Measurable company outcome owned by the runtime |
-| Workgroup | Installable worker-owned capability |
-| Workflow | Bounded playbook inside a Workgroup |
-| Worker | Executor that performs one declared workflow |
-| Skill | Reusable method a Worker follows |
+| Department | Installable Agent-owned capability |
+| Workflow | Bounded playbook inside a Department |
+| WorkOrder | Durable exact unit of work created by Resolution |
+| Agent | Replaceable executor that performs a WorkOrder |
+| Skill | Reusable method an Agent follows |
 | Connection | Authorized access to an external or local system |
 | Artifact | Output or evidence from a run |
 
 ## Universal vocabulary
 
-The terms above are the only public layers. The runtime owns the loop; a Workgroup supplies a capability; a Worker executes its assigned Workflow; Skills and Connections are declared inputs; Artifacts are the durable outputs.
+The terms above are the public layers. The runtime owns the Goal loop; Resolution
+owns execution; a Department supplies capability; an Agent executes a WorkOrder;
+Skills and Connections are declared inputs; Artifacts are durable outputs.
 
-Owner wording is accepted without creating parallel types: Department maps to
-Workgroup; Agent and Employee map to Worker. The Director translates these
-aliases silently and `company overview` returns Goals, topology health,
-Workgroups, Workers, assignments, artifacts, and friction in one read.
+Legacy vocabulary is accepted only at migration and persisted-state boundaries;
+new prompts, packages, commands, and output use the canonical terms above.
+`company overview` returns Goals, topology health,
+Departments, Agents, assignments, artifacts, and friction in one read.
+
+`company observatory` opens the read-only living-system view. The default canvas
+places the Goal tree and support DAG above the active loop, Resolution work, and
+the source-owned architecture layers. Focused views expose Workflows, Memory,
+Evidence, code dependencies, and coherence findings. When a persisted home has
+not yet migrated, the observer labels its historical state as an isolated
+compatibility boundary; it never merges those records into clean-core state.
 
 ## Pursuit semantics and alignment
 
-A primary Goal is a durable measurable outcome. A supporting Goal is an active bottleneck. A system-improvement Goal is a bounded technical change that enables or protects an active outcome. A run, batch, task, and guardrail are not Goals. Technical acceptance proves only technical readiness, never market success.
+A Goal is one measurable outcome. `parent_id` forms the human organizational
+tree; `supports` edges form a separate acyclic causal graph. There are no Goal
+subclasses. Each Run is one adaptive OBSERVE → DECIDE → ACT → EVALUATE
+iteration. ACT creates an Intervention; execution, creation, repair, retry, and
+validation stay inside that Intervention's Resolution cycle.
 
-## Workgroup contract
+## Department contract
 
-Workgroups are declarative packages under `workgroups/<id>/`. A Workgroup declares its metrics, Workers, and Worker workflows. A workflow declares its worksteps, evidence, skills, Connections, and explicit approval points. The shared interpreter advances the one company loop; Workgroups and Workers never create a second loop.
+Departments are declarative packages under `departments/<id>/`. A Department declares its metrics, Agents, and Agent workflows. A workflow declares its worksteps, evidence, skills, Connections, and explicit approval points. The shared interpreter advances the one company loop; Departments and Agents never create a second loop.
 
 Install into a chosen home only after validation:
 
 ```sh
-spielos workgroup validate --file workgroup.json
-spielos workgroup install --file workgroup.json --dir /chosen/home
-spielos workgroup install --all --dir /chosen/home
+spielos department validate --file department.json
+spielos department install --file department.json --dir /chosen/home
+spielos department install --all --dir /chosen/home
 ```
 
 ## Safety and system improvement
@@ -84,7 +100,10 @@ They can inspect the projection with `company context --prompt ...`. Ambiguous
 comments and task-only detail are
 never promoted automatically.
 
-Source changes use a bounded system-improvement Goal with an explicit problem, allowed files, and acceptance commands. The executor records actual acceptance evidence before the change is complete.
+Repairs and source changes are Resolution work beneath the active Goal they
+serve. They retain Goal → Run → Intervention lineage and actual acceptance
+evidence. If no relevant Goal is clear—or several are genuinely ambiguous—the
+runtime asks the owner instead of inventing a technical Goal.
 
 ## Artifact contract
 
@@ -105,7 +124,7 @@ A missing or misleading tool, command, instruction, contradiction, duplicate,
 unexpected result shape, or required fallback is recorded with `company friction
 report`. The Director tells the owner what was expected, what happened, and the
 safe fallback before continuing. Repeated fingerprints remain visible in
-`company overview`; they are system-improvement evidence, not hidden retries.
+`company overview`; they are Resolution evidence, not hidden retries.
 
 ## Migration contract
 
@@ -113,19 +132,18 @@ Migration starts in a fresh home with `company migration inspect --from PATH`
 and `company migration plan --from PATH --out PLAN.json`. The current runtime
 schema is authority. Foreign runtime code is replaced, unknown files are
 quarantined, historical state is archived, and only owner-selected Goals with
-explicit lineage enter the new active graph. Department/Workgroup normalizes to
-Workgroup; Agent/Employee/Worker to Worker; playbooks to Workflows; methods and
-prompts to Workbook methods; tools, permissions, and integrations to Workkit
-capabilities; outputs to Artifacts or Evidence. Each Workgroup is converted,
+explicit lineage enter the new active graph. Foreign capability, executor,
+playbook, method, access, and output aliases normalize at this boundary to
+Department, Agent, Workflow, Skill, Connection, Artifact, or Evidence. Each Department is converted,
 validated, tested, and installed atomically with external credentials disabled.
 
 ## Home lifecycle
 
 `spielos init --dir PATH` creates a clean self-contained home with no installed
-Workgroups. Open OpenCode or Codex and select the Director before chatting;
+Departments. Open OpenCode or Codex and select the Director before chatting;
 fresh state is injected automatically. After installing a newer SpielOS
 release, `spielos update --dir PATH` replaces the runtime and host adapters
-while preserving strategy, assets, installed Workgroups, configuration, and
+while preserving strategy, assets, installed Departments, configuration, and
 `.spielos/` state. `spielos refresh` remains a compatibility alias.
 
 The source checkout runs with:

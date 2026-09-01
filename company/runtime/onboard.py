@@ -23,7 +23,7 @@ import threading
 import time
 from pathlib import Path
 
-from .bootstrap import available_workgroups, scaffold
+from .bootstrap import available_departments, scaffold
 
 SPINNER_FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 
@@ -199,7 +199,7 @@ def _verify_home(root: Path) -> tuple[bool, str]:
 
 
 def _next_steps(root: Path, hosts: dict[str, bool], minimal: bool,
-                workgroups: list[str]) -> tuple[list[str], dict[str, str]]:
+                departments: list[str]) -> tuple[list[str], dict[str, str]]:
     """Hand the fresh home to the Director instead of onboarding in the CLI."""
     steps = [
         ("cd " + str(root), ""),
@@ -239,8 +239,8 @@ def _render_success(style: _Style, receipt: dict) -> None:
         row("Home", root)
         row("Files", str(receipt["files_written"]))
         row("Mode", receipt.get("mode_label", "harness"))
-        if receipt.get("workgroups"):
-            row("Workgroups", ", ".join(receipt["workgroups"]))
+        if receipt.get("departments"):
+            row("Departments", ", ".join(receipt["departments"]))
         verified = (style.green("verified") if receipt.get("verified")
                     else style.red("FAILED"))
         row("Runtime", verified)
@@ -254,7 +254,7 @@ def _render_success(style: _Style, receipt: dict) -> None:
         print()
 
     steps, notes = _next_steps(Path(root), hosts, receipt.get("minimal", False),
-                               receipt.get("workgroups") or [])
+                               receipt.get("departments") or [])
     print(style.bold("Next steps"))
     for command, note in steps:
         print(f"  {style.green('$')} {style.bold(command)}")
@@ -269,12 +269,12 @@ def _render_success(style: _Style, receipt: dict) -> None:
 
 
 def run_init(*, dir: str = ".", force: bool = False, minimal: bool = True,
-             workgroups: list[str] | None = None, assume_yes: bool = False,
+             departments: list[str] | None = None, assume_yes: bool = False,
              as_json: bool = False) -> int:
     """Entry point for ``spielos init``. Returns the process exit code.
 
-    A fresh home ships the spine only — zero Workgroups. Starter
-    Workgroups are an explicit opt-in (``--workgroup``, ``--all-workgroups``
+    A fresh home ships the spine only — zero Departments. Starter
+    Departments are an explicit opt-in (``--department``, ``--all-departments``
     or the interactive picker).
     """
     style = _Style()
@@ -291,23 +291,23 @@ def run_init(*, dir: str = ".", force: bool = False, minimal: bool = True,
         quiet = as_json  # machine mode: keep stdout parseable, no chrome
         if not quiet:
             receipt = scaffold(target, force=force, minimal=minimal,
-                               workgroups=workgroups)
+                               departments=departments)
             print(f"{style.mark_ok()} Company runtime installed", flush=True)
             print(f"{style.mark_ok()} Director added to Codex and OpenCode", flush=True)
         else:
             receipt = scaffold(target, force=force, minimal=minimal,
-                               workgroups=workgroups)
+                               departments=departments)
 
         hosts = _detect_hosts()
-        count = len(workgroups or [])
+        count = len(departments or [])
         if not minimal:
             mode_label = "Full harness"
         elif count:
-            mode_label = f"Fresh spine + {count} Workgroup(s)"
+            mode_label = f"Fresh spine + {count} Department(s)"
         else:
             mode_label = "Fresh spine"
         receipt.update({"hosts": hosts, "minimal": minimal,
-                        "workgroups": workgroups or [],
+                        "departments": departments or [],
                         "mode_label": mode_label})
         # Verification runs in both modes; only the rendering differs.
         if as_json:
@@ -341,9 +341,9 @@ def run_init(*, dir: str = ".", force: bool = False, minimal: bool = True,
                           "           (your .spielos/ state is never touched)")
     except ValueError as exc:
         detail = str(exc)
-        known = available_workgroups()
-        hint = (f"available Workgroups: {', '.join(known)}"
-                if known and "Workgroup" in detail else None)
+        known = available_departments()
+        hint = (f"available Departments: {', '.join(known)}"
+                if known and "Department" in detail else None)
         if as_json:
             print(json.dumps({"error": detail}, indent=2), file=sys.stderr)
             return 1
