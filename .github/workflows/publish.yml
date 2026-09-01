@@ -9,17 +9,78 @@ jobs:
   pypi-publish:
     name: Build and publish
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.release.outputs.version }}
     permissions:
       id-token: write          # Trusted Publishing — no API token stored
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Validate release metadata
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(python -c 'from company.runtime.config import VERSION; print(VERSION)')"
+          PACKAGE_VERSION="$(node -p "require('./package.json').version")"
+          TEMPLATE_VERSION="$(sed -n 's/^VERSION = "\([^"]*\)"/\1/p' company/init_templates/agents/company/runtime/config.py)"
+          test "$VERSION" = "$PACKAGE_VERSION"
+          test "$VERSION" = "$TEMPLATE_VERSION"
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            test "$GITHUB_REF_NAME" = "v$VERSION"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
       - name: Build sdist + wheel
         run: pipx run build
+      - name: Check distributions
+        shell: bash
+        run: |
+          set -euo pipefail
+          pipx run twine check dist/*
+          if unzip -l dist/*.whl | grep -E 'company/(workgroups/|runtime/workgroup_install\.py)|company/init_templates/.*/(workgroups/|workgroup_install\.py)'; then
+            echo "retired Workgroup files found in release wheel" >&2
+            exit 1
+          fi
+      - name: Verify installed wheel and home update
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m venv "$RUNNER_TEMP/spielos-smoke"
+          "$RUNNER_TEMP/spielos-smoke/bin/python" -m pip install dist/*.whl
+          SMOKE_HOME="$RUNNER_TEMP/spielos-home"
+          "$RUNNER_TEMP/spielos-smoke/bin/spielos" init --dir "$SMOKE_HOME" -y
+          sed -i.bak 's/VERSION = ".*"/VERSION = "7.3.0"/' "$SMOKE_HOME/.agents/company/runtime/config.py"
+          rm "$SMOKE_HOME/.agents/company/runtime/config.py.bak"
+          (
+            cd "$SMOKE_HOME"
+            "$RUNNER_TEMP/spielos-smoke/bin/spielos" update --dir "$SMOKE_HOME" --json
+          )
+          EXPECTED="${{ steps.release.outputs.version }}" \
+          "$RUNNER_TEMP/spielos-smoke/bin/python" - "$SMOKE_HOME" <<'PY'
+          import os
+          import re
+          import subprocess
+          import sys
+          from pathlib import Path
+
+          home = Path(sys.argv[1])
+          config = (home / ".agents/company/runtime/config.py").read_text()
+          match = re.search(r'^VERSION\s*=\s*"([^"]+)"', config, re.MULTILINE)
+          actual = match.group(1) if match else None
+          expected = os.environ["EXPECTED"]
+          assert actual == expected, (actual, expected)
+          command = Path(sys.executable).with_name("spielos")
+          reported = subprocess.check_output(
+              [command, "--version"], cwd=home, text=True).strip()
+          assert reported == f"spielos {expected}", reported
+          PY
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true
 
   npm-publish:
     name: Publish to npm via trusted publishing
@@ -67,7 +128,7 @@ jobs:
         id: dist
         run: |
           set -euo pipefail
-          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="${{ needs.pypi-publish.outputs.version }}"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           python - "$VERSION" "$GITHUB_OUTPUT" <<'PY'
           import hashlib
@@ -146,4 +207,4 @@ jobs:
           push: true
           tags: |
             ghcr.io/shayanspiel/spielos:latest
-            ghcr.io/shayanspiel/spielos:${{ github.ref_name }}
+            ghcr.io/shayanspiel/spielos:v${{ needs.pypi-publish.outputs.version }}

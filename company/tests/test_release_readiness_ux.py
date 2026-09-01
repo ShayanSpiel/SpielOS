@@ -10,14 +10,16 @@ from pathlib import Path
 from unittest.mock import patch
 
 from company.__main__ import build_parser, main
-from company.cli import _vendored_home, main as console_main
+from company.cli import (
+    _uses_installed_package, _vendored_home, main as console_main)
 from company.runtime.artifacts import (
     finalize_workspace, prepare_workspace, present_artifact)
 from company.runtime.friction import friction_summary, record_friction
 from company.runtime.migration import inspect_source, migration_plan
 from company.runtime.bootstrap import scaffold
 from company.runtime.export import (
-    RETIRED_HARNESS_FILES, RETIRED_HOST_AGENTS, refresh_home)
+    RETIRED_HARNESS_DIRS, RETIRED_HARNESS_FILES, RETIRED_HOST_AGENTS,
+    refresh_home)
 from company.runtime.config import VERSION
 
 
@@ -27,11 +29,32 @@ class OrientationTests(unittest.TestCase):
         package = json.loads((root / "package.json").read_text())
         workflow = (root / ".github/workflows/publish.yml").read_text()
 
-        self.assertEqual("8.0.1", VERSION)
+        self.assertEqual("8.0.2", VERSION)
         self.assertEqual(VERSION, package["version"])
         self.assertIn("npm@^11.5.1", workflow)
         self.assertNotIn("NPM_TOKEN", workflow)
+        self.assertIn("skip-existing: true", workflow)
+        self.assertIn("Verify installed wheel and home update", workflow)
         self.assertFalse((root / ".github/workflows/npm-only.yml").exists())
+
+    def test_home_lifecycle_commands_use_installed_distribution(self):
+        for argv in (["update"], ["refresh", "--dir", "/tmp/home"],
+                     ["init", "--force"], ["--version"]):
+            with self.subTest(argv=argv):
+                self.assertTrue(_uses_installed_package(list(argv)))
+        self.assertFalse(_uses_installed_package(["status"]))
+        self.assertFalse(_uses_installed_package(["overview"]))
+
+    def test_console_update_bypasses_old_vendored_runtime(self):
+        with tempfile.TemporaryDirectory() as directory, \
+                patch("company.cli._vendored_home", return_value=Path(directory)), \
+                patch("company.cli.os.execve") as execve, \
+                patch("company.__main__.main", return_value=0) as package_main:
+            code = console_main(["update", "--dir", directory])
+
+        self.assertEqual(0, code)
+        execve.assert_not_called()
+        package_main.assert_called_once_with(["update", "--dir", directory])
 
     def test_update_prunes_only_known_legacy_host_agents(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -39,6 +62,14 @@ class OrientationTests(unittest.TestCase):
             scaffold(home, minimal=True)
             self.assertTrue(
                 (home / ".agents/company/departments/core.py").is_file())
+            config = home / ".agents/company/runtime/config.py"
+            config.write_text(
+                config.read_text().replace(f'VERSION = "{VERSION}"',
+                                           'VERSION = "7.3.0"'))
+            work_orders = home / ".agents/company/work_orders"
+            for path in sorted(work_orders.rglob("*"), reverse=True):
+                path.unlink() if path.is_file() else path.rmdir()
+            work_orders.rmdir()
             for host, filenames in RETIRED_HOST_AGENTS.items():
                 agents = home / f".{host}" / "agents"
                 agents.mkdir(parents=True, exist_ok=True)
@@ -50,12 +81,22 @@ class OrientationTests(unittest.TestCase):
                 retired = company / relative
                 retired.parent.mkdir(parents=True, exist_ok=True)
                 retired.write_text("retired\n")
+            for relative in RETIRED_HARNESS_DIRS:
+                retired = company / relative
+                retired.mkdir(parents=True, exist_ok=True)
+                (retired / "legacy.json").write_text("{}\n")
             custom_connection = company / "connections/custom-owner.py"
             custom_connection.write_text("keep = True\n")
 
             receipt = refresh_home(target=home)
 
-            self.assertEqual(2, len(receipt["removed_retired_host_agents"]))
+            self.assertEqual("7.3.0", receipt["from_version"])
+            self.assertEqual(VERSION, receipt["version"])
+            self.assertTrue(
+                (home / ".agents/company/work_orders/core.py").is_file())
+            self.assertEqual(
+                sum(len(names) for names in RETIRED_HOST_AGENTS.values()),
+                len(receipt["removed_retired_host_agents"]))
             self.assertEqual(
                 len(RETIRED_HARNESS_FILES),
                 len(receipt["removed_retired_harness_files"]))
@@ -66,6 +107,13 @@ class OrientationTests(unittest.TestCase):
                     self.assertFalse((agents / filename).exists())
             for relative in RETIRED_HARNESS_FILES:
                 self.assertFalse((company / relative).exists())
+            for relative in RETIRED_HARNESS_DIRS:
+                self.assertFalse((company / relative).exists())
+            self.assertEqual(
+                len(RETIRED_HARNESS_DIRS),
+                len(receipt["archived_retired_harness_dirs"]))
+            for archived in receipt["archived_retired_harness_dirs"]:
+                self.assertTrue(Path(archived, "legacy.json").is_file())
             self.assertTrue(custom_connection.is_file())
 
     def test_director_does_not_auto_open_code_or_internal_artifacts(self):

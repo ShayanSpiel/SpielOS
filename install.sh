@@ -80,7 +80,9 @@ printf '%s' "${DIM}   installing/updating spielos ...${RESET}"
 # location a previous install happened to use.
 if pipx install --force "$REPO" >/dev/null 2>&1; then
     printf '%s\n' " done"
-    step "spielos CLI ready at $(command -v spielos) ${DIM}(global tool — not your project folder)${RESET}"
+    INSTALLED_VERSION=$(spielos --version 2>/dev/null | sed -n 's/^spielos //p')
+    [ -n "$INSTALLED_VERSION" ] || fail "the package installed, but 'spielos --version' did not return a runtime version."
+    step "spielos $INSTALLED_VERSION ready at $(command -v spielos) ${DIM}(global tool — not your project folder)${RESET}"
 else
     printf '%s\n' ""
     fail "'pipx install $REPO' failed — run it manually to see why."
@@ -111,8 +113,10 @@ HOME_UPDATED=0
 if [ -d "$TARGET_DIR/.agents/company" ]; then
     info "updating the existing SpielOS home ..."
     if spielos update --dir "$TARGET_DIR"; then
+        HOME_VERSION=$("$PY" -c 'import re,sys; text=open(sys.argv[1], encoding="utf-8").read(); match=re.search(r"^VERSION\s*=\s*[\"'\"']([^\"'\"']+)", text, re.M); print(match.group(1) if match else "")' "$TARGET_DIR/.agents/company/runtime/config.py")
+        [ "$HOME_VERSION" = "$INSTALLED_VERSION" ] || fail "home update version mismatch: package is $INSTALLED_VERSION but home is ${HOME_VERSION:-unknown}."
         HOME_UPDATED=1
-        step "existing SpielOS home updated"
+        step "existing SpielOS home updated to $HOME_VERSION"
     else
         fail "the CLI was upgraded, but the existing home update failed. Run 'spielos update --dir $TARGET_DIR' to see the diagnostic."
     fi

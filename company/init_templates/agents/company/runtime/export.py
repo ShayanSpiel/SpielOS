@@ -26,11 +26,14 @@ COMPANY_ROOT = Path(__file__).resolve().parents[1]
 DEPARTMENTS_ROOT = COMPANY_ROOT / "departments"
 
 RETIRED_HOST_AGENTS = {
-    "codex": ("workgroup-runner.toml",),
-    "opencode": ("workgroup-runner.md",),
+    "codex": ("lead-researcher.toml", "outreach-writer.toml",
+              "social-researcher.toml", "workgroup-runner.toml"),
+    "opencode": ("lead-researcher.md", "outreach-writer.md",
+                 "social-researcher.md", "workgroup-runner.md"),
 }
 
 RETIRED_HARNESS_FILES = ("runtime/workgroup_install.py",)
+RETIRED_HARNESS_DIRS = ("workgroups", "skills/workgroup-runner")
 
 
 def _sha256(path: Path) -> str:
@@ -288,13 +291,32 @@ def refresh_home(*, force: bool = True,
     """Re-vendor the SPINE (runtime code + company skills + host adapters)
     into the current home from the newest templates. User layer is preserved:
     strategy/, assets/, departments/, agents/, config.user.json, .spielos/."""
+    import re
+
     from .bootstrap import template_root
+    from .config import VERSION
+
+    def runtime_version(config_path: Path) -> str | None:
+        if not config_path.is_file():
+            return None
+        match = re.search(
+            r'^VERSION\s*=\s*["\']([^"\']+)["\']',
+            config_path.read_text(encoding="utf-8"), re.MULTILINE)
+        return match.group(1) if match else None
 
     templates = template_root()
     home = _home_agents_dir(target)
     if not (home / "company").is_dir():
         raise ValueError("no harness home here; run `spielos init` first")
 
+    source_config = templates / "agents" / "company" / "runtime" / "config.py"
+    template_version = runtime_version(source_config)
+    if template_version != VERSION:
+        raise RuntimeError(
+            "installed runtime/template version mismatch: "
+            f"runtime={VERSION}, templates={template_version or 'unknown'}")
+    destination_config = home / "company" / "runtime" / "config.py"
+    previous_version = runtime_version(destination_config)
     refreshed: list[str] = []
 
     def _sync(src: Path, dst: Path, preserve: set[str] = frozenset()) -> None:
@@ -311,12 +333,16 @@ def refresh_home(*, force: bool = True,
             refreshed.append(str(dest))
 
     spine = templates / "agents" / "company"
-    _sync(spine / "runtime", home / "company" / "runtime")
-    _sync(spine / "evals", home / "company" / "evals")
-    _sync(spine / "connections", home / "company" / "connections")
-    _sync(spine / "agents", home / "company" / "agents",
-          preserve={"installed"})
-    _sync(spine / "skills", home / "company" / "skills")
+    # Sync every runtime-owned package, including packages introduced after
+    # the home's current release.  A fixed allowlist stranded older homes when
+    # 8.x added work_orders/, goals/, state/, and the other clean-core modules.
+    preserved_top_level = {"assets", "departments", "init_templates",
+                           "strategy", "tests"}
+    for package in sorted(spine.iterdir()):
+        if not package.is_dir() or package.name in preserved_top_level:
+            continue
+        _sync(package, home / "company" / package.name,
+              preserve={"installed"} if package.name == "agents" else set())
     # Note: the contract test suite deliberately does NOT ship to homes.
     # It validates this product repository's packaging layout and belongs
     # to the source checkout and CI. Homes verify through company status,
@@ -347,9 +373,35 @@ def refresh_home(*, force: bool = True,
             path.unlink()
             removed_harness_files.append(str(path))
 
+    archived_harness_dirs: list[str] = []
+    archive_root = (home.parent / ".spielos" / "archive" /
+                    f"retired-architecture-before-{VERSION}")
+    for relative in RETIRED_HARNESS_DIRS:
+        path = home / "company" / relative
+        if path.is_dir():
+            destination = archive_root / ".agents" / "company" / relative
+            suffix = 1
+            while destination.exists():
+                destination = destination.with_name(
+                    f"{destination.name}.{suffix}")
+                suffix += 1
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(path), str(destination))
+            archived_harness_dirs.append(str(destination))
+
+    installed_version = runtime_version(destination_config)
+    if installed_version != VERSION:
+        raise RuntimeError(
+            "home update did not install the current runtime: "
+            f"expected={VERSION}, found={installed_version or 'unknown'}")
+
     return {"refreshed_files": len(refreshed),
+            "from_version": previous_version,
+            "version": installed_version,
+            "template_source": str(templates),
             "removed_retired_host_agents": removed_host_agents,
             "removed_retired_harness_files": removed_harness_files,
+            "archived_retired_harness_dirs": archived_harness_dirs,
             "preserved": ["strategy/", "assets/", "departments/",
                           "agents/installed/", "config.user.json",
                           ".spielos/"]}

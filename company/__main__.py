@@ -1410,6 +1410,8 @@ def render_notification_ack(item):
 def render_update(value):
     """Card for `spielos update` after installing a newer release."""
     lines = ["# SpielOS home updated", "",
+             f"- Runtime: `{value.get('from_version') or 'unknown'}` → "
+             f"`{value.get('version') or 'unknown'}`",
              f"- Updated files: `{value.get('refreshed_files', 0)}`",
              "- Preserved: strategy, assets, Departments, installed Agents, "
              "config.user.json, .spielos/ state"]
