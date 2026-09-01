@@ -161,7 +161,19 @@ class WorkOrderRepository:
                 connection.execute("""UPDATE core_workflow_runs
                     SET current_step=?,status=?,updated_at=? WHERE id=?""",
                     (next_step, status, stamp, row["workflow_run_id"]))
-            if wake_run:
+            connection.execute("""UPDATE core_notifications
+                SET status='acknowledged',acknowledged_at=?
+                WHERE intervention_id=? AND status='pending'""",
+                (stamp, row["intervention_id"]))
+            is_direct = row["workflow_run_id"] is None and row["step_id"] == "direct"
+            if is_direct:
+                connection.execute("""UPDATE core_interventions
+                    SET status='complete',resolution_outcome='RETURN_TO_GOAL',updated_at=?
+                    WHERE id=?""", (stamp, row["intervention_id"]))
+                connection.execute("""UPDATE core_runs
+                    SET stage='EVALUATE',status='running',updated_at=? WHERE id=?""",
+                    (stamp, row["run_id"]))
+            elif wake_run:
                 connection.execute("""UPDATE core_runs SET status='ready',updated_at=?
                     WHERE id=? AND status='waiting'""", (stamp, row["run_id"]))
         return self.get(order_id), evidence_ids

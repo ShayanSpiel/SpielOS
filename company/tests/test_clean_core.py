@@ -60,6 +60,34 @@ class CleanCoreAcceptanceTests(unittest.TestCase):
     def tearDown(self):
         self.temporary.cleanup()
 
+    def _direct_external_completion_state(self, database_path=None):
+        class DirectExternalController(ScenarioController):
+            def decide(self, context, observation):
+                return Decision(
+                    "repair_agent", "repair the research Agent", context={
+                        "agent_id": "repairer",
+                        "evidence_kind": "repair_validated",
+                    })
+
+            def evaluate(self, context, decision, evidence):
+                return Evaluation(True, {"reply_rate": 2}, "repair ready")
+
+        runtime = GoalRuntime(
+            database_path or self.db, DirectExternalController(complete_after=1),
+            FunctionExecutor({"repairer": lambda order: AgentResult(
+                "ask_user", message="owner must finish the repair")}))
+        goal = runtime.create_goal("Increase replies", "reply_rate", ">=", 2)
+        runtime.tick(max_advances=10)
+        waiting = runtime.status(goal.id)
+        intervention = waiting["intervention"]
+        with runtime.database.connect() as connection:
+            order = connection.execute(
+                """SELECT * FROM core_work_orders
+                   WHERE intervention_id=? AND step_id='direct'""",
+                (intervention.id,),
+            ).fetchone()
+        return runtime, goal, waiting["run"], intervention, order
+
     def test_full_goal_run_repairs_locally_then_starts_next_run(self):
         attempts = {"count": 0}
 
@@ -233,6 +261,9 @@ class CleanCoreAcceptanceTests(unittest.TestCase):
                         "evidence_kind": "repair_validated",
                     })
 
+            def evaluate(self, context, decision, evidence):
+                return Evaluation(True, {"reply_rate": 2}, "repair ready")
+
         def request_external_completion(order):
             attempts["count"] += 1
             return AgentResult("ask_user", message="owner must finish the repair")
@@ -275,6 +306,86 @@ class CleanCoreAcceptanceTests(unittest.TestCase):
                    WHERE work_order_id=? AND kind='repair_validated'""",
                 (order["id"],),
             ).fetchone()[0], 1)
+
+    def test_external_direct_completion_atomically_returns_to_evaluate(self):
+        runtime, goal, run, intervention, order = (
+            self._direct_external_completion_state())
+
+        completed, evidence_ids = runtime.resolution.work_orders.complete_with_evidence(
+            order["id"], {"tests": "passed"},
+            executor_id=order["claimed_by"], kind="repair_validated",
+            payload={"tests": "passed"})
+
+        self.assertEqual(completed.status, "completed")
+        self.assertEqual(len(evidence_ids), 1)
+        self.assertEqual(runtime.interventions.get(intervention.id).status, "complete")
+        self.assertEqual(
+            runtime.interventions.get(intervention.id).resolution_outcome,
+            "RETURN_TO_GOAL")
+        transitioned = runtime.runs.get(run.id)
+        self.assertEqual(transitioned.stage, GoalStage.EVALUATE)
+        self.assertEqual(transitioned.status, "running")
+        with runtime.database.connect() as connection:
+            notification = connection.execute(
+                """SELECT status FROM core_notifications
+                   WHERE intervention_id=? AND kind='owner_input_required'""",
+                (intervention.id,),
+            ).fetchone()
+        self.assertEqual(notification["status"], "acknowledged")
+        self.assertEqual(runtime.goals.get(goal.id).status, "active")
+
+    def test_external_direct_completion_rolls_back_at_every_write_boundary(self):
+        failure_triggers = {
+            "evidence insert": """CREATE TRIGGER reject_external_evidence
+                BEFORE INSERT ON core_evidence BEGIN
+                SELECT RAISE(ABORT, 'simulated external completion crash'); END""",
+            "notification acknowledgement": """CREATE TRIGGER reject_external_ack
+                BEFORE UPDATE ON core_notifications WHEN NEW.status='acknowledged' BEGIN
+                SELECT RAISE(ABORT, 'simulated external completion crash'); END""",
+            "intervention transition": """CREATE TRIGGER reject_external_intervention
+                BEFORE UPDATE ON core_interventions WHEN NEW.status='complete' BEGIN
+                SELECT RAISE(ABORT, 'simulated external completion crash'); END""",
+            "run transition": """CREATE TRIGGER reject_external_run
+                BEFORE UPDATE ON core_runs WHEN NEW.stage='EVALUATE' BEGIN
+                SELECT RAISE(ABORT, 'simulated external completion crash'); END""",
+        }
+        for boundary, trigger in failure_triggers.items():
+            with self.subTest(boundary=boundary), tempfile.TemporaryDirectory() as tmp:
+                runtime, goal, run, intervention, order = (
+                    self._direct_external_completion_state(
+                        Path(tmp) / "company.sqlite"))
+                with runtime.database.connect() as connection:
+                    connection.execute(trigger)
+
+                with self.assertRaisesRegex(
+                        sqlite3.IntegrityError,
+                        "simulated external completion crash"):
+                    runtime.resolution.work_orders.complete_with_evidence(
+                        order["id"], {"tests": "passed"},
+                        executor_id=order["claimed_by"], kind="repair_validated",
+                        payload={"tests": "passed"})
+
+                self.assertEqual(
+                    runtime.resolution.work_orders.get(order["id"]).status,
+                    "claimed")
+                self.assertEqual(
+                    runtime.interventions.get(intervention.id).status, "waiting")
+                unchanged_run = runtime.runs.get(run.id)
+                self.assertEqual(unchanged_run.stage, GoalStage.ACT)
+                self.assertEqual(unchanged_run.status, "waiting")
+                with runtime.database.connect() as connection:
+                    self.assertEqual(connection.execute(
+                        "SELECT COUNT(*) FROM core_evidence WHERE work_order_id=?",
+                        (order["id"],),
+                    ).fetchone()[0], 0)
+                    notification = connection.execute(
+                        """SELECT status FROM core_notifications
+                           WHERE intervention_id=?
+                             AND kind='owner_input_required'""",
+                        (intervention.id,),
+                    ).fetchone()
+                self.assertEqual(notification["status"], "pending")
+                self.assertEqual(runtime.goals.get(goal.id).status, "active")
 
     def test_intervention_cannot_exist_without_goal_and_run_lineage(self):
         database = Database(self.db)

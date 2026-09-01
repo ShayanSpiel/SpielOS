@@ -394,10 +394,6 @@ class CleanCommandRuntime:
             evidence_items=[(item["kind"], item.get("payload") or {})
                             for item in evidence],
             advance_workflow=bool(order.workflow_run_id), wake_run=True)
-        with self.database.connect() as connection:
-            connection.execute("""UPDATE core_notifications
-                SET status='acknowledged',acknowledged_at=datetime('now')
-                WHERE intervention_id=? AND status='pending'""", (order.intervention_id,))
         return {"work_order": self._order(order)}
 
     def events(self, *_args, **_kwargs): return []
