@@ -72,6 +72,23 @@ class Database:
             if name not in order_columns:
                 connection.execute(
                     f"ALTER TABLE core_work_orders ADD COLUMN {name} {declaration}")
+        edge_sql = connection.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='core_goal_edges'"
+        ).fetchone()[0]
+        if "'blocks'" not in edge_sql:
+            connection.executescript("""
+                ALTER TABLE core_goal_edges RENAME TO core_goal_edges_legacy;
+                CREATE TABLE core_goal_edges (
+                    source_goal_id TEXT NOT NULL REFERENCES core_goals(id),
+                    target_goal_id TEXT NOT NULL REFERENCES core_goals(id),
+                    relation TEXT NOT NULL CHECK(relation IN ('supports','blocks')),
+                    created_at TEXT NOT NULL,
+                    PRIMARY KEY(source_goal_id, target_goal_id, relation),
+                    CHECK(source_goal_id <> target_goal_id)
+                );
+                INSERT INTO core_goal_edges SELECT * FROM core_goal_edges_legacy;
+                DROP TABLE core_goal_edges_legacy;
+            """)
         approval_sql = connection.execute(
             "SELECT sql FROM sqlite_master WHERE type='table' AND name='core_approvals'"
         ).fetchone()[0]
@@ -114,7 +131,7 @@ CREATE TABLE IF NOT EXISTS core_goals (
 CREATE TABLE IF NOT EXISTS core_goal_edges (
     source_goal_id TEXT NOT NULL REFERENCES core_goals(id),
     target_goal_id TEXT NOT NULL REFERENCES core_goals(id),
-    relation TEXT NOT NULL CHECK(relation = 'supports'),
+    relation TEXT NOT NULL CHECK(relation IN ('supports','blocks')),
     created_at TEXT NOT NULL,
     PRIMARY KEY(source_goal_id, target_goal_id, relation),
     CHECK(source_goal_id <> target_goal_id)

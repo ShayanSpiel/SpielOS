@@ -1,4 +1,4 @@
-"""Goal records plus the two deliberately separate relationship systems."""
+"""Goal records plus separate parent, support, and blocking relationships."""
 
 from __future__ import annotations
 
@@ -106,21 +106,32 @@ class GoalRepository:
         return self.get(goal_id)
 
     def add_support(self, source_goal_id: str, target_goal_id: str) -> GoalEdge:
+        return self._add_edge(source_goal_id, target_goal_id, "supports")
+
+    def add_block(self, source_goal_id: str, target_goal_id: str) -> GoalEdge:
+        return self._add_edge(source_goal_id, target_goal_id, "blocks")
+
+    def _add_edge(self, source_goal_id: str, target_goal_id: str,
+                  relation: str) -> GoalEdge:
         self.get(source_goal_id)
         self.get(target_goal_id)
-        if source_goal_id == target_goal_id or source_goal_id in self._supported_by(target_goal_id):
-            raise ValueError("support edge would create a Goal DAG cycle")
+        if relation not in {"supports", "blocks"}:
+            raise ValueError(f"invalid Goal edge relation: {relation}")
+        if (source_goal_id == target_goal_id
+                or source_goal_id in self._reachable(target_goal_id, relation)):
+            raise ValueError(f"{relation} edge would create a Goal DAG cycle")
         with self.database.connect() as connection:
             connection.execute(
                 "INSERT OR IGNORE INTO core_goal_edges VALUES (?,?,?,?)",
-                (source_goal_id, target_goal_id, "supports", _now()),
+                (source_goal_id, target_goal_id, relation, _now()),
             )
-        return GoalEdge(source_goal_id, target_goal_id)
+        return GoalEdge(source_goal_id, target_goal_id, relation)
 
     def supports(self, goal_id: str) -> list[Goal]:
         with self.database.connect() as connection:
             ids = [row[0] for row in connection.execute(
-                "SELECT target_goal_id FROM core_goal_edges WHERE source_goal_id=?",
+                """SELECT target_goal_id FROM core_goal_edges
+                   WHERE source_goal_id=? AND relation='supports'""",
                 (goal_id,),
             )]
         return [self.get(item) for item in ids]
@@ -128,7 +139,26 @@ class GoalRepository:
     def supporters(self, goal_id: str) -> list[Goal]:
         with self.database.connect() as connection:
             ids = [row[0] for row in connection.execute(
-                "SELECT source_goal_id FROM core_goal_edges WHERE target_goal_id=?",
+                """SELECT source_goal_id FROM core_goal_edges
+                   WHERE target_goal_id=? AND relation='supports'""",
+                (goal_id,),
+            )]
+        return [self.get(item) for item in ids]
+
+    def blocks(self, goal_id: str) -> list[Goal]:
+        with self.database.connect() as connection:
+            ids = [row[0] for row in connection.execute(
+                """SELECT target_goal_id FROM core_goal_edges
+                   WHERE source_goal_id=? AND relation='blocks'""",
+                (goal_id,),
+            )]
+        return [self.get(item) for item in ids]
+
+    def blockers(self, goal_id: str) -> list[Goal]:
+        with self.database.connect() as connection:
+            ids = [row[0] for row in connection.execute(
+                """SELECT source_goal_id FROM core_goal_edges
+                   WHERE target_goal_id=? AND relation='blocks'""",
                 (goal_id,),
             )]
         return [self.get(item) for item in ids]
@@ -143,7 +173,7 @@ class GoalRepository:
             current = self.get(current.parent_id)
         return found
 
-    def _supported_by(self, goal_id: str) -> set[str]:
+    def _reachable(self, goal_id: str, relation: str) -> set[str]:
         found: set[str] = set()
         frontier = {goal_id}
         with self.database.connect() as connection:
@@ -151,7 +181,8 @@ class GoalRepository:
                 marks = ",".join("?" for _ in frontier)
                 rows = connection.execute(
                     f"SELECT target_goal_id FROM core_goal_edges "
-                    f"WHERE source_goal_id IN ({marks})", tuple(frontier)
+                    f"WHERE relation=? AND source_goal_id IN ({marks})",
+                    (relation, *frontier)
                 ).fetchall()
                 next_frontier = {row[0] for row in rows} - found
                 found |= next_frontier

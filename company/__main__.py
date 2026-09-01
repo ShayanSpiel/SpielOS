@@ -229,6 +229,8 @@ def build_parser():
     create.add_argument("--parent")
     create.add_argument("--supports", action="append", default=[],
                         help="Goal ID this Goal causally supports; repeat for a support DAG")
+    create.add_argument("--blocks", action="append", default=[],
+                        help="Goal ID this Goal blocks from running; repeat for a block DAG")
     create.add_argument("--priority", choices=("critical", "high", "normal", "low", "deferred"))
     create.add_argument("--config", default="{}")
     create.add_argument("--id")
@@ -245,12 +247,15 @@ def build_parser():
     create.add_argument("--json", action="store_true")
     goal_list = goals.add_parser("list")
     goal_list.add_argument("--json", action="store_true")
-    topology = goals.add_parser("topology", help="audit the control tree and causal support DAG")
+    topology = goals.add_parser(
+        "topology", help="audit the parent tree, support DAG, and block DAG")
     topology.add_argument("--json", action="store_true")
     show = goals.add_parser("show"); show.add_argument("goal_id")
     show.add_argument("--json", action="store_true")
     link = goals.add_parser("link"); link.add_argument("goal_id")
-    link.add_argument("--supports", required=True)
+    link_relation = link.add_mutually_exclusive_group(required=True)
+    link_relation.add_argument("--supports")
+    link_relation.add_argument("--blocks")
     link.add_argument("--json", action="store_true")
     once = commands.add_parser("once"); once.add_argument("goal_id")
     once.add_argument("--json", action="store_true")
@@ -703,6 +708,8 @@ def main(argv=None):
                 raise ValueError("--config must be a JSON object")
             if args.supports:
                 config["supports_goal_ids"] = list(dict.fromkeys(args.supports))
+            if args.blocks:
+                config["blocks_goal_ids"] = list(dict.fromkeys(args.blocks))
             if args.priority:
                 config["priority"] = args.priority
             output = runtime.create_goal(name=args.name, owner_id=args.owner, metric=args.metric,
@@ -716,7 +723,8 @@ def main(argv=None):
         elif args.command == "goal" and args.goal_command == "topology":
             output = runtime.topology_audit()
         elif args.command == "goal" and args.goal_command == "link":
-            output = runtime.link_support(args.goal_id, args.supports)
+            output = (runtime.link_support(args.goal_id, args.supports)
+                      if args.supports else runtime.link_block(args.goal_id, args.blocks))
         elif args.command == "goal":
             output = runtime.status(args.goal_id)
         elif args.command == "once":

@@ -4,7 +4,7 @@ SpielOS is a Goal-driven adaptive system. A Goal chooses which outcome to move;
 everything below it makes the chosen Intervention work.
 
 ```text
-Goal tree + Goal support DAG
+Goal tree + support DAG + block DAG
             │
            Goal
             │
@@ -19,9 +19,10 @@ Goal tree + Goal support DAG
 ## Relationships
 
 The Goal tree is the human hierarchy and uses `Goal.parent_id`. The support DAG
-is causal and uses `GoalEdge(relation="supports")`. Both reject cycles. A Goal
-is always the same record; primary, supporting, and system-improvement Goal
-subclasses do not exist.
+is causal and uses `GoalEdge(relation="supports")`; it does not delay either
+Goal. The block DAG uses `GoalEdge(relation="blocks")`, and only an incomplete
+blocker makes its target ineligible to run. All three relationships reject
+cycles. A Goal is always the same record; Goal subclasses do not exist.
 
 ## Runs and Resolution
 
@@ -49,7 +50,7 @@ This makes every meaningful action traceable to the outcome it served.
 
 | Package | Responsibility |
 |---|---|
-| `goals` | Goal tree and support DAG |
+| `goals` | Goal tree, causal support DAG, and scheduling block DAG |
 | `runtime` | Run stages and scheduling |
 | `resolution` | Intervention execution, repair, retry, validation |
 | `workflows` | Reusable definitions and durable WorkflowRuns |

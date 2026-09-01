@@ -147,7 +147,8 @@ class RunRepository:
                   AND NOT EXISTS (
                     SELECT 1 FROM core_goal_edges e
                     JOIN core_goals prerequisite ON prerequisite.id=e.source_goal_id
-                    WHERE e.target_goal_id=g.id AND prerequisite.status!='complete')
+                    WHERE e.target_goal_id=g.id AND e.relation='blocks'
+                      AND prerequisite.status!='complete')
                 ORDER BY CASE json_extract(m.config_json,'$.priority')
                     WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2
                     WHEN 'low' THEN 3 WHEN 'deferred' THEN 4 ELSE 2 END,

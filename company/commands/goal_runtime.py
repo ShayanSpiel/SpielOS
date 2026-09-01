@@ -198,6 +198,8 @@ class CleanCommandRuntime:
             deadline=values.get("deadline"), config=values.get("config") or {})
         for target in (values.get("config") or {}).get("supports_goal_ids") or ():
             self.goals.add_support(goal.id, target)
+        for target in (values.get("config") or {}).get("blocks_goal_ids") or ():
+            self.goals.add_block(goal.id, target)
         return self._goal(goal)
 
     def _goal(self, goal) -> dict:
@@ -258,7 +260,7 @@ class CleanCommandRuntime:
                   for key in ("active", "achieved", "abandoned", "expired")}
         counts["total"] = len(values)
         with self.database.connect() as connection:
-            support_links = [dict(row) for row in connection.execute(
+            goal_links = [dict(row) for row in connection.execute(
                 "SELECT source_goal_id,target_goal_id,relation FROM core_goal_edges")]
         return {"counts": counts, "focus_goal": active[0] if active else None,
                 "attention": self.attention(),
@@ -266,7 +268,12 @@ class CleanCommandRuntime:
                 "active_goals": active, "proposed_goals": [], "paused_goals": paused,
                 "unread_results": self.unread_results(), "directives": [],
                 "recent_memory": self.memories(limit=20),
-                "support_links": support_links, "recent_results": terminal[:recent_limit]}
+                "goal_links": goal_links,
+                "support_links": [item for item in goal_links
+                                  if item["relation"] == "supports"],
+                "block_links": [item for item in goal_links
+                                if item["relation"] == "blocks"],
+                "recent_results": terminal[:recent_limit]}
 
     def topology_audit(self):
         goals = self.goals.list(); roots = [item.id for item in goals if not item.parent_id]
@@ -279,6 +286,11 @@ class CleanCommandRuntime:
     def link_support(self, goal_id, target_id):
         self._require_writable()
         self.goals.add_support(goal_id, target_id)
+        return self.status(goal_id)
+
+    def link_block(self, goal_id, target_id):
+        self._require_writable()
+        self.goals.add_block(goal_id, target_id)
         return self.status(goal_id)
 
     def set_goal_status(self, goal_id, status):

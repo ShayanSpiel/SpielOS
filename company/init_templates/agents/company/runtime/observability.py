@@ -211,9 +211,11 @@ def _core_goal_projection(store) -> list[dict]:
                 FROM core_goals g LEFT JOIN core_goal_metadata m ON m.goal_id=g.id
                 ORDER BY g.created_at,g.id""")]
         supports: dict[str, list[str]] = defaultdict(list)
+        blocks: dict[str, list[str]] = defaultdict(list)
         for row in connection.execute(
-                "SELECT source_goal_id,target_goal_id FROM core_goal_edges"):
-            supports[row["source_goal_id"]].append(row["target_goal_id"])
+                "SELECT source_goal_id,target_goal_id,relation FROM core_goal_edges"):
+            relation_map = supports if row["relation"] == "supports" else blocks
+            relation_map[row["source_goal_id"]].append(row["target_goal_id"])
         current_runs = {}
         for row in connection.execute("""SELECT r.* FROM core_runs r
                 WHERE r.sequence=(SELECT MAX(r2.sequence) FROM core_runs r2
@@ -236,6 +238,7 @@ def _core_goal_projection(store) -> list[dict]:
             "run_status": run.get("status"), "runtime_updated_at": run.get("updated_at"),
             "run_type": "goal_run", "pursuit_kind": "goal",
             "supports_goal_ids": supports.get(goal["id"], []),
+            "blocks_goal_ids": blocks.get(goal["id"], []),
             "source_model": "clean-core",
         })
     return values

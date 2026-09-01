@@ -173,37 +173,42 @@ class CleanCoreAcceptanceTests(unittest.TestCase):
         runtime.advance(goal.id)
         self.assertEqual(runtime.goals.get(goal.id).status, "complete")
 
-    def test_goal_tree_and_support_dag_are_independent_and_acyclic(self):
+    def test_parent_support_and_block_graphs_are_independent_and_acyclic(self):
         runtime = GoalRuntime(
             self.db, ScenarioController(), FunctionExecutor({}))
         north = runtime.create_goal("Revenue", "revenue", ">=", 10)
         outbound = runtime.create_goal(
             "Outbound", "replies", ">=", 4, parent_id=north.id)
         quality = runtime.create_goal("Lead quality", "quality", ">=", 8)
+        capacity = runtime.create_goal("Delivery capacity", "capacity", ">=", 4)
         runtime.goals.add_support(quality.id, outbound.id)
+        runtime.goals.add_block(capacity.id, outbound.id)
         self.assertEqual(runtime.goals.get(outbound.id).parent_id, north.id)
         self.assertEqual(runtime.goals.supports(quality.id)[0].id, outbound.id)
+        self.assertEqual(runtime.goals.blocks(capacity.id)[0].id, outbound.id)
         with self.assertRaisesRegex(ValueError, "DAG cycle"):
             runtime.goals.add_support(outbound.id, quality.id)
+        with self.assertRaisesRegex(ValueError, "DAG cycle"):
+            runtime.goals.add_block(outbound.id, capacity.id)
         with self.assertRaisesRegex(ValueError, "tree cycle"):
             runtime.goals.set_parent(north.id, outbound.id)
 
-    def test_scheduler_honors_support_dependencies_and_priority(self):
+    def test_scheduler_uses_blocks_but_not_supports_for_eligibility(self):
         runtime = GoalRuntime(self.db, ScenarioController(), FunctionExecutor({}))
-        prerequisite = runtime.create_goal(
-            "Prerequisite", "ready", "eq", True, config={"priority": "normal"})
-        dependent = runtime.create_goal(
-            "Dependent", "ready", "eq", True, config={"priority": "critical"})
-        urgent = runtime.create_goal(
-            "Urgent", "ready", "eq", True, config={"priority": "critical"})
-        runtime.goals.add_support(prerequisite.id, dependent.id)
+        supporter = runtime.create_goal("Supporter", "ready", "eq", True)
+        supported = runtime.create_goal("Supported", "ready", "eq", True)
+        blocker = runtime.create_goal("Blocker", "ready", "eq", True)
+        blocked = runtime.create_goal("Blocked", "ready", "eq", True)
+        runtime.goals.add_support(supporter.id, supported.id)
+        runtime.goals.add_block(blocker.id, blocked.id)
 
         ready = runtime.runs.ready()
 
-        self.assertEqual(ready[0].goal_id, urgent.id)
-        self.assertNotIn(dependent.id, [item.goal_id for item in ready])
-        runtime.goals.set_status(prerequisite.id, "complete")
-        self.assertIn(dependent.id, [item.goal_id for item in runtime.runs.ready()])
+        ready_goal_ids = [item.goal_id for item in ready]
+        self.assertIn(supported.id, ready_goal_ids)
+        self.assertNotIn(blocked.id, ready_goal_ids)
+        runtime.goals.set_status(blocker.id, "complete")
+        self.assertIn(blocked.id, [item.goal_id for item in runtime.runs.ready()])
 
     def test_strategy_memory_requires_same_run_evidence_owner_memory_does_not(self):
         runtime = GoalRuntime(

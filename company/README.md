@@ -35,7 +35,7 @@ new prompts, packages, commands, and output use the canonical terms above.
 Departments, Agents, assignments, artifacts, and friction in one read.
 
 `company observatory` opens the read-only living-system view. The default canvas
-places the Goal tree and support DAG above the active loop, Resolution work, and
+places the Goal tree, support DAG, and block DAG above the active loop, Resolution work, and
 the source-owned architecture layers. Focused views expose Workflows, Memory,
 Evidence, code dependencies, and coherence findings. When a persisted home has
 not yet migrated, the observer labels its historical state as an isolated
@@ -44,7 +44,8 @@ compatibility boundary; it never merges those records into clean-core state.
 ## Pursuit semantics and alignment
 
 A Goal is one measurable outcome. `parent_id` forms the human organizational
-tree; `supports` edges form a separate acyclic causal graph. There are no Goal
+tree; `supports` edges form a separate acyclic causal graph without gating
+execution, while only `blocks` edges gate scheduling. There are no Goal
 subclasses. Each Run is one adaptive OBSERVE → DECIDE → ACT → EVALUATE
 iteration. ACT creates an Intervention; execution, creation, repair, retry, and
 validation stay inside that Intervention's Resolution cycle.
