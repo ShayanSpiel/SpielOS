@@ -31,6 +31,11 @@ bounded Intervention. Resolution owns Workflow execution and may repair Agents,
 Skills, Connections, Workflows, Departments, or SpielOS itself. Local work does
 not create another Goal and does not wake the Goal after every Workflow step.
 
+Each Goal declares one deterministic Evidence aggregation: `count`, `sum`,
+`latest`, `max`, `min`, `boolean_all`, or `boolean_any`. The default is
+`latest`; aggregation spans the Goal's Runs and never switches semantics based
+on payload shape.
+
 Resolution has four outcomes:
 
 - `CONTINUE_LOCAL`: more local work is needed.

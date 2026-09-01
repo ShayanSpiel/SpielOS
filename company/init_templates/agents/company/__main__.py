@@ -223,6 +223,10 @@ def build_parser():
     create.add_argument("--name", required=True)
     create.add_argument("--owner", required=True)
     create.add_argument("--metric", required=True)
+    create.add_argument(
+        "--aggregation",
+        choices=("count", "sum", "latest", "max", "min", "boolean_all", "boolean_any"),
+        default="latest")
     create.add_argument("--operator", choices=("ge", "gt", "eq", "le", "lt"), default="ge")
     create.add_argument("--target", required=True)
     create.add_argument("--deadline")
@@ -712,6 +716,7 @@ def main(argv=None):
                 config["blocks_goal_ids"] = list(dict.fromkeys(args.blocks))
             if args.priority:
                 config["priority"] = args.priority
+            config["aggregation"] = args.aggregation
             output = runtime.create_goal(name=args.name, owner_id=args.owner, metric=args.metric,
                 operator=args.operator, target=scalar(args.target), deadline=args.deadline,
                 parent_id=args.parent, config=config, goal_id=args.id, run_type=args.run_type,

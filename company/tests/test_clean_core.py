@@ -210,6 +210,54 @@ class CleanCoreAcceptanceTests(unittest.TestCase):
         runtime.goals.set_status(blocker.id, "complete")
         self.assertIn(blocked.id, [item.goal_id for item in runtime.runs.ready()])
 
+    def test_goal_metric_aggregation_is_explicit_and_deterministic(self):
+        cases = {
+            "count": ((2, 5, 9), 3),
+            "sum": ((2, 5, 9), 16),
+            "latest": ((2, 5, 9), 9),
+            "max": ((2, 5, 9), 9),
+            "min": ((2, 5, 9), 2),
+            "boolean_all": ((True, False, True), False),
+            "boolean_any": ((True, False, False), True),
+        }
+        for aggregation, (values, expected) in cases.items():
+            with self.subTest(aggregation=aggregation), tempfile.TemporaryDirectory() as tmp:
+                runtime = CleanCommandRuntime(Path(tmp) / "company.sqlite")
+                created = runtime.create_goal(
+                    name=f"Aggregate {aggregation}", owner_id="analytics",
+                    metric="result", operator="ge", target=1,
+                    config={"aggregation": aggregation})
+                first_run = runtime.runs.current(created["id"])
+                runtime.evidence.record(
+                    goal_id=created["id"], run_id=first_run.id,
+                    kind="measurement", payload={"result": values[0]})
+                runtime.runs.update(first_run.id, status="complete")
+                second_run = runtime.runs.create(created["id"])
+                for value in values[1:]:
+                    runtime.evidence.record(
+                        goal_id=created["id"], run_id=second_run.id,
+                        kind="measurement", payload={"result": value})
+
+                runtime.runtime.advance(created["id"])
+
+                observation = runtime.runs.get(second_run.id).observation
+                self.assertEqual(observation["result"], expected)
+
+    def test_goal_metric_aggregation_defaults_to_latest_not_evidence_count(self):
+        runtime = CleanCommandRuntime(self.db)
+        created = runtime.create_goal(
+            name="Latest result", owner_id="analytics", metric="result",
+            operator="ge", target=1, config={})
+        run = runtime.runs.current(created["id"])
+        for value in (2, 5, 9):
+            runtime.evidence.record(
+                goal_id=created["id"], run_id=run.id, kind="measurement",
+                payload={"result": value})
+
+        runtime.runtime.advance(created["id"])
+
+        self.assertEqual(runtime.runs.get(run.id).observation["result"], 9)
+
     def test_strategy_memory_requires_same_run_evidence_owner_memory_does_not(self):
         runtime = GoalRuntime(
             self.db, ScenarioController(), FunctionExecutor({}))

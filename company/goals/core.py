@@ -11,6 +11,11 @@ from typing import Any
 from ..state import Database
 
 
+METRIC_AGGREGATIONS = frozenset({
+    "count", "sum", "latest", "max", "min", "boolean_all", "boolean_any",
+})
+
+
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -27,6 +32,7 @@ class Goal:
     owner_id: str = "goal-runtime"
     deadline: str | None = None
     config: dict[str, Any] | None = None
+    aggregation: str = "latest"
 
 
 @dataclass(frozen=True)
@@ -45,6 +51,10 @@ class GoalRepository:
                owner_id: str = "goal-runtime", deadline: str | None = None,
                config: dict[str, Any] | None = None) -> Goal:
         goal_id = goal_id or f"goal-{uuid.uuid4().hex[:12]}"
+        config = dict(config or {})
+        aggregation = config.get("aggregation", "latest")
+        if aggregation not in METRIC_AGGREGATIONS:
+            raise ValueError(f"invalid Goal metric aggregation: {aggregation}")
         if parent_id:
             self.get(parent_id)
         stamp = _now()
@@ -56,7 +66,7 @@ class GoalRepository:
             )
             connection.execute(
                 "INSERT INTO core_goal_metadata VALUES (?,?,?,?)",
-                (goal_id, owner_id, deadline, json.dumps(config or {})),
+                (goal_id, owner_id, deadline, json.dumps(config)),
             )
         return self.get(goal_id)
 
@@ -69,10 +79,14 @@ class GoalRepository:
             ).fetchone()
         if row is None:
             raise KeyError(f"unknown goal: {goal_id}")
+        config = json.loads(row["config_json"] or "{}")
+        aggregation = config.get("aggregation", "latest")
+        if aggregation not in METRIC_AGGREGATIONS:
+            raise ValueError(f"invalid Goal metric aggregation: {aggregation}")
         return Goal(row["id"], row["name"], row["metric"], row["operator"],
                     json.loads(row["target_json"]), row["parent_id"], row["status"],
-                    row["owner_id"] or "goal-runtime", row["deadline"],
-                    json.loads(row["config_json"] or "{}"))
+                    row["owner_id"] or "goal-runtime", row["deadline"], config,
+                    aggregation)
 
     def list(self) -> list[Goal]:
         with self.database.connect() as connection:

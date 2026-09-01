@@ -59,11 +59,25 @@ class CatalogController:
         handler = self.departments.get(goal.owner_id)
         kinds = tuple((getattr(handler, "evidence_metrics", {}) or {}).get(goal.metric) or ())
         matching = [item for item in context.evidence if not kinds or item.kind in kinds]
-        value = len(matching)
-        for item in matching:
-            candidate = item.payload.get(goal.metric)
-            if isinstance(candidate, (int, float, bool)):
-                value = candidate
+        candidates = [item.payload[goal.metric] for item in matching
+                      if isinstance(item.payload.get(goal.metric), (int, float, bool))]
+        aggregation = goal.aggregation
+        if aggregation == "count":
+            value = len(matching)
+        elif aggregation == "sum":
+            value = sum(item for item in candidates if not isinstance(item, bool))
+        elif aggregation == "latest":
+            value = candidates[-1] if candidates else 0
+        elif aggregation == "max":
+            numeric = [item for item in candidates if not isinstance(item, bool)]
+            value = max(numeric) if numeric else 0
+        elif aggregation == "min":
+            numeric = [item for item in candidates if not isinstance(item, bool)]
+            value = min(numeric) if numeric else 0
+        elif aggregation == "boolean_all":
+            value = bool(candidates) and all(item is True for item in candidates)
+        else:
+            value = any(item is True for item in candidates)
         if goal.owner_id == "director" and goal.metric == "all_children_achieved":
             children = [item for item in self.goals.list() if item.parent_id == goal.id]
             value = bool(children) and all(item.status == "complete" for item in children)
@@ -206,6 +220,7 @@ class CleanCommandRuntime:
         run = self.runs.current(goal.id)
         return {"id": goal.id, "name": goal.name, "owner_id": goal.owner_id,
                 "metric": goal.metric, "operator": goal.operator, "target": goal.target,
+                "aggregation": goal.aggregation,
                 "deadline": goal.deadline, "parent_id": goal.parent_id,
                 "goal_status": "achieved" if goal.status == "complete" else goal.status,
                 "config": goal.config or {}, "run_id": run.id, "run_type": "execution",
