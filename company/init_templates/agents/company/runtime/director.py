@@ -23,7 +23,7 @@ class Director(GoalHandler):
     default_strategy_context = {
         "topics": ["company", "focus", "goals", "priorities", "evidence"],
         "scopes": ["director"],
-        "layers": ["intent", "policy", "constitution"],
+        "categories": ["company", "priorities", "constraints"],
     }
     goal_schema = {
         "metrics": list(config.director_metrics()),
@@ -136,7 +136,7 @@ class Director(GoalHandler):
                     "rationale": (
                         "Competent execution and a trustworthy system produced "
                         "three rejected business hypotheses; test the declared "
-                        f"{strategic['strategic_level']} candidate next"),
+                        f"{strategic['strategy_category']} candidate next"),
                     "evidence_ids": strategic["supporting_evidence_ids"],
                     "next_run_type": "business_experiment",
                     "payload": strategic,

@@ -1,16 +1,16 @@
 {
-  "schema_version": "1.0",
-  "authority": ".agents/company/strategy/ plus referenced company Constitution sections",
+  "schema_version": "2.0",
+  "authority": ".agents/company/strategy/",
   "views": {
     "icp": "strategy/icp.md",
     "positioning": "strategy/positioning.md",
     "voice": "strategy/voice.md",
     "measurement": "strategy/measurement.md"
   },
-  "layers": {
-    "intent": [
+  "categories": {
+    "company": [
       {
-        "id": "intent.focus_doctrine",
+        "id": "company.focus_doctrine",
         "source": "strategy/focus.md",
         "heading": "Focus doctrine",
         "topics": ["company", "focus", "goals", "priorities"],
@@ -18,7 +18,7 @@
         "required": true
       },
       {
-        "id": "intent.operating_thesis",
+        "id": "company.operating_thesis",
         "source": "strategy/operating-thesis.md",
         "heading": "Operating thesis",
         "topics": ["company", "product", "proof"],
@@ -26,95 +26,79 @@
         "required": true
       }
     ],
-    "model": [
+    "icp": [
       {
-        "id": "model.icp.buyer",
+        "id": "icp.buyer",
         "source": "strategy/icp.md",
         "heading": "Who it is",
         "topics": ["buyer", "customer", "icp"],
         "scopes": ["content", "outbound", "product", "sales"]
       },
       {
-        "id": "model.icp.exclusions",
+        "id": "icp.exclusions",
         "source": "strategy/icp.md",
         "heading": "Who it is NOT",
         "topics": ["buyer", "customer", "exclusions", "icp"],
         "scopes": ["content", "outbound", "product", "sales"]
-      },
+      }
+    ],
+    "positioning": [
       {
-        "id": "model.positioning.category",
+        "id": "positioning.category",
         "source": "strategy/positioning.md",
         "heading": "Category",
         "topics": ["category", "positioning", "product"],
         "scopes": ["content", "outbound", "product", "sales"]
       },
       {
-        "id": "model.positioning.promise",
+        "id": "positioning.promise",
         "source": "strategy/positioning.md",
         "heading": "Buyer-facing promise",
         "topics": ["offer", "positioning", "promise"],
         "scopes": ["content", "outbound", "product", "sales"]
       }
     ],
-    "policy": [
+    "priorities": [
       {
-        "id": "policy.positioning.paths",
+        "id": "priorities.commercial_paths",
         "source": "strategy/positioning.md",
         "heading": "Commercial paths",
         "topics": ["commercial", "offer", "sales"],
         "scopes": ["content", "outbound", "product", "sales"]
-      },
+      }
+    ],
+    "constraints": [
       {
-        "id": "policy.positioning.guardrails",
+        "id": "constraints.positioning_guardrails",
         "source": "strategy/positioning.md",
         "heading": "Guardrails",
         "topics": ["claims", "positioning", "safety"],
-        "scopes": ["content", "outbound", "product", "sales"]
+        "scopes": ["all"],
+        "required": true
       },
       {
-        "id": "policy.voice.one_idea",
+        "id": "constraints.measurement_evidence",
+        "source": "strategy/measurement.md",
+        "heading": "Evidence classes",
+        "topics": ["evidence", "measurement", "metrics"],
+        "scopes": ["all"],
+        "required": true
+      }
+    ],
+    "preferences": [
+      {
+        "id": "preferences.voice_one_idea",
         "source": "strategy/voice.md",
         "heading": "One idea",
         "topics": ["content", "voice", "writing"],
         "scopes": ["content"]
       },
       {
-        "id": "policy.voice.copy_shape",
+        "id": "preferences.voice_copy_shape",
         "source": "strategy/voice.md",
         "heading": "Copy shape",
         "topics": ["content", "voice", "writing"],
         "scopes": ["content"]
-      },
-      {
-        "id": "policy.measurement.evidence",
-        "source": "strategy/measurement.md",
-        "heading": "Evidence classes",
-        "topics": ["evidence", "measurement", "metrics"],
-        "scopes": ["all"]
-      }
-    ],
-    "constitution": [
-      {
-        "id": "constitution.vocabulary",
-        "source": "README.md",
-        "heading": "Universal vocabulary",
-        "topics": ["architecture", "authority", "vocabulary"],
-        "scopes": ["director", "runtime", "system-improvement"]
-      },
-      {
-        "id": "constitution.pursuit",
-        "source": "README.md",
-        "heading": "Pursuit semantics and alignment",
-        "topics": ["alignment", "goals", "runtime"],
-        "scopes": ["director", "runtime", "system-improvement"]
-      },
-      {
-        "id": "constitution.safety",
-        "source": "README.md",
-        "heading": "Safety and system improvement",
-        "topics": ["approval", "authority", "evidence", "safety"],
-        "scopes": ["all"],
-        "required": true
       }
     ]
   }

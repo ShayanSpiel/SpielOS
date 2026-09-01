@@ -1,21 +1,16 @@
-"""Discover Departments and the two internal control handlers."""
+"""Discover declarative Department packages for the canonical clean core."""
 
 import importlib
 import pkgutil
 
 from .. import departments as department_package
-from .director import Director
-from .models import Department, GoalHandler
-from .system_improvement import SystemImprovement
+from ..departments import DepartmentManifest
 
 
-def handlers() -> dict[str, GoalHandler]:
-    """Internal lookup used by the loop; callers should use the catalog."""
+def departments() -> dict[str, DepartmentManifest]:
+    """Return portable declarations only; execution belongs to GoalRuntime."""
 
-    installed: dict[str, GoalHandler] = {
-        "director": Director(),
-        "system-improvement": SystemImprovement(),
-    }
+    installed: dict[str, DepartmentManifest] = {}
     for module_info in pkgutil.iter_modules(department_package.__path__):
         if module_info.name.startswith("_"):
             continue
@@ -26,22 +21,34 @@ def handlers() -> dict[str, GoalHandler]:
             if error.name == module_name:
                 continue
             raise
-        candidates = [
-            value for value in vars(module).values()
-            if isinstance(value, type)
-            and issubclass(value, Department)
-            and value is not Department
-            and value.__module__ == module.__name__
-        ]
+        candidates = [value for value in vars(module).values()
+                      if isinstance(value, type)
+                      and value.__module__ == module.__name__
+                      and getattr(value, "department_id", None)]
         if len(candidates) != 1:
             raise ValueError(f"{module.__name__} must export exactly one Department")
-        instance = candidates[0]()
-        if instance.id in installed:
-            raise ValueError(f"duplicate goal owner: {instance.id}")
-        installed[instance.id] = instance
+        declaration = candidates[0]()
+        department_id = declaration.department_id or declaration.id
+        workflows = tuple(getattr(declaration, "workflows", ()) or ())
+        skill_ids = tuple(dict.fromkeys(
+            skill for workflow in workflows for skill in workflow.skill_ids))
+        connection_ids = tuple(dict.fromkeys(
+            connection for workflow in workflows for connection in workflow.connection_ids))
+        manifest = DepartmentManifest(
+            department_id, getattr(declaration, "version", "0.0.0"),
+            getattr(declaration, "description", ""), workflows,
+            tuple(getattr(declaration, "agent_ids", ()) or ()), skill_ids,
+            connection_ids,
+            dict(getattr(declaration, "evidence_metrics", {}) or {}),
+            dict(getattr(declaration, "goal_schema", {}) or {}),
+            dict(getattr(declaration, "workflow_agents", {}) or {}))
+        if manifest.id in installed:
+            raise ValueError(f"duplicate Department: {manifest.id}")
+        installed[manifest.id] = manifest
     return installed
 
 
-def departments() -> dict[str, Department]:
-    return {key: value for key, value in handlers().items()
-            if isinstance(value, Department)}
+def handlers() -> dict[str, DepartmentManifest]:
+    """Deprecated declaration alias; canonical entries are not GoalHandlers."""
+
+    return departments()

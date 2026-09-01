@@ -17,11 +17,23 @@ class WorkflowStep:
     id: str
     agent_id: str
     instruction: str
-    evidence_kind: str
+    evidence_kind: str | None = None
     approval_key: str | None = None
     skill_ids: tuple[str, ...] = ()
     connection_ids: tuple[str, ...] = ()
     requirements: dict = field(default_factory=dict)
+    evidence_kinds: tuple[str, ...] = ()
+    approval_keys: tuple[str, ...] = ()
+
+    def __post_init__(self):
+        evidence_kinds = tuple(dict.fromkeys(
+            self.evidence_kinds or ((self.evidence_kind,) if self.evidence_kind else ())))
+        approval_keys = tuple(dict.fromkeys(
+            self.approval_keys or ((self.approval_key,) if self.approval_key else ())))
+        object.__setattr__(self, "evidence_kinds", evidence_kinds)
+        object.__setattr__(self, "approval_keys", approval_keys)
+        object.__setattr__(self, "evidence_kind", evidence_kinds[0] if evidence_kinds else None)
+        object.__setattr__(self, "approval_key", approval_keys[0] if approval_keys else None)
 
 
 @dataclass(frozen=True)

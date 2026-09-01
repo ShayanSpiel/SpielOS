@@ -1,4 +1,4 @@
-"""Evidence gate for moving repeated business failure to strategic altitude."""
+"""Evidence gate for proposing a bounded strategy change."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ MIN_STRATEGIC_FAILURES = 3
 
 
 def strategic_frontier(children: list[dict] | tuple[dict, ...]) -> dict | None:
-    """Build one bounded Policy/Model experiment proposal when warranted."""
+    """Build one bounded business-context experiment proposal when warranted."""
 
     for child in children or ():
         history = list(child.get("history") or ())[:MIN_STRATEGIC_FAILURES]
@@ -55,7 +55,8 @@ def strategic_frontier(children: list[dict] | tuple[dict, ...]) -> dict | None:
             confidence = float(candidate.get("confidence"))
         except (TypeError, ValueError):
             continue
-        if (kind not in {"policy", "model"} or not proposal or not scope
+        if (kind not in {"company", "icp", "positioning", "priorities",
+                         "constraints", "preferences"} or not proposal or not scope
                 or not contradictions or not isinstance(experiment, dict)
                 or not all(experiment.get(key) for key in (
                     "hypothesis", "changed_variable", "stop_condition"))
@@ -65,7 +66,7 @@ def strategic_frontier(children: list[dict] | tuple[dict, ...]) -> dict | None:
             "action": "propose_strategic_experiment",
             "status": "proposed",
             "source_goal_id": child["id"],
-            "strategic_level": kind,
+            "strategy_category": kind,
             "proposal": proposal,
             "scope": scope,
             "experiment": experiment,
@@ -79,7 +80,7 @@ def strategic_frontier(children: list[dict] | tuple[dict, ...]) -> dict | None:
                 "execution": "competent",
                 "system": "trustworthy",
                 "persistent_business_failure": True,
-                "next_altitude": kind,
+                "proposed_category": kind,
             },
             "required_owner_authority": True,
             "strategy_mutated": False,

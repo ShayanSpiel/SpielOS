@@ -45,8 +45,8 @@ def catalog():
         "runtime": {
             "version": runtime_config.VERSION,
             "loop": ["GOAL", "OBSERVE", "DECIDE", "ACT", "EVALUATE"],
-            "controls": ["director", "system-improvement"],
-            "department_runtime": "interpreter",
+            "owner_agent": "director",
+            "department_runtime": "declarative manifests executed by GoalRuntime",
             "goal_authority": ".spielos/state/company.sqlite",
             "strategy_kernel": strategy_kernel_summary(),
         },

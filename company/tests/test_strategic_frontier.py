@@ -96,7 +96,7 @@ class StrategicFrontierTests(unittest.TestCase):
             config={
                 "failure_mode": mode,
                 "strategic_candidate": {
-                    "kind": "model",
+                    "kind": "positioning",
                     "proposal": "Test whether the ICP problem framing is wrong",
                     "scope": "outbound positioning for the canonical ICP",
                     "experiment": {
@@ -129,7 +129,7 @@ class StrategicFrontierTests(unittest.TestCase):
         self.assertEqual(1, len(decisions))
         decision = decisions[0]
         proposal = decision["payload"]
-        self.assertEqual("model", proposal["strategic_level"])
+        self.assertEqual("positioning", proposal["strategy_category"])
         self.assertEqual(3, len(proposal["failed_run_ids"]))
         self.assertEqual(3, len(proposal["rejected_hypothesis_ids"]))
         self.assertEqual(3, len(decision["evidence_ids"]))

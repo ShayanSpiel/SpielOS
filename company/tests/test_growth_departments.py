@@ -5,6 +5,7 @@ from unittest.mock import patch
 from urllib.error import HTTPError
 
 from company.connections import connection, connections
+from company.departments import DepartmentManifest
 from company.departments.analytics.posthog import (
     FUNNEL_EVENTS, LEAD_SUCCESS_EVENTS, PostHogClient, PostHogError,
     consume_batch_evidence, posthog_token,
@@ -12,7 +13,8 @@ from company.departments.analytics.posthog import (
 from company.departments.design.department import accept_design_order, validate_design_order
 from company.departments.seo.keywords import build_opportunities
 from company.runtime.catalog import catalog
-from company.runtime.models import Department, GoalContext, Goal
+from company.runtime.models import GoalContext, Goal
+from company.runtime.legacy_registry import handlers as legacy_handlers
 from company.runtime.registry import departments
 from company.tests.test_campaign_handoff_contract import campaign_manifest
 
@@ -23,13 +25,15 @@ class GrowthDepartmentTests(unittest.TestCase):
         self.assertEqual({"outbound", "content", "design", "analytics", "seo",
                           "client_delivery", "videography"},
                          set(installed))
-        self.assertTrue(all(isinstance(item, Department) for item in installed.values()))
+        self.assertTrue(all(isinstance(item, DepartmentManifest)
+                            for item in installed.values()))
 
     def test_catalog_exposes_only_universal_building_blocks(self):
         value = catalog()
         self.assertNotIn("tools", value)
         self.assertNotIn("control_engines", value)
-        self.assertEqual("interpreter", value["runtime"]["department_runtime"])
+        self.assertEqual("declarative manifests executed by GoalRuntime",
+                         value["runtime"]["department_runtime"])
         self.assertTrue({"attio", "buffer", "cal-booking", "posthog",
                          "search-console", "website", "web-research",
                          "email-delivery", "google-drive", "google-sheets",
@@ -85,7 +89,7 @@ class GrowthDepartmentTests(unittest.TestCase):
     def test_department_requests_agent_then_evaluates_typed_evidence(self):
         goal = Goal("g", "graphics", "design", "approved_designs", "ge", 1,
                     None, None, "active", {"workflow": "social-visual"})
-        department = departments()["design"]
+        department = legacy_handlers()["design"]
         ctx = GoalContext(goal, {"evidence": []}, (), lambda _: None)
         decision = department.decide(ctx, department.observe(ctx).payload)
         self.assertEqual("request_agent", decision.payload["action"])
@@ -102,7 +106,7 @@ class GrowthDepartmentTests(unittest.TestCase):
                     None, None, "active",
                     {"workflow": "publish", "connection": "buffer", "execution_mode": "dry_run"})
         evidence = [{"kind": "content_package", "payload": {"channel_id": "channel", "text": "hello"}}]
-        department = departments()["content"]
+        department = legacy_handlers()["content"]
         waiting = GoalContext(goal, {"evidence": evidence}, (), lambda _: None)
         observation = department.observe(waiting).payload
         decision = department.decide(waiting, observation)

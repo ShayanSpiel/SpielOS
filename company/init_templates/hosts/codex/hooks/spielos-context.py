@@ -21,6 +21,7 @@ def main() -> int:
         root = _root(Path.cwd().resolve())
         vendored = root / ".agents"
         sys.path.insert(0, str(vendored if vendored.is_dir() else root))
+        from company.commands import CleanCommandRuntime, goal_authority
         from company.runtime.context import ContextAssembler, codex_hook_output
         from company.runtime.store import Store
 
@@ -29,11 +30,15 @@ def main() -> int:
             return 0
         event_name = str(request.get("hook_event_name") or request.get("hookEventName") or
                          "UserPromptSubmit")
-        projection = ContextAssembler(
-            Store(database, readonly=True), project_root=root).assemble(
+        if goal_authority(database) == "clean-core":
+            projection = CleanCommandRuntime(database, readonly=True).assemble_context(
                 prompt=str(request.get("prompt") or ""),
-                boot=event_name == "SessionStart",
-                owner_id="director")
+                boot=event_name == "SessionStart", owner_id="director")
+        else:
+            projection = ContextAssembler(
+                Store(database, readonly=True), project_root=root).assemble(
+                    prompt=str(request.get("prompt") or ""),
+                    boot=event_name == "SessionStart", owner_id="director")
         print(json.dumps(codex_hook_output(projection, event_name), ensure_ascii=False))
     except Exception:
         # Host startup must remain available if state is absent or outdated.

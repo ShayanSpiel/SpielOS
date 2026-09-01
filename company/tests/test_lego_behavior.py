@@ -13,6 +13,7 @@ from company.runtime.loop import Runtime
 from company.runtime.models import Department, Goal, GoalContext, WorkflowSpec, WorkflowStep
 from company.runtime.package import validate_package
 from company.runtime.registry import departments
+from company.runtime.legacy_registry import handlers as legacy_handlers
 from company.tests.test_campaign_handoff_contract import campaign_manifest
 
 
@@ -25,7 +26,7 @@ class RequiresAllKindsTests(unittest.TestCase):
             ("campaign_manifest", "render_report")))
 
     def test_content_quality_gate_waits_for_render_report(self):
-        department = departments()["content"]
+        department = legacy_handlers()["content"]
         goal = Goal("g", "Campaign", "content", "published_items", "ge", 1,
                     None, None, "active", {"workflow": "content-campaign"})
         ctx = GoalContext(goal, {"evidence": [
@@ -46,7 +47,7 @@ class RequiresAllKindsTests(unittest.TestCase):
 
 class SharedInterpreterFlowTests(unittest.TestCase):
     def test_content_publish_uses_interpreter_approval_then_connection(self):
-        department = departments()["content"]
+        department = legacy_handlers()["content"]
         self.assertIsInstance(department, InterpretedDepartment)
         goal = Goal("g", "publish", "content", "published_items", "ge", 1,
                     None, None, "active",
@@ -73,7 +74,7 @@ class SharedInterpreterFlowTests(unittest.TestCase):
             self.assertEqual(["funnel_report"], order["accepts_evidence"])
 
     def test_outbound_social_research_uses_interpreter_not_custom_stages(self):
-        department = departments()["outbound"]
+        department = legacy_handlers()["outbound"]
         goal = Goal("g", "Research", "outbound", "qualified_social_leads", "ge", 1,
                     None, None, "active", {"workflow": "social-lead-research"})
         self.assertFalse(department.uses_email_exception(GoalContext(goal, {}, (), lambda _: None)))
@@ -100,7 +101,7 @@ class SharedInterpreterFlowTests(unittest.TestCase):
 
     def test_email_outreach_is_the_named_stage_exception(self):
         self.assertEqual(set(BESPOKE_STAGE_EXCEPTIONS), {"email-outreach"})
-        department = departments()["outbound"]
+        department = legacy_handlers()["outbound"]
         self.assertIsInstance(department, OutboundDepartment)
         email = Goal("g", "Send", "outbound", "reply_rate", "ge", 0.3,
                      None, None, "active", {"workflow": "email-outreach"})

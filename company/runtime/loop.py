@@ -31,7 +31,7 @@ from .models import (
 from .notifications import followup_payload, terminal_state_payload
 from .memory import eligible_memory
 from .strategy import select_strategy_context
-from .registry import handlers as installed_handlers
+from .legacy_registry import handlers as installed_handlers
 from .service import automation_enabled
 from .store import Store
 from .truth import achievement_allowed, countable_evidence, hypothesis_resolution
@@ -1082,8 +1082,8 @@ class CompatibilityRuntime:
         cycle = self.store.cycle(order["goal_id"])
         if cycle["run_status"] in {"blocked", "failed"}:
             self.retry(order["goal_id"])
-            from .runner import Runner
-            Runner(self).tick(order["goal_id"])
+            from .legacy_runner import LegacyRunner
+            LegacyRunner(self).tick(order["goal_id"])
         return {"work_order": completed, "goal": self.status(order["goal_id"])}
 
     def complete_change(self, task_id: str, *, passed: bool, result: dict,

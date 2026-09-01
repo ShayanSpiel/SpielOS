@@ -104,11 +104,11 @@ class CatalogController:
                                      "evidence_kind": goal.metric})
         workflow_id = f"{goal.owner_id}:{workflow_spec.id}"
         steps = []
-        pending_approval = None
+        pending_approvals = []
         graph = tuple(workflow_spec.graph or ())
         for node in graph:
             if node.kind == "approval":
-                pending_approval = f"step:{node.id}"
+                pending_approvals.append(f"step:{node.id}")
                 continue
             agent_id = node.agent_id
             if not agent_id:
@@ -119,20 +119,25 @@ class CatalogController:
                 else:
                     agent_id = (workflow_spec.agent_ids or handler.agent_ids or
                                 (goal.owner_id,))[0]
-            evidence_kind = (node.produces or (goal.metric,))[0]
             steps.append(WorkflowStep(
-                node.id, agent_id, f"Execute {workflow_spec.id} step {node.id}",
-                evidence_kind, pending_approval,
-                tuple(getattr(node, "skill_ids", ()) or ()),
-                tuple(getattr(node, "connection_ids", ()) or ()),
-                dict(getattr(node, "requirements", {}) or {})))
-            pending_approval = None
+                id=node.id, agent_id=agent_id,
+                instruction=f"Execute {workflow_spec.id} step {node.id}",
+                skill_ids=tuple(getattr(node, "skill_ids", ()) or ()),
+                connection_ids=tuple(getattr(node, "connection_ids", ()) or ()),
+                requirements=dict(getattr(node, "requirements", {}) or {}),
+                evidence_kinds=tuple(node.produces or (goal.metric,)),
+                approval_keys=tuple(pending_approvals)))
+            pending_approvals = []
+        if pending_approvals:
+            raise ValueError(
+                f"Workflow {workflow_spec.id} ends with approval-only nodes: "
+                + ", ".join(pending_approvals))
         if not steps:
             agent_id = (workflow_spec.agent_ids or handler.agent_ids or (goal.owner_id,))[0]
-            evidence_kind = (workflow_spec.evidence_sources or (goal.metric,))[0]
             steps.append(WorkflowStep(
-                workflow_spec.id, agent_id, workflow_spec.description,
-                evidence_kind, pending_approval))
+                id=workflow_spec.id, agent_id=agent_id,
+                instruction=workflow_spec.description,
+                evidence_kinds=tuple(workflow_spec.evidence_sources or (goal.metric,))))
         self.workflows.save(Workflow(
             workflow_id, workflow_spec.description, tuple(steps), goal.owner_id))
         return Decision("execute_workflow", workflow_spec.description, workflow_id)
@@ -203,6 +208,9 @@ class CleanCommandRuntime:
     def _require_writable(self) -> None:
         if self.readonly:
             raise PermissionError("clean-core runtime was opened read-only")
+
+    def connect(self):
+        return self.database.connect()
 
     def create_goal(self, **values) -> dict:
         self._require_writable()
@@ -292,12 +300,62 @@ class CleanCommandRuntime:
                 "recent_results": terminal[:recent_limit]}
 
     def topology_audit(self):
-        goals = self.goals.list(); roots = [item.id for item in goals if not item.parent_id]
+        goals = self.goals.list()
+        by_id = {item.id: item for item in goals}
+        roots = sorted(item.id for item in goals if not item.parent_id)
+        defects = []
+        for goal in goals:
+            if goal.parent_id and goal.parent_id not in by_id:
+                defects.append({"goal_id": goal.id, "kind": "missing_parent",
+                                "parent_id": goal.parent_id})
+            seen, current = {goal.id}, goal
+            while current.parent_id and current.parent_id in by_id:
+                if current.parent_id in seen:
+                    defects.append({"goal_id": goal.id, "kind": "parent_cycle"})
+                    break
+                seen.add(current.parent_id)
+                current = by_id[current.parent_id]
+        with self.database.connect() as connection:
+            edges = [dict(row) for row in connection.execute(
+                "SELECT source_goal_id,target_goal_id,relation FROM core_goal_edges")]
+        for relation in ("supports", "blocks"):
+            graph = {goal_id: set() for goal_id in by_id}
+            for edge in (item for item in edges if item["relation"] == relation):
+                source, target = edge["source_goal_id"], edge["target_goal_id"]
+                if source not in by_id or target not in by_id:
+                    defects.append({"goal_id": target, "kind": f"missing_{relation}_goal",
+                                    "source_goal_id": source,
+                                    "target_goal_id": target})
+                    continue
+                graph[source].add(target)
+                if (relation == "blocks" and by_id[source].status == "abandoned"
+                        and by_id[target].status == "active"):
+                    defects.append({
+                        "goal_id": target,
+                        "kind": "permanently_blocked_by_abandoned_goal",
+                        "blocker_goal_id": source})
+            visiting, visited = set(), set()
+            def visit(goal_id):
+                if goal_id in visiting:
+                    defects.append({"goal_id": goal_id,
+                                    "kind": f"{relation[:-1]}_cycle"})
+                    return
+                if goal_id in visited:
+                    return
+                visiting.add(goal_id)
+                for target in graph[goal_id]:
+                    visit(target)
+                visiting.remove(goal_id)
+                visited.add(goal_id)
+            for goal_id in sorted(graph):
+                visit(goal_id)
+        if len(roots) != 1:
+            defects.extend({"goal_id": item,
+                            "kind": "disconnected_non_primary_root"}
+                           for item in roots)
         return {"goal_count": len(goals), "root_goal_ids": roots,
                 "canonical_root_goal_id": roots[0] if len(roots) == 1 else None,
-                "defects": [] if len(roots) == 1 else [
-                    {"goal_id": item, "kind": "disconnected_non_primary_root"}
-                    for item in roots], "migration_plan": {"safe_first": []}}
+                "defects": defects, "migration_plan": {"safe_first": []}}
 
     def link_support(self, goal_id, target_id):
         self._require_writable()
@@ -498,7 +556,7 @@ class CleanCommandRuntime:
                 "run_id": run.id if run else None,
                 "workflow_id": workflow_id}
 
-    def notifications(self, status="pending", goal_id=None, limit=100, **_kwargs):
+    def notifications(self, status="pending", limit=100, goal_id=None, **_kwargs):
         clauses, args = ["status=?"], [status]
         if goal_id:
             clauses.append("goal_id=?"); args.append(goal_id)
@@ -509,9 +567,10 @@ class CleanCommandRuntime:
             return [{**dict(row), "payload": json.loads(row["payload_json"])}
                     for row in rows]
 
-    def attention(self, goal_id=None, **_kwargs):
+    def attention(self, limit=100, goal_id=None, **_kwargs):
         return [{"id": item["id"], "kind": item["kind"],
-                 **item["payload"]} for item in self.notifications(goal_id=goal_id)]
+                 **item["payload"]} for item in self.notifications(
+                     goal_id=goal_id, limit=limit)]
 
     def unread_results(self, goal_id=None, **_kwargs):
         clauses, args = ["r.status='complete'"], []

@@ -138,6 +138,13 @@ class WorkOrderRepository:
                 raise KeyError(f"unknown work order: {order_id}")
             if row["status"] != "claimed" or row["claimed_by"] != executor_id:
                 raise RuntimeError("only the claiming Agent executor can complete a WorkOrder")
+            required_kinds = set(json.loads(row["brief_json"]).get("evidence_kinds") or ())
+            supplied_kinds = {item_kind for item_kind, _ in items}
+            if required_kinds and not required_kinds.issubset(supplied_kinds):
+                missing = sorted(required_kinds - supplied_kinds)
+                raise ValueError(
+                    "WorkOrder completion is missing required Evidence: "
+                    + ", ".join(missing))
             connection.execute("""UPDATE core_work_orders
                 SET status='completed',result_json=?,lease_expires_at=NULL,updated_at=?
                 WHERE id=?""", (json.dumps(result), stamp, order_id))

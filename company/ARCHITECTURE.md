@@ -79,6 +79,16 @@ Dependencies point inward through these contracts. Goals do not import
 Workflows or Agents. Hosts do not own Goal semantics. Departments are packages,
 not runtimes.
 
+The canonical Department registry exposes `DepartmentManifest` declarations;
+it never registers GoalHandlers. Director is an owner-facing Agent that creates
+or changes Goals and answers escalations, not a control loop. Improving SpielOS
+is an ordinary Goal whose Intervention diagnoses, repairs, retries, and
+validates the relevant Agent, Skill, Connection, Workflow, or runtime code.
+
+Strategy is plain business context grouped as company, ICP, positioning,
+priorities, constraints, and preferences. These categories do not participate
+in stage transitions or form a control hierarchy.
+
 An Agent is execution identity, a Skill is a reusable method, a Capability is
 a raw ability, a Connection is external access, a Workflow is a reusable
 process, and a WorkOrder is one exact instance of work. These meanings are not
@@ -88,9 +98,9 @@ interchangeable.
 
 The Observatory is a read-only projection, not a second runtime. It combines a
 static map derived from the source contracts with live rows from the one SQLite
-database. Goal hierarchy and `supports` edges remain separately identifiable on
-the same canvas; Runs, Interventions, WorkflowRuns, WorkOrders, Evidence, and
-Memory retain their causal relations.
+database. Goal hierarchy, `supports`, and `blocks` edges remain separately
+identifiable on the same canvas; Runs, Interventions, WorkflowRuns, WorkOrders,
+Evidence, and Memory retain their causal relations.
 
 Clean-core tables are the sole live authority as soon as they contain Goals.
 Until then, persisted historical state is shown behind an explicit compatibility

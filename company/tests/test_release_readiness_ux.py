@@ -29,7 +29,7 @@ class OrientationTests(unittest.TestCase):
         package = json.loads((root / "package.json").read_text())
         workflow = (root / ".github/workflows/publish.yml").read_text()
 
-        self.assertEqual("8.0.2", VERSION)
+        self.assertEqual("9.0.0", VERSION)
         self.assertEqual(VERSION, package["version"])
         self.assertIn("npm@^11.5.1", workflow)
         self.assertNotIn("NPM_TOKEN", workflow)

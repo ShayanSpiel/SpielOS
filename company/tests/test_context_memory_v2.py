@@ -155,9 +155,13 @@ class ContextMemoryV2Tests(unittest.TestCase):
         self.assertNotIn("Fresh-home route", active["context"])
 
     def test_memory_summary_counts_profile_as_durable_memory(self):
-        claim = self.store.set_profile_claim(
-            namespace="operating_principles", claim_key="review_ux",
-            value="Review UX and Director tone", source_ref="chat:1")
+        profile_output = io.StringIO()
+        with redirect_stdout(profile_output):
+            self.assertEqual(0, main([
+                "--db", str(self.store.path), "profile", "set",
+                "--namespace", "operating_principles", "--key", "review_ux",
+                "--value", "Review UX and Director tone", "--json"]))
+        claim = json.loads(profile_output.getvalue())
         output = io.StringIO()
         with redirect_stdout(output):
             exit_code = main([
@@ -165,16 +169,17 @@ class ContextMemoryV2Tests(unittest.TestCase):
         payload = json.loads(output.getvalue())
 
         self.assertEqual(0, exit_code)
-        self.assertEqual(1, payload["counts"]["company_profile"])
+        self.assertEqual(1, payload["counts"]["owner"])
         self.assertEqual(
-            claim["id"], payload["durable_memory"]["company_profile"][0]["id"])
-        self.assertEqual(0, payload["counts"]["experiment_learning"])
-        self.assertIn("does not mean owner profile memory is absent",
-                      payload["interpretation"])
-
-        projection = ContextAssembler(self.store, project_root=self.root).assemble(
-            prompt="what permanent instructions do you remember?", owner_id="director")
-        self.assertIn("Durable company memory · owner direction", projection["context"])
+            claim["id"], payload["durable_memory"]["owner"][0]["id"])
+        self.assertEqual(0, payload["counts"]["strategy"])
+        context_output = io.StringIO()
+        with redirect_stdout(context_output):
+            self.assertEqual(0, main([
+                "--db", str(self.store.path), "context", "--prompt",
+                "what permanent instructions do you remember?", "--json"]))
+        projection = json.loads(context_output.getvalue())
+        self.assertIn("operating_principles.review_ux", projection["context"])
         self.assertIn("Review UX and Director tone", projection["context"])
 
 

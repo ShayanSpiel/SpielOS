@@ -1,7 +1,7 @@
 """Live, read-only architecture observability for a SpielOS home.
 
 The observatory deliberately projects existing authorities instead of creating a
-second state model: SQLite owns operations, Strategy owns intent/policy, package
+second state model: SQLite owns operations, Strategy owns business context, package
 registries own capabilities, and the artifact tree owns deliverables.
 """
 
@@ -266,19 +266,20 @@ def _add_strategy(graph: Graph, project_root: Path) -> dict:
         status="healthy", source=str(summary.get("authority") or ""), meta={
             "mutation": summary.get("mutation"), "state_hash": summary.get("state_hash"),
         })
-    for layer, sections in (summary.get("layers") or {}).items():
-        layer_id = graph.node(
-            f"strategy-layer:{layer}", kind="strategy_layer", label=layer.title(),
+    for category, sections in (summary.get("categories") or {}).items():
+        category_id = graph.node(
+            f"strategy-category:{category}", kind="strategy_category",
+            label=category.title(),
             layer="direction", subtitle=f"{len(sections)} sections", status="healthy",
             meta={"section_count": len(sections)})
-        graph.edge(root_id, layer_id, "contains")
+        graph.edge(root_id, category_id, "contains")
         for section in sections:
             identifier = f"strategy:{section['id']}"
             graph.node(identifier, kind="strategy_section", label=section.get("heading") or section["id"],
                        layer="direction", subtitle=section.get("source", ""),
                        status="healthy" if section.get("required") else "neutral",
                        source=section.get("source"), meta=section)
-            graph.edge(layer_id, identifier, "defines")
+            graph.edge(category_id, identifier, "contains")
     return summary
 
 
@@ -500,6 +501,7 @@ def _add_runtime_state(graph: Graph, runtime, goals: list[dict], tables: list[di
             meta={key: goal.get(key) for key in (
                 "id", "owner_id", "goal_status", "priority", "pursuit_kind", "metric",
                 "operator", "target", "deadline", "parent_id", "supports_goal_ids",
+                "blocks_goal_ids",
                 "run_id", "run_type", "run_status", "stage", "step", "why_next",
                 "evidence_count", "verdict", "goal_met", "created_at", "updated_at",
                 "runtime_updated_at", "causal_lineage")})
@@ -513,6 +515,9 @@ def _add_runtime_state(graph: Graph, runtime, goals: list[dict], tables: list[di
         for target in goal.get("supports_goal_ids") or ():
             if target in goal_ids:
                 graph.edge(goal_node, f"goal:{target}", "supports", status="active")
+        for target in goal.get("blocks_goal_ids") or ():
+            if target in goal_ids:
+                graph.edge(goal_node, f"goal:{target}", "blocks", status="active")
         run_id = goal.get("run_id")
         if run_id:
             run_status = goal.get("run_status") or "unknown"
@@ -866,66 +871,14 @@ def _activity(runtime) -> list[dict]:
     return values
 
 
-def _core_topology_audit(graph: Graph, goals: list[dict]) -> dict:
-    """Validate the clean Goal tree and support DAG without trusting row order."""
-
-    by_id = {item["id"]: item for item in goals}
-    roots = sorted(item["id"] for item in goals if not item.get("parent_id"))
-    defects = []
-    for goal in goals:
-        parent_id = goal.get("parent_id")
-        if parent_id and parent_id not in by_id:
-            defects.append({"goal_id": goal["id"], "kind": "missing_parent"})
-            continue
-        seen = {goal["id"]}
-        current = goal
-        while current.get("parent_id"):
-            parent_id = current["parent_id"]
-            if parent_id in seen:
-                defects.append({"goal_id": goal["id"], "kind": "parent_cycle"})
-                break
-            seen.add(parent_id)
-            current = by_id.get(parent_id, {})
-
-    support = {goal_id: set() for goal_id in by_id}
-    for edge in graph.edges.values():
-        if edge.get("relation") != "supports":
-            continue
-        source = str(edge.get("source", "")).removeprefix("goal:")
-        target = str(edge.get("target", "")).removeprefix("goal:")
-        if source in support and target in by_id:
-            support[source].add(target)
-
-    visiting, visited = set(), set()
-    def visit(goal_id: str) -> None:
-        if goal_id in visiting:
-            defects.append({"goal_id": goal_id, "kind": "support_cycle"})
-            return
-        if goal_id in visited:
-            return
-        visiting.add(goal_id)
-        for target in support[goal_id]:
-            visit(target)
-        visiting.remove(goal_id)
-        visited.add(goal_id)
-    for goal_id in sorted(support):
-        visit(goal_id)
-
-    if len(roots) != 1:
-        defects.extend({"goal_id": goal_id, "kind": "disconnected_non_primary_root"}
-                       for goal_id in roots)
-    return {
-        "canonical_root_goal_id": roots[0] if len(roots) == 1 else None,
-        "root_goal_ids": roots,
-        "defects": defects,
-    }
-
-
 def _coherence(graph: Graph, runtime, goals: list[dict], project_root: Path,
                graph_inventory: dict, runtime_state: dict) -> dict:
     source_model = goals[0].get("source_model") if goals else "compatibility"
-    audit = (runtime.topology_audit() if source_model == "compatibility"
-             else _core_topology_audit(graph, goals))
+    if source_model == "clean-core" and not hasattr(runtime, "clean_memory_summary"):
+        from ..commands import CleanCommandRuntime
+        audit = CleanCommandRuntime(runtime.store.path, readonly=True).topology_audit()
+    else:
+        audit = runtime.topology_audit()
     active_goals = [goal for goal in goals if goal.get("goal_status") == "active"]
     active_goal_ids = {goal["id"] for goal in active_goals}
     active_defects = [defect for defect in audit.get("defects") or ()

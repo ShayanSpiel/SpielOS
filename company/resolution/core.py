@@ -166,12 +166,14 @@ class ResolutionCycle:
                 return self._finish(intervention, ResolutionOutcome.RETURN_TO_GOAL,
                                     "workflow completed and validated")
             step = workflow_run.steps[workflow_run.current_step]
-            if step.approval_key and self.approvals.status(
-                    intervention.run_id, step.approval_key,
-                    intervention_id=intervention.id) != "approved":
+            missing_approvals = [key for key in step.approval_keys
+                if self.approvals.status(
+                    intervention.run_id, key,
+                    intervention_id=intervention.id) != "approved"]
+            if missing_approvals:
                 self.workflows.set_status(workflow_run.id, "waiting")
                 return self._finish(intervention, ResolutionOutcome.ASK_USER,
-                                    f"approval required: {step.approval_key}")
+                                    f"approval required: {missing_approvals[0]}")
 
             prior = self.work_orders.for_workflow_run(workflow_run.id)
             completed = [item for item in prior
@@ -185,7 +187,9 @@ class ResolutionCycle:
                 goal_id=intervention.goal_id, run_id=intervention.run_id,
                 intervention_id=intervention.id, workflow_run_id=workflow_run.id,
                 step_id=step.id, agent_id=step.agent_id,
-                brief={"instruction": step.instruction, "evidence_kind": step.evidence_kind,
+                brief={"instruction": step.instruction,
+                       "evidence_kind": step.evidence_kind,
+                       "evidence_kinds": list(step.evidence_kinds),
                        "skill_ids": list(step.skill_ids),
                        "connection_ids": list(step.connection_ids),
                        "requirements": dict(step.requirements)})
@@ -196,7 +200,7 @@ class ResolutionCycle:
             if result.status == "completed":
                 order, evidence_ids = self.work_orders.complete_with_evidence(
                     order.id, result.payload, executor_id=order.claimed_by or "",
-                    kind=result.evidence_kind or step.evidence_kind,
+                    kind=result.evidence_kind or step.evidence_kind or "workflow_result",
                     payload=result.payload, advance_workflow=True)
                 if result.workflow_learning:
                     self.memory.remember(

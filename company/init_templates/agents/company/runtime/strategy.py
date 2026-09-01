@@ -11,7 +11,7 @@ from typing import Any
 
 COMPANY_ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = COMPANY_ROOT / "strategy" / "kernel.json"
-LAYERS = ("intent", "model", "policy", "constitution")
+CATEGORIES = ("company", "icp", "positioning", "priorities", "constraints", "preferences")
 MAX_CONTEXT_SECTIONS = 8
 
 
@@ -65,9 +65,9 @@ def load_strategy_kernel(
     root = Path(company_root).resolve()
     raw = manifest_path.read_bytes()
     manifest = json.loads(raw)
-    layers = manifest.get("layers")
-    if not isinstance(layers, dict) or tuple(layers) != LAYERS:
-        raise ValueError("strategy kernel layers must be Intent, Model, Policy, Constitution in order")
+    categories = manifest.get("categories")
+    if not isinstance(categories, dict) or tuple(categories) != CATEGORIES:
+        raise ValueError("strategy categories must be company, ICP, positioning, priorities, constraints, preferences")
     views = manifest.get("views")
     if not isinstance(views, dict) or set(views) != {
             "icp", "positioning", "voice", "measurement"}:
@@ -76,15 +76,15 @@ def load_strategy_kernel(
     sources: dict[str, dict[str, str]] = {}
     atoms: list[dict[str, Any]] = []
     identifiers: set[str] = set()
-    for layer in LAYERS:
-        entries = layers[layer]
+    for category in CATEGORIES:
+        entries = categories[category]
         if not isinstance(entries, list) or not entries:
-            raise ValueError(f"strategy layer {layer} must contain at least one atom")
+            raise ValueError(f"strategy category {category} must contain at least one entry")
         for entry in entries:
             if not isinstance(entry, dict):
                 raise ValueError("strategy atoms must be objects")
             identifier = entry.get("id")
-            if (not isinstance(identifier, str) or not identifier.startswith(f"{layer}.")
+            if (not isinstance(identifier, str) or not identifier.startswith(f"{category}.")
                     or identifier in identifiers):
                 raise ValueError(f"invalid or duplicate strategy atom id: {identifier}")
             identifiers.add(identifier)
@@ -98,7 +98,7 @@ def load_strategy_kernel(
             sources[source] = {"path": source, "sha256": digest}
             atoms.append({
                 "id": identifier,
-                "layer": layer,
+                "category": category,
                 "source": source,
                 "source_sha256": digest,
                 "heading": heading,
@@ -119,8 +119,9 @@ def load_strategy_kernel(
         "authority": manifest.get("authority"),
         "state_hash": hashlib.sha256(state_material).hexdigest(),
         "views": dict(views),
-        "layers": {layer: [atom for atom in atoms if atom["layer"] == layer]
-                   for layer in LAYERS},
+        "categories": {category: [atom for atom in atoms
+                                  if atom["category"] == category]
+                       for category in CATEGORIES},
         "sources": [sources[key] for key in sorted(sources)],
     }
 
@@ -134,11 +135,11 @@ def strategy_kernel_summary(kernel: dict[str, Any] | None = None) -> dict[str, A
         "authority": kernel["authority"],
         "state_hash": kernel["state_hash"],
         "views": kernel["views"],
-        "layers": {
-            layer: [{key: atom[key] for key in (
+        "categories": {
+            category: [{key: atom[key] for key in (
                 "id", "source", "heading", "topics", "scopes", "required")}
-                    for atom in kernel["layers"][layer]]
-            for layer in LAYERS
+                    for atom in kernel["categories"][category]]
+            for category in CATEGORIES
         },
         "sources": kernel["sources"],
         "mutation": "proposal_only_owner_authorized",
@@ -149,7 +150,7 @@ def select_strategy_context(goal: Any, kernel: dict[str, Any] | None = None,
                             *, max_sections: int = MAX_CONTEXT_SECTIONS) -> dict[str, Any]:
     """Select direct strategy references only when a Goal explicitly asks.
 
-    Most Goals need their measurable intent, not a four-layer strategy graph.
+    Most Goals need their measurable intent, not the whole strategy catalog.
     Avoid loading or validating the legacy Kernel on every runtime transition;
     an explicit ``strategy_context`` selector keeps the old bounded reference
     view available for workflows that genuinely consume it.
@@ -171,7 +172,7 @@ def select_strategy_context(goal: Any, kernel: dict[str, Any] | None = None,
         return {
             "state_hash": None,
             "current_intent": current_intent,
-            "selector": {"topics": [], "scopes": [], "layers": []},
+            "selector": {"topics": [], "scopes": [], "categories": []},
             "sections": [],
             "section_limit": MAX_CONTEXT_SECTIONS,
             "memory_separate": True,
@@ -181,23 +182,24 @@ def select_strategy_context(goal: Any, kernel: dict[str, Any] | None = None,
     kernel = kernel or load_strategy_kernel()
     topics = selector.get("topics") or ()
     scopes = selector.get("scopes") or (owner_id,)
-    layers = selector.get("layers") or ("model", "policy", "constitution")
+    categories = selector.get("categories") or ()
     if not isinstance(topics, (list, tuple)):
         topics = ()
     if not isinstance(scopes, (list, tuple)):
         scopes = (owner_id,)
-    if not isinstance(layers, (list, tuple)):
-        layers = ()
+    if not isinstance(categories, (list, tuple)):
+        categories = ()
     topic_set = {str(item) for item in topics if item}
     scope_set = {str(item) for item in scopes if item}
-    layer_set = {str(item) for item in layers if item in LAYERS}
+    category_set = {str(item) for item in categories if item in CATEGORIES}
     limit = max(1, min(int(max_sections), MAX_CONTEXT_SECTIONS))
 
     selected = []
-    for layer in LAYERS:
-        for atom in kernel["layers"][layer]:
+    for category in CATEGORIES:
+        for atom in kernel["categories"][category]:
             scope_match = "all" in atom["scopes"] or bool(scope_set.intersection(atom["scopes"]))
-            explicit_match = (layer in layer_set and bool(topic_set.intersection(atom["topics"])))
+            explicit_match = (category in category_set
+                              and bool(topic_set.intersection(atom["topics"])))
             if scope_match and (atom["required"] or explicit_match):
                 selected.append(atom)
             if len(selected) >= limit:
@@ -208,7 +210,7 @@ def select_strategy_context(goal: Any, kernel: dict[str, Any] | None = None,
         "state_hash": kernel["state_hash"],
         "current_intent": current_intent,
         "selector": {"topics": sorted(topic_set), "scopes": sorted(scope_set),
-                     "layers": sorted(layer_set)},
+                     "categories": sorted(category_set)},
         "sections": selected,
         "section_limit": MAX_CONTEXT_SECTIONS,
         "memory_separate": True,

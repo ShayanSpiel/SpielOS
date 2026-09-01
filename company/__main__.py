@@ -9,7 +9,7 @@ from pathlib import Path
 
 from .runtime.models import GoalStatus
 from .runtime.runner import Runner
-from .runtime import CompatibilityRuntime
+from .runtime.loop import CompatibilityRuntime
 from .runtime.paths import find_project_root
 from .runtime.service import RunnerService
 
@@ -79,8 +79,9 @@ def build_parser():
     strategy = commands.add_parser("strategy", help="show the read-only Strategy Kernel")
     strategy.add_argument("--topic", action="append", default=[])
     strategy.add_argument("--scope", action="append", default=[])
-    strategy.add_argument("--layer", action="append", choices=(
-        "intent", "model", "policy", "constitution"), default=[])
+    strategy.add_argument("--category", action="append", choices=(
+        "company", "icp", "positioning", "priorities", "constraints", "preferences"),
+        default=[])
     strategy.add_argument("--max-sections", type=int, default=8)
     strategy.add_argument("--json", action="store_true")
     context = commands.add_parser("context", help="assemble bounded host context")
@@ -415,7 +416,7 @@ def _uses_goal_authority(args) -> bool:
     return args.command in {
         "goal", "once", "next", "status", "approve", "pause", "resume",
         "abandon", "retry", "evidence", "tasks", "runner", "report", "change",
-        "memory", "profile", "context", "overview",
+        "memory", "profile", "context", "overview", "observatory",
     } or (args.command == "eval" and getattr(args, "goal", None))
 
 
@@ -613,14 +614,14 @@ def main(argv=None):
             from .runtime.strategy import (
                 load_strategy_kernel, select_strategy_context, strategy_kernel_summary)
             kernel = load_strategy_kernel()
-            if args.topic or args.scope or args.layer:
+            if args.topic or args.scope or args.category:
                 synthetic = Goal(
                     id="strategy-view", name="Inspect canonical strategy",
                     owner_id="director", metric="strategy_state", operator="eq",
                     target="current", deadline=None, parent_id=None,
                     goal_status="active", config={"strategy_context": {
                         "topics": args.topic, "scopes": args.scope or ["director"],
-                        "layers": args.layer or ["model", "policy", "constitution"],
+                        "categories": args.category,
                     }})
                 output = select_strategy_context(
                     synthetic, kernel, max_sections=args.max_sections)
@@ -764,7 +765,8 @@ def main(argv=None):
         elif args.command == "next":
             runtime.next(args.goal_id)
             if isinstance(runtime, CompatibilityRuntime):
-                Runner(runtime).tick(args.goal_id)
+                from .runtime.legacy_runner import LegacyRunner
+                LegacyRunner(runtime).tick(args.goal_id)
             else:
                 runtime.tick()
             output = runtime.status(args.goal_id)
@@ -814,17 +816,26 @@ def main(argv=None):
                 runtime.add_evidence(args.goal_id, kind=args.kind, source=args.source,
                                      payload=json.loads(args.payload), validity=args.validity)
             if isinstance(runtime, CompatibilityRuntime):
-                Runner(runtime).tick(args.goal_id)
+                from .runtime.legacy_runner import LegacyRunner
+                LegacyRunner(runtime).tick(args.goal_id)
             else:
                 runtime.tick()
             output = runtime.status(args.goal_id)
         elif args.command == "change":
             output = runtime.complete_change(args.task_id, passed=args.passed,
                                              deployed=args.deployed, result=json.loads(args.result))
-            Runner(runtime).tick(output["goal"]["id"])
+            if isinstance(runtime, CompatibilityRuntime):
+                from .runtime.legacy_runner import LegacyRunner
+                LegacyRunner(runtime).tick(output["goal"]["id"])
+            else:
+                Runner(runtime).tick(output["goal"]["id"])
             output = runtime.status(output["goal"]["id"])
         elif args.command == "runner":
-            runner = Runner(runtime)
+            if isinstance(runtime, CompatibilityRuntime):
+                from .runtime.legacy_runner import LegacyRunner
+                runner = LegacyRunner(runtime)
+            else:
+                runner = Runner(runtime)
             if args.runner_command == "tick":
                 output = (runner.tick(args.goal_id, args.max_advances)
                           if isinstance(runtime, CompatibilityRuntime)
@@ -1481,8 +1492,8 @@ def render_strategy(value):
                  f"- Authority: `{value.get('authority')}`",
                  f"- Mutation: `{value.get('mutation')}`",
                  ""]
-        for layer, atoms in (value.get("layers") or {}).items():
-            lines.append(f"## {layer.capitalize()} ({len(atoms)})")
+        for category, atoms in (value.get("categories") or {}).items():
+            lines.append(f"## {category.capitalize()} ({len(atoms)})")
             for atom in atoms:
                 lines.append(f"- `{atom['id']}` — {atom['heading']}")
     return "\n".join(lines) + "\n"

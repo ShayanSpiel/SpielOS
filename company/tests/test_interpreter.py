@@ -9,6 +9,7 @@ from company.runtime.interpreter import InterpretedDepartment
 from company.runtime.models import Department, Goal, GoalContext, WorkflowSpec, WorkflowStep
 from company.runtime.package import package_spec, validate_package
 from company.runtime.registry import departments
+from company.runtime.legacy_registry import handlers as legacy_handlers
 
 
 class PackageShapeTests(unittest.TestCase):
@@ -195,7 +196,7 @@ class InterpreterRuntimeTests(unittest.TestCase):
             self.assertEqual(["publication_receipt"], orders[0]["accepts_evidence"])
 
     def test_observe_surfaces_memory_for_department(self):
-        department = departments()["design"]
+        department = legacy_handlers()["design"]
         goal = Goal("g", "Graphics", "design", "rendition_count", "ge", 1,
                     None, None, "active", {"workflow": "rendition-pack"})
         memory = ({"claim": "Square cards convert better", "confidence": 0.7, "goal_id": "g"},)

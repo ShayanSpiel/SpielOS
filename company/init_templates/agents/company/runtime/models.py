@@ -1,4 +1,8 @@
-"""Small, stable contract for the one Goal loop and its Departments."""
+"""Compatibility-only models for historical GoalHandler homes.
+
+Canonical code uses ``company.goals``, ``company.workflows``, and
+``company.departments.DepartmentManifest``.
+"""
 
 from __future__ import annotations
 

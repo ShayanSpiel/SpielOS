@@ -7,9 +7,11 @@ import unittest
 from contextlib import redirect_stdout
 from io import StringIO
 from pathlib import Path
+from types import SimpleNamespace
 
 from company.agents.core import Agent, AgentResult, AgentSpec, FunctionExecutor
 from company.connections.core import Connection, ConnectionSpec
+from company.departments import DepartmentManifest
 from company.capabilities import Capability
 from company.commands import CleanCommandRuntime
 from company.goals import GoalRepository
@@ -258,6 +260,35 @@ class CleanCoreAcceptanceTests(unittest.TestCase):
         runtime.runtime.advance(created["id"])
 
         self.assertEqual(runtime.runs.get(run.id).observation["result"], 9)
+
+    def test_clean_workflow_compiler_preserves_outputs_and_consecutive_approvals(self):
+        runtime = CleanCommandRuntime(self.db)
+        approvals = [SimpleNamespace(
+            id=key, kind="approval", agent_id=None, produces=(),
+            skill_ids=(), connection_ids=(), requirements={})
+            for key in ("legal", "owner")]
+        executable = SimpleNamespace(
+            id="publish", kind="agent", agent_id="publisher",
+            produces=("receipt", "metrics"), skill_ids=(),
+            connection_ids=(), requirements={})
+        workflow = SimpleNamespace(
+            id="release", description="release", graph=(*approvals, executable),
+            agent_ids=("publisher",), evidence_sources=("receipt", "metrics"),
+            connection_ids=())
+        runtime.runtime.controller.departments["fixture"] = DepartmentManifest(
+            "fixture", workflows=(workflow,), agent_ids=("publisher",),
+            evidence_metrics={"releases": ("receipt", "metrics")})
+        goal = runtime.create_goal(
+            name="Release", owner_id="fixture", metric="releases",
+            operator="ge", target=1, config={"workflow": "release"})
+
+        runtime.runtime.advance(goal["id"])
+        runtime.runtime.advance(goal["id"])
+
+        compiled = runtime.runtime.resolution.workflows.get("fixture:release")
+        self.assertEqual(compiled.steps[0].evidence_kinds, ("receipt", "metrics"))
+        self.assertEqual(
+            compiled.steps[0].approval_keys, ("step:legal", "step:owner"))
 
     def test_strategy_memory_requires_same_run_evidence_owner_memory_does_not(self):
         runtime = GoalRuntime(
@@ -561,7 +592,8 @@ class CleanCoreAcceptanceTests(unittest.TestCase):
             self.assertNotIn("from ..runtime", source, relative)
             self.assertNotIn("from company.runtime", source, relative)
         cli = (company / "__main__.py").read_text()
-        self.assertIn("from .runtime import CompatibilityRuntime", cli)
+        self.assertNotIn("from .runtime import CompatibilityRuntime", cli)
+        self.assertIn("from .runtime.loop import CompatibilityRuntime", cli)
         self.assertNotIn("LegacyRuntime as Runtime", cli)
 
     def test_capability_is_a_host_resolved_contract_not_runtime_state(self):

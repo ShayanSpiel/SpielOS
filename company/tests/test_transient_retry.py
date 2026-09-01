@@ -56,7 +56,7 @@ from company.runtime.loop import Runtime  # noqa: E402
 from company.runtime.models import (  # noqa: E402
     GoalHandler, GoalStatus, RunStatus, Stage, StageResult,
 )
-from company.runtime.runner import Runner  # noqa: E402
+from company.runtime.legacy_runner import LegacyRunner as Runner  # noqa: E402
 
 
 def _errors_module():
@@ -218,7 +218,7 @@ class TransientRetryRuntimeTests(unittest.TestCase):
                                                 "backoff_seconds": 0})
         runtime.once(goal["id"])  # first attempt fails (retryable)
         watched = []
-        with unittest.mock.patch("company.runtime.runner.time.sleep"):
+        with unittest.mock.patch("company.runtime.legacy_runner.time.sleep"):
             for item in Runner(runtime).watch(
                     interval_seconds=0.1, goal_id=goal["id"], max_ticks=3):
                 watched.append(item)
