@@ -670,6 +670,28 @@ class CleanCoreAcceptanceTests(unittest.TestCase):
         self.assertEqual(reclaimed.claimed_by, "second")
         self.assertEqual(reclaimed.attempt, 1)
 
+    def test_legacy_claimed_work_order_with_null_lease_can_be_reclaimed(self):
+        runtime = GoalRuntime(self.db, ScenarioController(), FunctionExecutor({}))
+        goal = runtime.create_goal("Replies", "reply_rate", ">=", 2)
+        run = runtime.runs.current(goal.id)
+        intervention = runtime.interventions.create(
+            goal_id=goal.id, run_id=run.id, kind="repair", description="repair")
+        orders = WorkOrderRepository(runtime.database)
+        order = orders.open(
+            goal_id=goal.id, run_id=run.id, intervention_id=intervention.id,
+            agent_id="agent", step_id="direct", brief={})
+        with runtime.database.connect() as connection:
+            connection.execute("""UPDATE core_work_orders
+                SET status='claimed',claimed_by='legacy-executor',
+                    claimed_at='2020-01-01T00:00:00+00:00',lease_expires_at=NULL
+                WHERE id=?""", (order.id,))
+
+        reclaimed = orders.claim(order.id, "current-executor")
+
+        self.assertEqual(reclaimed.claimed_by, "current-executor")
+        self.assertIsNotNone(reclaimed.lease_expires_at)
+        self.assertEqual(reclaimed.attempt, 1)
+
     def test_order_evidence_and_workflow_advance_roll_back_together(self):
         runtime = GoalRuntime(self.db, ScenarioController(), FunctionExecutor({}))
         runtime.resolution.workflows.save(research_workflow())

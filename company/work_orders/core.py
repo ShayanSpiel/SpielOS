@@ -85,7 +85,8 @@ class WorkOrderRepository:
         with self.database.connect() as connection:
             changed = connection.execute("""UPDATE core_work_orders
                 SET status='claimed',claimed_by=?,claimed_at=?,lease_expires_at=?,updated_at=?
-                WHERE id=? AND (status='open' OR (status='claimed' AND lease_expires_at<=?))""",
+                WHERE id=? AND (status='open' OR (status='claimed' AND
+                  (lease_expires_at IS NULL OR lease_expires_at<=?)))""",
                 (executor_id, stamp.isoformat(), expires.isoformat(), stamp.isoformat(),
                  order_id, stamp.isoformat())).rowcount
         if changed != 1:
