@@ -222,6 +222,60 @@ class CleanCoreAcceptanceTests(unittest.TestCase):
         self.assertEqual(attempts["count"], 2)
         self.assertEqual(len(runtime.goals.list()), 1)
 
+    def test_completed_direct_work_order_resumes_once_without_reexecution(self):
+        attempts = {"count": 0}
+
+        class DirectExternalController(ScenarioController):
+            def decide(self, context, observation):
+                return Decision(
+                    "repair_agent", "repair the research Agent", context={
+                        "agent_id": "repairer",
+                        "evidence_kind": "repair_validated",
+                    })
+
+        def request_external_completion(order):
+            attempts["count"] += 1
+            return AgentResult("ask_user", message="owner must finish the repair")
+
+        runtime = GoalRuntime(
+            self.db, DirectExternalController(complete_after=1),
+            FunctionExecutor({"repairer": request_external_completion}))
+        goal = runtime.create_goal("Increase replies", "reply_rate", ">=", 2)
+        runtime.tick(max_advances=10)
+        waiting = runtime.status(goal.id)
+        intervention = waiting["intervention"]
+        with runtime.database.connect() as connection:
+            order = connection.execute(
+                """SELECT * FROM core_work_orders
+                   WHERE intervention_id=? AND step_id='direct'""",
+                (intervention.id,),
+            ).fetchone()
+        self.assertIsNotNone(order)
+        self.assertEqual(attempts["count"], 1)
+
+        runtime.resolution.work_orders.complete_with_evidence(
+            order["id"], {"tests": "passed"},
+            executor_id=order["claimed_by"], kind="repair_validated",
+            payload={"tests": "passed"})
+        resumed = runtime.resume(goal.id)
+        self.assertEqual(resumed["run"].stage, GoalStage.EVALUATE)
+        completed_intervention = runtime.interventions.get(intervention.id)
+        self.assertEqual(completed_intervention.status, "complete")
+        self.assertEqual(
+            completed_intervention.resolution_outcome, "RETURN_TO_GOAL")
+        self.assertEqual(attempts["count"], 1)
+        with runtime.database.connect() as connection:
+            self.assertEqual(connection.execute(
+                """SELECT COUNT(*) FROM core_work_orders
+                   WHERE intervention_id=? AND step_id='direct'""",
+                (intervention.id,),
+            ).fetchone()[0], 1)
+            self.assertEqual(connection.execute(
+                """SELECT COUNT(*) FROM core_evidence
+                   WHERE work_order_id=? AND kind='repair_validated'""",
+                (order["id"],),
+            ).fetchone()[0], 1)
+
     def test_intervention_cannot_exist_without_goal_and_run_lineage(self):
         database = Database(self.db)
         with self.assertRaises(sqlite3.IntegrityError):

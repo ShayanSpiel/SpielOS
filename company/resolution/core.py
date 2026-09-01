@@ -231,6 +231,19 @@ class ResolutionCycle:
         if not agent_id:
             return self._finish(intervention, ResolutionOutcome.ASK_USER,
                                 "intervention requires a Workflow or Agent")
+        with self.database.connect() as connection:
+            completed = connection.execute("""SELECT work.id
+                FROM core_work_orders AS work
+                WHERE work.intervention_id=? AND work.step_id='direct'
+                  AND work.status='completed'
+                  AND EXISTS (
+                    SELECT 1 FROM core_evidence AS evidence
+                    WHERE evidence.work_order_id=work.id)
+                ORDER BY work.created_at DESC LIMIT 1""",
+                (intervention.id,)).fetchone()
+        if completed is not None:
+            return self._finish(intervention, ResolutionOutcome.RETURN_TO_GOAL,
+                                "direct intervention completed and validated")
         for _ in range(self.max_local_iterations):
             order = self.work_orders.open(
                 goal_id=intervention.goal_id, run_id=intervention.run_id,
