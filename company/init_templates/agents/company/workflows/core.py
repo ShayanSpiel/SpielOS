@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 
 from ..state import Database
@@ -19,6 +19,9 @@ class WorkflowStep:
     instruction: str
     evidence_kind: str
     approval_key: str | None = None
+    skill_ids: tuple[str, ...] = ()
+    connection_ids: tuple[str, ...] = ()
+    requirements: dict = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -37,6 +40,8 @@ class WorkflowRun:
     goal_id: str
     run_id: str
     intervention_id: str
+    workflow_version: int
+    steps: tuple[WorkflowStep, ...]
     current_step: int
     status: str
 
@@ -47,16 +52,23 @@ class WorkflowRepository:
 
     def save(self, workflow: Workflow) -> Workflow:
         stamp = _now()
+        steps_json = json.dumps([asdict(step) for step in workflow.steps], sort_keys=True)
         with self.database.connect() as connection:
-            connection.execute("""INSERT INTO core_workflows
-                (id,department_id,name,steps_json,version,created_at,updated_at)
-                VALUES (?,?,?,?,?,?,?)
-                ON CONFLICT(id) DO UPDATE SET department_id=excluded.department_id,
-                    name=excluded.name,steps_json=excluded.steps_json,
-                    version=core_workflows.version+1,updated_at=excluded.updated_at""",
-                (workflow.id, workflow.department_id, workflow.name,
-                 json.dumps([asdict(step) for step in workflow.steps]),
-                 workflow.version, stamp, stamp))
+            current = connection.execute(
+                "SELECT department_id,name,steps_json FROM core_workflows WHERE id=?",
+                (workflow.id,)).fetchone()
+            if current is None:
+                connection.execute("""INSERT INTO core_workflows
+                    (id,department_id,name,steps_json,version,created_at,updated_at)
+                    VALUES (?,?,?,?,?,?,?)""",
+                    (workflow.id, workflow.department_id, workflow.name,
+                     steps_json, workflow.version, stamp, stamp))
+            elif (current["department_id"], current["name"], current["steps_json"]) != (
+                    workflow.department_id, workflow.name, steps_json):
+                connection.execute("""UPDATE core_workflows
+                    SET department_id=?,name=?,steps_json=?,version=version+1,updated_at=?
+                    WHERE id=?""", (workflow.department_id, workflow.name,
+                                     steps_json, stamp, workflow.id))
         return self.get(workflow.id)
 
     def get(self, workflow_id: str) -> Workflow:
@@ -73,12 +85,17 @@ class WorkflowRepository:
     def start(self, workflow_id: str, *, goal_id: str, run_id: str,
               intervention_id: str) -> WorkflowRun:
         self.get(workflow_id)
+        workflow = self.get(workflow_id)
         workflow_run_id = f"workflow-run-{uuid.uuid4().hex[:12]}"
         stamp = _now()
         with self.database.connect() as connection:
-            connection.execute(
-                "INSERT INTO core_workflow_runs VALUES (?,?,?,?,?,?,?,?,?)",
+            connection.execute("""INSERT INTO core_workflow_runs
+                (id,workflow_id,goal_id,run_id,intervention_id,workflow_version,
+                 steps_json,current_step,status,created_at,updated_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
                 (workflow_run_id, workflow_id, goal_id, run_id, intervention_id,
+                 workflow.version,
+                 json.dumps([asdict(step) for step in workflow.steps], sort_keys=True),
                  0, "running", stamp, stamp))
         return self.run(workflow_run_id)
 
@@ -89,22 +106,23 @@ class WorkflowRepository:
             ).fetchone()
         if row is None:
             raise KeyError(f"unknown workflow run: {workflow_run_id}")
+        steps = tuple(WorkflowStep(**item) for item in json.loads(row["steps_json"]))
         return WorkflowRun(row["id"], row["workflow_id"], row["goal_id"],
                            row["run_id"], row["intervention_id"],
+                           row["workflow_version"], steps,
                            row["current_step"], row["status"])
 
     def active_for_intervention(self, intervention_id: str) -> WorkflowRun | None:
         with self.database.connect() as connection:
             row = connection.execute("""SELECT id FROM core_workflow_runs
-                WHERE intervention_id=? AND status IN ('running','waiting')
+                WHERE intervention_id=? AND status IN ('running','waiting','complete')
                 ORDER BY created_at DESC LIMIT 1""", (intervention_id,)).fetchone()
         return None if row is None else self.run(row[0])
 
     def advance(self, workflow_run_id: str) -> WorkflowRun:
         current = self.run(workflow_run_id)
-        workflow = self.get(current.workflow_id)
         next_step = current.current_step + 1
-        status = "complete" if next_step >= len(workflow.steps) else "running"
+        status = "complete" if next_step >= len(current.steps) else "running"
         with self.database.connect() as connection:
             connection.execute("""UPDATE core_workflow_runs
                 SET current_step=?,status=?,updated_at=? WHERE id=?""",

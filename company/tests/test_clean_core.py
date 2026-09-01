@@ -18,6 +18,7 @@ from company.runtime.engine import Decision, Evaluation, GoalRuntime, GoalStage
 from company.runtime.loop import CompatibilityRuntime
 from company.state import Database, migrate_legacy_goals
 from company.state.migration import backup_database, plan_legacy_goal_migration
+from company.work_orders import WorkOrderRepository
 from company.workflows import Workflow, WorkflowStep
 from company.__main__ import main as cli_main
 
@@ -158,6 +159,23 @@ class CleanCoreAcceptanceTests(unittest.TestCase):
             runtime.goals.add_support(outbound.id, quality.id)
         with self.assertRaisesRegex(ValueError, "tree cycle"):
             runtime.goals.set_parent(north.id, outbound.id)
+
+    def test_scheduler_honors_support_dependencies_and_priority(self):
+        runtime = GoalRuntime(self.db, ScenarioController(), FunctionExecutor({}))
+        prerequisite = runtime.create_goal(
+            "Prerequisite", "ready", "eq", True, config={"priority": "normal"})
+        dependent = runtime.create_goal(
+            "Dependent", "ready", "eq", True, config={"priority": "critical"})
+        urgent = runtime.create_goal(
+            "Urgent", "ready", "eq", True, config={"priority": "critical"})
+        runtime.goals.add_support(prerequisite.id, dependent.id)
+
+        ready = runtime.runs.ready()
+
+        self.assertEqual(ready[0].goal_id, urgent.id)
+        self.assertNotIn(dependent.id, [item.goal_id for item in ready])
+        runtime.goals.set_status(prerequisite.id, "complete")
+        self.assertIn(dependent.id, [item.goal_id for item in runtime.runs.ready()])
 
     def test_strategy_memory_requires_same_run_evidence_owner_memory_does_not(self):
         runtime = GoalRuntime(
@@ -318,6 +336,21 @@ class CleanCoreAcceptanceTests(unittest.TestCase):
                 connection.execute(
                     "UPDATE core_evidence SET kind='changed' WHERE id=?", (evidence.id,))
 
+        second_intervention = runtime.interventions.create(
+            goal_id=first.id, run_id=first_run.id, kind="observe", description="other")
+        order = runtime.resolution.work_orders.open(
+            goal_id=first.id, run_id=first_run.id,
+            intervention_id=intervention.id, agent_id="agent", brief={})
+        with self.assertRaisesRegex(sqlite3.IntegrityError, "lineage mismatch"):
+            runtime.evidence.record(
+                goal_id=first.id, run_id=first_run.id,
+                intervention_id=second_intervention.id, work_order_id=order.id,
+                kind="mixed", payload={})
+        with self.assertRaisesRegex(sqlite3.IntegrityError, "lineage mismatch"):
+            runtime.resolution.approvals.grant(
+                goal_id=first.id, run_id=second_run.id, key="mixed",
+                intervention_id=intervention.id)
+
     def test_agent_and_connection_compatibility_names_are_aliases_not_models(self):
         self.assertIs(AgentSpec, Agent)
         self.assertIs(ConnectionSpec, Connection)
@@ -413,6 +446,189 @@ class CleanCoreAcceptanceTests(unittest.TestCase):
                 "Release")
         finally:
             copied.close()
+
+    def test_continue_local_stays_runnable_instead_of_stranding_act(self):
+        runtime = GoalRuntime(
+            self.db, ScenarioController(),
+            FunctionExecutor({"researcher": lambda order: AgentResult(
+                "fixable", message="retry locally")}),
+            max_local_iterations=1)
+        runtime.resolution.workflows.save(research_workflow())
+        goal = runtime.create_goal("Replies", "reply_rate", ">=", 2)
+
+        runtime.advance(goal.id)
+        runtime.advance(goal.id)
+        runtime.advance(goal.id)
+
+        state = runtime.status(goal.id)
+        self.assertEqual(state["run"].stage, GoalStage.ACT)
+        self.assertEqual(state["run"].status, "ready")
+        self.assertEqual(state["intervention"].status, "running")
+        self.assertEqual(state["intervention"].resolution_outcome, "CONTINUE_LOCAL")
+
+    def test_ask_user_is_durable_and_claimant_cannot_be_substituted(self):
+        runtime = GoalRuntime(
+            self.db, ScenarioController(complete_after=1),
+            FunctionExecutor({"researcher": lambda order: AgentResult(
+                "ask_user", message="credentials required")}))
+        runtime.resolution.workflows.save(research_workflow())
+        goal = runtime.create_goal("Replies", "reply_rate", ">=", 2)
+        runtime.tick(max_advances=10)
+        order = runtime.resolution.work_orders.for_workflow_run(
+            runtime.resolution.workflows.active_for_intervention(
+                runtime.status(goal.id)["intervention"].id).id)[0]
+
+        with runtime.database.connect() as connection:
+            notification = connection.execute("""SELECT kind,payload_json,status
+                FROM core_notifications WHERE intervention_id=?""",
+                (order.intervention_id,)).fetchone()
+        self.assertEqual(notification["kind"], "owner_input_required")
+        self.assertEqual(notification["status"], "pending")
+        with self.assertRaisesRegex(RuntimeError, "claiming Agent"):
+            runtime.resolution.work_orders.complete_with_evidence(
+                order.id, {}, executor_id="intruder", kind="fact", payload={})
+
+    def test_expired_work_order_lease_can_be_reclaimed(self):
+        runtime = GoalRuntime(self.db, ScenarioController(), FunctionExecutor({}))
+        goal = runtime.create_goal("Replies", "reply_rate", ">=", 2)
+        run = runtime.runs.current(goal.id)
+        intervention = runtime.interventions.create(
+            goal_id=goal.id, run_id=run.id, kind="repair", description="repair")
+        orders = WorkOrderRepository(runtime.database)
+        order = orders.open(goal_id=goal.id, run_id=run.id,
+                            intervention_id=intervention.id, agent_id="agent",
+                            step_id="direct", brief={})
+        orders.claim(order.id, "first", lease_seconds=-1)
+
+        reclaimed = orders.claim(order.id, "second")
+
+        self.assertEqual(reclaimed.claimed_by, "second")
+        self.assertEqual(reclaimed.attempt, 1)
+
+    def test_order_evidence_and_workflow_advance_roll_back_together(self):
+        runtime = GoalRuntime(self.db, ScenarioController(), FunctionExecutor({}))
+        runtime.resolution.workflows.save(research_workflow())
+        goal = runtime.create_goal("Replies", "reply_rate", ">=", 2)
+        run = runtime.runs.current(goal.id)
+        intervention = runtime.interventions.create(
+            goal_id=goal.id, run_id=run.id, kind="repair", description="repair")
+        workflow_run = runtime.resolution.workflows.start(
+            "research", goal_id=goal.id, run_id=run.id,
+            intervention_id=intervention.id)
+        order = runtime.resolution.work_orders.open(
+            goal_id=goal.id, run_id=run.id, intervention_id=intervention.id,
+            workflow_run_id=workflow_run.id, step_id="research",
+            agent_id="researcher", brief={})
+        order = runtime.resolution.work_orders.claim(order.id, "executor")
+        with runtime.database.connect() as connection:
+            connection.execute("""CREATE TRIGGER reject_workflow_advance
+                BEFORE UPDATE ON core_workflow_runs BEGIN
+                SELECT RAISE(ABORT, 'simulated crash'); END""")
+
+        with self.assertRaisesRegex(sqlite3.IntegrityError, "simulated crash"):
+            runtime.resolution.work_orders.complete_with_evidence(
+                order.id, {"ok": True}, executor_id="executor", kind="fact",
+                payload={"ok": True}, advance_workflow=True)
+
+        self.assertEqual(runtime.resolution.work_orders.get(order.id).status, "claimed")
+        with runtime.database.connect() as connection:
+            self.assertEqual(connection.execute(
+                "SELECT COUNT(*) FROM core_evidence").fetchone()[0], 0)
+
+    def test_intervention_and_run_transition_roll_back_together(self):
+        runtime = GoalRuntime(
+            self.db, ScenarioController(complete_after=1),
+            FunctionExecutor({"researcher": lambda order: AgentResult(
+                "completed", "research_validated", {"reply_rate": 2})}))
+        runtime.resolution.workflows.save(research_workflow())
+        goal = runtime.create_goal("Replies", "reply_rate", ">=", 2)
+        runtime.advance(goal.id)
+        runtime.advance(goal.id)
+        run = runtime.runs.current(goal.id)
+        with runtime.database.connect() as connection:
+            connection.execute("""CREATE TRIGGER reject_evaluate_transition
+                BEFORE UPDATE ON core_runs WHEN NEW.stage='EVALUATE' BEGIN
+                SELECT RAISE(ABORT, 'simulated transition crash'); END""")
+
+        with self.assertRaisesRegex(sqlite3.IntegrityError, "simulated transition crash"):
+            runtime.advance(goal.id)
+
+        intervention = runtime.interventions.active_for_run(run.id)
+        self.assertEqual(intervention.status, "running")
+        self.assertIsNone(intervention.resolution_outcome)
+        self.assertEqual(runtime.runs.get(run.id).stage, GoalStage.ACT)
+
+    def test_evaluation_memory_goal_and_next_run_roll_back_together(self):
+        runtime = GoalRuntime(self.db, ScenarioController(), FunctionExecutor({}))
+        goal = runtime.create_goal("Replies", "reply_rate", ">=", 4)
+        run = runtime.runs.current(goal.id)
+        evidence = runtime.evidence.record(
+            goal_id=goal.id, run_id=run.id, kind="fact", payload={})
+        evaluation = Evaluation(
+            False, {"reply_rate": 2}, "continue", "learned",
+            (evidence.id,))
+        with runtime.database.connect() as connection:
+            connection.execute("""CREATE TRIGGER reject_next_run
+                BEFORE INSERT ON core_runs WHEN NEW.sequence=2 BEGIN
+                SELECT RAISE(ABORT, 'simulated next-run crash'); END""")
+
+        with self.assertRaisesRegex(sqlite3.IntegrityError, "simulated next-run crash"):
+            runtime._commit_evaluation(goal, run, evaluation)
+
+        self.assertNotEqual(runtime.runs.get(run.id).status, "complete")
+        with runtime.database.connect() as connection:
+            self.assertEqual(connection.execute(
+                "SELECT COUNT(*) FROM core_memory").fetchone()[0], 0)
+
+    def test_workflow_run_freezes_revision_and_unchanged_save_is_idempotent(self):
+        runtime = GoalRuntime(self.db, ScenarioController(), FunctionExecutor({}))
+        original = runtime.resolution.workflows.save(research_workflow())
+        same = runtime.resolution.workflows.save(research_workflow())
+        self.assertEqual((original.version, same.version), (1, 1))
+        goal = runtime.create_goal("Replies", "reply_rate", ">=", 2)
+        run = runtime.runs.current(goal.id)
+        intervention = runtime.interventions.create(
+            goal_id=goal.id, run_id=run.id, kind="repair", description="repair")
+        frozen = runtime.resolution.workflows.start(
+            "research", goal_id=goal.id, run_id=run.id,
+            intervention_id=intervention.id)
+        runtime.resolution.workflows.save(Workflow(
+            "research", "Changed", (WorkflowStep(
+                "changed", "writer", "Changed", "changed"),), "outbound"))
+
+        self.assertEqual(frozen.workflow_version, 1)
+        self.assertEqual(frozen.steps[0].id, "research")
+        self.assertEqual(runtime.resolution.workflows.get("research").version, 2)
+
+    def test_escalation_finishes_old_run_and_creates_fresh_run(self):
+        runtime = GoalRuntime(
+            self.db, ScenarioController(),
+            FunctionExecutor({"researcher": lambda order: AgentResult(
+                "escalate", message="strategy invalid")}))
+        runtime.resolution.workflows.save(research_workflow())
+        goal = runtime.create_goal("Replies", "reply_rate", ">=", 2)
+        first = runtime.runs.current(goal.id)
+        runtime.advance(goal.id)
+        runtime.advance(goal.id)
+        runtime.advance(goal.id)
+
+        current = runtime.runs.current(goal.id)
+        self.assertEqual(runtime.runs.get(first.id).status, "complete")
+        self.assertEqual(current.sequence, 2)
+        self.assertEqual(current.stage, GoalStage.OBSERVE)
+        self.assertEqual(runtime.runs.get(first.id).decision.kind, "change_workflow")
+
+    def test_readonly_clean_runtime_uses_sqlite_readonly_mode(self):
+        writable = CleanCommandRuntime(self.db)
+        writable.create_goal(name="Read", owner_id="outbound", metric="leads",
+                             operator="ge", target=1, config={})
+        before = self.db.read_bytes()
+        readonly = CleanCommandRuntime(self.db, readonly=True)
+        self.assertEqual(len(readonly.goal_summaries()), 1)
+        with self.assertRaises(PermissionError):
+            readonly.create_goal(name="Write", owner_id="outbound", metric="leads",
+                                 operator="ge", target=1, config={})
+        self.assertEqual(self.db.read_bytes(), before)
 
 
 if __name__ == "__main__":

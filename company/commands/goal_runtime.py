@@ -6,8 +6,12 @@ The adapter contains presentation compatibility only. Goal control remains in
 
 from __future__ import annotations
 
+import json
+import shutil
 import sqlite3
+import tempfile
 import time
+import weakref
 from dataclasses import asdict
 from pathlib import Path
 
@@ -104,7 +108,10 @@ class CatalogController:
             evidence_kind = (node.produces or (goal.metric,))[0]
             steps.append(WorkflowStep(
                 node.id, agent_id, f"Execute {workflow_spec.id} step {node.id}",
-                evidence_kind, pending_approval))
+                evidence_kind, pending_approval,
+                tuple(getattr(node, "skill_ids", ()) or ()),
+                tuple(getattr(node, "connection_ids", ()) or ()),
+                dict(getattr(node, "requirements", {}) or {})))
             pending_approval = None
         if not steps:
             agent_id = (workflow_spec.agent_ids or handler.agent_ids or (goal.owner_id,))[0]
@@ -139,8 +146,31 @@ class CleanCommandRuntime:
     def __init__(self, path: str | Path, *, readonly: bool = False):
         self.path = Path(path)
         self.readonly = readonly
-        self.database = Database(path)
-        self.runtime = GoalRuntime(path, CatalogController(self.database), AssignmentExecutor())
+        self._readonly_scratch = None
+        self._scratch_finalizer = None
+        database_path = self.path
+        database_readonly = readonly
+        if readonly:
+            # Read commands use a migrated scratch snapshot. This keeps the
+            # requested database byte-for-byte read-only even when its schema
+            # predates the current projection.
+            self._readonly_scratch = Path(tempfile.mkdtemp(prefix="spielos-readonly-"))
+            self._scratch_finalizer = weakref.finalize(
+                self, shutil.rmtree, self._readonly_scratch, True)
+            database_path = self._readonly_scratch / "empty.sqlite"
+            database_readonly = False
+            if self.path.exists():
+                source = sqlite3.connect(f"file:{self.path}?mode=ro", uri=True)
+                destination = sqlite3.connect(database_path)
+                try:
+                    source.backup(destination)
+                finally:
+                    destination.close()
+                    source.close()
+        self.database = Database(database_path, readonly=database_readonly)
+        self.runtime = GoalRuntime(
+            database_path, CatalogController(self.database), AssignmentExecutor(),
+            readonly=database_readonly)
         self.goals = self.runtime.goals
         self.runs = self.runtime.runs
         self.interventions = self.runtime.interventions
@@ -155,7 +185,12 @@ class CleanCommandRuntime:
                 "eq": "eq", "==": "eq", "le": "le", "<=": "le",
                 "lt": "lt", "<": "lt"}.get(value, value)
 
+    def _require_writable(self) -> None:
+        if self.readonly:
+            raise PermissionError("clean-core runtime was opened read-only")
+
     def create_goal(self, **values) -> dict:
+        self._require_writable()
         goal = self.runtime.create_goal(
             values["name"], values["metric"], self._operator(values["operator"]),
             values["target"], parent_id=values.get("parent_id"),
@@ -185,14 +220,19 @@ class CleanCommandRuntime:
                    "status": run.status, "evidence_validity": "technical_only"}
         cycle = {"id": run.id, "stage": run.stage.value, "step": run.stage.value.lower(),
                  "run_status": run.status, "data": {}}
+        attention = self.attention(goal_id=goal_id)
         return {"goal": goal_row, "run": run_row, "cycle": cycle,
                 "evidence": evidence, "evaluation": None if run.evaluation is None
-                else asdict(run.evaluation), "pending_notifications": [], "attention": [],
+                else asdict(run.evaluation),
+                "pending_notifications": self.notifications(goal_id=goal_id),
+                "attention": attention,
                 "work_orders": self.work_orders(status="active", goal_id=goal_id)}
 
     def goal_summary(self, goal_id: str) -> dict:
-        return {"goal": self._goal(self.goals.get(goal_id)), "attention": [],
-                "unread_results": [], "work_orders": self.work_orders(
+        return {"goal": self._goal(self.goals.get(goal_id)),
+                "attention": self.attention(goal_id=goal_id),
+                "unread_results": self.unread_results(goal_id=goal_id),
+                "work_orders": self.work_orders(
                     status="active", goal_id=goal_id)}
 
     def goal_summaries(self, *, statuses=None, goal_id=None, limit=100):
@@ -217,11 +257,16 @@ class CleanCommandRuntime:
         counts = {key: sum(item["goal_status"] == key for item in values)
                   for key in ("active", "achieved", "abandoned", "expired")}
         counts["total"] = len(values)
+        with self.database.connect() as connection:
+            support_links = [dict(row) for row in connection.execute(
+                "SELECT source_goal_id,target_goal_id,relation FROM core_goal_edges")]
         return {"counts": counts, "focus_goal": active[0] if active else None,
-                "attention": [], "work_orders": self.work_orders(status="active", limit=20),
+                "attention": self.attention(),
+                "work_orders": self.work_orders(status="active", limit=20),
                 "active_goals": active, "proposed_goals": [], "paused_goals": paused,
-                "unread_results": [], "directives": [], "recent_memory": [],
-                "support_links": [], "recent_results": terminal[:recent_limit]}
+                "unread_results": self.unread_results(), "directives": [],
+                "recent_memory": self.memories(limit=20),
+                "support_links": support_links, "recent_results": terminal[:recent_limit]}
 
     def topology_audit(self):
         goals = self.goals.list(); roots = [item.id for item in goals if not item.parent_id]
@@ -232,16 +277,19 @@ class CleanCommandRuntime:
                     for item in roots], "migration_plan": {"safe_first": []}}
 
     def link_support(self, goal_id, target_id):
+        self._require_writable()
         self.goals.add_support(goal_id, target_id)
         return self.status(goal_id)
 
     def set_goal_status(self, goal_id, status):
+        self._require_writable()
         value = getattr(status, "value", status)
         value = {"achieved": "complete", "expired": "abandoned"}.get(value, value)
         self.goals.set_status(goal_id, value)
         return self.status(goal_id)
 
     def approve(self, goal_id, note="", scope=None):
+        self._require_writable()
         run = self.runs.current(goal_id)
         intervention = self.interventions.active_for_run(run.id)
         keys = {"execute"}
@@ -249,9 +297,8 @@ class CleanCommandRuntime:
             workflow_run = self.runtime.resolution.workflows.active_for_intervention(
                 intervention.id)
             if workflow_run is not None:
-                workflow = self.runtime.resolution.workflows.get(workflow_run.workflow_id)
-                if workflow_run.current_step < len(workflow.steps):
-                    key = workflow.steps[workflow_run.current_step].approval_key
+                if workflow_run.current_step < len(workflow_run.steps):
+                    key = workflow_run.steps[workflow_run.current_step].approval_key
                     if key:
                         keys.add(key)
         for key in keys:
@@ -264,6 +311,7 @@ class CleanCommandRuntime:
         return self.status(goal_id)
 
     def add_evidence(self, goal_id, *, kind, source, payload, validity=None):
+        self._require_writable()
         run = self.runs.current(goal_id)
         intervention = self.interventions.active_for_run(run.id)
         self.evidence.record(goal_id=goal_id, run_id=run.id, kind=kind,
@@ -273,6 +321,7 @@ class CleanCommandRuntime:
         return self.status(goal_id)
 
     def once(self, goal_id, holder=None):
+        self._require_writable()
         self.runtime.advance(goal_id)
         return self.status(goal_id)
 
@@ -280,10 +329,12 @@ class CleanCommandRuntime:
         return self.retry(goal_id)
 
     def retry(self, goal_id):
+        self._require_writable()
         self.runtime.resume(goal_id)
         return self.status(goal_id)
 
     def tick(self, max_advances=100):
+        self._require_writable()
         return self.runtime.tick(max_advances=max_advances)
 
     def watch(self, interval_seconds=5.0, goal_id=None, max_ticks=None):
@@ -323,27 +374,60 @@ class CleanCommandRuntime:
                 if order.brief.get("evidence_kind") else [], "why_next": "Agent assignment"}
 
     def claim_work_order(self, work_order_id, agent_id):
+        self._require_writable()
         return self._order(self.work_orders_repository.claim(work_order_id, agent_id))
 
     def complete_work_order(self, work_order_id, agent_id, evidence):
+        self._require_writable()
         order = self.work_orders_repository.get(work_order_id)
         if order.status == "open":
             order = self.work_orders_repository.claim(work_order_id, agent_id)
         elif order.claimed_by != agent_id:
-            agent_id = order.claimed_by or agent_id
-        order = self.work_orders_repository.complete(
-            work_order_id, {"evidence": evidence}, executor_id=agent_id)
-        for item in evidence:
-            self.evidence.record(
-                goal_id=order.goal_id, run_id=order.run_id,
-                intervention_id=order.intervention_id,
-                workflow_run_id=order.workflow_run_id, work_order_id=order.id,
-                kind=item["kind"], payload=item.get("payload") or {})
-        self.runs.update(order.run_id, status="ready")
+            raise RuntimeError(
+                f"work order is claimed by {order.claimed_by!r}, not {agent_id!r}")
+        if not evidence:
+            raise ValueError("completing a clean-core WorkOrder requires Evidence")
+        first = evidence[0]
+        order, _ = self.work_orders_repository.complete_with_evidence(
+            work_order_id, {"evidence": evidence}, executor_id=agent_id,
+            kind=first["kind"], payload=first.get("payload") or {},
+            evidence_items=[(item["kind"], item.get("payload") or {})
+                            for item in evidence],
+            advance_workflow=bool(order.workflow_run_id), wake_run=True)
+        with self.database.connect() as connection:
+            connection.execute("""UPDATE core_notifications
+                SET status='acknowledged',acknowledged_at=datetime('now')
+                WHERE intervention_id=? AND status='pending'""", (order.intervention_id,))
         return {"work_order": self._order(order)}
 
     def events(self, *_args, **_kwargs): return []
-    def memories(self, *_args, **_kwargs): return []
-    def notifications(self, *_args, **_kwargs): return []
-    def attention(self, *_args, **_kwargs): return []
-    def unread_results(self, *_args, **_kwargs): return []
+
+    def memories(self, limit=100, **_kwargs):
+        with self.database.connect() as connection:
+            return [dict(row) for row in connection.execute("""SELECT id,scope,claim,
+                goal_id,run_id,intervention_id,workflow_id,created_at FROM core_memory
+                ORDER BY created_at DESC LIMIT ?""", (limit,))]
+
+    def notifications(self, status="pending", goal_id=None, limit=100, **_kwargs):
+        clauses, args = ["status=?"], [status]
+        if goal_id:
+            clauses.append("goal_id=?"); args.append(goal_id)
+        args.append(limit)
+        with self.database.connect() as connection:
+            rows = connection.execute("""SELECT * FROM core_notifications WHERE """
+                + " AND ".join(clauses) + " ORDER BY created_at LIMIT ?", args)
+            return [{**dict(row), "payload": json.loads(row["payload_json"])}
+                    for row in rows]
+
+    def attention(self, goal_id=None, **_kwargs):
+        return [{"id": item["id"], "kind": item["kind"],
+                 **item["payload"]} for item in self.notifications(goal_id=goal_id)]
+
+    def unread_results(self, goal_id=None, **_kwargs):
+        clauses, args = ["r.status='complete'"], []
+        if goal_id:
+            clauses.append("r.goal_id=?"); args.append(goal_id)
+        with self.database.connect() as connection:
+            return [dict(row) for row in connection.execute("""SELECT r.id,r.goal_id,
+                r.evaluation_json AS result FROM core_runs r WHERE """
+                + " AND ".join(clauses) + " ORDER BY r.updated_at DESC LIMIT 20", args)]

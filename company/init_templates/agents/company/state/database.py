@@ -11,19 +11,28 @@ from typing import Iterator
 class Database:
     """Connection lifecycle only. This class intentionally has no domain methods."""
 
-    def __init__(self, path: str | Path):
+    def __init__(self, path: str | Path, *, readonly: bool = False):
         self.path = Path(path)
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        self._initialize()
+        self.readonly = readonly
+        if readonly:
+            if not self.path.exists():
+                raise FileNotFoundError(self.path)
+        else:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            self._initialize()
 
     @contextmanager
     def connect(self) -> Iterator[sqlite3.Connection]:
-        connection = sqlite3.connect(self.path, timeout=30)
+        target = f"file:{self.path}?mode=ro" if self.readonly else str(self.path)
+        connection = sqlite3.connect(target, timeout=30, uri=self.readonly)
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys=ON")
         try:
             yield connection
-            connection.commit()
+            if self.readonly:
+                connection.rollback()
+            else:
+                connection.commit()
         except Exception:
             connection.rollback()
             raise
@@ -33,6 +42,58 @@ class Database:
     def _initialize(self) -> None:
         with self.connect() as connection:
             connection.executescript(SCHEMA)
+            self._migrate(connection)
+            connection.executescript(POST_MIGRATION_SCHEMA)
+
+    @staticmethod
+    def _migrate(connection: sqlite3.Connection) -> None:
+        workflow_run_columns = {row[1] for row in connection.execute(
+            "PRAGMA table_info(core_workflow_runs)")}
+        for name, declaration in (
+            ("workflow_version", "INTEGER NOT NULL DEFAULT 1"),
+            ("steps_json", "TEXT NOT NULL DEFAULT '[]'"),
+        ):
+            if name not in workflow_run_columns:
+                connection.execute(
+                    f"ALTER TABLE core_workflow_runs ADD COLUMN {name} {declaration}")
+        connection.execute("""UPDATE core_workflow_runs
+            SET workflow_version=COALESCE((SELECT version FROM core_workflows w
+                                           WHERE w.id=workflow_id),1),
+                steps_json=COALESCE((SELECT steps_json FROM core_workflows w
+                                     WHERE w.id=workflow_id),'[]')
+            WHERE steps_json='[]'""")
+        order_columns = {row[1] for row in connection.execute(
+            "PRAGMA table_info(core_work_orders)")}
+        for name, declaration in (
+            ("claimed_at", "TEXT"),
+            ("lease_expires_at", "TEXT"),
+            ("attempt", "INTEGER NOT NULL DEFAULT 1"),
+        ):
+            if name not in order_columns:
+                connection.execute(
+                    f"ALTER TABLE core_work_orders ADD COLUMN {name} {declaration}")
+        approval_sql = connection.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='core_approvals'"
+        ).fetchone()[0]
+        if "UNIQUE(run_id,key)" in approval_sql.replace(" ", ""):
+            connection.executescript("""
+                ALTER TABLE core_approvals RENAME TO core_approvals_legacy;
+                CREATE TABLE core_approvals (
+                    id TEXT PRIMARY KEY,
+                    goal_id TEXT NOT NULL REFERENCES core_goals(id),
+                    run_id TEXT NOT NULL REFERENCES core_runs(id),
+                    intervention_id TEXT REFERENCES core_interventions(id),
+                    key TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    note TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    UNIQUE(intervention_id, key)
+                );
+                INSERT INTO core_approvals SELECT * FROM core_approvals_legacy;
+                DROP TABLE core_approvals_legacy;
+            """)
+        connection.execute("DROP TRIGGER IF EXISTS core_evidence_lineage_insert")
 
 
 SCHEMA = """
@@ -109,6 +170,8 @@ CREATE TABLE IF NOT EXISTS core_workflow_runs (
     goal_id TEXT NOT NULL REFERENCES core_goals(id),
     run_id TEXT NOT NULL REFERENCES core_runs(id),
     intervention_id TEXT NOT NULL REFERENCES core_interventions(id),
+    workflow_version INTEGER NOT NULL,
+    steps_json TEXT NOT NULL,
     current_step INTEGER NOT NULL,
     status TEXT NOT NULL,
     created_at TEXT NOT NULL,
@@ -126,6 +189,9 @@ CREATE TABLE IF NOT EXISTS core_work_orders (
     brief_json TEXT NOT NULL,
     status TEXT NOT NULL,
     claimed_by TEXT,
+    claimed_at TEXT,
+    lease_expires_at TEXT,
+    attempt INTEGER NOT NULL DEFAULT 1,
     result_json TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
@@ -165,7 +231,20 @@ CREATE TABLE IF NOT EXISTS core_approvals (
     note TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
-    UNIQUE(run_id, key)
+    UNIQUE(intervention_id, key)
+);
+
+CREATE TABLE IF NOT EXISTS core_notifications (
+    id TEXT PRIMARY KEY,
+    goal_id TEXT NOT NULL REFERENCES core_goals(id),
+    run_id TEXT NOT NULL REFERENCES core_runs(id),
+    intervention_id TEXT REFERENCES core_interventions(id),
+    kind TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+    status TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    acknowledged_at TEXT,
+    UNIQUE(intervention_id, kind)
 );
 
 CREATE INDEX IF NOT EXISTS core_runs_ready ON core_runs(status, updated_at);
@@ -265,6 +344,7 @@ WHEN NOT EXISTS (
     SELECT 1 FROM core_work_orders o
     WHERE o.id=NEW.work_order_id AND o.run_id=NEW.run_id
       AND o.goal_id=NEW.goal_id
+      AND (NEW.intervention_id IS NULL OR o.intervention_id=NEW.intervention_id)
 ))
 BEGIN
     SELECT RAISE(ABORT, 'Evidence lineage mismatch');
@@ -280,5 +360,65 @@ CREATE TRIGGER IF NOT EXISTS core_evidence_immutable_delete
 BEFORE DELETE ON core_evidence
 BEGIN
     SELECT RAISE(ABORT, 'Evidence is immutable');
+END;
+"""
+
+POST_MIGRATION_SCHEMA = """
+CREATE UNIQUE INDEX IF NOT EXISTS core_work_order_step_attempt
+ON core_work_orders(workflow_run_id,step_id,attempt)
+WHERE workflow_run_id IS NOT NULL AND step_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS core_work_order_direct_attempt
+ON core_work_orders(intervention_id,step_id,attempt)
+WHERE workflow_run_id IS NULL AND step_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS core_run_approval_key
+ON core_approvals(run_id,key) WHERE intervention_id IS NULL;
+
+CREATE TRIGGER IF NOT EXISTS core_approval_lineage_insert
+BEFORE INSERT ON core_approvals
+WHEN NOT EXISTS (
+    SELECT 1 FROM core_runs r WHERE r.id=NEW.run_id AND r.goal_id=NEW.goal_id
+) OR (NEW.intervention_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM core_interventions i
+    WHERE i.id=NEW.intervention_id AND i.run_id=NEW.run_id
+      AND i.goal_id=NEW.goal_id
+))
+BEGIN
+    SELECT RAISE(ABORT, 'Approval lineage mismatch');
+END;
+
+CREATE TRIGGER IF NOT EXISTS core_notification_lineage_insert
+BEFORE INSERT ON core_notifications
+WHEN NOT EXISTS (
+    SELECT 1 FROM core_runs r WHERE r.id=NEW.run_id AND r.goal_id=NEW.goal_id
+) OR (NEW.intervention_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM core_interventions i
+    WHERE i.id=NEW.intervention_id AND i.run_id=NEW.run_id
+      AND i.goal_id=NEW.goal_id
+))
+BEGIN
+    SELECT RAISE(ABORT, 'Notification lineage mismatch');
+END;
+
+CREATE TRIGGER core_evidence_lineage_insert
+BEFORE INSERT ON core_evidence
+WHEN NOT EXISTS (
+    SELECT 1 FROM core_runs r
+    WHERE r.id=NEW.run_id AND r.goal_id=NEW.goal_id
+) OR (NEW.intervention_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM core_interventions i
+    WHERE i.id=NEW.intervention_id AND i.run_id=NEW.run_id
+      AND i.goal_id=NEW.goal_id
+)) OR (NEW.workflow_run_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM core_workflow_runs w
+    WHERE w.id=NEW.workflow_run_id AND w.intervention_id=NEW.intervention_id
+      AND w.run_id=NEW.run_id AND w.goal_id=NEW.goal_id
+)) OR (NEW.work_order_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM core_work_orders o
+    WHERE o.id=NEW.work_order_id AND o.run_id=NEW.run_id
+      AND o.goal_id=NEW.goal_id
+      AND (NEW.intervention_id IS NULL OR o.intervention_id=NEW.intervention_id)
+))
+BEGIN
+    SELECT RAISE(ABORT, 'Evidence lineage mismatch');
 END;
 """

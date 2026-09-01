@@ -55,3 +55,10 @@ class EvidenceRepository:
             ids = [row[0] for row in connection.execute(
                 "SELECT id FROM core_evidence WHERE run_id=? ORDER BY created_at", (run_id,))]
         return [self.get(item) for item in ids]
+
+    def for_goal(self, goal_id: str) -> list[Evidence]:
+        with self.database.connect() as connection:
+            ids = [row[0] for row in connection.execute("""SELECT e.id
+                FROM core_evidence e JOIN core_runs r ON r.id=e.run_id
+                WHERE e.goal_id=? ORDER BY r.sequence,e.created_at""", (goal_id,))]
+        return [self.get(item) for item in ids]

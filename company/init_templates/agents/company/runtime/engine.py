@@ -140,10 +140,19 @@ class RunRepository:
         with self.database.connect() as connection:
             ids = [row[0] for row in connection.execute("""SELECT r.id
                 FROM core_runs r JOIN core_goals g ON g.id=r.goal_id
+                LEFT JOIN core_goal_metadata m ON m.goal_id=g.id
                 WHERE g.status='active' AND r.status IN ('ready','running')
                   AND r.sequence=(SELECT MAX(r2.sequence) FROM core_runs r2
                                   WHERE r2.goal_id=r.goal_id)
-                ORDER BY r.updated_at,r.id""")]
+                  AND NOT EXISTS (
+                    SELECT 1 FROM core_goal_edges e
+                    JOIN core_goals prerequisite ON prerequisite.id=e.source_goal_id
+                    WHERE e.target_goal_id=g.id AND prerequisite.status!='complete')
+                ORDER BY CASE json_extract(m.config_json,'$.priority')
+                    WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2
+                    WHEN 'low' THEN 3 WHEN 'deferred' THEN 4 ELSE 2 END,
+                    CASE WHEN m.deadline IS NULL THEN 1 ELSE 0 END,m.deadline,
+                    r.updated_at,r.id""")]
         return [self.get(item) for item in ids]
 
 
@@ -151,8 +160,9 @@ class GoalRuntime:
     """Composes isolated repositories; owns only Goal control and scheduling."""
 
     def __init__(self, path: str | Path, controller: GoalController,
-                 executor: AgentExecutor, *, agents=None, max_local_iterations: int = 50):
-        self.database = Database(path)
+                 executor: AgentExecutor, *, agents=None, max_local_iterations: int = 50,
+                 readonly: bool = False):
+        self.database = Database(path, readonly=readonly)
         self.controller = controller
         self.goals = GoalRepository(self.database)
         self.runs = RunRepository(self.database)
@@ -176,7 +186,16 @@ class GoalRuntime:
     def advance(self, goal_id: str) -> dict:
         goal = self.goals.get(goal_id)
         run = self.runs.current(goal_id)
-        if goal.status != "active" or run.status == "complete":
+        if goal.status != "active":
+            return self.status(goal_id)
+        if run.status == "complete":
+            # Recover databases written by the pre-1.1 runtime, where a crash
+            # could complete a Run before completing its Goal or creating the
+            # next Run.
+            if run.evaluation and run.evaluation.goal_complete:
+                self.goals.set_status(goal.id, "complete")
+            else:
+                self.runs.create(goal.id)
             return self.status(goal_id)
         context = self._context(goal, run)
         if run.stage == GoalStage.OBSERVE:
@@ -201,13 +220,7 @@ class GoalRuntime:
                     goal_id=goal.id, run_id=run.id, kind=run.decision.kind,
                     description=run.decision.description, context=intervention_context)
             result = self.resolution.resolve(intervention.id)
-            if result.outcome == ResolutionOutcome.RETURN_TO_GOAL:
-                self.runs.update(run.id, stage=GoalStage.EVALUATE, status="running")
-            elif result.outcome == ResolutionOutcome.ESCALATE_TO_GOAL:
-                self.runs.update(run.id, stage=GoalStage.OBSERVE, status="ready",
-                                 observation={})
-            else:
-                self.runs.update(run.id, stage=GoalStage.ACT, status="waiting")
+            self._commit_resolution(goal, run, result)
         else:
             if run.decision is None:
                 raise RuntimeError("EVALUATE requires a persisted Goal decision")
@@ -217,16 +230,86 @@ class GoalRuntime:
                 raise TypeError("GoalController.evaluate must return Evaluation")
             if evaluation.strategy_learning and not evaluation.evidence_ids:
                 raise ValueError("strategy learning requires evidence from this Run")
-            self.runs.update(run.id, status="complete", evaluation=evaluation)
-            if evaluation.strategy_learning:
-                self.memory.remember(
-                    "strategy", evaluation.strategy_learning,
-                    evidence_ids=evaluation.evidence_ids, goal_id=goal.id, run_id=run.id)
-            if evaluation.goal_complete:
-                self.goals.set_status(goal.id, "complete")
-            else:
-                self.runs.create(goal.id)
+            self._commit_evaluation(goal, run, evaluation)
         return self.status(goal_id)
+
+    def _commit_resolution(self, goal: Goal, run: GoalRun, result) -> None:
+        stamp = _now()
+        with self.database.connect() as connection:
+            row = connection.execute(
+                "SELECT context_json FROM core_interventions WHERE id=?",
+                (result.intervention.id,)).fetchone()
+            if row is None:
+                raise RuntimeError("Resolution Intervention disappeared")
+            context = json.loads(row[0])
+            context["resolution_message"] = result.message
+            if result.outcome == ResolutionOutcome.RETURN_TO_GOAL:
+                intervention_status, stage, run_status = "complete", GoalStage.EVALUATE, "running"
+            elif result.outcome == ResolutionOutcome.CONTINUE_LOCAL:
+                intervention_status, stage, run_status = "running", GoalStage.ACT, "ready"
+            elif result.outcome == ResolutionOutcome.ASK_USER:
+                intervention_status, stage, run_status = "waiting", GoalStage.ACT, "waiting"
+            else:
+                intervention_status, stage, run_status = "escalated", GoalStage.ACT, "complete"
+            connection.execute("""UPDATE core_interventions
+                SET status=?,resolution_outcome=?,context_json=?,updated_at=? WHERE id=?""",
+                (intervention_status, result.outcome.value, json.dumps(context), stamp,
+                 result.intervention.id))
+            if result.outcome == ResolutionOutcome.ESCALATE_TO_GOAL:
+                evaluation = Evaluation(False, {}, result.message)
+                connection.execute("""UPDATE core_runs SET status='complete',
+                    evaluation_json=?,updated_at=? WHERE id=?""",
+                    (json.dumps(evaluation.__dict__), stamp, run.id))
+                sequence = connection.execute(
+                    "SELECT COALESCE(MAX(sequence),0)+1 FROM core_runs WHERE goal_id=?",
+                    (goal.id,)).fetchone()[0]
+                connection.execute("INSERT INTO core_runs VALUES (?,?,?,?,?,?,?,?,?,?)",
+                    (f"run-{uuid.uuid4().hex[:12]}", goal.id, sequence,
+                     GoalStage.OBSERVE.value, "ready", None, None, None, stamp, stamp))
+            else:
+                connection.execute("""UPDATE core_runs SET stage=?,status=?,updated_at=?
+                    WHERE id=?""", (stage.value, run_status, stamp, run.id))
+            if result.outcome == ResolutionOutcome.ASK_USER:
+                connection.execute("""INSERT INTO core_notifications
+                    (id,goal_id,run_id,intervention_id,kind,payload_json,status,
+                     created_at,acknowledged_at) VALUES (?,?,?,?,?,?,?,?,NULL)
+                    ON CONFLICT(intervention_id,kind) DO UPDATE SET
+                      payload_json=excluded.payload_json,status='pending',
+                      acknowledged_at=NULL""",
+                    (f"notification-{uuid.uuid4().hex[:12]}", goal.id, run.id,
+                     result.intervention.id, "owner_input_required",
+                     json.dumps({"message": result.message,
+                                 "required_user_action": result.message}),
+                     "pending", stamp))
+
+    def _commit_evaluation(self, goal: Goal, run: GoalRun,
+                           evaluation: Evaluation) -> None:
+        stamp = _now()
+        with self.database.connect() as connection:
+            if evaluation.strategy_learning:
+                marks = ",".join("?" for _ in evaluation.evidence_ids)
+                rows = connection.execute(
+                    f"SELECT id FROM core_evidence WHERE run_id=? AND id IN ({marks})",
+                    (run.id, *evaluation.evidence_ids)).fetchall()
+                if len(rows) != len(evaluation.evidence_ids):
+                    raise ValueError("strategy learning evidence must belong to this Run")
+                connection.execute("INSERT INTO core_memory VALUES (?,?,?,?,?,?,?,?,?)",
+                    (f"memory-{uuid.uuid4().hex[:12]}", "strategy",
+                     evaluation.strategy_learning, goal.id, run.id, None, None,
+                     json.dumps(evaluation.evidence_ids), stamp))
+            connection.execute("""UPDATE core_runs SET status='complete',
+                evaluation_json=?,updated_at=? WHERE id=?""",
+                (json.dumps(evaluation.__dict__), stamp, run.id))
+            if evaluation.goal_complete:
+                connection.execute("UPDATE core_goals SET status='complete',updated_at=? WHERE id=?",
+                                   (stamp, goal.id))
+            else:
+                sequence = connection.execute(
+                    "SELECT COALESCE(MAX(sequence),0)+1 FROM core_runs WHERE goal_id=?",
+                    (goal.id,)).fetchone()[0]
+                connection.execute("INSERT INTO core_runs VALUES (?,?,?,?,?,?,?,?,?,?)",
+                    (f"run-{uuid.uuid4().hex[:12]}", goal.id, sequence,
+                     GoalStage.OBSERVE.value, "ready", None, None, None, stamp, stamp))
 
     def resume(self, goal_id: str) -> dict:
         run = self.runs.current(goal_id)
@@ -261,6 +344,7 @@ class GoalRuntime:
                 "evidence": self.evidence.for_run(run.id)}
 
     def _context(self, goal: Goal, run: GoalRun) -> GoalContext:
+        workflow_id = run.decision.workflow_id if run.decision else None
         return GoalContext(
-            goal, run.id, tuple(self.evidence.for_run(run.id)),
-            tuple(self.memory.relevant(goal_id=goal.id)))
+            goal, run.id, tuple(self.evidence.for_goal(goal.id)),
+            tuple(self.memory.relevant(goal_id=goal.id, workflow_id=workflow_id)))
