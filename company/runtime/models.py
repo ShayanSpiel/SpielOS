@@ -6,6 +6,9 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable
 
+from ..agents.core import AgentSpec
+from ..connections.core import ConnectionSpec
+
 
 class Stage(str, Enum):
     OBSERVE = "OBSERVE"
@@ -183,29 +186,6 @@ class WorkflowSpec:
     evidence_sources: tuple[str, ...] = ()
     connection_ids: tuple[str, ...] = ()
     graph: tuple[WorkflowStep, ...] = ()
-
-
-@dataclass(frozen=True)
-class AgentSpec:
-    """A bounded executor identity used by one or more workflow steps."""
-
-    id: str
-    description: str
-    skill_ids: tuple[str, ...]
-    permissions: tuple[str, ...]
-    produces: tuple[str, ...]
-
-
-@dataclass(frozen=True)
-class ConnectionSpec:
-    """Logical access to an external system, resolved by the active host."""
-
-    id: str
-    description: str
-    capabilities: tuple[str, ...]
-    hosts: tuple[str, ...] = ("codex", "opencode")
-    unattended: bool = False
-    required_environment: tuple[str, ...] = ()
 
 
 class GoalHandler:

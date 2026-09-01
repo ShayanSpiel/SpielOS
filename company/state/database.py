@@ -59,6 +59,13 @@ CREATE TABLE IF NOT EXISTS core_goal_edges (
     CHECK(source_goal_id <> target_goal_id)
 );
 
+CREATE TABLE IF NOT EXISTS core_goal_metadata (
+    goal_id TEXT PRIMARY KEY REFERENCES core_goals(id),
+    owner_id TEXT NOT NULL,
+    deadline TEXT,
+    config_json TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS core_runs (
     id TEXT PRIMARY KEY,
     goal_id TEXT NOT NULL REFERENCES core_goals(id),
@@ -166,4 +173,112 @@ CREATE INDEX IF NOT EXISTS core_interventions_run ON core_interventions(run_id, 
 CREATE INDEX IF NOT EXISTS core_work_orders_ready ON core_work_orders(status, created_at);
 CREATE INDEX IF NOT EXISTS core_evidence_lineage ON core_evidence(goal_id, run_id, intervention_id);
 CREATE INDEX IF NOT EXISTS core_memory_scope ON core_memory(scope, goal_id, workflow_id);
+
+-- Foreign keys prove that referenced rows exist. These triggers additionally
+-- prove that every descendant names one coherent Goal/Run/Intervention chain.
+CREATE TRIGGER IF NOT EXISTS core_intervention_lineage_insert
+BEFORE INSERT ON core_interventions
+WHEN NOT EXISTS (
+    SELECT 1 FROM core_runs r
+    WHERE r.id=NEW.run_id AND r.goal_id=NEW.goal_id
+)
+BEGIN
+    SELECT RAISE(ABORT, 'intervention Goal/Run lineage mismatch');
+END;
+
+CREATE TRIGGER IF NOT EXISTS core_intervention_lineage_update
+BEFORE UPDATE OF goal_id,run_id ON core_interventions
+WHEN NOT EXISTS (
+    SELECT 1 FROM core_runs r
+    WHERE r.id=NEW.run_id AND r.goal_id=NEW.goal_id
+)
+BEGIN
+    SELECT RAISE(ABORT, 'intervention Goal/Run lineage mismatch');
+END;
+
+CREATE TRIGGER IF NOT EXISTS core_workflow_run_lineage_insert
+BEFORE INSERT ON core_workflow_runs
+WHEN NOT EXISTS (
+    SELECT 1 FROM core_interventions i
+    WHERE i.id=NEW.intervention_id AND i.run_id=NEW.run_id
+      AND i.goal_id=NEW.goal_id
+)
+BEGIN
+    SELECT RAISE(ABORT, 'WorkflowRun lineage mismatch');
+END;
+
+CREATE TRIGGER IF NOT EXISTS core_workflow_run_lineage_update
+BEFORE UPDATE OF goal_id,run_id,intervention_id ON core_workflow_runs
+WHEN NOT EXISTS (
+    SELECT 1 FROM core_interventions i
+    WHERE i.id=NEW.intervention_id AND i.run_id=NEW.run_id
+      AND i.goal_id=NEW.goal_id
+)
+BEGIN
+    SELECT RAISE(ABORT, 'WorkflowRun lineage mismatch');
+END;
+
+CREATE TRIGGER IF NOT EXISTS core_work_order_lineage_insert
+BEFORE INSERT ON core_work_orders
+WHEN NOT EXISTS (
+    SELECT 1 FROM core_interventions i
+    WHERE i.id=NEW.intervention_id AND i.run_id=NEW.run_id
+      AND i.goal_id=NEW.goal_id
+) OR (NEW.workflow_run_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM core_workflow_runs w
+    WHERE w.id=NEW.workflow_run_id AND w.intervention_id=NEW.intervention_id
+      AND w.run_id=NEW.run_id AND w.goal_id=NEW.goal_id
+))
+BEGIN
+    SELECT RAISE(ABORT, 'WorkOrder lineage mismatch');
+END;
+
+CREATE TRIGGER IF NOT EXISTS core_work_order_lineage_update
+BEFORE UPDATE OF goal_id,run_id,intervention_id,workflow_run_id ON core_work_orders
+WHEN NOT EXISTS (
+    SELECT 1 FROM core_interventions i
+    WHERE i.id=NEW.intervention_id AND i.run_id=NEW.run_id
+      AND i.goal_id=NEW.goal_id
+) OR (NEW.workflow_run_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM core_workflow_runs w
+    WHERE w.id=NEW.workflow_run_id AND w.intervention_id=NEW.intervention_id
+      AND w.run_id=NEW.run_id AND w.goal_id=NEW.goal_id
+))
+BEGIN
+    SELECT RAISE(ABORT, 'WorkOrder lineage mismatch');
+END;
+
+CREATE TRIGGER IF NOT EXISTS core_evidence_lineage_insert
+BEFORE INSERT ON core_evidence
+WHEN NOT EXISTS (
+    SELECT 1 FROM core_runs r
+    WHERE r.id=NEW.run_id AND r.goal_id=NEW.goal_id
+) OR (NEW.intervention_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM core_interventions i
+    WHERE i.id=NEW.intervention_id AND i.run_id=NEW.run_id
+      AND i.goal_id=NEW.goal_id
+)) OR (NEW.workflow_run_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM core_workflow_runs w
+    WHERE w.id=NEW.workflow_run_id AND w.intervention_id=NEW.intervention_id
+      AND w.run_id=NEW.run_id AND w.goal_id=NEW.goal_id
+)) OR (NEW.work_order_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM core_work_orders o
+    WHERE o.id=NEW.work_order_id AND o.run_id=NEW.run_id
+      AND o.goal_id=NEW.goal_id
+))
+BEGIN
+    SELECT RAISE(ABORT, 'Evidence lineage mismatch');
+END;
+
+CREATE TRIGGER IF NOT EXISTS core_evidence_immutable_update
+BEFORE UPDATE ON core_evidence
+BEGIN
+    SELECT RAISE(ABORT, 'Evidence is immutable');
+END;
+
+CREATE TRIGGER IF NOT EXISTS core_evidence_immutable_delete
+BEFORE DELETE ON core_evidence
+BEGIN
+    SELECT RAISE(ABORT, 'Evidence is immutable');
+END;
 """

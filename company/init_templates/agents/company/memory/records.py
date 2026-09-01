@@ -33,9 +33,16 @@ class MemoryRepository:
         ids = tuple(dict.fromkeys(evidence_ids))
         if scope != "owner" and not ids:
             raise ValueError(f"{scope} memory requires evidence")
+        if scope != "owner" and (not goal_id or not run_id):
+            raise ValueError(f"{scope} memory requires Goal and Run lineage")
         records = [self.evidence.get(item) for item in ids]
+        if goal_id and any(item.goal_id != goal_id for item in records):
+            raise ValueError("memory evidence must belong to its causal Goal")
         if run_id and any(item.run_id != run_id for item in records):
             raise ValueError("memory evidence must belong to its causal run")
+        if intervention_id and any(
+                item.intervention_id != intervention_id for item in records):
+            raise ValueError("memory evidence must belong to its causal Intervention")
         memory_id = f"memory-{uuid.uuid4().hex[:12]}"
         with self.database.connect() as connection:
             connection.execute(

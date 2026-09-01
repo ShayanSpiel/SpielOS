@@ -29,7 +29,7 @@ LAYERS = (
     ("resolution", "Interventions & Resolution", "Execute, create, fix, retry, validate, or ask without spawning a Goal."),
     ("orchestration", "Workflows & WorkOrders", "Reusable definitions, durable executions, and exact assignments."),
     ("execution", "Agents", "Replaceable executors acting through a Host boundary."),
-    ("capability", "Departments, Skills & Connections", "Portable packages, reusable methods, and authorized access."),
+    ("capability", "Capabilities, Departments, Skills & Connections", "Raw abilities, portable packages, reusable methods, and authorized access."),
     ("knowledge", "Evidence & Memory", "Immutable facts and evidence-grounded reusable learning."),
     ("state", "State & artifacts", "One SQLite authority and canonical outcome artifacts."),
     ("code", "Code architecture", "Source modules and their local import relations."),
@@ -50,6 +50,7 @@ CORE_COMPONENTS = (
     ("workflow-run", "WorkflowRun", "orchestration", "Durable execution of one Workflow definition.", "company/workflows/core.py"),
     ("work-order", "WorkOrder", "orchestration", "Exact claimable unit of Agent work.", "company/work_orders/core.py"),
     ("agent", "Agent", "execution", "Replaceable executor identity.", "company/agents/core.py"),
+    ("capability", "Capability", "capability", "Raw ability resolved by a Host.", "company/capabilities/core.py"),
     ("department", "Department", "capability", "Portable manifest; owns no runtime.", "company/departments/core.py"),
     ("skill", "Skill", "capability", "Reusable method consumed by an Agent.", "company/skills/core.py"),
     ("connection", "Connection", "capability", "Authorized local or external capability.", "company/connections/core.py"),
@@ -66,10 +67,12 @@ CORE_RELATIONS = (
     ("run", "intervention", "chooses"), ("intervention", "resolution", "resolved_by"),
     ("resolution", "workflow-run", "executes"), ("workflow", "workflow-run", "instantiates"),
     ("workflow-run", "work-order", "issues"), ("work-order", "agent", "assigned_to"),
-    ("host", "agent", "executes"), ("department", "workflow", "packages"),
+    ("host", "agent", "executes"), ("host", "capability", "provides"),
+    ("department", "workflow", "packages"),
     ("department", "agent", "packages"), ("department", "skill", "packages"),
     ("department", "connection", "packages"), ("agent", "skill", "uses"),
-    ("agent", "connection", "uses"), ("work-order", "evidence", "produces"),
+    ("agent", "capability", "uses"), ("agent", "connection", "uses"),
+    ("work-order", "evidence", "produces"),
     ("evidence", "memory", "grounds"), ("observer", "database", "reads"),
 )
 
@@ -203,8 +206,10 @@ def _core_goal_projection(store) -> list[dict]:
     """Project the canonical clean-core Goal and current Run tables."""
 
     with store.connect() as connection:
-        goals = [dict(row) for row in connection.execute(
-            "SELECT * FROM core_goals ORDER BY created_at,id")]
+        goals = [dict(row) for row in connection.execute("""SELECT g.*,
+                m.owner_id,m.deadline,m.config_json
+                FROM core_goals g LEFT JOIN core_goal_metadata m ON m.goal_id=g.id
+                ORDER BY g.created_at,g.id""")]
         supports: dict[str, list[str]] = defaultdict(list)
         for row in connection.execute(
                 "SELECT source_goal_id,target_goal_id FROM core_goal_edges"):
@@ -218,10 +223,13 @@ def _core_goal_projection(store) -> list[dict]:
     for goal in goals:
         run = current_runs.get(goal["id"], {})
         values.append({
-            "id": goal["id"], "name": goal["name"], "owner_id": "goal-runtime",
+            "id": goal["id"], "name": goal["name"],
+            "owner_id": goal.get("owner_id") or "goal-runtime",
             "metric": goal["metric"], "operator": goal["operator"],
             "target": _json(goal["target_json"], goal["target_json"]),
             "parent_id": goal["parent_id"], "goal_status": goal["status"],
+            "deadline": goal.get("deadline"),
+            "config": _json(goal.get("config_json"), {}),
             "created_at": goal["created_at"], "updated_at": goal["updated_at"],
             "run_id": run.get("id"), "sequence": run.get("sequence"),
             "stage": run.get("stage"), "step": None,
@@ -477,7 +485,7 @@ def _add_runtime_state(graph: Graph, runtime, goals: list[dict], tables: list[di
     active_by_stage = Counter()
     for goal in goals:
         status = goal.get("goal_status") or "unknown"
-        live = status not in TERMINAL_GOALS
+        live = status == "active"
         stage = str(goal.get("stage") or "GOAL").upper()
         if live:
             active_by_stage[stage] += 1
@@ -915,19 +923,35 @@ def _coherence(graph: Graph, runtime, goals: list[dict], project_root: Path,
     source_model = goals[0].get("source_model") if goals else "compatibility"
     audit = (runtime.topology_audit() if source_model == "compatibility"
              else _core_topology_audit(graph, goals))
-    for defect in audit.get("defects") or ():
+    active_goals = [goal for goal in goals if goal.get("goal_status") == "active"]
+    active_goal_ids = {goal["id"] for goal in active_goals}
+    active_defects = [defect for defect in audit.get("defects") or ()
+                      if defect.get("goal_id") in active_goal_ids]
+    historical_defects = [defect for defect in audit.get("defects") or ()
+                          if defect.get("goal_id") not in active_goal_ids]
+    for defect in active_defects:
         goal_id = defect.get("goal_id")
         graph.finding(
             "error", "goal_topology", defect.get("kind", "topology defect").replace("_", " ").title(),
             f"{goal_id} violates the Goal control-tree or causal-support contract.",
             node_ids=[f"goal:{goal_id}"],
             suggestion="Use the owner-reviewed topology migration plan; never infer parentage from timestamps.")
-    if goals and not audit.get("canonical_root_goal_id"):
+    active_roots = [goal["id"] for goal in active_goals
+                    if not goal.get("parent_id")]
+    if active_goals and len(active_roots) != 1:
         graph.finding(
             "error", "missing_canonical_root", "No canonical primary Goal",
-            f"{len(audit.get('root_goal_ids') or ())} roots exist and none is canonical.",
-            node_ids=[f"goal:{item}" for item in audit.get("root_goal_ids") or ()],
+            f"{len(active_roots)} active roots exist; exactly one is required.",
+            node_ids=[f"goal:{item}" for item in active_roots],
             suggestion="Choose exactly one primary outcome and map every active supporting Goal to it.")
+    if historical_defects and not active_defects:
+        graph.finding(
+            "info", "historical_topology",
+            f"{len(historical_defects)} historical topology defects are quarantined",
+            "Closed compatibility records remain visible for audit, but they do not make "
+            "the live company unhealthy.",
+            node_ids=[f"goal:{item['goal_id']}" for item in historical_defects[:60]],
+            suggestion="Leave immutable history intact; map only owner-selected live work during cutover.")
 
     duplicates = {key: value for key, value in graph_inventory["workflow_ids"].items()
                   if len(set(value)) > 1}
@@ -939,7 +963,6 @@ def _coherence(graph: Graph, runtime, goals: list[dict], project_root: Path,
                       if node["kind"] == "workflow" and node["label"] == workflow_id],
             suggestion="Keep one canonical owner or qualify the workflows so routing is unambiguous.")
 
-    active_goals = [goal for goal in goals if goal.get("goal_status") == "active"]
     blocked = [goal for goal in active_goals if goal.get("run_status") in {"blocked", "failed"}]
     if blocked:
         graph.finding(
@@ -963,9 +986,13 @@ def _coherence(graph: Graph, runtime, goals: list[dict], project_root: Path,
             meta={"active_goals": len(active_goals), "migration": "owner-selected only"})
         graph.edge("state:sqlite", compatibility_id, "contains")
         graph.finding(
-            "warning", "compatibility_state", "Compatibility state is carrying live work",
-            "The observer is projecting the current persisted Goals honestly, while the canonical "
-            "clean-core tables remain empty. Migration is explicit and owner-selected.",
+            "warning" if active_goals else "info", "compatibility_state",
+            ("Compatibility state is carrying live work" if active_goals else
+             "Compatibility history is quarantined"),
+            ("The observer is projecting live compatibility Goals while the canonical clean-core "
+             "tables remain empty." if active_goals else
+             "Only closed historical Goals remain in compatibility state; they are visible but "
+             "are not an operational authority."),
             node_ids=[compatibility_id, *[f"goal:{item['id']}" for item in active_goals[:8]]],
             suggestion="Select the Goals that should enter the clean core; historical state remains isolated.")
 
@@ -981,7 +1008,8 @@ def _coherence(graph: Graph, runtime, goals: list[dict], project_root: Path,
     outgoing = Counter(edge["source"] for edge in graph.edges.values())
     disconnected = [node["id"] for node in graph.nodes.values()
                     if not incoming[node["id"]] and not outgoing[node["id"]]
-                    and node["kind"] not in {"state_table", "code_module"}]
+                    and node["kind"] not in {"state_table", "code_module"}
+                    and node.get("status") != "ignored"]
     if disconnected:
         graph.finding(
             "warning", "disconnected", f"{len(disconnected)} entities are disconnected",

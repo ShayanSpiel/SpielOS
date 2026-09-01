@@ -55,7 +55,8 @@ This makes every meaningful action traceable to the outcome it served.
 | `workflows` | Reusable definitions and durable WorkflowRuns |
 | `work_orders` | Claimable exact units of Agent work |
 | `agents`, `hosts` | Replaceable execution identity and transport |
-| `skills`, `connections`, `departments` | Portable capability definitions |
+| `capabilities` | Raw Host-resolved abilities such as browser or filesystem access |
+| `skills`, `connections`, `departments` | Reusable methods, external access, and owned operating packages |
 | `evidence` | Immutable facts about what happened |
 | `memory` | Owner, workflow, and strategy learning |
 | `context` | Bounded decision projection |
@@ -65,6 +66,11 @@ This makes every meaningful action traceable to the outcome it served.
 Dependencies point inward through these contracts. Goals do not import
 Workflows or Agents. Hosts do not own Goal semantics. Departments are packages,
 not runtimes.
+
+An Agent is execution identity, a Skill is a reusable method, a Capability is
+a raw ability, a Connection is external access, a Workflow is a reusable
+process, and a WorkOrder is one exact instance of work. These meanings are not
+interchangeable.
 
 ## Living observability
 
@@ -90,8 +96,15 @@ Run.
 
 ## Compatibility
 
-The historical `runtime.loop.Runtime` remains a compatibility facade for
-existing commands and persisted homes during the bounded data migration.
-`runtime.engine.GoalRuntime` is the canonical clean-core control path. New
-architecture code must depend on the subsystem contracts above, not on the
-compatibility facade.
+The historical `runtime.loop.CompatibilityRuntime` can operate a home only
+while its clean-core Goal tables are empty. As soon as a clean-core Goal
+exists, the compatibility loop is fail-closed for writes and remains available
+only for read-only audit. This prevents two Goal authorities from sharing one
+database.
+
+`runtime.engine.GoalRuntime` is the canonical clean-core control path. An
+owner-selected cutover is previewed with `spielos migration core-plan --goal
+GOAL_ID` and applied with `spielos migration core-apply --goal GOAL_ID`; apply
+creates a consistent backup and a restartable initial Run for every selected
+Goal. New architecture code must depend on subsystem contracts, never on the
+compatibility loop.

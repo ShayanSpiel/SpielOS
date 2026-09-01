@@ -24,6 +24,9 @@ class Goal:
     target: Any
     parent_id: str | None = None
     status: str = "active"
+    owner_id: str = "goal-runtime"
+    deadline: str | None = None
+    config: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -38,7 +41,9 @@ class GoalRepository:
         self.database = database
 
     def create(self, name: str, metric: str, operator: str, target: Any, *,
-               parent_id: str | None = None, goal_id: str | None = None) -> Goal:
+               parent_id: str | None = None, goal_id: str | None = None,
+               owner_id: str = "goal-runtime", deadline: str | None = None,
+               config: dict[str, Any] | None = None) -> Goal:
         goal_id = goal_id or f"goal-{uuid.uuid4().hex[:12]}"
         if parent_id:
             self.get(parent_id)
@@ -49,17 +54,25 @@ class GoalRepository:
                 (goal_id, name, metric, operator, json.dumps(target), parent_id,
                  "active", stamp, stamp),
             )
+            connection.execute(
+                "INSERT INTO core_goal_metadata VALUES (?,?,?,?)",
+                (goal_id, owner_id, deadline, json.dumps(config or {})),
+            )
         return self.get(goal_id)
 
     def get(self, goal_id: str) -> Goal:
         with self.database.connect() as connection:
             row = connection.execute(
-                "SELECT * FROM core_goals WHERE id=?", (goal_id,)
+                """SELECT g.*,m.owner_id,m.deadline,m.config_json
+                FROM core_goals g LEFT JOIN core_goal_metadata m ON m.goal_id=g.id
+                WHERE g.id=?""", (goal_id,)
             ).fetchone()
         if row is None:
             raise KeyError(f"unknown goal: {goal_id}")
         return Goal(row["id"], row["name"], row["metric"], row["operator"],
-                    json.loads(row["target_json"]), row["parent_id"], row["status"])
+                    json.loads(row["target_json"]), row["parent_id"], row["status"],
+                    row["owner_id"] or "goal-runtime", row["deadline"],
+                    json.loads(row["config_json"] or "{}"))
 
     def list(self) -> list[Goal]:
         with self.database.connect() as connection:

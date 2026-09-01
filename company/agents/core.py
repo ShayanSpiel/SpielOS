@@ -13,7 +13,15 @@ class Agent:
     id: str
     description: str = ""
     skill_ids: tuple[str, ...] = ()
+    capability_ids: tuple[str, ...] = ()
+    permissions: tuple[str, ...] = ()
+    produces: tuple[str, ...] = ()
     connection_ids: tuple[str, ...] = ()
+
+
+# One Agent identity contract. The old name remains an import alias while
+# compatibility modules are retired; it is not a second model.
+AgentSpec = Agent
 
 
 @dataclass(frozen=True)

@@ -50,14 +50,29 @@ CAPABILITY_WORKFLOWS = config.capability_workflows()
 logger = logging.getLogger("company.runtime.loop")
 
 
-class Runtime:
+class CompatibilityRuntime:
     def __init__(self, db_path: str | Path, registry: dict | None = None,
                  *, readonly: bool = False):
         self.readonly = readonly
         self.store = Store(db_path, readonly=readonly)
         self.registry = registry or installed_handlers()
 
+    def _assert_goal_write_authority(self) -> None:
+        """Never let the historical Goal loop write beside an activated clean core."""
+
+        if self.readonly:
+            return
+        with self.store.connect() as connection:
+            tables = {row[0] for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'")}
+            count = (connection.execute("SELECT COUNT(*) FROM core_goals").fetchone()[0]
+                     if "core_goals" in tables else 0)
+        if count:
+            raise RuntimeError(
+                "clean-core authority is active; compatibility Runtime is read-only")
+
     def create_goal(self, **values) -> dict:
+        self._assert_goal_write_authority()
         if values["owner_id"] not in self.registry:
             raise KeyError(f"goal owner '{values['owner_id']}' is not installed")
         if values.get("deadline"):
@@ -150,6 +165,7 @@ class Runtime:
                 f"`company {action}` is refused until `company runner enable`")
 
     def once(self, goal_id: str, holder: str | None = None) -> dict:
+        self._assert_goal_write_authority()
         self._automation_gate("once")
         holder = holder or f"runtime-{uuid.uuid4().hex[:8]}"
         goal = self.store.goal(goal_id)
@@ -688,6 +704,7 @@ class Runtime:
         ``config["approval_policy"]`` on the Goal in addition to granting the
         current action; ``per_action`` (or no scope) never changes the policy.
         """
+        self._assert_goal_write_authority()
         self._automation_gate("approve")
         cycle = self.store.cycle(goal_id)
         if cycle["run_status"] != "awaiting_approval":
@@ -739,6 +756,7 @@ class Runtime:
         return self.status(goal_id)
 
     def set_goal_status(self, goal_id: str, status: GoalStatus) -> dict:
+        self._assert_goal_write_authority()
         previous = self.store.goal(goal_id)["goal_status"]
         if (status is GoalStatus.ACTIVE and previous == "proposed"
                 and ((self.store.goal(goal_id).get("config") or {}).get("alignment") or {})
@@ -829,6 +847,7 @@ class Runtime:
                 self.store.wake_goal(target_id, f"support_changed:{source_id}")
 
     def link_support(self, goal_id: str, target_id: str) -> dict:
+        self._assert_goal_write_authority()
         goal = self.store.goal(goal_id)
         targets = validate_support_edges(
             self.store, goal_id, (*support_goal_ids(goal), target_id))
@@ -903,6 +922,7 @@ class Runtime:
         )
 
     def retry(self, goal_id: str, *, automatic: bool = False) -> dict:
+        self._assert_goal_write_authority()
         self._automation_gate("retry")
         cycle = self.store.cycle(goal_id)
         if cycle["run_status"] not in {"blocked", "failed"}:
@@ -953,6 +973,7 @@ class Runtime:
         )
 
     def next(self, goal_id: str, *, automatic: bool = False) -> dict:
+        self._assert_goal_write_authority()
         self._automation_gate("next")
         goal = self.store.goal(goal_id)
         if goal["goal_status"] != "active":
@@ -988,6 +1009,7 @@ class Runtime:
     def add_evidence(self, goal_id: str, *, kind: str, source: str, payload: dict,
                      validity: str | None = None,
                      work_order_id: str | None = None) -> dict:
+        self._assert_goal_write_authority()
         cycle = self.store.cycle(goal_id)
         run = self.store.run(cycle["id"])
         payload = dict(payload or {})
@@ -1012,6 +1034,7 @@ class Runtime:
     def claim_work_order(self, work_order_id: str, agent_id: str) -> dict:
         """Claim one assignment without changing its Goal or run state."""
 
+        self._assert_goal_write_authority()
         order = self.store.claim_work_order(work_order_id, agent_id)
         goal = self.store.goal(order["goal_id"])
         if goal["goal_status"] != "active":
@@ -1022,6 +1045,7 @@ class Runtime:
                             evidence: list[dict]) -> dict:
         """Validate linked evidence, close one claimed assignment, and resume its Goal."""
 
+        self._assert_goal_write_authority()
         order = self.store.work_order(work_order_id)
         if order["status"] != "claimed" or order.get("claimed_by") != agent_id:
             owner = order.get("claimed_by") or order["status"]
@@ -1064,6 +1088,7 @@ class Runtime:
 
     def complete_change(self, task_id: str, *, passed: bool, result: dict,
                         deployed: bool = False) -> dict:
+        self._assert_goal_write_authority()
         task = self.store.change_task(task_id)
         if task["status"] != "approved":
             raise RuntimeError(
@@ -1206,3 +1231,8 @@ def now_iso() -> str:
 
 def _compare(value, operator, target):
     return _shared_compare(value, operator, target)
+
+
+# Historical import compatibility. New code uses the explicit class name so
+# this loop cannot be mistaken for the canonical clean-core GoalRuntime.
+Runtime = CompatibilityRuntime

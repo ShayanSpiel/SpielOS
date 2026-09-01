@@ -87,11 +87,14 @@ class ControlSurfaceTests(unittest.TestCase):
         self.assertTrue({"department", "departments", "add", "agent"}
                         <= set(action.choices))
 
-    def test_runtime_uses_department_and_agent_contracts(self):
+    def test_runtime_reuses_canonical_agent_and_connection_contracts(self):
         models = (self.company / "runtime/models.py").read_text()
         interpreter = (self.company / "runtime/interpreter.py").read_text()
         self.assertIn("class Department", models)
-        self.assertIn("class AgentSpec", models)
+        self.assertIn("from ..agents.core import AgentSpec", models)
+        self.assertIn("from ..connections.core import ConnectionSpec", models)
+        self.assertNotIn("class AgentSpec", models)
+        self.assertNotIn("class ConnectionSpec", models)
         self.assertIn("class InterpretedDepartment", interpreter)
         self.assertNotIn("class Workgroup", models)
 

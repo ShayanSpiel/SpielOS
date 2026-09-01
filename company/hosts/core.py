@@ -10,6 +10,7 @@ class Host:
 
     id: str
     executor: AgentExecutor
+    capability_ids: tuple[str, ...] = ()
 
     def execute(self, agent: Agent, order: WorkOrder) -> AgentResult:
         return self.executor.execute(agent, order)

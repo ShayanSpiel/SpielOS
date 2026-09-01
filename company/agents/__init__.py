@@ -14,8 +14,7 @@ import json
 import os
 from pathlib import Path
 
-from ..runtime.models import AgentSpec
-from .core import Agent, AgentExecutor, AgentResult, FunctionExecutor
+from .core import Agent, AgentExecutor, AgentResult, AgentSpec, FunctionExecutor
 
 
 AGENTS = {

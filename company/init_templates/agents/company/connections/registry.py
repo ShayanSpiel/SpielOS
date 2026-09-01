@@ -1,6 +1,6 @@
 """Host-first logical Connections used by Department Workflows."""
 
-from ..runtime.models import ConnectionSpec
+from .core import ConnectionSpec
 
 
 _CONNECTIONS = {

@@ -4,11 +4,12 @@ import argparse
 import json
 import sqlite3
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 from .runtime.models import GoalStatus
 from .runtime.runner import Runner
-from .runtime import LegacyRuntime as Runtime
+from .runtime import CompatibilityRuntime
 from .runtime.paths import find_project_root
 from .runtime.service import RunnerService
 
@@ -205,6 +206,17 @@ def build_parser():
         if name == "plan":
             item.add_argument("--out")
         item.add_argument("--json", action="store_true")
+    core_plan = migration_commands.add_parser(
+        "core-plan", help="preview an explicit legacy-Goal cutover without writing")
+    core_plan.add_argument("--goal", action="append", required=True,
+                           help="legacy Goal id to migrate (repeatable)")
+    core_plan.add_argument("--json", action="store_true")
+    core_apply = migration_commands.add_parser(
+        "core-apply", help="back up state and migrate explicitly selected Goals")
+    core_apply.add_argument("--goal", action="append", required=True,
+                            help="legacy Goal id to migrate (repeatable)")
+    core_apply.add_argument("--backup", help="exact backup destination")
+    core_apply.add_argument("--json", action="store_true")
     goal = commands.add_parser("goal")
     goals = goal.add_subparsers(dest="goal_command", required=True)
     create = goals.add_parser("create")
@@ -388,6 +400,15 @@ def _runtime_mode(args) -> str | None:
     return "write"
 
 
+def _uses_goal_authority(args) -> bool:
+    """Commands that must never cross the active Goal-state boundary."""
+
+    return args.command in {
+        "goal", "once", "next", "status", "approve", "pause", "resume",
+        "abandon", "retry", "evidence", "tasks", "runner", "report", "change",
+    } or (args.command == "eval" and getattr(args, "goal", None))
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     if "--version" in argv or "-V" in argv:
@@ -408,7 +429,7 @@ def main(argv=None):
         root = find_project_root()
         if not in_source_repo:
             if (root / ".agents" / "company").is_dir():
-                runtime = Runtime(DEFAULT_DB, readonly=True)
+                runtime = CompatibilityRuntime(DEFAULT_DB, readonly=True)
                 service = RunnerService(PROJECT_ROOT,
                                         Path(DEFAULT_DB)).status()
                 snapshot = runtime.company_snapshot(5)
@@ -422,7 +443,15 @@ def main(argv=None):
             return run_init()
     args = build_parser().parse_args(argv)
     mode = _runtime_mode(args)
-    runtime = Runtime(args.db, readonly=(mode == "read")) if mode else None
+    runtime = None
+    if mode:
+        if _uses_goal_authority(args):
+            from .commands import CleanCommandRuntime, goal_authority
+            runtime = (CleanCommandRuntime(args.db, readonly=(mode == "read"))
+                       if goal_authority(args.db) == "clean-core" else
+                       CompatibilityRuntime(args.db, readonly=(mode == "read")))
+        else:
+            runtime = CompatibilityRuntime(args.db, readonly=(mode == "read"))
     exit_code = 0
     try:
         if args.command == "init":
@@ -473,9 +502,33 @@ def main(argv=None):
             else:
                 output = friction_events(project_root=PROJECT_ROOT, limit=args.limit)
         elif args.command == "migration":
-            from .runtime.migration import inspect_source, migration_plan
-            output = (inspect_source(args.source) if args.migration_command == "inspect"
-                      else migration_plan(args.source))
+            if args.migration_command in {"core-plan", "core-apply"}:
+                from .state import Database, migrate_legacy_goals
+                from .state.migration import backup_database, plan_legacy_goal_migration
+
+                database = Database(args.db)
+                plan = plan_legacy_goal_migration(database, args.goal)
+                if args.migration_command == "core-plan":
+                    output = plan
+                else:
+                    if plan["missing"] or plan["core_conflicts"]:
+                        raise ValueError(
+                            "core cutover refused: resolve missing Goals and core conflicts first")
+                    backup = (Path(args.backup).expanduser().resolve() if args.backup else
+                              Path(args.db).with_name(
+                                  "company.before-core-cutover-" +
+                                  datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") +
+                                  ".sqlite"))
+                    if backup.exists():
+                        raise ValueError(f"backup destination already exists: {backup}")
+                    backup_database(database, backup)
+                    result = migrate_legacy_goals(database, args.goal)
+                    output = {"plan": plan, **result, "backup": str(backup),
+                              "authority": "clean-core"}
+            else:
+                from .runtime.migration import inspect_source, migration_plan
+                output = (inspect_source(args.source) if args.migration_command == "inspect"
+                          else migration_plan(args.source))
             if args.migration_command == "plan" and args.out:
                 destination = Path(args.out).expanduser().resolve()
                 destination.parent.mkdir(parents=True, exist_ok=True)
@@ -659,7 +712,7 @@ def main(argv=None):
                 evidence_validity=args.validity, parent_run_id=args.parent_run,
                 triggered_by_run_id=args.triggered_by, resume_run_id=args.resume_run)
         elif args.command == "goal" and args.goal_command == "list":
-            output = runtime.store.goal_summaries(limit=100)
+            output = runtime.goal_summaries(limit=100)
         elif args.command == "goal" and args.goal_command == "topology":
             output = runtime.topology_audit()
         elif args.command == "goal" and args.goal_command == "link":
@@ -670,7 +723,10 @@ def main(argv=None):
             output = runtime.once(args.goal_id)
         elif args.command == "next":
             runtime.next(args.goal_id)
-            Runner(runtime).tick(args.goal_id)
+            if isinstance(runtime, CompatibilityRuntime):
+                Runner(runtime).tick(args.goal_id)
+            else:
+                runtime.tick()
             output = runtime.status(args.goal_id)
         elif args.command == "status":
             if args.goal_id and args.history:
@@ -717,7 +773,10 @@ def main(argv=None):
             else:
                 runtime.add_evidence(args.goal_id, kind=args.kind, source=args.source,
                                      payload=json.loads(args.payload), validity=args.validity)
-            Runner(runtime).tick(args.goal_id)
+            if isinstance(runtime, CompatibilityRuntime):
+                Runner(runtime).tick(args.goal_id)
+            else:
+                runtime.tick()
             output = runtime.status(args.goal_id)
         elif args.command == "change":
             output = runtime.complete_change(args.task_id, passed=args.passed,
@@ -727,14 +786,20 @@ def main(argv=None):
         elif args.command == "runner":
             runner = Runner(runtime)
             if args.runner_command == "tick":
-                output = runner.tick(args.goal_id, args.max_advances)
+                output = (runner.tick(args.goal_id, args.max_advances)
+                          if isinstance(runtime, CompatibilityRuntime)
+                          else runtime.tick(args.max_advances))
             elif args.runner_command == "watch":
                 # The daemon reports pending attention but never acknowledges
                 # it. Only a host that actually displays an exact id may mark
                 # that notification delivered.
                 from .runtime.notifications import pending_notifications
-                for result in runner.watch(args.interval, args.goal_id, args.max_ticks):
-                    pending = len(pending_notifications(runtime.store))
+                stream = (runner.watch(args.interval, args.goal_id, args.max_ticks)
+                          if isinstance(runtime, CompatibilityRuntime)
+                          else runtime.watch(args.interval, args.goal_id, args.max_ticks))
+                for result in stream:
+                    pending = (len(pending_notifications(runtime.store))
+                               if isinstance(runtime, CompatibilityRuntime) else 0)
                     print(json.dumps({**result, "notifications_pending": pending},
                                      ensure_ascii=False, default=str), flush=True)
                 return 0
@@ -1234,6 +1299,21 @@ def render_friction(args, value):
 
 
 def render_migration(args, value):
+    if args.migration_command in {"core-plan", "core-apply"}:
+        plan = value.get("plan", value)
+        lines = [f"# Clean-core migration {args.migration_command}", "",
+                 f"- Selected: `{len(plan.get('selected') or [])}`",
+                 f"- Missing: `{len(plan.get('missing') or [])}`",
+                 f"- Core conflicts: `{len(plan.get('core_conflicts') or [])}`",
+                 f"- Parent links omitted: `{len(plan.get('parents_omitted') or [])}`",
+                 f"- Support links omitted: `{len(plan.get('supports_omitted') or [])}`"]
+        if value.get("backup"):
+            lines += [f"- Backup: `{value['backup']}`",
+                      f"- Migrated: `{len(value.get('migrated') or [])}`",
+                      "- Authority: `clean-core` (compatibility writes are now disabled)"]
+        else:
+            lines += ["", "Review omissions, then apply the same explicit Goal selection."]
+        return "\n".join(lines) + "\n"
     inspection = value.get("inspection", value)
     inventory = inspection["inventory"]
     lines = [f"# Migration {args.migration_command}", "",

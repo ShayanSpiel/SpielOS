@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -90,6 +91,17 @@ def migrate_legacy_goals(database: Database, goal_ids: list[str]) -> dict:
                 VALUES (?,?,?,?,?,?,?,?,?)""",
                 (row["id"], row["name"], row["metric"], row["operator"],
                  row["target_json"], None, status, row["created_at"], stamp))
+            connection.execute("""INSERT OR IGNORE INTO core_goal_metadata
+                (goal_id,owner_id,deadline,config_json) VALUES (?,?,?,?)""",
+                (row["id"], row["owner_id"], row["deadline"],
+                 row["config_json"] or "{}"))
+            run_id = "run-migrated-" + hashlib.sha256(
+                row["id"].encode("utf-8")).hexdigest()[:12]
+            connection.execute("""INSERT OR IGNORE INTO core_runs
+                (id,goal_id,sequence,stage,status,observation_json,decision_json,
+                 evaluation_json,created_at,updated_at)
+                VALUES (?,?,1,'OBSERVE','ready',NULL,NULL,NULL,?,?)""",
+                (run_id, row["id"], row["created_at"], stamp))
             migrated.append(goal_id)
         for goal_id, row in rows.items():
             parent_id = row["parent_id"] if row["parent_id"] in rows else None

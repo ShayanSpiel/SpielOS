@@ -164,9 +164,12 @@ class GoalRuntime:
         self.interventions = InterventionRepository(self.database)
 
     def create_goal(self, name: str, metric: str, operator: str, target: Any, *,
-                    parent_id: str | None = None, goal_id: str | None = None) -> Goal:
+                    parent_id: str | None = None, goal_id: str | None = None,
+                    owner_id: str = "goal-runtime", deadline: str | None = None,
+                    config: dict[str, Any] | None = None) -> Goal:
         goal = self.goals.create(name, metric, operator, target,
-                                 parent_id=parent_id, goal_id=goal_id)
+                                 parent_id=parent_id, goal_id=goal_id,
+                                 owner_id=owner_id, deadline=deadline, config=config)
         self.runs.create(goal.id)
         return goal
 

@@ -77,6 +77,7 @@ class ObservatoryTests(unittest.TestCase):
         self.assertIn("system:resolution", nodes)
         self.assertIn("system:workflow-run", nodes)
         self.assertIn("system:memory", nodes)
+        self.assertIn("system:capability", nodes)
         self.assertEqual("compatibility", snapshot["source"]["runtime_model"])
         self.assertEqual([".spielos/", ".env"], nodes["policy:gitignore"]["meta"]["patterns"])
         self.assertGreater(snapshot["metrics"]["architecture_nodes"], 20)
@@ -88,7 +89,7 @@ class ObservatoryTests(unittest.TestCase):
         database = Database(self.root / ".spielos/state/company.sqlite")
         goals, runs = GoalRepository(database), RunRepository(database)
         goal = goals.create("Canonical outcome", "accepted", "eq", True,
-                            goal_id="goal-canonical")
+                            goal_id="goal-canonical", owner_id="outbound")
         run = runs.create(goal.id)
         runs.update(run.id, stage=GoalStage.ACT, status="running")
         intervention = InterventionRepository(database).create(
@@ -122,6 +123,7 @@ class ObservatoryTests(unittest.TestCase):
                  for entry in snapshot["edges"]}
         self.assertEqual("clean-core", snapshot["source"]["runtime_model"])
         self.assertIn("goal:goal-canonical", nodes)
+        self.assertEqual("outbound", nodes["goal:goal-canonical"]["meta"]["owner_id"])
         self.assertNotIn("goal:goal-primary", nodes)
         self.assertIn(f"intervention:{intervention.id}", nodes)
         self.assertIn(f"workflow-run:{workflow_run.id}", nodes)
@@ -156,6 +158,21 @@ class ObservatoryTests(unittest.TestCase):
                          "outfit-latin.woff2", "left-closed", "right-closed"):
             self.assertIn(required, ui)
         self.assertNotIn("https://", ui)
+
+    def test_closed_compatibility_history_does_not_make_live_health_critical(self):
+        goal = self.runtime.store.create_goal(
+            name="Historical root", owner_id="director", metric="outcome",
+            operator="ge", target=1, goal_id="historical")
+        self.runtime.store.set_goal_status(goal["id"], "abandoned")
+
+        snapshot = collect_snapshot(self.runtime, project_root=self.root)
+
+        self.assertEqual({}, snapshot["loop"]["active_by_stage"])
+        self.assertFalse(any(item["severity"] == "error"
+                             for item in snapshot["findings"]))
+        compatibility = next(item for item in snapshot["findings"]
+                             if item["kind"] == "compatibility_state")
+        self.assertEqual("info", compatibility["severity"])
 
 
 if __name__ == "__main__":

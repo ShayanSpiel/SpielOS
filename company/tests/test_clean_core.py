@@ -3,15 +3,23 @@ from __future__ import annotations
 import sqlite3
 import tempfile
 import unittest
+from contextlib import redirect_stdout
+from io import StringIO
 from pathlib import Path
 
-from company.agents.core import AgentResult, FunctionExecutor
+from company.agents.core import Agent, AgentResult, AgentSpec, FunctionExecutor
+from company.connections.core import Connection, ConnectionSpec
+from company.capabilities import Capability
+from company.commands import CleanCommandRuntime
+from company.goals import GoalRepository
 from company import GoalRuntime as PublicGoalRuntime, Runtime as PublicRuntime
 from company.observability import Observer
 from company.runtime.engine import Decision, Evaluation, GoalRuntime, GoalStage
+from company.runtime.loop import CompatibilityRuntime
 from company.state import Database, migrate_legacy_goals
 from company.state.migration import backup_database, plan_legacy_goal_migration
 from company.workflows import Workflow, WorkflowStep
+from company.__main__ import main as cli_main
 
 
 class ScenarioController:
@@ -161,6 +169,14 @@ class CleanCoreAcceptanceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "requires evidence"):
             runtime.memory.remember(
                 "strategy", "Targeting helps", goal_id=goal.id, run_id=run.id)
+        other = runtime.create_goal("Other", "ready", "eq", True)
+        other_run = runtime.runs.current(other.id)
+        other_evidence = runtime.evidence.record(
+            goal_id=other.id, run_id=other_run.id, kind="fact", payload={})
+        with self.assertRaisesRegex(ValueError, "causal Goal"):
+            runtime.memory.remember(
+                "strategy", "Wrong lineage", evidence_ids=(other_evidence.id,),
+                goal_id=goal.id, run_id=other_run.id)
 
     def test_direct_intervention_can_fix_retry_and_return_without_child_goal(self):
         attempts = {"count": 0}
@@ -199,12 +215,41 @@ class CleanCoreAcceptanceTests(unittest.TestCase):
     def test_subsystems_do_not_depend_on_goal_runtime(self):
         self.assertIs(PublicRuntime, PublicGoalRuntime)
         roots = ["goals/core.py", "workflows/core.py", "work_orders/core.py",
-                 "evidence/records.py", "memory/records.py", "state/database.py"]
+                 "evidence/records.py", "memory/records.py", "state/database.py",
+                 "agents/core.py", "connections/core.py", "skills/core.py",
+                 "capabilities/core.py",
+                 "departments/core.py", "hosts/core.py", "context/core.py",
+                 "observability/read_model.py"]
         company = Path(__file__).parents[1]
         for relative in roots:
             source = (company / relative).read_text()
-            self.assertNotIn("runtime.engine", source, relative)
-            self.assertNotIn("runtime.loop", source, relative)
+            self.assertNotIn("from ..runtime", source, relative)
+            self.assertNotIn("from company.runtime", source, relative)
+        cli = (company / "__main__.py").read_text()
+        self.assertIn("from .runtime import CompatibilityRuntime", cli)
+        self.assertNotIn("LegacyRuntime as Runtime", cli)
+
+    def test_capability_is_a_host_resolved_contract_not_runtime_state(self):
+        capability = Capability(
+            "browser", "Navigate web pages", ("codex",), ("network",))
+        agent = Agent("researcher", capability_ids=(capability.id,))
+        self.assertEqual(agent.capability_ids, ("browser",))
+        self.assertTrue(capability.requires_approval)
+
+    def test_domain_import_boundaries_are_enforced(self):
+        company = Path(__file__).parents[1]
+        boundaries = {
+            "goals/core.py": ("agents", "workflows", "resolution"),
+            "capabilities/core.py": ("runtime", "goals", "workflows"),
+            "skills/core.py": ("runtime", "goals", "workflows"),
+            "evidence/records.py": ("agents", "workflows", "resolution"),
+            "memory/records.py": ("agents", "hosts", "resolution"),
+        }
+        for relative, forbidden in boundaries.items():
+            source = (company / relative).read_text()
+            for package in forbidden:
+                self.assertNotIn(f"from ..{package}", source, relative)
+                self.assertNotIn(f"from company.{package}", source, relative)
 
     def test_legacy_goal_migration_is_explicit_and_bounded(self):
         connection = sqlite3.connect(self.db)
@@ -230,6 +275,100 @@ class CleanCoreAcceptanceTests(unittest.TestCase):
                 "SELECT COUNT(*) FROM core_goals").fetchone()[0], 1)
             self.assertEqual(current.execute(
                 "SELECT COUNT(*) FROM core_goal_edges").fetchone()[0], 0)
+        migrated = GoalRuntime(
+            self.db, ScenarioController(), FunctionExecutor({}))
+        self.assertEqual(migrated.runs.current("chosen").stage, GoalStage.OBSERVE)
+
+    def test_compatibility_runtime_cannot_write_after_clean_core_activation(self):
+        runtime = GoalRuntime(
+            self.db, ScenarioController(), FunctionExecutor({}))
+        runtime.create_goal("Canonical", "ready", "eq", True)
+        compatibility = CompatibilityRuntime(self.db)
+        with self.assertRaisesRegex(RuntimeError, "clean-core authority is active"):
+            compatibility.create_goal(
+                name="Historical", owner_id="director", metric="ready",
+                operator="eq", target=True, config={})
+        readonly = CompatibilityRuntime(self.db, readonly=True)
+        self.assertTrue(readonly.readonly)
+
+    def test_lineage_is_coherent_and_evidence_is_immutable_in_sqlite(self):
+        runtime = GoalRuntime(
+            self.db, ScenarioController(), FunctionExecutor({}))
+        first = runtime.create_goal("First", "ready", "eq", True)
+        second = runtime.create_goal("Second", "ready", "eq", True)
+        first_run = runtime.runs.current(first.id)
+        second_run = runtime.runs.current(second.id)
+        with self.assertRaisesRegex(sqlite3.IntegrityError, "lineage mismatch"):
+            with runtime.database.connect() as connection:
+                connection.execute("""INSERT INTO core_interventions
+                    VALUES ('mixed',?,?,?,?,?,NULL,'{}','now','now')""",
+                    (first.id, second_run.id, "repair", "mixed lineage", "running"))
+        intervention = runtime.interventions.create(
+            goal_id=first.id, run_id=first_run.id, kind="observe", description="record")
+        with self.assertRaisesRegex(sqlite3.IntegrityError, "lineage mismatch"):
+            with runtime.database.connect() as connection:
+                connection.execute(
+                    "UPDATE core_interventions SET run_id=? WHERE id=?",
+                    (second_run.id, intervention.id))
+        evidence = runtime.evidence.record(
+            goal_id=first.id, run_id=first_run.id, intervention_id=intervention.id,
+            kind="fact", payload={"value": 1})
+        with self.assertRaisesRegex(sqlite3.IntegrityError, "immutable"):
+            with runtime.database.connect() as connection:
+                connection.execute(
+                    "UPDATE core_evidence SET kind='changed' WHERE id=?", (evidence.id,))
+
+    def test_agent_and_connection_compatibility_names_are_aliases_not_models(self):
+        self.assertIs(AgentSpec, Agent)
+        self.assertIs(ConnectionSpec, Connection)
+
+    def test_public_goal_commands_use_clean_core_in_a_fresh_home(self):
+        output = StringIO()
+        with redirect_stdout(output):
+            code = cli_main([
+                "--db", str(self.db), "goal", "create", "--name", "Research",
+                "--owner", "outbound", "--metric", "qualified_leads",
+                "--target", "1", "--config", '{"workflow":"lead-research"}',
+                "--json",
+            ])
+        self.assertEqual(code, 0)
+        database = Database(self.db)
+        with database.connect() as connection:
+            self.assertEqual(connection.execute(
+                "SELECT COUNT(*) FROM core_goals").fetchone()[0], 1)
+            self.assertIsNone(connection.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='goals'"
+            ).fetchone())
+        with redirect_stdout(StringIO()):
+            self.assertEqual(cli_main([
+                "--db", str(self.db), "runner", "tick", "--json"]), 0)
+        with database.connect() as connection:
+            order = connection.execute(
+                "SELECT id,goal_id,claimed_by FROM core_work_orders").fetchone()
+        with redirect_stdout(StringIO()):
+            self.assertEqual(cli_main([
+                "--db", str(self.db), "tasks", order["id"],
+                "--complete", order["claimed_by"], "--evidence",
+                '[{"kind":"lead_dossier","payload":{"qualified_leads":1}}]',
+                "--json"]), 0)
+            self.assertEqual(cli_main([
+                "--db", str(self.db), "retry", order["goal_id"], "--json"]), 0)
+            self.assertEqual(cli_main([
+                "--db", str(self.db), "runner", "tick", "--json"]), 0)
+        self.assertEqual(GoalRepository(database).get(order["goal_id"]).status, "complete")
+
+    def test_clean_command_approval_grants_the_exact_workflow_gate(self):
+        runtime = CleanCommandRuntime(self.db)
+        goal = runtime.create_goal(
+            name="Approve SEO change", owner_id="seo", metric="seo_reports",
+            operator="ge", target=1, config={"workflow": "seo-improvement"})
+        runtime.tick()
+        run = runtime.runs.current(goal["id"])
+        self.assertEqual(run.status, "waiting")
+        runtime.approve(goal["id"], "approved")
+        self.assertEqual(runtime.approvals.status(run.id, "step:approve"), "approved")
+        self.assertEqual(len(runtime.work_orders(goal_id=goal["id"])), 1)
+        self.assertEqual(len(list(runtime.watch(0, goal["id"], 1))), 1)
 
     def test_legacy_goal_migration_preview_is_read_only_and_reports_omissions(self):
         connection = sqlite3.connect(self.db)

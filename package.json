@@ -1,6 +1,6 @@
 {
   "name": "spielos",
-  "version": "8.0.0",
+  "version": "8.0.1",
   "description": "SpielOS: one durable Goal loop, portable Agent-owned Departments, approvals, Evidence, and evals for operating AI work.",
   "bin": {
     "spielos": "bin/spielos.js"
