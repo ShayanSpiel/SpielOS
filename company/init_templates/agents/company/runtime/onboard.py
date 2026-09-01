@@ -23,7 +23,7 @@ import threading
 import time
 from pathlib import Path
 
-from .bootstrap import available_departments, scaffold
+from .bootstrap import scaffold
 
 SPINNER_FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 
@@ -198,8 +198,7 @@ def _verify_home(root: Path) -> tuple[bool, str]:
     return True, ""
 
 
-def _next_steps(root: Path, hosts: dict[str, bool], minimal: bool,
-                departments: list[str]) -> tuple[list[str], dict[str, str]]:
+def _next_steps(root: Path, hosts: dict[str, bool]) -> tuple[list[str], dict[str, str]]:
     """Hand the fresh home to the Director instead of onboarding in the CLI."""
     steps = [
         ("cd " + str(root), ""),
@@ -253,8 +252,7 @@ def _render_success(style: _Style, receipt: dict) -> None:
         print(style.cyan("└" + "─" * (width - 2) + "┘"))
         print()
 
-    steps, notes = _next_steps(Path(root), hosts, receipt.get("minimal", False),
-                               receipt.get("departments") or [])
+    steps, notes = _next_steps(Path(root), hosts)
     print(style.bold("Next steps"))
     for command, note in steps:
         print(f"  {style.green('$')} {style.bold(command)}")
@@ -268,14 +266,11 @@ def _render_success(style: _Style, receipt: dict) -> None:
 # ---- the driver -------------------------------------------------------------
 
 
-def run_init(*, dir: str = ".", force: bool = False, minimal: bool = True,
-             departments: list[str] | None = None, assume_yes: bool = False,
+def run_init(*, dir: str = ".", force: bool = False, assume_yes: bool = False,
              as_json: bool = False) -> int:
     """Entry point for ``spielos init``. Returns the process exit code.
 
-    A fresh home ships the spine only — zero Departments. Starter
-    Departments are an explicit opt-in (``--department``, ``--all-departments``
-    or the interactive picker).
+    A fresh home ships the clean spine only, with zero Departments.
     """
     style = _Style()
     interactive = (style.tty and sys.stdin.isatty()
@@ -290,25 +285,14 @@ def run_init(*, dir: str = ".", force: bool = False, minimal: bool = True,
         receipt = None
         quiet = as_json  # machine mode: keep stdout parseable, no chrome
         if not quiet:
-            receipt = scaffold(target, force=force, minimal=minimal,
-                               departments=departments)
+            receipt = scaffold(target, force=force)
             print(f"{style.mark_ok()} Company runtime installed", flush=True)
             print(f"{style.mark_ok()} Director added to Codex and OpenCode", flush=True)
         else:
-            receipt = scaffold(target, force=force, minimal=minimal,
-                               departments=departments)
+            receipt = scaffold(target, force=force)
 
         hosts = _detect_hosts()
-        count = len(departments or [])
-        if not minimal:
-            mode_label = "Full harness"
-        elif count:
-            mode_label = f"Fresh spine + {count} Department(s)"
-        else:
-            mode_label = "Fresh spine"
-        receipt.update({"hosts": hosts, "minimal": minimal,
-                        "departments": departments or [],
-                        "mode_label": mode_label})
+        receipt.update({"hosts": hosts, "mode_label": "Fresh clean spine"})
         # Verification runs in both modes; only the rendering differs.
         if as_json:
             ok, error = _verify_home(target)
@@ -341,13 +325,10 @@ def run_init(*, dir: str = ".", force: bool = False, minimal: bool = True,
                           "           (your .spielos/ state is never touched)")
     except ValueError as exc:
         detail = str(exc)
-        known = available_departments()
-        hint = (f"available Departments: {', '.join(known)}"
-                if known and "Department" in detail else None)
         if as_json:
             print(json.dumps({"error": detail}, indent=2), file=sys.stderr)
             return 1
-        return _fail(style, "Could not scaffold the harness.", detail, hint=hint)
+        return _fail(style, "Could not scaffold the harness.", detail)
     except OSError as exc:
         if as_json:
             print(json.dumps({"error": str(exc)}, indent=2), file=sys.stderr)

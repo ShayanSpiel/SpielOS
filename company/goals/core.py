@@ -70,6 +70,40 @@ class GoalRepository:
             )
         return self.get(goal_id)
 
+    def create_with_initial_run(self, name: str, metric: str, operator: str,
+                                target: Any, *, parent_id: str | None = None,
+                                goal_id: str | None = None,
+                                owner_id: str = "goal-runtime",
+                                deadline: str | None = None,
+                                config: dict[str, Any] | None = None) -> Goal:
+        """Create a Goal and its first ready Run in one transaction."""
+
+        goal_id = goal_id or f"goal-{uuid.uuid4().hex[:12]}"
+        config = dict(config or {})
+        aggregation = config.get("aggregation", "latest")
+        if aggregation not in METRIC_AGGREGATIONS:
+            raise ValueError(f"invalid Goal metric aggregation: {aggregation}")
+        if parent_id:
+            self.get(parent_id)
+        run_id = f"run-{uuid.uuid4().hex[:12]}"
+        stamp = _now()
+        with self.database.connect() as connection:
+            connection.execute(
+                "INSERT INTO core_goals VALUES (?,?,?,?,?,?,?,?,?)",
+                (goal_id, name, metric, operator, json.dumps(target), parent_id,
+                 "active", stamp, stamp),
+            )
+            connection.execute(
+                "INSERT INTO core_goal_metadata VALUES (?,?,?,?)",
+                (goal_id, owner_id, deadline, json.dumps(config)),
+            )
+            connection.execute("""INSERT INTO core_runs
+                VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                (run_id, goal_id, 1, "OBSERVE", "ready", None, None, None,
+                 stamp, stamp),
+            )
+        return self.get(goal_id)
+
     def get(self, goal_id: str) -> Goal:
         with self.database.connect() as connection:
             row = connection.execute(

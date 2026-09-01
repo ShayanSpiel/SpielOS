@@ -151,15 +151,6 @@ def template_root() -> Path:
 _template_root = template_root  # backward-compatible alias
 
 
-def available_departments() -> list[str]:
-    """Department ids vendorable with ``init --department ID``."""
-    root = template_root() / "agents" / "company" / "departments"
-    if not root.is_dir():
-        return []
-    return sorted(entry.name for entry in root.iterdir()
-                  if entry.is_dir() and not entry.name.startswith(("_", ".")))
-
-
 def _copy_tree(src: Path, dst: Path, overwrite: bool = False,
                skip=None) -> list[str]:
     written: list[str] = []
@@ -181,14 +172,9 @@ def _copy_tree(src: Path, dst: Path, overwrite: bool = False,
 
 
 def scaffold(target: Path | None = None, *, force: bool = False,
-             minimal: bool = False, departments: list[str] | None = None,
              on_phase=None) -> dict:
     """Materialize a complete harness home. Returns a receipt dict.
 
-    ``minimal=True`` ships the Department contract without bundled production
-    Departments.
-    Pass ``departments=["id", ...]`` to vendor selected Departments from
-    the templates.
     ``on_phase(label)`` is called before each materialization chunk so an
     interactive driver can show progress; it is optional plumbing and
     never changes what gets written.
@@ -205,12 +191,7 @@ def scaffold(target: Path | None = None, *, force: bool = False,
             "this folder already has a SpielOS home (.agents/company); "
             "re-run with --force to overwrite")
 
-    # A forced init on an existing home is effectively an update. Seed the
-    # generic strategy only for a genuinely fresh home; never replace the
-    # existing home's user-owned layer.
     preserved_user_prefixes = (
-        "company/strategy/",
-        "company/assets/",
         "company/departments/",
         "company/agents/installed/",
     ) if existing_home else ()
@@ -219,27 +200,8 @@ def scaffold(target: Path | None = None, *, force: bool = False,
         return any(rel.startswith(prefix) for prefix in preserved_user_prefixes)
 
     notify("Vendoring harness spine")
-    if minimal:
-        written += _copy_tree(templates / "agents", root / ".agents",
-                              overwrite=force,
-                              skip=lambda rel: (
-                                  (rel.startswith("company/departments/")
-                                   and rel.count("/") > 2)
-                                  or preserve_user_layer(rel)))
-        departments_pkg = root / ".agents" / "company" / "departments"
-        departments_pkg.mkdir(parents=True, exist_ok=True)
-        (departments_pkg / "__init__.py").touch()
-        written.append(str(departments_pkg / "__init__.py"))
-        for department_id in departments or []:
-            src = templates / "agents" / "company" / "departments" / department_id
-            if not src.is_dir():
-                raise ValueError(f"template has no Department '{department_id}'")
-            written += _copy_tree(src, root / ".agents" / "company"
-                                  / "departments" / department_id, overwrite=force)
-    else:
-        written += _copy_tree(templates / "agents", root / ".agents",
-                              overwrite=force,
-                              skip=preserve_user_layer)
+    written += _copy_tree(templates / "agents", root / ".agents",
+                          overwrite=force, skip=preserve_user_layer)
     notify("Installing host adapters (OpenCode, Codex)")
     # Host adapters.
     for name in ("opencode", "codex"):
@@ -300,7 +262,7 @@ def scaffold(target: Path | None = None, *, force: bool = False,
             "cd " + str(root),
             "opencode",
             "Select the Director agent before chatting (not Build).",
-            "Make it yours: edit .agents/company/strategy/ and add a Department.",
+            "Create a clean Department only when its Workflow contract is ready.",
             "Set credentials in .spielos/.env (see .spielos/.env.example).",
         ],
     }
@@ -352,7 +314,6 @@ probe.
 ## Rules
 
 - Live external actions always park for explicit approval.
-- The Director and Department Agents never edit repository files;
-  `system-improvement` executes bounded Resolution work beneath an active Goal.
-- Strategy authority lives in `.agents/company/strategy/`; never restate it.
+- Departments are declarations; Agents execute only claimed WorkOrders.
+- Owner, workflow, and strategy Memory must retain its required lineage.
 """

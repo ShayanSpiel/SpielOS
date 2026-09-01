@@ -1,6 +1,0 @@
-interface:
-  display_name: "Department Runner"
-  short_description: "Run one Department against a goal"
-  default_prompt: "Use $department-runner to run one Department independently and report its persisted state."
-policy:
-  allow_implicit_invocation: true

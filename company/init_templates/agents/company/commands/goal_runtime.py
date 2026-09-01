@@ -1,8 +1,4 @@
-"""CLI adapter for the canonical clean core.
-
-The adapter contains presentation compatibility only. Goal control remains in
-``GoalRuntime`` and every write goes through a clean-core repository.
-"""
+"""CLI adapter for the canonical clean core."""
 
 from __future__ import annotations
 
@@ -24,25 +20,6 @@ from ..workflows import Workflow, WorkflowRepository, WorkflowStep
 from ..runtime.engine import Decision, Evaluation, GoalRuntime
 from ..runtime.registry import departments
 from ..runtime.util import compare
-
-
-def goal_authority(path: str | Path) -> str:
-    """Return the one Goal authority for this database without mutating it."""
-
-    path = Path(path)
-    if not path.exists():
-        return "clean-core"
-    connection = sqlite3.connect(path)
-    try:
-        tables = {row[0] for row in connection.execute(
-            "SELECT name FROM sqlite_master WHERE type='table'")}
-        core = (connection.execute("SELECT COUNT(*) FROM core_goals").fetchone()[0]
-                if "core_goals" in tables else 0)
-        legacy = (connection.execute("SELECT COUNT(*) FROM goals").fetchone()[0]
-                  if "goals" in tables else 0)
-    finally:
-        connection.close()
-    return "clean-core" if core or not legacy else "compatibility"
 
 
 class CatalogController:
@@ -94,53 +71,21 @@ class CatalogController:
                             context={"agent_id": goal.owner_id,
                                      "evidence_kind": goal.metric})
         requested = (goal.config or {}).get("workflow")
-        workflow_spec = next((item for item in handler.workflows
-                              if item.id == requested), None)
-        if workflow_spec is None:
-            workflow_spec = handler.workflows[0] if handler.workflows else None
-        if workflow_spec is None:
+        workflow = next((item for item in handler.workflows
+                         if item.id == requested), None)
+        if workflow is None:
+            workflow = handler.workflows[0] if handler.workflows else None
+        if workflow is None:
             return Decision("request_agent", f"{goal.owner_id} must produce {goal.metric}",
                             context={"agent_id": goal.owner_id,
                                      "evidence_kind": goal.metric})
-        workflow_id = f"{goal.owner_id}:{workflow_spec.id}"
-        steps = []
-        pending_approvals = []
-        graph = tuple(workflow_spec.graph or ())
-        for node in graph:
-            if node.kind == "approval":
-                pending_approvals.append(f"step:{node.id}")
-                continue
-            agent_id = node.agent_id
-            if not agent_id:
-                if node.kind == "connection":
-                    connection = (node.connection_ids or workflow_spec.connection_ids or
-                                  ("connection",))[0]
-                    agent_id = f"connection:{connection}"
-                else:
-                    agent_id = (workflow_spec.agent_ids or handler.agent_ids or
-                                (goal.owner_id,))[0]
-            steps.append(WorkflowStep(
-                id=node.id, agent_id=agent_id,
-                instruction=f"Execute {workflow_spec.id} step {node.id}",
-                skill_ids=tuple(getattr(node, "skill_ids", ()) or ()),
-                connection_ids=tuple(getattr(node, "connection_ids", ()) or ()),
-                requirements=dict(getattr(node, "requirements", {}) or {}),
-                evidence_kinds=tuple(node.produces or (goal.metric,)),
-                approval_keys=tuple(pending_approvals)))
-            pending_approvals = []
-        if pending_approvals:
-            raise ValueError(
-                f"Workflow {workflow_spec.id} ends with approval-only nodes: "
-                + ", ".join(pending_approvals))
-        if not steps:
-            agent_id = (workflow_spec.agent_ids or handler.agent_ids or (goal.owner_id,))[0]
-            steps.append(WorkflowStep(
-                id=workflow_spec.id, agent_id=agent_id,
-                instruction=workflow_spec.description,
-                evidence_kinds=tuple(workflow_spec.evidence_sources or (goal.metric,))))
+        if not isinstance(workflow, Workflow):
+            raise TypeError("Department workflows must use company.workflows.Workflow")
+        workflow_id = f"{goal.owner_id}:{workflow.id}"
         self.workflows.save(Workflow(
-            workflow_id, workflow_spec.description, tuple(steps), goal.owner_id))
-        return Decision("execute_workflow", workflow_spec.description, workflow_id)
+            workflow_id, workflow.name, workflow.steps, goal.owner_id,
+            workflow.version))
+        return Decision("execute_workflow", workflow.name, workflow_id)
 
     def evaluate(self, context, decision: Decision, evidence: tuple) -> Evaluation:
         observation = self.observe(context)
@@ -160,7 +105,7 @@ class AssignmentExecutor:
 
 
 class CleanCommandRuntime:
-    """Legacy-shaped CLI projection backed exclusively by clean-core records."""
+    """CLI projection backed exclusively by clean-core records."""
 
     def __init__(self, path: str | Path, *, readonly: bool = False):
         self.path = Path(path)
@@ -197,7 +142,6 @@ class CleanCommandRuntime:
         self.memory = self.runtime.memory
         self.work_orders_repository = WorkOrderRepository(self.database)
         self.approvals = ApprovalRepository(self.database)
-        self.store = self
 
     @staticmethod
     def _operator(value: str) -> str:
@@ -355,7 +299,7 @@ class CleanCommandRuntime:
                            for item in roots)
         return {"goal_count": len(goals), "root_goal_ids": roots,
                 "canonical_root_goal_id": roots[0] if len(roots) == 1 else None,
-                "defects": defects, "migration_plan": {"safe_first": []}}
+                "defects": defects}
 
     def link_support(self, goal_id, target_id):
         self._require_writable()
@@ -374,20 +318,22 @@ class CleanCommandRuntime:
         self.goals.set_status(goal_id, value)
         return self.status(goal_id)
 
-    def approve(self, goal_id, note="", scope=None):
+    def approve(self, goal_id, note="", keys=()):
         self._require_writable()
         run = self.runs.current(goal_id)
         intervention = self.interventions.active_for_run(run.id)
-        keys = {"execute"}
+        granted = set(keys)
         if intervention is not None:
             workflow_run = self.runtime.resolution.workflows.active_for_intervention(
                 intervention.id)
             if workflow_run is not None:
                 if workflow_run.current_step < len(workflow_run.steps):
-                    key = workflow_run.steps[workflow_run.current_step].approval_key
-                    if key:
-                        keys.add(key)
-        for key in keys:
+                    required = workflow_run.steps[workflow_run.current_step].approval_keys
+                    if required and not granted:
+                        granted.update(required)
+        if not granted:
+            granted.add("execute")
+        for key in granted:
             self.approvals.grant(
                 goal_id=goal_id, run_id=run.id, key=key,
                 intervention_id=None if intervention is None else intervention.id,
@@ -513,7 +459,7 @@ class CleanCommandRuntime:
             workflow_id=workflow_id, supersedes_id=current.id if current else None)
         return self._profile(memory)
 
-    def profile_claims(self, *, goal_id=None, workflow_id=None, limit=200, **_kwargs):
+    def owner_memory(self, *, goal_id=None, workflow_id=None, limit=200, **_kwargs):
         return tuple(self._profile(item) for item in self.memory.relevant(
             scope="owner", goal_id=goal_id, workflow_id=workflow_id, limit=limit))
 

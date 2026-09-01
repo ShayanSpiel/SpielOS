@@ -1,4 +1,0 @@
-interface:
-  display_name: "Migration Planning"
-  short_description: "Plan safe, complete SpielOS migrations"
-  default_prompt: "Use $migration-planning to inventory my existing project and write a scope-safe SpielOS migration plan without executing it."

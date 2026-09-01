@@ -1,6 +1,0 @@
-interface:
-  display_name: "Outbound Email"
-  short_description: "Research, write, and operate guarded email"
-  default_prompt: "Use $outbound-email to research and operate a specific outbound email goal."
-policy:
-  allow_implicit_invocation: true

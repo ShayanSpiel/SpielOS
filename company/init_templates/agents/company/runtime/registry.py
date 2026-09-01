@@ -46,9 +46,3 @@ def departments() -> dict[str, DepartmentManifest]:
             raise ValueError(f"duplicate Department: {manifest.id}")
         installed[manifest.id] = manifest
     return installed
-
-
-def handlers() -> dict[str, DepartmentManifest]:
-    """Deprecated declaration alias; canonical entries are not GoalHandlers."""
-
-    return departments()

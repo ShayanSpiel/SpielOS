@@ -40,11 +40,7 @@ jobs:
         run: |
           set -euo pipefail
           pipx run twine check dist/*
-          if unzip -l dist/*.whl | grep -E 'company/(workgroups/|runtime/workgroup_install\.py)|company/init_templates/.*/(workgroups/|workgroup_install\.py)'; then
-            echo "retired Workgroup files found in release wheel" >&2
-            exit 1
-          fi
-      - name: Verify installed wheel and home update
+      - name: Verify installed wheel and fresh clean home
         shell: bash
         run: |
           set -euo pipefail
@@ -52,26 +48,42 @@ jobs:
           "$RUNNER_TEMP/spielos-smoke/bin/python" -m pip install dist/*.whl
           SMOKE_HOME="$RUNNER_TEMP/spielos-home"
           "$RUNNER_TEMP/spielos-smoke/bin/spielos" init --dir "$SMOKE_HOME" -y
-          sed -i.bak 's/VERSION = ".*"/VERSION = "7.3.0"/' "$SMOKE_HOME/.agents/company/runtime/config.py"
-          rm "$SMOKE_HOME/.agents/company/runtime/config.py.bak"
           (
             cd "$SMOKE_HOME"
-            "$RUNNER_TEMP/spielos-smoke/bin/spielos" update --dir "$SMOKE_HOME" --json
+            "$RUNNER_TEMP/spielos-smoke/bin/spielos"
+            "$RUNNER_TEMP/spielos-smoke/bin/spielos" status
+            "$RUNNER_TEMP/spielos-smoke/bin/spielos" overview
+            "$RUNNER_TEMP/spielos-smoke/bin/spielos" context
+            "$RUNNER_TEMP/spielos-smoke/bin/spielos" memory summary
+            "$RUNNER_TEMP/spielos-smoke/bin/spielos" profile list
+            "$RUNNER_TEMP/spielos-smoke/bin/spielos" runner tick
           )
-          EXPECTED="${{ steps.release.outputs.version }}" \
+          EXPECTED="${{ steps.release.outputs.version }}" SMOKE_HOME="$SMOKE_HOME" \
           "$RUNNER_TEMP/spielos-smoke/bin/python" - "$SMOKE_HOME" <<'PY'
           import os
           import re
+          import sqlite3
           import subprocess
           import sys
           from pathlib import Path
 
           home = Path(sys.argv[1])
-          config = (home / ".agents/company/runtime/config.py").read_text()
+          config = (home / ".agents/company/runtime/config.py").read_text(encoding="utf-8")
           match = re.search(r'^VERSION\s*=\s*"([^"]+)"', config, re.MULTILINE)
           actual = match.group(1) if match else None
           expected = os.environ["EXPECTED"]
           assert actual == expected, (actual, expected)
+          expected_tables = {
+              "core_goals", "core_goal_metadata", "core_goal_edges", "core_runs",
+              "core_interventions", "core_workflows", "core_workflow_runs",
+              "core_work_orders", "core_evidence", "core_memory", "core_approvals",
+              "core_notifications",
+          }
+          database = home / ".spielos/state/company.sqlite"
+          with sqlite3.connect(database) as connection:
+              actual_tables = {row[0] for row in connection.execute(
+                  "SELECT name FROM sqlite_master WHERE type='table'")}
+          assert actual_tables == expected_tables, actual_tables
           command = Path(sys.executable).with_name("spielos")
           reported = subprocess.check_output(
               [command, "--version"], cwd=home, text=True).strip()

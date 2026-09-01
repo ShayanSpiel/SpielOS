@@ -42,85 +42,7 @@ class Database:
     def _initialize(self) -> None:
         with self.connect() as connection:
             connection.executescript(SCHEMA)
-            self._migrate(connection)
-            connection.executescript(POST_MIGRATION_SCHEMA)
-
-    @staticmethod
-    def _migrate(connection: sqlite3.Connection) -> None:
-        workflow_run_columns = {row[1] for row in connection.execute(
-            "PRAGMA table_info(core_workflow_runs)")}
-        for name, declaration in (
-            ("workflow_version", "INTEGER NOT NULL DEFAULT 1"),
-            ("steps_json", "TEXT NOT NULL DEFAULT '[]'"),
-        ):
-            if name not in workflow_run_columns:
-                connection.execute(
-                    f"ALTER TABLE core_workflow_runs ADD COLUMN {name} {declaration}")
-        connection.execute("""UPDATE core_workflow_runs
-            SET workflow_version=COALESCE((SELECT version FROM core_workflows w
-                                           WHERE w.id=workflow_id),1),
-                steps_json=COALESCE((SELECT steps_json FROM core_workflows w
-                                     WHERE w.id=workflow_id),'[]')
-            WHERE steps_json='[]'""")
-        order_columns = {row[1] for row in connection.execute(
-            "PRAGMA table_info(core_work_orders)")}
-        for name, declaration in (
-            ("claimed_at", "TEXT"),
-            ("lease_expires_at", "TEXT"),
-            ("attempt", "INTEGER NOT NULL DEFAULT 1"),
-        ):
-            if name not in order_columns:
-                connection.execute(
-                    f"ALTER TABLE core_work_orders ADD COLUMN {name} {declaration}")
-        memory_columns = {row[1] for row in connection.execute(
-            "PRAGMA table_info(core_memory)")}
-        for name, declaration in (
-            ("confidence", "REAL NOT NULL DEFAULT 1.0"),
-            ("status", "TEXT NOT NULL DEFAULT 'active'"),
-            ("supersedes_id", "TEXT REFERENCES core_memory(id)"),
-        ):
-            if name not in memory_columns:
-                connection.execute(
-                    f"ALTER TABLE core_memory ADD COLUMN {name} {declaration}")
-        edge_sql = connection.execute(
-            "SELECT sql FROM sqlite_master WHERE type='table' AND name='core_goal_edges'"
-        ).fetchone()[0]
-        if "'blocks'" not in edge_sql:
-            connection.executescript("""
-                ALTER TABLE core_goal_edges RENAME TO core_goal_edges_legacy;
-                CREATE TABLE core_goal_edges (
-                    source_goal_id TEXT NOT NULL REFERENCES core_goals(id),
-                    target_goal_id TEXT NOT NULL REFERENCES core_goals(id),
-                    relation TEXT NOT NULL CHECK(relation IN ('supports','blocks')),
-                    created_at TEXT NOT NULL,
-                    PRIMARY KEY(source_goal_id, target_goal_id, relation),
-                    CHECK(source_goal_id <> target_goal_id)
-                );
-                INSERT INTO core_goal_edges SELECT * FROM core_goal_edges_legacy;
-                DROP TABLE core_goal_edges_legacy;
-            """)
-        approval_sql = connection.execute(
-            "SELECT sql FROM sqlite_master WHERE type='table' AND name='core_approvals'"
-        ).fetchone()[0]
-        if "UNIQUE(run_id,key)" in approval_sql.replace(" ", ""):
-            connection.executescript("""
-                ALTER TABLE core_approvals RENAME TO core_approvals_legacy;
-                CREATE TABLE core_approvals (
-                    id TEXT PRIMARY KEY,
-                    goal_id TEXT NOT NULL REFERENCES core_goals(id),
-                    run_id TEXT NOT NULL REFERENCES core_runs(id),
-                    intervention_id TEXT REFERENCES core_interventions(id),
-                    key TEXT NOT NULL,
-                    status TEXT NOT NULL,
-                    note TEXT,
-                    created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL,
-                    UNIQUE(intervention_id, key)
-                );
-                INSERT INTO core_approvals SELECT * FROM core_approvals_legacy;
-                DROP TABLE core_approvals_legacy;
-            """)
-        connection.execute("DROP TRIGGER IF EXISTS core_evidence_lineage_insert")
+            connection.executescript(INTEGRITY_SCHEMA)
 
 
 SCHEMA = """
@@ -393,7 +315,7 @@ BEGIN
 END;
 """
 
-POST_MIGRATION_SCHEMA = """
+INTEGRITY_SCHEMA = """
 CREATE UNIQUE INDEX IF NOT EXISTS core_work_order_step_attempt
 ON core_work_orders(workflow_run_id,step_id,attempt)
 WHERE workflow_run_id IS NOT NULL AND step_id IS NOT NULL;
@@ -429,26 +351,4 @@ BEGIN
     SELECT RAISE(ABORT, 'Notification lineage mismatch');
 END;
 
-CREATE TRIGGER core_evidence_lineage_insert
-BEFORE INSERT ON core_evidence
-WHEN NOT EXISTS (
-    SELECT 1 FROM core_runs r
-    WHERE r.id=NEW.run_id AND r.goal_id=NEW.goal_id
-) OR (NEW.intervention_id IS NOT NULL AND NOT EXISTS (
-    SELECT 1 FROM core_interventions i
-    WHERE i.id=NEW.intervention_id AND i.run_id=NEW.run_id
-      AND i.goal_id=NEW.goal_id
-)) OR (NEW.workflow_run_id IS NOT NULL AND NOT EXISTS (
-    SELECT 1 FROM core_workflow_runs w
-    WHERE w.id=NEW.workflow_run_id AND w.intervention_id=NEW.intervention_id
-      AND w.run_id=NEW.run_id AND w.goal_id=NEW.goal_id
-)) OR (NEW.work_order_id IS NOT NULL AND NOT EXISTS (
-    SELECT 1 FROM core_work_orders o
-    WHERE o.id=NEW.work_order_id AND o.run_id=NEW.run_id
-      AND o.goal_id=NEW.goal_id
-      AND (NEW.intervention_id IS NULL OR o.intervention_id=NEW.intervention_id)
-))
-BEGIN
-    SELECT RAISE(ABORT, 'Evidence lineage mismatch');
-END;
 """

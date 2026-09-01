@@ -19,9 +19,12 @@ class Agent:
     connection_ids: tuple[str, ...] = ()
 
 
-# One Agent identity contract. The old name remains an import alias while
-# compatibility modules are retired; it is not a second model.
-AgentSpec = Agent
+@dataclass(frozen=True)
+class AgentEvidence:
+    """One durable evidence item returned by an Agent execution."""
+
+    kind: str
+    payload: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -29,6 +32,7 @@ class AgentResult:
     status: str
     evidence_kind: str | None = None
     payload: dict[str, Any] = field(default_factory=dict)
+    evidence: tuple[AgentEvidence, ...] = ()
     message: str = ""
     workflow_learning: str | None = None
 

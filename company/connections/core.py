@@ -15,7 +15,3 @@ class Connection:
     @property
     def requires_approval(self) -> bool:
         return not self.unattended
-
-
-# Compatibility import alias; both names construct the same domain record.
-ConnectionSpec = Connection

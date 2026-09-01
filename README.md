@@ -1,135 +1,35 @@
-# SpielOS — Agent-owned AI Company Operating System
+# SpielOS
 
-SpielOS is an open-source local harness for running durable company work with AI: one Director owns the Goal loop, agents complete bounded workflows, and every approval, hand-off, and result is persisted on disk.
-
-```
-GOAL → OBSERVE → DECIDE → ACT → EVALUATE
-```
-
-## Install
+SpielOS is a local clean-core runtime for durable Goals.
 
 ```sh
-pipx install spielos && spielos init --dir /your/chosen/folder
+pipx install spielos
+spielos init --dir my-company -y
+cd my-company
+spielos
 ```
 
-The chosen folder becomes a self-contained SpielOS home. It receives the runtime, agent host adapters for Codex and OpenCode, empty private state, and no pre-installed departments.
+`GoalRuntime` owns the persisted loop: observe, decide, act, and evaluate.
+Departments are optional declarative packages; Agents complete bounded work
+orders through declared Hosts, Skills, and Connections. Evidence, approvals,
+notifications, and owner/workflow/strategy Memory are stored locally in the
+canonical `core_*` schema.
 
-## Update
-
-```sh
-pipx upgrade spielos && spielos update --dir /your/chosen/folder
-```
-
-Update replaces only the harness spine and host adapters. It preserves the
-home’s strategy, assets, installed Departments, configuration, and private
-`.spielos/` state. `spielos refresh` remains a compatibility alias.
-
-To test unreleased source changes locally, install the built wheel explicitly;
-plain `pipx install spielos` installs the latest release published on PyPI:
+Useful commands:
 
 ```sh
-pipx install --force /path/to/SpielOS/dist/spielos-VERSION-py3-none-any.whl
-spielos update --dir /your/chosen/folder
-```
-
-## Departments and agents
-
-A Department is an installable, Agent-owned capability. Its agents own narrowly-scoped workflows and can only produce their declared evidence. The Director routes work through durable work orders; agents never own the company loop or approve external actions.
-
-```sh
-spielos department validate --file department.json
-spielos department install --file department.json --dir /your/chosen/folder
-spielos department list
-```
-
-Fresh homes deliberately start with no Departments. Install one package or all
-seven bundled capabilities only when they match a real company outcome:
-
-```sh
-spielos department install --all --dir /your/chosen/folder
-```
-
-The public architecture has one name per layer: Goal, Department, Workflow,
-Agent, Skill, Connection, and Artifact. Use one orientation command instead of
-probing several catalogs:
-
-```sh
+spielos status
 spielos overview
+spielos context
+spielos memory summary
+spielos profile list
+spielos runner tick
 ```
 
-Open the live, read-only organism view with:
+For source development, run:
 
 ```sh
-spielos observatory
+PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest company.tests.test_clean_core_acceptance
 ```
 
-The Observatory layers the Goal tree and support graph, current loop stage,
-Resolution work, Workflows, WorkOrders, Agents, Evidence, Memory, and source
-contracts on one navigable canvas. Its coherence view surfaces blocked,
-disconnected, redundant, unused, and compatibility-only state without mixing
-historical records into the clean-core authority.
-
-## Artifacts, friction, and migration
-
-Generated work has one lifecycle under
-`.spielos/artifacts/<goal>/<run>/<workflow?>/{work,final}`. Agents prepare the
-workspace, finalize verified deliverables, clean declared intermediates, and
-automatically open the final folder only for owner-facing creative or content
-deliverables such as videos, images, audio, copy, documents, and decks:
-
-```sh
-spielos artifact prepare --goal GOAL_ID --run RUN_ID
-spielos artifact finalize --goal GOAL_ID --run RUN_ID --file PATH --open
-```
-
-Code, packages, archives, tests, logs, manifests, migration plans, and internal
-evidence are reported with their paths but are not opened unless the owner asks.
-
-Misleading tools, commands, instructions, contradictions, and fallbacks are
-durable friction rather than silent retries. Inspect them with `spielos friction
-list`.
-
-Migrate into a fresh home, never by treating a foreign runtime as current code:
-
-```sh
-spielos migration inspect --from /old/home
-spielos migration plan --from /old/home --out migration-plan.json
-```
-
-The plan archives foreign Goals by default, normalizes capability/executor
-aliases, quarantines unknowns, and converts one Department at a time.
-
-## State, context, and memory
-
-Goals, runs, approvals, work orders, evidence, typed company-profile overlays,
-experiment learning, and reusable Workflow candidates are stored locally in
-`.spielos/state/`. Strategy Markdown is the reviewed base profile; owner-explicit
-profile overlays can supersede one typed claim without rewriting the source files.
-
-Codex `SessionStart` and `UserPromptSubmit` hooks, plus OpenCode's model-request
-hook, load a small read-only projection automatically. Initial context contains
-the company profile, top Goal state, and urgent attention. Each user message adds
-only prompt-relevant profile claims, experiment results, and Workflow instructions.
-Chat history and tool traces remain host-owned and are not copied into SpielOS.
-
-Memory writes have explicit triggers: the Goal loop records experiment learning
-only after valid cited evidence; an owner-explicit strategy correction writes a
-profile claim; and every user turn carries a typed memory-candidate contract.
-The host model interprets semantic intent while deterministic runtime code owns
-scope, authority, identity, deduplication, supersession, provenance, and
-retrieval. Explicit owner Workflow corrections apply immediately, task-only
-instructions stay temporary, and a canonical Workflow defect routes to a
-bounded source repair instead of contradictory memory. Other procedural
-candidates harden after two matching behavior keys in 14 days; stale one-offs
-expire during consolidation. Hooks remain read-only.
-
-## Development
-
-```sh
-PYTHONDONTWRITEBYTECODE=1 python3 -B -m company status
-PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest discover -s company/tests -v
-```
-
-The shipped home is built from `company/init_templates/`; runtime spine files must remain identical between source and template.
-
-See [company/README.md](company/README.md) for the operating contract.
+See [the architecture](company/ARCHITECTURE.md) for the clean-core contract.

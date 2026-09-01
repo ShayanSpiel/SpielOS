@@ -178,11 +178,9 @@ class GoalRuntime:
                     parent_id: str | None = None, goal_id: str | None = None,
                     owner_id: str = "goal-runtime", deadline: str | None = None,
                     config: dict[str, Any] | None = None) -> Goal:
-        goal = self.goals.create(name, metric, operator, target,
-                                 parent_id=parent_id, goal_id=goal_id,
-                                 owner_id=owner_id, deadline=deadline, config=config)
-        self.runs.create(goal.id)
-        return goal
+        return self.goals.create_with_initial_run(
+            name, metric, operator, target, parent_id=parent_id, goal_id=goal_id,
+            owner_id=owner_id, deadline=deadline, config=config)
 
     def advance(self, goal_id: str) -> dict:
         goal = self.goals.get(goal_id)

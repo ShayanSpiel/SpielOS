@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
 
-from ..agents.core import Agent, AgentExecutor
+from ..agents.core import Agent, AgentEvidence, AgentExecutor
 from ..evidence import EvidenceRepository
 from ..memory import MemoryRepository
 from ..state import Database
@@ -198,14 +198,18 @@ class ResolutionCycle:
             agent = self.agents.get(step.agent_id, Agent(step.agent_id))
             result = self.executor.execute(agent, order)
             if result.status == "completed":
+                evidence = tuple(result.evidence) or (AgentEvidence(
+                    result.evidence_kind or step.evidence_kind or "workflow_result",
+                    result.payload),)
                 order, evidence_ids = self.work_orders.complete_with_evidence(
                     order.id, result.payload, executor_id=order.claimed_by or "",
-                    kind=result.evidence_kind or step.evidence_kind or "workflow_result",
-                    payload=result.payload, advance_workflow=True)
+                    kind=evidence[0].kind, payload=evidence[0].payload,
+                    evidence_items=[(item.kind, item.payload) for item in evidence],
+                    advance_workflow=True)
                 if result.workflow_learning:
                     self.memory.remember(
                         "workflow", result.workflow_learning,
-                        evidence_ids=(evidence_ids[0],), goal_id=intervention.goal_id,
+                        evidence_ids=evidence_ids, goal_id=intervention.goal_id,
                         run_id=intervention.run_id, intervention_id=intervention.id,
                         workflow_id=workflow.id)
                 continue
@@ -259,10 +263,13 @@ class ResolutionCycle:
                 order = self.work_orders.claim(order.id, f"executor:{agent_id}")
             result = self.executor.execute(self.agents.get(agent_id, Agent(agent_id)), order)
             if result.status == "completed":
+                evidence = tuple(result.evidence) or (AgentEvidence(
+                    result.evidence_kind or intervention.context.get(
+                        "evidence_kind", "intervention_result"), result.payload),)
                 self.work_orders.complete_with_evidence(
                     order.id, result.payload, executor_id=order.claimed_by or "",
-                    kind=result.evidence_kind or intervention.context.get(
-                        "evidence_kind", "intervention_result"), payload=result.payload)
+                    kind=evidence[0].kind, payload=evidence[0].payload,
+                    evidence_items=[(item.kind, item.payload) for item in evidence])
                 return self._finish(intervention, ResolutionOutcome.RETURN_TO_GOAL,
                                     "direct intervention completed and validated")
             if result.status == "fixable":
