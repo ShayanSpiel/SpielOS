@@ -294,7 +294,10 @@ class GoalRuntime:
                     (run.id, *evaluation.evidence_ids)).fetchall()
                 if len(rows) != len(evaluation.evidence_ids):
                     raise ValueError("strategy learning evidence must belong to this Run")
-                connection.execute("INSERT INTO core_memory VALUES (?,?,?,?,?,?,?,?,?)",
+                connection.execute("""INSERT INTO core_memory
+                    (id,scope,claim,goal_id,run_id,intervention_id,workflow_id,
+                     evidence_ids_json,created_at)
+                    VALUES (?,?,?,?,?,?,?,?,?)""",
                     (f"memory-{uuid.uuid4().hex[:12]}", "strategy",
                      evaluation.strategy_learning, goal.id, run.id, None, None,
                      json.dumps(evaluation.evidence_ids), stamp))

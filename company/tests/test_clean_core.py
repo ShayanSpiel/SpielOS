@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 import tempfile
 import unittest
@@ -276,6 +277,104 @@ class CleanCoreAcceptanceTests(unittest.TestCase):
             runtime.memory.remember(
                 "strategy", "Wrong lineage", evidence_ids=(other_evidence.id,),
                 goal_id=goal.id, run_id=other_run.id)
+
+    def test_clean_cli_memory_profile_context_and_overview_share_one_authority(self):
+        runtime = CleanCommandRuntime(self.db)
+        goal = runtime.create_goal(
+            name="Respect the owner voice", owner_id="content", metric="drafts",
+            operator="ge", target=1, config={"aggregation": "count"})
+
+        profile_output = StringIO()
+        with redirect_stdout(profile_output):
+            self.assertEqual(cli_main([
+                "--db", str(self.db), "profile", "set",
+                "--namespace", "voice", "--key", "tone", "--value", "direct",
+                "--json",
+            ]), 0)
+        profile_record = json.loads(profile_output.getvalue())
+        self.assertEqual(profile_record["scope"], "owner")
+
+        commands = (
+            ("profile", "list", "--json"),
+            ("memory", "summary", "--json"),
+            ("context", "--prompt", "draft in my voice", "--json"),
+            ("overview", "--json"),
+        )
+        outputs = []
+        for command in commands:
+            output = StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(
+                    cli_main(["--db", str(self.db), *command]), 0,
+                    command)
+            outputs.append(json.loads(output.getvalue()))
+
+        profile_list, memory_summary, context, overview = outputs
+        self.assertEqual(profile_list[0]["id"], profile_record["id"])
+        self.assertEqual(memory_summary["counts"]["owner"], 1)
+        self.assertIn("voice.tone", context["context"])
+        self.assertIn("Respect the owner voice", context["context"])
+        self.assertEqual(overview["goals"]["focus"]["id"], goal["id"])
+        with runtime.database.connect() as connection:
+            self.assertEqual(connection.execute(
+                "SELECT COUNT(*) FROM core_memory WHERE scope='owner'"
+            ).fetchone()[0], 1)
+            tables = {row[0] for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'")}
+        self.assertTrue({
+            "profile_claims", "directives", "experiment_memories",
+            "workflow_memories", "recent_memories",
+        }.isdisjoint(tables))
+
+    def test_clean_memory_retrieval_is_bounded_scoped_and_supersession_aware(self):
+        runtime = GoalRuntime(self.db, ScenarioController(), FunctionExecutor({}))
+        goal = runtime.create_goal("Replies", "reply_rate", ">=", 4)
+        run = runtime.runs.current(goal.id)
+        evidence = runtime.evidence.record(
+            goal_id=goal.id, run_id=run.id, kind="fact", payload={"ok": True})
+        other_goal = runtime.create_goal("Other", "ready", "eq", True)
+        other_run = runtime.runs.current(other_goal.id)
+        other_evidence = runtime.evidence.record(
+            goal_id=other_goal.id, run_id=other_run.id,
+            kind="fact", payload={"ok": True})
+
+        obsolete = runtime.memory.remember("owner", "Use formal language")
+        replacement = runtime.memory.remember(
+            "owner", "Use direct language", confidence=0.95,
+            supersedes_id=obsolete.id)
+        strategy = runtime.memory.remember(
+            "strategy", "Target technical founders", goal_id=goal.id,
+            run_id=run.id, evidence_ids=(evidence.id,))
+        runtime.memory.remember(
+            "strategy", "Unrelated strategy", goal_id=other_goal.id,
+            run_id=other_run.id, evidence_ids=(other_evidence.id,))
+        selected_workflow = runtime.memory.remember(
+            "workflow", "Verify account fit", goal_id=goal.id, run_id=run.id,
+            workflow_id="research", evidence_ids=(evidence.id,))
+        runtime.memory.remember(
+            "workflow", "Use a different process", goal_id=goal.id, run_id=run.id,
+            workflow_id="other-workflow", evidence_ids=(evidence.id,))
+
+        before_decide = runtime._context(goal, run).memory
+        before_claims = {item.claim for item in before_decide}
+        self.assertIn(replacement.claim, before_claims)
+        self.assertIn(strategy.claim, before_claims)
+        self.assertNotIn(obsolete.claim, before_claims)
+        self.assertNotIn(selected_workflow.claim, before_claims)
+        self.assertNotIn("Use a different process", before_claims)
+        self.assertNotIn("Unrelated strategy", before_claims)
+
+        runtime.runs.update(
+            run.id, decision=Decision(
+                "change_workflow", "use research", workflow_id="research"))
+        after_decide = runtime._context(goal, runtime.runs.get(run.id)).memory
+        after_claims = {item.claim for item in after_decide}
+        self.assertIn(selected_workflow.claim, after_claims)
+        self.assertNotIn("Use a different process", after_claims)
+        self.assertLessEqual(len(runtime.memory.relevant(
+            goal_id=goal.id, workflow_id="research", limit=2)), 2)
+        self.assertEqual(runtime.memory.get(obsolete.id).status, "superseded")
+        self.assertEqual(replacement.confidence, 0.95)
 
     def test_direct_intervention_can_fix_retry_and_return_without_child_goal(self):
         attempts = {"count": 0}

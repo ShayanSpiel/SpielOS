@@ -189,6 +189,7 @@ class CleanCommandRuntime:
         self.runs = self.runtime.runs
         self.interventions = self.runtime.interventions
         self.evidence = self.runtime.evidence
+        self.memory = self.runtime.memory
         self.work_orders_repository = WorkOrderRepository(self.database)
         self.approvals = ApprovalRepository(self.database)
         self.store = self
@@ -428,8 +429,74 @@ class CleanCommandRuntime:
     def memories(self, limit=100, **_kwargs):
         with self.database.connect() as connection:
             return [dict(row) for row in connection.execute("""SELECT id,scope,claim,
-                goal_id,run_id,intervention_id,workflow_id,created_at FROM core_memory
+                goal_id,run_id,intervention_id,workflow_id,confidence,status,
+                supersedes_id,created_at FROM core_memory
                 ORDER BY created_at DESC LIMIT ?""", (limit,))]
+
+    @staticmethod
+    def _profile(memory):
+        key, separator, raw = memory.claim.partition(" = ")
+        namespace, dot, claim_key = key.partition(".")
+        try:
+            value = json.loads(raw) if separator else memory.claim
+        except json.JSONDecodeError:
+            value = raw
+        return {**asdict(memory), "namespace": namespace if dot else "owner",
+                "claim_key": claim_key if dot else key, "value": value}
+
+    def set_profile_claim(self, *, namespace, claim_key, value, scope="company",
+                          goal_id=None, workflow_id=None, **_kwargs):
+        self._require_writable()
+        prefix = f"{namespace}.{claim_key} = "
+        current = next((item for item in self.memory.relevant(
+            scope="owner", limit=200) if item.claim.startswith(prefix)), None)
+        memory = self.memory.remember(
+            "owner", prefix + json.dumps(value, sort_keys=True), goal_id=goal_id,
+            workflow_id=workflow_id, supersedes_id=current.id if current else None)
+        return self._profile(memory)
+
+    def profile_claims(self, *, goal_id=None, workflow_id=None, limit=200, **_kwargs):
+        return tuple(self._profile(item) for item in self.memory.relevant(
+            scope="owner", goal_id=goal_id, workflow_id=workflow_id, limit=limit))
+
+    def clean_memory_summary(self):
+        records = self.memories(limit=200)
+        active = [item for item in records if item["status"] == "active"]
+        by_scope = {scope: [item for item in active if item["scope"] == scope]
+                    for scope in ("owner", "workflow", "strategy")}
+        return {"schema_version": 3, "durable_memory": by_scope,
+                "counts": {scope: len(items) for scope, items in by_scope.items()}}
+
+    def assemble_context(self, *, prompt="", owner_id=None, workflow_id=None,
+                         token_budget=None, **_kwargs):
+        goals = [item for item in self.goals.list()
+                 if item.status == "active" and (not owner_id or item.owner_id == owner_id)]
+        goal = goals[0] if goals else None
+        run = self.runs.current(goal.id) if goal else None
+        evidence = self.evidence.for_goal(goal.id)[-20:] if goal else []
+        memory = self.memory.relevant(
+            goal_id=goal.id if goal else None, workflow_id=workflow_id, limit=20)
+        lines = [f"Request: {prompt}" if prompt else "Current clean-core context"]
+        sources = []
+        if goal and run:
+            lines.append(
+                f"Goal: {goal.name} ({goal.id}) · Run {run.sequence} · {run.stage.value}/{run.status}")
+            sources.append(f"goal:{goal.id}")
+        if evidence:
+            lines.append("Evidence: " + "; ".join(
+                f"{item.kind}={json.dumps(item.payload, sort_keys=True)}"
+                for item in evidence))
+            sources.extend(item.id for item in evidence)
+        if memory:
+            lines.append("Memory: " + "; ".join(item.claim for item in memory))
+            sources.extend(item.id for item in memory)
+        rendered = "\n".join(lines)
+        if token_budget:
+            rendered = rendered[:max(1, int(token_budget)) * 4]
+        return {"context": rendered, "sources": sources,
+                "goal_id": goal.id if goal else None,
+                "run_id": run.id if run else None,
+                "workflow_id": workflow_id}
 
     def notifications(self, status="pending", goal_id=None, limit=100, **_kwargs):
         clauses, args = ["status=?"], [status]

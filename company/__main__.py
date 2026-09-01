@@ -415,6 +415,7 @@ def _uses_goal_authority(args) -> bool:
     return args.command in {
         "goal", "once", "next", "status", "approve", "pause", "resume",
         "abandon", "retry", "evidence", "tasks", "runner", "report", "change",
+        "memory", "profile", "context", "overview",
     } or (args.command == "eval" and getattr(args, "goal", None))
 
 
@@ -626,16 +627,24 @@ def main(argv=None):
             else:
                 output = strategy_kernel_summary(kernel)
         elif args.command == "context":
-            from .runtime.context import ContextAssembler
             trigger_context = json.loads(args.trigger_context)
             if not isinstance(trigger_context, dict):
                 raise ValueError("--trigger-context must be a JSON object")
-            output = ContextAssembler(runtime.store, project_root=PROJECT_ROOT).assemble(
-                prompt=args.prompt, boot=args.boot, owner_id=args.owner,
-                workflow_id=args.workflow, step_id=args.step,
-                trigger_context=trigger_context,
-                available_dependencies=args.dependency,
-                token_budget=args.token_budget)
+            if hasattr(runtime, "assemble_context"):
+                output = runtime.assemble_context(
+                    prompt=args.prompt, boot=args.boot, owner_id=args.owner,
+                    workflow_id=args.workflow, step_id=args.step,
+                    trigger_context=trigger_context,
+                    available_dependencies=args.dependency,
+                    token_budget=args.token_budget)
+            else:
+                from .runtime.context import ContextAssembler
+                output = ContextAssembler(runtime.store, project_root=PROJECT_ROOT).assemble(
+                    prompt=args.prompt, boot=args.boot, owner_id=args.owner,
+                    workflow_id=args.workflow, step_id=args.step,
+                    trigger_context=trigger_context,
+                    available_dependencies=args.dependency,
+                    token_budget=args.token_budget)
             if not args.json:
                 print(output["context"])
                 return 0
@@ -652,12 +661,15 @@ def main(argv=None):
                     goal_id=args.goal, workflow_id=args.workflow, limit=200))
         elif args.command == "memory":
             if args.memory_command == "summary":
-                profile_claims = list(runtime.store.profile_claims(limit=200))
-                directives = list(runtime.store.directives(limit=100))
-                experiments = list(runtime.store.experiment_memories(limit=200))
-                workflows = list(runtime.store.workflow_memories(limit=200))
-                legacy = list(runtime.store.recent_memories(50))
-                output = {
+                if hasattr(runtime, "clean_memory_summary"):
+                    output = runtime.clean_memory_summary()
+                else:
+                    profile_claims = list(runtime.store.profile_claims(limit=200))
+                    directives = list(runtime.store.directives(limit=100))
+                    experiments = list(runtime.store.experiment_memories(limit=200))
+                    workflows = list(runtime.store.workflow_memories(limit=200))
+                    legacy = list(runtime.store.recent_memories(50))
+                    output = {
                     "schema_version": 2,
                     "durable_memory": {
                         "company_profile": profile_claims,
@@ -677,13 +689,22 @@ def main(argv=None):
                         "All five categories are durable memory. An empty learning category "
                         "does not mean owner profile memory is absent."
                     ),
-                }
+                    }
             elif args.memory_command == "experiments":
-                output = list(runtime.store.experiment_memories(
-                    owner_id=args.owner, limit=200))
+                output = ([item for item in runtime.memories(200)
+                           if item["scope"] == "strategy" and item["status"] == "active"]
+                          if hasattr(runtime, "clean_memory_summary") else
+                          list(runtime.store.experiment_memories(
+                              owner_id=args.owner, limit=200)))
             elif args.memory_command == "workflows":
-                output = list(runtime.store.workflow_memories(limit=200))
+                output = ([item for item in runtime.memories(200)
+                           if item["scope"] == "workflow" and item["status"] == "active"]
+                          if hasattr(runtime, "clean_memory_summary") else
+                          list(runtime.store.workflow_memories(limit=200)))
             elif args.memory_command == "observe-workflow":
+                if hasattr(runtime, "clean_memory_summary"):
+                    raise ValueError(
+                        "clean Workflow Memory is written from evidence-backed Goal execution")
                 instructions = json.loads(args.instructions)
                 dependencies = json.loads(args.dependencies)
                 trigger = json.loads(args.trigger)
@@ -698,10 +719,16 @@ def main(argv=None):
                     dependencies=dependencies, department_id=args.department,
                     source_ref=args.source_ref, explicit_update=args.explicit_update)
             elif args.memory_command == "apply-candidate":
+                if hasattr(runtime, "clean_memory_summary"):
+                    raise ValueError(
+                        "legacy memory candidates are available only in compatibility inspection")
                 from .runtime.memory_capture import apply_candidate
                 candidate = json.loads(args.candidate)
                 output = apply_candidate(runtime.store, candidate)
             else:
+                if hasattr(runtime, "clean_memory_summary"):
+                    raise ValueError(
+                        "legacy memory consolidation is available only in compatibility inspection")
                 output = runtime.store.consolidate_operating_memory()
         elif args.command == "goal" and args.goal_command == "create":
             config = json.loads(args.config)

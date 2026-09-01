@@ -72,6 +72,16 @@ class Database:
             if name not in order_columns:
                 connection.execute(
                     f"ALTER TABLE core_work_orders ADD COLUMN {name} {declaration}")
+        memory_columns = {row[1] for row in connection.execute(
+            "PRAGMA table_info(core_memory)")}
+        for name, declaration in (
+            ("confidence", "REAL NOT NULL DEFAULT 1.0"),
+            ("status", "TEXT NOT NULL DEFAULT 'active'"),
+            ("supersedes_id", "TEXT REFERENCES core_memory(id)"),
+        ):
+            if name not in memory_columns:
+                connection.execute(
+                    f"ALTER TABLE core_memory ADD COLUMN {name} {declaration}")
         edge_sql = connection.execute(
             "SELECT sql FROM sqlite_master WHERE type='table' AND name='core_goal_edges'"
         ).fetchone()[0]
@@ -235,7 +245,10 @@ CREATE TABLE IF NOT EXISTS core_memory (
     intervention_id TEXT REFERENCES core_interventions(id),
     workflow_id TEXT,
     evidence_ids_json TEXT NOT NULL,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    confidence REAL NOT NULL DEFAULT 1.0 CHECK(confidence >= 0.0 AND confidence <= 1.0),
+    status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','superseded')),
+    supersedes_id TEXT REFERENCES core_memory(id)
 );
 
 CREATE TABLE IF NOT EXISTS core_approvals (

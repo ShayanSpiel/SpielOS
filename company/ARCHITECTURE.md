@@ -51,6 +51,12 @@ Every WorkOrder and execution Evidence record retains `goal_id`, `run_id`, and
 `intervention_id`, plus WorkflowRun and WorkOrder references where applicable.
 This makes every meaningful action traceable to the outcome it served.
 
+Clean authority has one Memory table with `owner`, `workflow`, and `strategy`
+scopes. Retrieval excludes superseded records, defaults to 20 records, keeps
+strategy scoped to its Goal, and includes Workflow Memory only after that
+Workflow is selected. CLI profile data is owner Memory, not a parallel profile
+store.
+
 ## Responsibility boundaries
 
 | Package | Responsibility |
