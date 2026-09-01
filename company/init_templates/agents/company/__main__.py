@@ -440,7 +440,10 @@ def main(argv=None):
         root = find_project_root()
         if not in_source_repo:
             if (root / ".agents" / "company").is_dir():
-                runtime = CompatibilityRuntime(DEFAULT_DB, readonly=True)
+                from .commands import CleanCommandRuntime, goal_authority
+                runtime = (CleanCommandRuntime(DEFAULT_DB, readonly=True)
+                           if goal_authority(DEFAULT_DB) == "clean-core" else
+                           CompatibilityRuntime(DEFAULT_DB, readonly=True))
                 service = RunnerService(PROJECT_ROOT,
                                         Path(DEFAULT_DB)).status()
                 snapshot = runtime.company_snapshot(5)

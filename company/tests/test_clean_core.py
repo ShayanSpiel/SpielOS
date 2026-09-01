@@ -595,6 +595,7 @@ class CleanCoreAcceptanceTests(unittest.TestCase):
         self.assertNotIn("from .runtime import CompatibilityRuntime", cli)
         self.assertIn("from .runtime.loop import CompatibilityRuntime", cli)
         self.assertNotIn("LegacyRuntime as Runtime", cli)
+        self.assertIn('if goal_authority(DEFAULT_DB) == "clean-core"', cli)
 
     def test_capability_is_a_host_resolved_contract_not_runtime_state(self):
         capability = Capability(
