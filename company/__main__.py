@@ -106,6 +106,9 @@ def main(argv=None):
     if "--version" in argv or "-V" in argv:
         print(f"spielos {VERSION}"); return 0
     if not argv:
+        if not (PROJECT_ROOT / ".agents" / "company").is_dir():
+            from .runtime.onboard import run_first_use
+            return run_first_use(PROJECT_ROOT)
         runtime = CleanCommandRuntime(DEFAULT_DB, readonly=_readonly(str(DEFAULT_DB)))
         print(_render(runtime.company_snapshot())); return 0
     args = build_parser().parse_args(argv)

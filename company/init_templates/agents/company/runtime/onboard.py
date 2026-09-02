@@ -2,20 +2,21 @@
 
 One driver, two renderings:
 
-- a terminal (TTY) run gets an OpenCode-style experience: a quiet banner,
-  a braille spinner per materialization phase, green checkmarks as each
-  step lands, one confirmation card at the end;
+- a terminal (TTY) run gets an animated experience: a boxed banner, one
+  braille spinner line per materialization phase (with per-phase timings),
+  a confirmation card, and host-specific next steps;
 - pipes and CI get the same steps as plain deterministic lines with the
   same exit codes (0 ok / 1 failure / 130 aborted). No prompts, no ANSI.
 
 The scaffold itself lives in ``bootstrap.scaffold``; this module owns only
-the human surface: prompts, progress, verification, and next steps.
+the human surface.
 """
 
 from __future__ import annotations
 
 import json
 import os
+import queue
 import shutil
 import subprocess
 import sys
@@ -26,6 +27,15 @@ from pathlib import Path
 from .bootstrap import scaffold
 
 SPINNER_FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+
+LOGO = [
+    "██╗ ██╗███████╗██╗",
+    "██║ ██║██╔════╝██║",
+    "███████║██████╗ ██║",
+    "██╔══██║╚═══██║██║",
+    "██║  ██║██████╔╝███████╗",
+    "╚═╝  ╚═╝╚═════╝ ╚══════╝",
+]
 
 
 # ---- rendering primitives --------------------------------------------------
@@ -120,11 +130,40 @@ class _Spinner:
             self._thread.join()
         if self.style.tty and self.style.unicode:
             sys.stdout.write("\r\033[K")
-        seconds = f" ({elapsed:.1f}s)" if elapsed >= 2.0 else ""
+        seconds = f" ({elapsed:.1f}s)" if elapsed >= 1.0 else ""
         if exc_type is None:
             print(f"{self.style.mark_ok()} {self.label}{seconds}", flush=True)
         else:
             print(f"{self.style.mark_fail()} {self.label}", flush=True)
+
+
+def _scaffold_with_progress(target: Path, force: bool, style: _Style):
+    """Run the scaffold on a worker thread; animate one spinner per phase.
+
+    Returns (receipt, error). Exactly one of them is None.
+    """
+    phases: "queue.Queue[str | None]" = queue.Queue()
+    outcome: dict = {}
+
+    def worker() -> None:
+        try:
+            outcome["receipt"] = scaffold(target, force=force,
+                                           on_phase=phases.put)
+        except BaseException as error:  # surfaced to the caller below
+            outcome["error"] = error
+        finally:
+            phases.put(None)
+
+    threading.Thread(target=worker, daemon=True).start()
+    label = phases.get()
+    while label is not None:
+        with _Spinner(style, label):
+            label = phases.get()
+    receipt, error = outcome.get("receipt"), outcome.get("error")
+    return receipt, error
+
+
+# ---- failure helpers -------------------------------------------------------
 
 
 def _fail_json(error: str) -> int:
@@ -148,23 +187,6 @@ def _prompt(style: _Style, question: str, default: str = "") -> str:
     except EOFError:
         return default
     return answer or default
-
-
-def _choose(style: _Style, question: str, options: list[tuple[str, str]],
-            default: int = 1) -> int:
-    """Numbered choice menu. Returns the 1-based selection."""
-    print(f"\n{style.bold(question)}")
-    for index, (label, detail) in enumerate(options, start=1):
-        marker = style.dim("(default)") if index == default else ""
-        print(f"  {style.cyan(str(index))}) {label} {style.dim(detail)} {marker}")
-    raw = _prompt(style, "Choose", str(default))
-    if raw.isdigit() and 1 <= int(raw) <= len(options):
-        return int(raw)
-    for index, (label, _) in enumerate(options, start=1):
-        if raw.lower() == label.lower():
-            return index
-    print(style.yellow(f"  Didn't catch that — using option {default}."))
-    return default
 
 
 # ---- host detection and verification ---------------------------------------
@@ -198,59 +220,81 @@ def _verify_home(root: Path) -> tuple[bool, str]:
     return True, ""
 
 
-def _next_steps(root: Path, hosts: dict[str, bool]) -> tuple[list[str], dict[str, str]]:
+def _department_count(root: Path) -> int:
+    departments = root / ".agents" / "company" / "departments"
+    if not departments.is_dir():
+        return 0
+    return sum(1 for _ in departments.glob("*/department.py"))
+
+
+# ---- success rendering ------------------------------------------------------
+
+
+def _next_steps(root: Path, hosts: dict[str, bool]) -> tuple[list[tuple[str, str]], list[str]]:
     """Hand the fresh home to the Director instead of onboarding in the CLI."""
-    steps = [
-        ("cd " + str(root), ""),
-        ("codex", "call @Director and talk to the SpielOS Director agent"),
-        ("opencode", "run /agent, select the Director agent, and talk to it"),
+    steps = [("cd " + str(root), "your SpielOS home")]
+    if hosts.get("opencode"):
+        steps.append(("opencode",
+                      "run /agents, select the Director agent, and talk to it — "
+                      "it already sees your company state"))
+    if hosts.get("codex"):
+        steps.append(("codex",
+                      "talk to the Director agent (@director) — it already "
+                      "sees your company state"))
+    notes = [
+        "Choose OpenCode or Codex; the Director handles everything else in chat.",
+        "Set credentials in .spielos/.env (see .spielos/.env.example).",
     ]
-    notes = {
-        "handoff": "Choose Codex or OpenCode; the SpielOS Director handles onboarding in chat.",
-    }
     return steps, notes
 
 
 def _render_success(style: _Style, receipt: dict) -> None:
+    from .config import VERSION
+
     root = receipt["root"]
     hosts = receipt.get("hosts") or {}
     if not style.tty:
-        print(f"SpielOS harness ready at {root} ({receipt['files_written']} files)"
+        print(f"SpielOS {VERSION} ready at {root} ({receipt['files_written']} files)"
               + (" · runtime verified" if receipt.get("verified") else ""))
-    else:
-        import re
+        steps, _ = _next_steps(Path(root), hosts)
+        for command, _note in steps:
+            print(f"  $ {command}")
+        return
 
-        def visible_len(text: str) -> int:
-            return len(re.sub(r"\033\[[0-9;]*m", "", text))
+    import re
 
-        width = 64
-        print()
-        print(style.cyan("┌" + "─" * (width - 2) + "┐"))
-        title = " SpielOS is ready"
-        print(style.cyan("│") + style.bold(title.ljust(width - 2))
+    def visible_len(text: str) -> int:
+        return len(re.sub(r"\033\[[0-9;]*m", "", text))
+
+    width = 64
+    content = width - 2  # printable columns between the two border chars
+    label_column = 12    # 11 for the label + one trailing space
+
+    def row(label: str, value: str) -> None:
+        room = content - 1 - label_column
+        if visible_len(value) > room:
+            value = (value[:room - 2] + "…" if style.unicode
+                     else value[:room - 3] + "...")
+        pad = max(1, room - visible_len(value))
+        print(style.cyan("│")
+              + f" {label.ljust(label_column)}{value}{' ' * pad}"
               + style.cyan("│"))
 
-        def row(label: str, value: str) -> None:
-            pad = max(0, width - 4 - visible_len(value))
-            line = f" {label.ljust(10)}{value}{' ' * pad}"
-            print(style.cyan("│") + line + style.cyan(" │"))
-
-        row("Home", root)
-        row("Files", str(receipt["files_written"]))
-        row("Mode", receipt.get("mode_label", "harness"))
-        if receipt.get("departments"):
-            row("Departments", ", ".join(receipt["departments"]))
-        verified = (style.green("verified") if receipt.get("verified")
-                    else style.red("FAILED"))
-        row("Runtime", verified)
-        hosts_text = []
-        for name in ("opencode", "codex"):
-            state = (style.green("✓") if hosts.get(name)
-                     else style.dim("—"))
-            hosts_text.append(f"{name} {state}")
-        row("Hosts", "   ".join(hosts_text))
-        print(style.cyan("└" + "─" * (width - 2) + "┘"))
-        print()
+    print()
+    print(style.cyan("┌" + "─" * (width - 2) + "┐"))
+    row("", style.bold(f"SpielOS {VERSION} is ready"))
+    print(style.cyan("├" + "─" * (width - 2) + "┤"))
+    row("Home", str(root))
+    row("Files", str(receipt["files_written"]))
+    row("Departments", str(receipt.get("department_count", 0)))
+    row("Runtime", style.green("verified ✓") if receipt.get("verified")
+        else style.red("FAILED"))
+    hosts_text = "  ".join(
+        f"{name} {(style.green('✓') if hosts.get(name) else style.dim('—'))}"
+        for name in ("opencode", "codex"))
+    row("Hosts", hosts_text)
+    print(style.cyan("└" + "─" * (width - 2) + "┘"))
+    print()
 
     steps, notes = _next_steps(Path(root), hosts)
     print(style.bold("Next steps"))
@@ -258,12 +302,12 @@ def _render_success(style: _Style, receipt: dict) -> None:
         print(f"  {style.green('$')} {style.bold(command)}")
         if note:
             print(f"    {style.dim(note)}")
-    for note in notes.values():
+    for note in notes:
         print(f"  {style.mark_warn()} {note}")
     print()
 
 
-# ---- the driver -------------------------------------------------------------
+# ---- the drivers -------------------------------------------------------------
 
 
 def run_init(*, dir: str = ".", force: bool = False, assume_yes: bool = False,
@@ -272,6 +316,8 @@ def run_init(*, dir: str = ".", force: bool = False, assume_yes: bool = False,
 
     A fresh home ships the clean spine only, with zero Departments.
     """
+    from .config import VERSION
+
     style = _Style()
     interactive = (style.tty and sys.stdin.isatty()
                    and not assume_yes and not as_json)
@@ -279,20 +325,21 @@ def run_init(*, dir: str = ".", force: bool = False, assume_yes: bool = False,
 
     try:
         if interactive:
-            banner(style, target)
+            _banner(style, target, VERSION)
             force = force or _confirm_overwrite(style, target)
 
-        receipt = None
         quiet = as_json  # machine mode: keep stdout parseable, no chrome
-        if not quiet:
+        if quiet:
             receipt = scaffold(target, force=force)
-            print(f"{style.mark_ok()} Company runtime installed", flush=True)
-            print(f"{style.mark_ok()} Director added to Codex and OpenCode", flush=True)
         else:
-            receipt = scaffold(target, force=force)
+            receipt, error = _scaffold_with_progress(target, force, style)
+            if error is not None:
+                raise error
+            print(f"{style.mark_ok()} Company runtime installed", flush=True)
 
         hosts = _detect_hosts()
-        receipt.update({"hosts": hosts, "mode_label": "Fresh clean spine"})
+        receipt.update({"hosts": hosts, "mode_label": "Fresh clean spine",
+                        "department_count": _department_count(target)})
         # Verification runs in both modes; only the rendering differs.
         if as_json:
             ok, error = _verify_home(target)
@@ -345,7 +392,8 @@ def run_update(*, dir: str = ".", as_json: bool = False) -> int:
     user Department/Agent layers are always preserved; a missing home is an
     error (use ``init``).
     """
-    from .bootstrap import scaffold
+    from .config import VERSION
+
     from .paths import validate_home_destination
 
     style = _Style()
@@ -359,7 +407,13 @@ def run_update(*, dir: str = ".", as_json: bool = False) -> int:
         print(f"{style.mark_fail()} {style.bold(message)}", file=sys.stderr)
         return 1
     try:
-        receipt = scaffold(target, force=True)
+        if as_json:
+            receipt = scaffold(target, force=True)
+        else:
+            print(style.bold(f"SpielOS {VERSION} — refreshing {target}"))
+            receipt, error = _scaffold_with_progress(target, True, style)
+            if error is not None:
+                raise error
     except (OSError, ValueError) as error:
         if as_json:
             print(json.dumps({"error": str(error), "updated": False}, indent=2),
@@ -367,7 +421,8 @@ def run_update(*, dir: str = ".", as_json: bool = False) -> int:
             return 1
         return _fail(style, "Could not refresh the home.", str(error))
     ok, error_text = _verify_home(target)
-    receipt.update({"updated": ok, "verified": ok, "mode_label": "Refreshed clean spine"})
+    receipt.update({"updated": ok, "verified": ok, "mode_label": "Refreshed clean spine",
+                    "department_count": _department_count(target)})
     if not ok:
         if as_json:
             print(json.dumps({**receipt, "error": error_text}, indent=2),
@@ -379,23 +434,48 @@ def run_update(*, dir: str = ".", as_json: bool = False) -> int:
         print(json.dumps(receipt, indent=2))
     else:
         print(f"{style.mark_ok()} SpielOS home refreshed at {target} "
-              f"({receipt['files_written']} files)")
+              f"({receipt['files_written']} files · state preserved)")
     return 0
 
 
-def banner(style: _Style, target: Path) -> None:
+def run_first_use(root: Path) -> int:
+    """Bare ``spielos`` with no home in this folder: invite the owner in."""
+    style = _Style()
     from .config import VERSION
 
-    width = 52
+    if not (style.tty and sys.stdin.isatty()):
+        print("No SpielOS home in this folder.", file=sys.stderr)
+        print("Create one:  spielos init", file=sys.stderr)
+        print("Home elsewhere:  spielos --db /path/to/.spielos/state/company.sqlite status",
+              file=sys.stderr)
+        return 1
+    _banner(style, root, VERSION)
+    answer = _prompt(style, "Create your SpielOS home in this folder?", "Y")
+    if answer.strip().lower() in {"n", "no"}:
+        print(style.yellow("  Nothing was written. Run `spielos init --dir <folder>` "
+                          "when you are ready."))
+        return 0
+    return run_init(dir=str(root))
+
+
+def _banner(style: _Style, target: Path, version: str) -> None:
+    width = 34
     print()
     print(style.cyan("╭" + "─" * (width - 2) + "╮"))
-    title = " SpielOS"
-    print(style.cyan("│") + style.bold(style.cyan(title.ljust(width - 2)))
+    if style.unicode:
+        for line in LOGO:
+            pad = width - 2 - len(line)
+            print(style.cyan("│") + " " + style.bold(style.cyan(line))
+                  + " " * max(1, pad) + style.cyan("│"))
+        print(style.cyan("├" + "─" * (width - 2) + "┤"))
+    else:
+        title = " SpielOS"
+        print(style.cyan("│") + style.bold(title.ljust(width - 2))
+              + style.cyan("│"))
+    tagline = f" company operating system · v{version}"
+    print(style.cyan("│") + style.dim(tagline.ljust(width - 2)[:width - 2])
           + style.cyan("│"))
-    tagline = f" company operating system · v{VERSION}"
-    print(style.cyan("│") + style.dim(tagline.ljust(width - 2))
-          + style.cyan("│"))
-    target_line = f" setting up: {target}"
+    target_line = f" home: {target}"
     if len(target_line) > width - 4:
         target_line = target_line[:width - 7] + "..."
     print(style.cyan("│") + style.dim(target_line.ljust(width - 2))

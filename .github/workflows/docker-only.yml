@@ -26,6 +26,8 @@ jobs:
         with:
           context: .
           push: true
+          build-args: |
+            SPIELOS_VERSION=${{ steps.ver.outputs.version }}
           tags: |
             ghcr.io/shayanspiel/spielos:latest
             ghcr.io/shayanspiel/spielos:${{ steps.ver.outputs.version }}

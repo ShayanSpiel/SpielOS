@@ -144,8 +144,10 @@ def template_root() -> Path:
         if staged.is_dir():
             return staged
     raise FileNotFoundError(
-        "No init templates found. Set SPIELOS_TEMPLATE_DIR to a directory "
-        "containing agents/, opencode/, codex/, dot-env-example.")
+        "No init templates found for this home. Update through the installed "
+        "`spielos` command (pipx upgrade spielos, then `spielos update --dir "
+        "<home>`), or run from a source checkout, or set SPIELOS_TEMPLATE_DIR "
+        "to a directory containing agents/, hosts/, dot-env-example.")
 
 
 def _copy_tree(src: Path, dst: Path, overwrite: bool = False,
@@ -311,8 +313,9 @@ def scaffold(target: Path | None = None, *, force: bool = False,
         "files_written": len(written),
         "next_steps": [
             "cd " + str(root),
-            "opencode",
-            "Select the Director agent before chatting (not Build).",
+            "opencode (run /agents, select the Director agent) "
+            "or codex (talk to the Director agent)",
+            "The Director already sees your company state; just talk to it.",
             "Create a clean Department only when its Workflow contract is ready.",
             "Set credentials in .spielos/.env (see .spielos/.env.example).",
         ],
@@ -348,9 +351,10 @@ record; Departments supply Agent-owned behavior only.
 
 Authority and full documentation: `.agents/company/README.md`.
 
-Open OpenCode or Codex and select the Director agent before chatting. The host
-injects fresh company state automatically; do not begin with a manual status
-probe.
+Open OpenCode (run `/agents`, select the Director agent) or Codex (talk to
+the Director agent) and just talk to it — it already sees your company state.
+The host injects fresh company state automatically; do not begin with a manual
+status probe.
 
 ## OpenCode commands
 

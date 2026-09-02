@@ -97,11 +97,10 @@ jobs:
           skip-existing: true
 
   npm-publish:
-    name: Publish to npm via trusted publishing
+    name: Publish to npm
     runs-on: ubuntu-latest
     needs: pypi-publish
     permissions:
-      id-token: write          # npm OIDC provenance
       contents: read
     steps:
       - uses: actions/checkout@v4
@@ -109,8 +108,6 @@ jobs:
         with:
           node-version: "22"
           registry-url: "https://registry.npmjs.org"
-      - name: Ensure npm supports trusted publishing
-        run: npm install -g npm@^11.5.1
       - name: Check whether this version is already published
         id: npm-version
         run: |
@@ -121,9 +118,11 @@ jobs:
           else
             echo "published=false" >> "$GITHUB_OUTPUT"
           fi
-      - name: Publish to npm with provenance
+      - name: Publish to npm
         if: steps.npm-version.outputs.published != 'true'
-        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public
 
   homebrew-publish:
     name: Update Homebrew tap
@@ -219,6 +218,8 @@ jobs:
         with:
           context: .
           push: true
+          build-args: |
+            SPIELOS_VERSION=${{ needs.pypi-publish.outputs.version }}
           tags: |
             ghcr.io/shayanspiel/spielos:latest
             ghcr.io/shayanspiel/spielos:v${{ needs.pypi-publish.outputs.version }}
