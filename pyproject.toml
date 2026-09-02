@@ -27,12 +27,10 @@ exclude = ["company.tests*", "company.init_templates*"]
 company = [
     "init_templates/**/*",
     "dot-env-example",
-    "skills/**/*",
-    "departments/**/*",
 ]
 
 [tool.setuptools.exclude-package-data]
-"*" = ["**/__pycache__/*", "**/*.pyc", "init_templates/agents/company/tests/*"]
+"*" = ["**/__pycache__/*", "**/*.pyc"]
 
 [tool.setuptools.dynamic]
 version = { attr = "company.runtime.config.VERSION" }

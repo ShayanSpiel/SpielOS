@@ -24,6 +24,13 @@ spielos context
 spielos memory summary
 spielos profile list
 spielos runner tick
+spielos notifications list
+```
+
+Upgrade an existing home after `pipx upgrade spielos`:
+
+```sh
+spielos update --dir /path/to/home
 ```
 
 For source development, run:

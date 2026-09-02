@@ -5,11 +5,13 @@
 #   curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/SpielOS/main/install.sh | sh
 #
 # The script is idempotent: re-running it upgrades an existing install.
-# Override the source repository with SPIELOS_REPO=<git-url>.
+# Override the install source with SPIELOS_SOURCE=<name-or-path>
+# (e.g. a git URL for a branch build). SPIELOS_REPO is the older name for
+# the same override and still works.
 
 set -eu
 
-REPO="${SPIELOS_REPO:-https://github.com/ShayanSpiel/SpielOS.git}"
+SOURCE="${SPIELOS_SOURCE:-${SPIELOS_REPO:-spielos}}"
 TARGET_DIR="${SPIELOS_DIR:-$(pwd)}"
 
 # ---- output helpers --------------------------------------------------------
@@ -75,17 +77,16 @@ fi
 # ---- 3. spielos ------------------------------------------------------------
 
 printf '%s' "${DIM}   installing/updating spielos ...${RESET}"
-# --force re-pins the package to REPO even when an older install exists,
-# so "update" always pulls from the canonical source instead of whatever
-# location a previous install happened to use.
-if pipx install --force "$REPO" >/dev/null 2>&1; then
+# --force re-pins the package to the requested source even when an older
+# install exists, so re-running the installer always upgrades in place.
+if pipx install --force "$SOURCE" >/dev/null 2>&1; then
     printf '%s\n' " done"
     INSTALLED_VERSION=$(spielos --version 2>/dev/null | sed -n 's/^spielos //p')
     [ -n "$INSTALLED_VERSION" ] || fail "the package installed, but 'spielos --version' did not return a runtime version."
     step "spielos $INSTALLED_VERSION ready at $(command -v spielos) ${DIM}(global tool — not your project folder)${RESET}"
 else
     printf '%s\n' ""
-    fail "'pipx install $REPO' failed — run it manually to see why."
+    fail "'pipx install $SOURCE' failed — run it manually to see why."
 fi
 
 case ":$PATH:" in

@@ -19,7 +19,19 @@ spielos context
 spielos memory summary
 spielos profile list
 spielos runner tick
+spielos notifications list
 ```
+
+## Upgrade an existing home
+
+```sh
+pipx upgrade spielos
+spielos update --dir /path/to/home
+```
+
+`update` overwrites only the vendored `.agents/` spine and host adapters;
+private `.spielos/` state and user Departments under
+`.agents/company/departments/` are always preserved.
 
 A new home starts with no bundled Departments. Add clean declarative packages
 only when their Goal, Workflow, Agent, Evidence, and approval contracts are

@@ -37,6 +37,9 @@ def build_parser():
         item = commands.add_parser(name)
         if name == "status": item.add_argument("goal_id", nargs="?")
         item.add_argument("--json", action="store_true")
+    update = commands.add_parser("update", help="refresh the vendored home in place")
+    update.add_argument("--dir", default=".")
+    update.add_argument("--json", action="store_true")
     context = commands.add_parser("context")
     context.add_argument("--prompt", default=""); context.add_argument("--owner")
     context.add_argument("--workflow"); context.add_argument("--token-budget", type=int)
@@ -69,6 +72,12 @@ def build_parser():
     add.add_argument("goal_id"); add.add_argument("--kind", required=True); add.add_argument("--source", required=True)
     add.add_argument("--payload", default="{}"); add.add_argument("--validity"); add.add_argument("--json", action="store_true")
     approve = commands.add_parser("approve"); approve.add_argument("goal_id"); approve.add_argument("--note", default=""); approve.add_argument("--key", action="append", default=[]); approve.add_argument("--json", action="store_true")
+    notifications = commands.add_parser("notifications")
+    notification_commands = notifications.add_subparsers(dest="notification_command", required=True)
+    notification_list = notification_commands.add_parser("list")
+    notification_list.add_argument("--status", default="pending"); notification_list.add_argument("--goal")
+    notification_list.add_argument("--limit", type=int, default=100); notification_list.add_argument("--json", action="store_true")
+    notification_ack = notification_commands.add_parser("ack"); notification_ack.add_argument("notification_id"); notification_ack.add_argument("--json", action="store_true")
     tasks = commands.add_parser("tasks")
     tasks.add_argument("work_order_id", nargs="?"); tasks.add_argument("--status", default="active", choices=("active", "open", "claimed"))
     tasks.add_argument("--goal"); tasks.add_argument("--limit", type=int, default=50); tasks.add_argument("--claim"); tasks.add_argument("--complete")
@@ -104,6 +113,12 @@ def main(argv=None):
         if args.command == "init":
             from .runtime.onboard import run_init
             return run_init(dir=args.dir, force=args.force, assume_yes=args.yes, as_json=args.json)
+        if args.command == "update":
+            # Home lifecycle: refresh the vendored spine from the installed
+            # distribution's templates. State (.spielos/) and the user
+            # Department/Agent layers are always preserved.
+            from .runtime.onboard import run_update
+            return run_update(dir=args.dir, as_json=args.json)
         if args.command in {"catalog", "departments"}:
             from .runtime.registry import departments
             output = [{"id": item.id, "version": item.version, "workflows": [flow.id for flow in item.workflows]} for item in departments().values()]
@@ -111,7 +126,12 @@ def main(argv=None):
             service = RunnerService(PROJECT_ROOT, Path(args.db))
             output = service.start(args.interval) if args.runner_command == "start" else getattr(service, args.runner_command)()
         else:
-            readonly = args.command in {"status", "overview", "context", "memory", "profile"} and _readonly(args.db)
+            readonly = (args.command in {"status", "overview", "context", "memory",
+                                         "catalog", "departments"}
+                        or (args.command == "profile"
+                            and args.profile_command == "list")
+                        or (args.command == "notifications"
+                            and args.notification_command == "list")) and _readonly(args.db)
             runtime = CleanCommandRuntime(args.db, readonly=readonly)
             if args.command == "status": output = runtime.status(args.goal_id) if args.goal_id else runtime.company_snapshot()
             elif args.command == "overview": output = runtime.company_snapshot()
@@ -135,6 +155,12 @@ def main(argv=None):
                 if not isinstance(payload, dict): raise ValueError("--payload must be a JSON object")
                 output = runtime.add_evidence(args.goal_id, kind=args.kind, source=args.source, payload=payload, validity=args.validity)
             elif args.command == "approve": output = runtime.approve(args.goal_id, args.note, args.key)
+            elif args.command == "notifications":
+                if args.notification_command == "list":
+                    output = runtime.notifications(
+                        status=args.status, limit=args.limit, goal_id=args.goal)
+                else:
+                    output = runtime.acknowledge_notification(args.notification_id)
             elif args.command == "tasks":
                 if args.claim: output = runtime.claim_work_order(args.work_order_id, args.claim)
                 elif args.complete: output = runtime.complete_work_order(args.work_order_id, args.complete, _json(args.evidence))

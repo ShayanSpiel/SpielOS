@@ -3,14 +3,13 @@ description: Approve one exact parked action
 agent: director
 ---
 
-Inspect the goal in `$ARGUMENTS` and show its exact parked action, artifact,
-destination, scope, risk, and consequence. Map the owner's words to the runtime:
-“approve this” is `per_action`, “approve this run” is `per_run`, and “everything
-approved for this goal/until stopped” is `everything_approved` for the Goal and
-its descendants. Record that exact scope and advance to the next real
-suspension. Do not invent another confirmation inside an already approved scope.
+Inspect the goal in `$ARGUMENTS` and show its exact parked action and what
+the runtime is waiting for. When the owner approves, record it exactly:
 
-When the pending notification includes `approval_interaction`, invoke the
-native `question` tool with its separate Approve and Reject choices before
-recording anything. Run its fallback command only after Approve. On Reject,
-leave the action parked and confirm that nothing executed.
+    PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.agents python3 -B -m company approve <goal_id> --note "<owner intent>"
+
+If the parked Workflow step declares named approval keys, grant exactly those
+keys with `--key <name>` (repeatable). One approval command grants the keys of
+the current step; never invent another confirmation inside an already
+approved step. On reject, leave the action parked and confirm that nothing
+executed.

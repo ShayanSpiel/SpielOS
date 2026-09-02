@@ -57,6 +57,8 @@ jobs:
             "$RUNNER_TEMP/spielos-smoke/bin/spielos" memory summary
             "$RUNNER_TEMP/spielos-smoke/bin/spielos" profile list
             "$RUNNER_TEMP/spielos-smoke/bin/spielos" runner tick
+            "$RUNNER_TEMP/spielos-smoke/bin/spielos" notifications list
+            "$RUNNER_TEMP/spielos-smoke/bin/spielos" update --dir "$SMOKE_HOME" --json
           )
           EXPECTED="${{ steps.release.outputs.version }}" SMOKE_HOME="$SMOKE_HOME" \
           "$RUNNER_TEMP/spielos-smoke/bin/python" - "$SMOKE_HOME" <<'PY'

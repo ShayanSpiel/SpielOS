@@ -20,8 +20,8 @@ def _uses_installed_package(argv: list[str]) -> bool:
     """Return whether this invocation must bypass a vendored home.
 
     Home lifecycle commands need the just-installed distribution as their
-    authority.  Dispatching ``update`` into the existing home would run the
-    old runtime and can only re-copy old templates.
+    authority: dispatching ``init`` or ``update`` into the existing home
+    would re-copy that home's own templates instead of the new release.
     """
     index = 0
     while index < len(argv):
@@ -36,7 +36,7 @@ def _uses_installed_package(argv: list[str]) -> bool:
             continue
         if token.startswith("-"):
             return False
-        return token in {"init", "update", "refresh"}
+        return token in {"init", "update"}
     return False
 
 

@@ -10,10 +10,11 @@ LABEL org.opencontainers.image.title="spielos" \
       org.opencontainers.image.description="SpielOS AI company operating system CLI" \
       org.opencontainers.image.source="https://github.com/ShayanSpiel/SpielOS" \
       org.opencontainers.image.licenses="MIT" \
-      org.opencontainers.image.version="6.3.0"
+      org.opencontainers.image.version="10.0.1"
 
-# Install the published package (pinned major.minor for reproducible images).
-RUN pip install --no-cache-dir "spielos==6.3.0"
+# Install the published package (pinned minor for reproducible images; the
+# publish workflow retags every release).
+RUN pip install --no-cache-dir "spielos>=10.0.1,<10.1"
 
 ENTRYPOINT ["spielos"]
 CMD ["--help"]

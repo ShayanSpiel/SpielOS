@@ -148,9 +148,6 @@ def template_root() -> Path:
         "containing agents/, opencode/, codex/, dot-env-example.")
 
 
-_template_root = template_root  # backward-compatible alias
-
-
 def _copy_tree(src: Path, dst: Path, overwrite: bool = False,
                skip=None) -> list[str]:
     written: list[str] = []
@@ -169,6 +166,51 @@ def _copy_tree(src: Path, dst: Path, overwrite: bool = False,
         shutil.copy2(path, target)
         written.append(str(target))
     return written
+
+
+def _prune_stale(src: Path, dst: Path, skip=None) -> list[str]:
+    """Delete vendored files that the current templates no longer ship.
+
+    An ``update`` must leave the vendored spine exactly like a fresh init:
+    files left behind by an older release (for example a removed runtime
+    module) are deleted. Bytecode is always cleaned; the preserved owner
+    layers are never touched.
+    """
+    removed: list[str] = []
+    keep: set[str] = set()
+    for path in src.rglob("*"):
+        if path.is_file() and "__pycache__" not in path.parts \
+                and path.suffix != ".pyc":
+            rel = path.relative_to(src).as_posix()
+            if skip is None or not skip(rel):
+                keep.add(rel)
+    if not dst.is_dir():
+        return removed
+    for path in sorted(dst.rglob("*")):
+        if not path.is_file():
+            continue
+        rel = path.relative_to(dst).as_posix()
+        if rel in keep:
+            continue
+        if "__pycache__" in path.parts or path.suffix == ".pyc":
+            path.unlink(missing_ok=True)
+            removed.append(str(path))
+            continue
+        if skip is not None and skip(rel):
+            continue
+        if "node_modules" in path.parts:
+            continue
+        path.unlink(missing_ok=True)
+        removed.append(str(path))
+    for path in sorted((p for p in dst.rglob("*") if p.is_dir()),
+                       reverse=True):
+        if "node_modules" in path.parts:
+            continue
+        try:
+            path.rmdir()
+        except OSError:
+            pass
+    return removed
 
 
 def scaffold(target: Path | None = None, *, force: bool = False,
@@ -200,6 +242,12 @@ def scaffold(target: Path | None = None, *, force: bool = False,
         return any(rel.startswith(prefix) for prefix in preserved_user_prefixes)
 
     notify("Vendoring harness spine")
+    if existing_home and force:
+        # An update removes stale vendored files so the spine matches a
+        # fresh init exactly; the preserved user layers are skipped.
+        removed = _prune_stale(templates / "agents", root / ".agents",
+                               skip=preserve_user_layer)
+        written.extend(f"removed {item}" for item in removed)
     written += _copy_tree(templates / "agents", root / ".agents",
                           overwrite=force, skip=preserve_user_layer)
     notify("Installing host adapters (OpenCode, Codex)")
@@ -207,6 +255,9 @@ def scaffold(target: Path | None = None, *, force: bool = False,
     for name in ("opencode", "codex"):
         src = templates / "hosts" / name
         if src.is_dir():
+            if existing_home and force:
+                written.extend(f"removed {item}" for item in _prune_stale(
+                    src, root / ("." + name)))
             written += _copy_tree(src, root / ("." + name), overwrite=force)
 
     # Private state/data/artifact trees (empty on purpose).

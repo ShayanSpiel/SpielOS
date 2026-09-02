@@ -337,6 +337,52 @@ def run_init(*, dir: str = ".", force: bool = False, assume_yes: bool = False,
                      hint="check folder permissions and free disk space")
 
 
+def run_update(*, dir: str = ".", as_json: bool = False) -> int:
+    """Entry point for ``spielos update``. Returns the process exit code.
+
+    Refreshes the vendored spine in an existing home from the templates of
+    the distribution that is running. Private ``.spielos/`` state and the
+    user Department/Agent layers are always preserved; a missing home is an
+    error (use ``init``).
+    """
+    from .bootstrap import scaffold
+    from .paths import validate_home_destination
+
+    style = _Style()
+    target = validate_home_destination(Path(dir).expanduser().resolve())
+    if not (target / ".agents" / "company" / "runtime").is_dir():
+        message = f"no SpielOS home in {target}; run `spielos init --dir {target}` first"
+        if as_json:
+            print(json.dumps({"error": message, "updated": False}, indent=2),
+                  file=sys.stderr)
+            return 1
+        print(f"{style.mark_fail()} {style.bold(message)}", file=sys.stderr)
+        return 1
+    try:
+        receipt = scaffold(target, force=True)
+    except (OSError, ValueError) as error:
+        if as_json:
+            print(json.dumps({"error": str(error), "updated": False}, indent=2),
+                  file=sys.stderr)
+            return 1
+        return _fail(style, "Could not refresh the home.", str(error))
+    ok, error_text = _verify_home(target)
+    receipt.update({"updated": ok, "verified": ok, "mode_label": "Refreshed clean spine"})
+    if not ok:
+        if as_json:
+            print(json.dumps({**receipt, "error": error_text}, indent=2),
+                  file=sys.stderr)
+            return 1
+        return _fail(style, "Verification failed — the home was written "
+                     "but its runtime did not answer.", error_text)
+    if as_json:
+        print(json.dumps(receipt, indent=2))
+    else:
+        print(f"{style.mark_ok()} SpielOS home refreshed at {target} "
+              f"({receipt['files_written']} files)")
+    return 0
+
+
 def banner(style: _Style, target: Path) -> None:
     from .config import VERSION
 

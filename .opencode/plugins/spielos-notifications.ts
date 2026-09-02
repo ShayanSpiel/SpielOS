@@ -11,13 +11,11 @@ type Notification = {
   goal_id: string
   run_id?: string
   payload?: Record<string, any>
-  why_next?: string
 }
 
+// The clean core parks live actions as one kind of owner attention.
 const REPORTABLE = new Set([
-  "approval_required", "action_required", "blocked", "stuck_goal",
-  "goal_achieved", "goal_abandoned", "goal_expired",
-  "goal_completed_followup", "watchdog_digest", "runner_down",
+  "owner_input_required",
 ])
 
 const companyRunner = (directory: string) => async (args: string[]): Promise<any> => {
@@ -50,25 +48,13 @@ const companyRunner = (directory: string) => async (args: string[]): Promise<any
 
 const formatNotification = (item: Notification): string => {
   const payload = item.payload || {}
-  const interaction = payload.approval_interaction || {}
-  const result = payload.result || {}
-  const followup = payload.followup || {}
   const lines = [
     `SpielOS attention · ${item.kind}`,
     `Goal: ${payload.goal?.name || item.goal_id}`,
   ]
-  if (result.message) lines.push(`Result: ${result.message}`)
-  if (interaction.question) lines.push(`Question: ${interaction.question}`)
-  if (interaction.action) lines.push(`Action: ${interaction.action}`)
-  if (interaction.destination) lines.push(`Destination: ${interaction.destination}`)
-  if (interaction.scope) lines.push(`Scope: ${interaction.scope}`)
-  if (interaction.risk) lines.push(`Risk: ${interaction.risk}`)
-  if (interaction.consequence) lines.push(`Consequence: ${interaction.consequence}`)
+  if (payload.message) lines.push(`Message: ${payload.message}`)
   const next = payload.required_user_action
-    || followup.recommended_next_action
-    || item.why_next
   if (next) lines.push(`Next: ${next}`)
-  if (interaction.fallback_command) lines.push(`Command: ${interaction.fallback_command}`)
   return lines.join("\n")
 }
 
@@ -82,21 +68,8 @@ const surfacePending = async (
     "notifications", "list", "--status", "pending", "--limit", "20", "--json",
   ]) as Notification[]
   const reportable = rows.filter((row) => REPORTABLE.has(row.kind))
-  const approvals = reportable.filter((row) => row.kind === "approval_required")
-  const ordinary = reportable.filter((row) => row.kind !== "approval_required")
-  const preferred = new Map<string, Notification>()
-  for (const item of ordinary) {
-    const key = `${item.goal_id}:${item.run_id || ""}`
-    const current = preferred.get(key)
-    if (!current || item.kind === "goal_completed_followup") preferred.set(key, item)
-  }
-  const messages = [
-    ...approvals.map(formatNotification),
-    ...([...preferred.values()].length
-      ? [`SpielOS company update\n\n${[...preferred.values()].map(formatNotification).join("\n\n")}`]
-      : []),
-  ]
-  for (const text of messages) {
+  if (reportable.length) {
+    const text = reportable.map(formatNotification).join("\n\n")
     await client.session.prompt({
       path: { id: sessionID },
       query: { directory },
@@ -114,7 +87,6 @@ const surfacePending = async (
 export const SpielOSContext: Plugin = async ({ client, directory }) => {
   const runCompany = companyRunner(directory)
   const prompts = new Map<string, string>()
-  const seen = new Set<string>()
   return {
     "chat.message": async (input, output) => {
       prompts.set(input.sessionID, output.parts
@@ -125,16 +97,12 @@ export const SpielOSContext: Plugin = async ({ client, directory }) => {
     "experimental.chat.system.transform": async (input, output) => {
       const sessionID = input.sessionID || ""
       try {
-        const args = [
+        const projection = await runCompany([
           "context", "--prompt", prompts.get(sessionID) || "",
-          "--owner", "director",
-        ]
-        if (!seen.has(sessionID)) args.push("--boot")
-        args.push("--json")
-        const projection = await runCompany(args) as { context?: string }
+          "--owner", "director", "--json",
+        ]) as { context?: string }
         if (!projection.context) throw new Error("empty context projection")
         output.system.push(projection.context)
-        seen.add(sessionID)
       } catch (error) {
         const detail = error instanceof Error ? error.message : "unknown host error"
         output.system.push(

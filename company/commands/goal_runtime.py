@@ -9,6 +9,7 @@ import tempfile
 import time
 import weakref
 from dataclasses import asdict
+from datetime import datetime, timezone
 from pathlib import Path
 
 from ..agents.core import AgentResult
@@ -115,7 +116,7 @@ class CleanCommandRuntime:
         database_path = self.path
         database_readonly = readonly
         if readonly:
-            # Read commands use a migrated scratch snapshot. This keeps the
+            # Read commands use a scratch snapshot. This keeps the
             # requested database byte-for-byte read-only even when its schema
             # predates the current projection.
             self._readonly_scratch = Path(tempfile.mkdtemp(prefix="spielos-readonly-"))
@@ -188,22 +189,13 @@ class CleanCommandRuntime:
         goal_row = self._goal(goal)
         run_row = {"id": run.id, "sequence": run.sequence, "run_type": "execution",
                    "status": run.status, "evidence_validity": "technical_only"}
-        cycle = {"id": run.id, "stage": run.stage.value, "step": run.stage.value.lower(),
-                 "run_status": run.status, "data": {}}
         attention = self.attention(goal_id=goal_id)
-        return {"goal": goal_row, "run": run_row, "cycle": cycle,
+        return {"goal": goal_row, "run": run_row,
                 "evidence": evidence, "evaluation": None if run.evaluation is None
                 else asdict(run.evaluation),
                 "pending_notifications": self.notifications(goal_id=goal_id),
                 "attention": attention,
                 "work_orders": self.work_orders(status="active", goal_id=goal_id)}
-
-    def goal_summary(self, goal_id: str) -> dict:
-        return {"goal": self._goal(self.goals.get(goal_id)),
-                "attention": self.attention(goal_id=goal_id),
-                "unread_results": self.unread_results(goal_id=goal_id),
-                "work_orders": self.work_orders(
-                    status="active", goal_id=goal_id)}
 
     def goal_summaries(self, *, statuses=None, goal_id=None, limit=100):
         values = [self._goal(item) for item in self.goals.list()
@@ -211,12 +203,6 @@ class CleanCommandRuntime:
         if statuses:
             values = [item for item in values if item["goal_status"] in statuses]
         return values[:limit]
-
-    def list_goals(self):
-        return [self.status(item.id) for item in self.goals.list()]
-
-    def goal_history(self, limit=10):
-        return self.goal_summaries(statuses=("achieved", "abandoned"), limit=limit)
 
     def company_snapshot(self, recent_limit=5):
         values = self.goal_summaries(limit=100)
@@ -233,8 +219,8 @@ class CleanCommandRuntime:
         return {"counts": counts, "focus_goal": active[0] if active else None,
                 "attention": self.attention(),
                 "work_orders": self.work_orders(status="active", limit=20),
-                "active_goals": active, "proposed_goals": [], "paused_goals": paused,
-                "unread_results": self.unread_results(), "directives": [],
+                "active_goals": active, "paused_goals": paused,
+                "unread_results": self.unread_results(),
                 "recent_memory": self.memories(limit=20),
                 "goal_links": goal_links,
                 "support_links": [item for item in goal_links
@@ -301,23 +287,6 @@ class CleanCommandRuntime:
                 "canonical_root_goal_id": roots[0] if len(roots) == 1 else None,
                 "defects": defects}
 
-    def link_support(self, goal_id, target_id):
-        self._require_writable()
-        self.goals.add_support(goal_id, target_id)
-        return self.status(goal_id)
-
-    def link_block(self, goal_id, target_id):
-        self._require_writable()
-        self.goals.add_block(goal_id, target_id)
-        return self.status(goal_id)
-
-    def set_goal_status(self, goal_id, status):
-        self._require_writable()
-        value = getattr(status, "value", status)
-        value = {"achieved": "complete", "expired": "abandoned"}.get(value, value)
-        self.goals.set_status(goal_id, value)
-        return self.status(goal_id)
-
     def approve(self, goal_id, note="", keys=()):
         self._require_writable()
         run = self.runs.current(goal_id)
@@ -357,14 +326,6 @@ class CleanCommandRuntime:
         self.runtime.advance(goal_id)
         return self.status(goal_id)
 
-    def next(self, goal_id, **_):
-        return self.retry(goal_id)
-
-    def retry(self, goal_id):
-        self._require_writable()
-        self.runtime.resume(goal_id)
-        return self.status(goal_id)
-
     def tick(self, max_advances=100):
         self._require_writable()
         return self.runtime.tick(max_advances=max_advances)
@@ -378,10 +339,6 @@ class CleanCommandRuntime:
             yield result
             if max_ticks is None or ticks < max_ticks:
                 time.sleep(interval_seconds)
-
-    def complete_change(self, *_args, **_kwargs):
-        raise RuntimeError(
-            "clean-core repairs are WorkOrders; complete them with `spielos tasks --complete`")
 
     def work_order(self, order_id):
         return self._order(self.work_orders_repository.get(order_id))
@@ -427,8 +384,6 @@ class CleanCommandRuntime:
                             for item in evidence],
             advance_workflow=bool(order.workflow_run_id), wake_run=True)
         return {"work_order": self._order(order)}
-
-    def events(self, *_args, **_kwargs): return []
 
     def memories(self, limit=100, **_kwargs):
         with self.database.connect() as connection:
@@ -512,6 +467,17 @@ class CleanCommandRuntime:
                 + " AND ".join(clauses) + " ORDER BY created_at LIMIT ?", args)
             return [{**dict(row), "payload": json.loads(row["payload_json"])}
                     for row in rows]
+
+    def acknowledge_notification(self, notification_id):
+        self._require_writable()
+        with self.database.connect() as connection:
+            updated = connection.execute("""UPDATE core_notifications
+                SET status='acknowledged', acknowledged_at=?
+                WHERE id=? AND status='pending'""",
+                (datetime.now(timezone.utc).isoformat(), notification_id))
+            if not updated.rowcount:
+                raise ValueError(f"unknown pending notification: {notification_id}")
+        return {"id": notification_id, "status": "acknowledged"}
 
     def attention(self, limit=100, goal_id=None, **_kwargs):
         return [{"id": item["id"], "kind": item["kind"],
