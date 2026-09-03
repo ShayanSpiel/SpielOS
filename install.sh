@@ -79,12 +79,17 @@ fi
 printf '%s' "${DIM}   installing/updating spielos ...${RESET}"
 # --force re-pins the package to the requested source even when an older
 # install exists, so re-running the installer always upgrades in place.
-if pipx install --force "$SOURCE" >/dev/null 2>&1; then
+# Run from a neutral directory: inside a project that has its own .venv,
+# pipx/uv tooling can otherwise land the environment into that project.
+INSTALL_CWD=$(mktemp -d)
+if (cd "$INSTALL_CWD" && pipx install --force "$SOURCE") >/dev/null 2>&1; then
+    rmdir "$INSTALL_CWD" 2>/dev/null || rm -rf "$INSTALL_CWD"
     printf '%s\n' " done"
     INSTALLED_VERSION=$(spielos --version 2>/dev/null | sed -n 's/^spielos //p')
     [ -n "$INSTALLED_VERSION" ] || fail "the package installed, but 'spielos --version' did not return a runtime version."
     step "spielos $INSTALLED_VERSION ready at $(command -v spielos) ${DIM}(global tool — not your project folder)${RESET}"
 else
+    rm -rf "$INSTALL_CWD"
     printf '%s\n' ""
     fail "'pipx install $SOURCE' failed — run it manually to see why."
 fi

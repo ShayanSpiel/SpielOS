@@ -25,7 +25,7 @@ pipx install spielos && spielos init --dir my-company -y
 One line with Homebrew:
 
 ```sh
-brew install shayanspiel/tap/spielos && spielos init --dir my-company -y
+brew install shayanspiel/spielos/spielos && spielos init --dir my-company -y
 ```
 
 One line with npm (thin launcher; needs the Python package too):
