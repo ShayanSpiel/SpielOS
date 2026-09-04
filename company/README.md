@@ -28,6 +28,8 @@ request; do not begin with a manual status probe.
 ```sh
 spielos status            # one Goal or the company snapshot
 spielos overview          # the full company projection
+spielos observe           # read-only dashboard (health, goals, attention)
+spielos observe --goal <id> # causal trace: Goal -> Runs -> Interventions
 spielos context           # the same context your host injects
 spielos memory summary    # owner, workflow, and strategy memory
 spielos memory add --scope workflow --claim "..." --evidence <id> --goal <id> --run <id>

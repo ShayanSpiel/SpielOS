@@ -63,8 +63,14 @@ class SpineIdentityTests(unittest.TestCase):
                      "tests/test_update_preservation.py",
                      "tests/test_context_projection.py",
                      "tests/test_host_adapter_contract.py",
+                     "tests/test_harness_behavior.py",
+                     "tests/test_observability_dashboard.py",
                      "tests/test_spine_identity.py",
                  }}
+        # Department fixtures power the behavioral suite; test data only,
+        # never shipped spine (a fresh home still ships zero departments).
+        extra = {rel for rel in extra
+                 if not rel.startswith("tests/fixtures/")}
         self.assertEqual(set(), extra,
                          "files in company/ outside the spine need a listed"
                          " exception here")

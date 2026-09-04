@@ -47,7 +47,7 @@ other shell processing to an allowed runtime command.
 Use the clean command surface only:
 
 ```text
-status            overview          context           catalog
+status            overview          context           observe catalog
 departments       layout            goal create|list|topology|show
 evidence add       approve           tasks             runner tick|watch|start|stop|status|enable
 memory summary|owner|workflows|strategy

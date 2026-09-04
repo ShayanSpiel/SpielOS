@@ -39,6 +39,11 @@ def build_parser():
         item.add_argument("--json", action="store_true")
     layout = commands.add_parser("layout", help="audit the canonical home layout")
     layout.add_argument("--json", action="store_true")
+    observe = commands.add_parser("observe", help="read-only company dashboard")
+    observe.add_argument("--goal", help="render the causal trace for one Goal")
+    observe.add_argument("--health", action="store_true",
+                         help="compact health counters only")
+    observe.add_argument("--json", action="store_true")
     update = commands.add_parser("update", help="refresh the vendored home in place")
     update.add_argument("--dir", default=".")
     update.add_argument("--json", action="store_true")
@@ -140,12 +145,17 @@ def main(argv=None):
         elif args.command == "layout":
             from .layout import audit
             output = audit(PROJECT_ROOT)
+        elif args.command == "observe":
+            readonly = _readonly(args.db)
+            runtime = CleanCommandRuntime(args.db, readonly=readonly)
+            output = runtime.observe(goal_id=args.goal, health=args.health)
         elif args.command == "runner" and args.runner_command in {"start", "stop", "status", "enable"}:
             service = RunnerService(PROJECT_ROOT, Path(args.db))
             output = service.start(args.interval) if args.runner_command == "start" else getattr(service, args.runner_command)()
         else:
             readonly = (args.command in {"status", "overview", "context",
-                                         "catalog", "departments", "layout"}
+                                         "observe", "catalog", "departments",
+                                         "layout"}
                         or (args.command == "memory"
                             and args.memory_command != "add")
                         or (args.command == "profile"

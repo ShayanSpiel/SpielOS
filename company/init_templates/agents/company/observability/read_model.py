@@ -54,3 +54,61 @@ class Observer:
                 })
         return {"goal": {"id": goal["id"], "name": goal["name"],
                          "status": goal["status"]}, "runs": values}
+
+    def dashboard(self) -> dict:
+        """One read-only company dashboard projection.
+
+        Health counters, per-goal progress with stage/run/work-order state,
+        pending attention, and workflow step positions — everything an owner
+        or Director needs to see where the company stands, derived only
+        from clean core tables.
+        """
+        with self.database.connect() as connection:
+            goals = [dict(row) for row in connection.execute("""
+                SELECT g.id, g.name, g.status, g.metric, g.target_json,
+                       m.owner_id,
+                       (SELECT COUNT(*) FROM core_evidence e
+                         WHERE e.goal_id = g.id) AS evidence_count,
+                       (SELECT COUNT(*) FROM core_work_orders w
+                         WHERE w.goal_id = g.id
+                           AND w.status IN ('open','claimed')) AS open_orders
+                FROM core_goals g
+                LEFT JOIN core_goal_metadata m ON m.goal_id = g.id
+                ORDER BY CASE g.status WHEN 'active' THEN 0
+                         WHEN 'paused' THEN 1 ELSE 2 END, g.created_at""")]
+            for goal in goals:
+                run = connection.execute("""SELECT id, sequence, stage,
+                    status FROM core_runs WHERE goal_id=?
+                    ORDER BY sequence DESC LIMIT 1""", (goal["id"],)).fetchone()
+                if run is not None:
+                    goal["run_id"] = run["id"]
+                    goal["run_sequence"] = run["sequence"]
+                    goal["stage"] = run["stage"]
+                    goal["run_status"] = run["status"]
+                    workflow_run = connection.execute("""
+                        SELECT wr.id, wr.workflow_id, wr.current_step, wr.status,
+                               (SELECT COUNT(*) FROM core_work_orders w
+                                 WHERE w.workflow_run_id = wr.id) AS orders,
+                               (SELECT steps_json FROM core_workflows f
+                                 WHERE f.id = wr.workflow_id) AS steps_json
+                        FROM core_workflow_runs wr WHERE wr.run_id=?
+                        ORDER BY wr.created_at DESC LIMIT 1""", (run["id"],)).fetchone()
+                    if workflow_run is not None:
+                        goal["workflow_id"] = workflow_run["workflow_id"]
+                        goal["workflow_status"] = workflow_run["status"]
+                        goal["workflow_orders"] = workflow_run["orders"]
+                        steps = json.loads(workflow_run["steps_json"] or "[]")
+                        if steps:
+                            goal["workflow_step"] = workflow_run["current_step"] + 1
+                            goal["workflow_steps_total"] = len(steps)
+            attention = [dict(row) for row in connection.execute("""
+                SELECT id, goal_id, kind, payload_json, created_at
+                FROM core_notifications WHERE status='pending'
+                ORDER BY created_at LIMIT 20""")]
+            for item in attention:
+                item["payload"] = json.loads(item.pop("payload_json"))
+            memory = {row[0]: row[1] for row in connection.execute("""
+                SELECT scope, COUNT(*) FROM core_memory
+                WHERE status='active' GROUP BY scope""")}
+        return {"health": self.health(), "goals": goals,
+                "attention": attention, "memory": memory}

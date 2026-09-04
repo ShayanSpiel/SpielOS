@@ -20,5 +20,6 @@ Memory has exactly three scopes: owner, workflow, and strategy. Non-owner
 Memory is evidence-backed and retains Goal and Run lineage.
 
 The command surface always opens `CleanCommandRuntime`, which projects the
-clean repositories for humans and host hooks. A new home starts with zero
+clean repositories for humans and host hooks; `company observe` renders the
+read-only `observability` dashboard (health, goal progress, causal traces). A new home starts with zero
 Departments and only the canonical clean schema.

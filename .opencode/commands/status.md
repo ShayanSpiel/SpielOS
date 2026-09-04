@@ -13,4 +13,7 @@ plain business language. Do not rediscover routine state through `--help`, goal
 lists, saved shell output, repository search, or conversation history. If the
 snapshot exposes a genuine inconsistency or the user explicitly requests audit
 detail, retain full autonomy to drill down with one goal ID, bounded history,
-or `--raw`. Do not mutate state.
+or `--raw`. For the observability dashboard (health, per-goal progress, workflow
+position, pending attention) use `company observe`; for one goal's causal
+trace (Runs and Interventions) use `company observe --goal <id>`. Both are
+read-only. Do not mutate state.

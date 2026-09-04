@@ -24,7 +24,7 @@ Command surface: run
 `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.agents python3 -B -m company ...`
 directly. Never add pipes, redirects, separators, head, tail, or other shell
 processing to an allowed runtime command. Use only: status, overview,
-context, catalog, departments, layout, goal create|list|topology|show,
+context, observe, catalog, departments, layout, goal create|list|topology|show,
 evidence add, approve, tasks, runner tick|watch|start|stop|status|enable,
 memory summary|owner|workflows|strategy, profile list|set,
 notifications list|ack.
