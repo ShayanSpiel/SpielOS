@@ -388,9 +388,11 @@ def run_update(*, dir: str = ".", as_json: bool = False) -> int:
     """Entry point for ``spielos update``. Returns the process exit code.
 
     Refreshes the vendored spine in an existing home from the templates of
-    the distribution that is running. Private ``.spielos/`` state and the
-    user Department/Agent layers are always preserved; a missing home is an
-    error (use ``init``).
+    the distribution that is running. Private ``.spielos/`` state,
+    ``opencode.json``/``AGENTS.md`` owner edits, and every owner-created file
+    in the user layers (Departments, Skills, Capabilities, Connections,
+    Strategy, installed Agents, host agents/commands/plugins) are always
+    preserved; a missing home is an error (use ``init``).
     """
     from .config import VERSION
 

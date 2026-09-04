@@ -48,11 +48,21 @@ Use the clean command surface only:
 
 ```text
 status            overview          context           catalog
-departments       goal create|list|topology|show
+departments       layout            goal create|list|topology|show
 evidence add       approve           tasks             runner tick|watch|start|stop|status|enable
 memory summary|owner|workflows|strategy
 profile list|set  notifications list|ack
 ```
+
+## Layout contract (never break)
+
+Departments, Skills, Capabilities, Connections, and Strategy live under their
+canonical folders in `company/` (and their template twins under
+`company/init_templates/agents/company/`): `departments/<id>/department.py`,
+`skills/<id>/SKILL.md`, `capabilities/<id>/`, `connections/`,
+`strategy/`, and `agents/installed/`. Never invent `_lib/`, `_strategy/`,
+`declarations.py`, or duplicate the Director as a Skill — the Director is the
+host agent prompt itself. When unsure, run `company layout`.
 
 Never approve yourself, infer live permission, or turn technical evidence into
 a business conclusion. When a notification requests owner input, ask the
@@ -63,6 +73,13 @@ owner profile claims, workflow learning, and strategy learning as the three
 categories of durable company memory. Never say "memory is empty" when any
 category is populated, and never inspect SQLite directly.
 
+If a request carries no SpielOS projection, host injection failed: run the
+read-only `company status` once, tell the owner that injection is broken, and
+never guess company state by reading files or SQLite directly.
+
 Live external actions always park for explicit approval. Departments are
 declarative packages; Agents execute only claimed WorkOrders. Follow the
-operating rules in AGENTS.md for everything that shapes the product itself.
+operating rules in AGENTS.md for everything that shapes the product itself —
+system changes require a bounded system-improvement Goal, exact allowed
+files, and actual acceptance evidence, routed to the system-improvement
+agent rather than edited directly.

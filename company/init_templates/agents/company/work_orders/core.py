@@ -13,6 +13,21 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+EXECUTOR_PREFIX = "executor:"
+
+
+def executor_identity(executor_id: str) -> str:
+    """Normalize a claimant to the bare agent identity.
+
+    The runtime used to pre-claim orders as ``executor:<agent_id>``; both
+    spellings name the same executor, so every guard accepts either. New
+    orders are claimed with the bare agent id (the documented host flow).
+    """
+    if executor_id.startswith(EXECUTOR_PREFIX):
+        return executor_id[len(EXECUTOR_PREFIX):]
+    return executor_id
+
+
 @dataclass(frozen=True)
 class WorkOrder:
     id: str
@@ -91,7 +106,8 @@ class WorkOrderRepository:
                  order_id, stamp.isoformat())).rowcount
         if changed != 1:
             current = self.get(order_id)
-            if current.status == "claimed" and current.claimed_by == executor_id:
+            if (current.status == "claimed"
+                    and executor_identity(current.claimed_by or "") == executor_identity(executor_id)):
                 return current
             raise RuntimeError("work order is not open")
         return self.get(order_id)
@@ -100,26 +116,32 @@ class WorkOrderRepository:
         stamp = datetime.now(timezone.utc)
         expires = stamp + timedelta(seconds=lease_seconds)
         with self.database.connect() as connection:
-            changed = connection.execute("""UPDATE core_work_orders
+            row = connection.execute(
+                "SELECT status,claimed_by FROM core_work_orders WHERE id=?",
+                (order_id,)).fetchone()
+            if (row is None or row["status"] != "claimed"
+                    or executor_identity(row["claimed_by"] or "") != executor_identity(executor_id)):
+                raise RuntimeError("only the claiming Agent executor can renew a WorkOrder")
+            connection.execute("""UPDATE core_work_orders
                 SET lease_expires_at=?,updated_at=?
-                WHERE id=? AND status='claimed' AND claimed_by=?""",
-                (expires.isoformat(), stamp.isoformat(), order_id, executor_id)).rowcount
-        if changed != 1:
-            raise RuntimeError("only the claiming Agent executor can renew a WorkOrder")
+                WHERE id=?""", (expires.isoformat(), stamp.isoformat(), order_id))
         return self.get(order_id)
 
     def complete(self, order_id: str, result: dict, *, executor_id: str) -> WorkOrder:
         with self.database.connect() as connection:
-            changed = connection.execute("""UPDATE core_work_orders
-                SET status='completed',result_json=?,updated_at=?
-                WHERE id=? AND status='claimed' AND claimed_by=?""",
-                (json.dumps(result), _now(), order_id, executor_id)).rowcount
-        if changed != 1:
-            current = self.get(order_id)
-            if current.status == "completed":
-                return current
-            raise RuntimeError("only the claiming Agent executor can complete a WorkOrder")
-        return self.get(order_id)
+            row = connection.execute(
+                "SELECT status,claimed_by FROM core_work_orders WHERE id=?",
+                (order_id,)).fetchone()
+            if (row is not None and row["status"] == "claimed"
+                    and executor_identity(row["claimed_by"] or "") == executor_identity(executor_id)):
+                connection.execute("""UPDATE core_work_orders
+                    SET status='completed',result_json=?,updated_at=? WHERE id=?""",
+                    (json.dumps(result), _now(), order_id))
+                return self.get(order_id)
+        current = self.get(order_id)
+        if current.status == "completed":
+            return current
+        raise RuntimeError("only the claiming Agent executor can complete a WorkOrder")
 
     def complete_with_evidence(self, order_id: str, result: dict, *, executor_id: str,
                                kind: str, payload: dict,
@@ -136,7 +158,8 @@ class WorkOrderRepository:
                 "SELECT * FROM core_work_orders WHERE id=?", (order_id,)).fetchone()
             if row is None:
                 raise KeyError(f"unknown work order: {order_id}")
-            if row["status"] != "claimed" or row["claimed_by"] != executor_id:
+            if (row["status"] != "claimed"
+                    or executor_identity(row["claimed_by"] or "") != executor_identity(executor_id)):
                 raise RuntimeError("only the claiming Agent executor can complete a WorkOrder")
             required_kinds = set(json.loads(row["brief_json"]).get("evidence_kinds") or ())
             supplied_kinds = {item_kind for item_kind, _ in items}
@@ -188,12 +211,15 @@ class WorkOrderRepository:
 
     def fail(self, order_id: str, error: str, *, executor_id: str) -> WorkOrder:
         with self.database.connect() as connection:
-            changed = connection.execute("""UPDATE core_work_orders
-                SET status='failed',result_json=?,updated_at=?
-                WHERE id=? AND status='claimed' AND claimed_by=?""",
-                (json.dumps({"error": error}), _now(), order_id, executor_id)).rowcount
-        if changed != 1:
-            raise RuntimeError("only the claiming Agent executor can fail a WorkOrder")
+            row = connection.execute(
+                "SELECT status,claimed_by FROM core_work_orders WHERE id=?",
+                (order_id,)).fetchone()
+            if (row is None or row["status"] != "claimed"
+                    or executor_identity(row["claimed_by"] or "") != executor_identity(executor_id)):
+                raise RuntimeError("only the claiming Agent executor can fail a WorkOrder")
+            connection.execute("""UPDATE core_work_orders
+                SET status='failed',result_json=?,updated_at=? WHERE id=?""",
+                (json.dumps({"error": error}), _now(), order_id))
         return self.get(order_id)
 
     def for_workflow_run(self, workflow_run_id: str) -> list[WorkOrder]:

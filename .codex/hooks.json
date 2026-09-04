@@ -2,13 +2,13 @@
   "hooks": {
     "SessionStart": [
       {
-        "matcher": "startup|resume|clear|compact",
+        "matcher": "compact",
         "hooks": [
           {
             "type": "command",
-            "command": "/usr/bin/python3 .codex/hooks/spielos-context.py",
+            "command": "python3 .codex/hooks/spielos-context.py",
             "timeout": 10,
-            "statusMessage": "Loading SpielOS company context"
+            "statusMessage": "Restoring SpielOS company context"
           }
         ]
       }
@@ -18,7 +18,18 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/usr/bin/python3 .codex/hooks/spielos-context.py",
+            "command": "python3 .codex/hooks/spielos-context.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .codex/hooks/spielos-attention.py",
             "timeout": 10
           }
         ]

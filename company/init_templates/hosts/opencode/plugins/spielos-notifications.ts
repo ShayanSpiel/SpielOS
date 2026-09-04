@@ -1,52 +1,115 @@
-// SpielOS OpenCode adapter for the stable 1.x plugin contract.
+// SpielOS OpenCode adapter — one plugin file for every host generation.
 //
-// Every model request receives one bounded, read-only company projection. On
-// session idle, pending runtime attention is surfaced as synthetic messages.
+// Contract resilience, on purpose (host versions must never matter to the
+// owner):
+//
+// - OpenCode V2 validates `default` as an object with `id` plus a `setup`
+//   (or `effect`) function — that shape is what we export.
+// - Older 1.x hosts auto-load local plugins and call every exported
+//   function; the named export keeps legacy
+//   `experimental.chat.system.transform` sessions working, and the default
+//   object also exposes setup for hosts that read `mod.default`.
+// - A server may be started from a different folder than the session it
+//   serves: never trust `ctx.location.directory` alone. Resolve the home
+//   per request from the session directory, then `.agents/company`, then
+//   a flat source checkout (`company/`), then the plugin's own home.
+//   This file has zero imports on purpose: a fresh home has no node_modules.
 
-import type { Plugin } from "@opencode-ai/plugin"
-
-type Notification = {
-  id: string
-  kind: string
-  goal_id: string
-  run_id?: string
-  payload?: Record<string, any>
-}
+type Any = Record<string, any>
 
 // The clean core parks live actions as one kind of owner attention.
-const REPORTABLE = new Set([
-  "owner_input_required",
-])
+const REPORTABLE = new Set(["owner_input_required"])
 
-const companyRunner = (directory: string) => async (args: string[]): Promise<any> => {
-  const vendoredPythonPath = `${directory}/.agents`
-  const pythonPath = process.env.PYTHONPATH
-    ? `${vendoredPythonPath}:${process.env.PYTHONPATH}`
-    : vendoredPythonPath
-  const child = Bun.spawn({
-    cmd: ["python3", "-B", "-m", "company", ...args],
-    cwd: directory,
-    stdout: "pipe",
-    stderr: "pipe",
-    env: {
-      ...process.env,
-      PYTHONDONTWRITEBYTECODE: "1",
-      PYTHONPATH: pythonPath,
-    },
-  })
-  const [code, stdout, stderr] = await Promise.all([
-    child.exited,
-    new Response(child.stdout).text(),
-    new Response(child.stderr).text(),
-  ])
-  if (code !== 0) {
-    const detail = stderr.trim().split("\n").at(-1) || `exit ${code}`
-    throw new Error(`company command failed: ${detail}`)
-  }
-  return JSON.parse(stdout)
+const homeAt = (directory: string): Promise<boolean> => {
+  if (typeof directory !== "string" || !directory) return Promise.resolve(false)
+  return Promise.all([
+    Bun.file(`${directory}/.agents/company/__main__.py`).exists(),
+    Bun.file(`${directory}/company/__main__.py`).exists(),
+  ]).then(([vendored, flat]) => vendored || flat).catch(() => false)
 }
 
-const formatNotification = (item: Notification): string => {
+// Candidate homes for one request, most specific first.
+const homeCandidates = (
+  sessionDirectory: string | undefined,
+  pluginHome: string,
+): string[] => {
+  const out: string[] = []
+  const push = (value: string | undefined) => {
+    if (typeof value === "string" && value.trim() && !out.includes(value)) {
+      out.push(value)
+    }
+  }
+  push(sessionDirectory)
+  push(pluginHome)
+  push(process.env.SPIELOS_HOME)
+  push(process.cwd())
+  return out
+}
+
+const companyRunner = (
+  sessionDirectoryOf: () => string | undefined,
+  pluginHome: string,
+) => {
+  const runners = new Map<string, (args: string[]) => Promise<Any> | null>()
+
+  const runnerFor = async (
+    home: string,
+  ): Promise<(args: string[]) => Promise<Any> | null> => {
+    const cached = runners.get(home)
+    if (cached !== undefined) return cached
+    if (!(await homeAt(home))) {
+      runners.set(home, null)
+      return null
+    }
+    const vendored = `${home}/.agents`
+    const pythonPath = process.env.PYTHONPATH
+      ? `${vendored}:${process.env.PYTHONPATH}`
+      : vendored
+    const run = async (args: string[]): Promise<Any> => {
+      const child = Bun.spawn({
+        cmd: ["python3", "-B", "-m", "company", ...args],
+        cwd: home,
+        stdout: "pipe",
+        stderr: "pipe",
+        env: {
+          ...process.env,
+          PYTHONDONTWRITEBYTECODE: "1",
+          PYTHONPATH: pythonPath,
+        },
+      })
+      const [code, stdout, stderr] = await Promise.all([
+        child.exited,
+        new Response(child.stdout).text(),
+        new Response(child.stderr).text(),
+      ])
+      if (code !== 0) {
+        const detail = stderr.trim().split("\n").at(-1) || `exit ${code}`
+        throw new Error(`company command failed: ${detail}`)
+      }
+      return JSON.parse(stdout)
+    }
+    runners.set(home, run)
+    return run
+  }
+
+  const resolve = async (): Promise<
+    ((args: string[]) => Promise<Any>) | null
+  > => {
+    for (const candidate of homeCandidates(sessionDirectoryOf(), pluginHome)) {
+      const run = await runnerFor(candidate)
+      if (run) return run
+    }
+    return null
+  }
+
+  return async (args: string[]): Promise<Any> => {
+    const run = await resolve()
+    if (!run) throw new Error("no SpielOS home found for this session")
+    return run(args)
+  }
+}
+
+const formatNotification = (item: Any): string => {
   const payload = item.payload || {}
   const lines = [
     `SpielOS attention · ${item.kind}`,
@@ -58,67 +121,193 @@ const formatNotification = (item: Notification): string => {
   return lines.join("\n")
 }
 
-const surfacePending = async (
-  client: any,
-  directory: string,
-  sessionID: string,
-  runCompany: (args: string[]) => Promise<any>,
-) => {
-  const rows = await runCompany([
-    "notifications", "list", "--status", "pending", "--limit", "20", "--json",
-  ]) as Notification[]
-  const reportable = rows.filter((row) => REPORTABLE.has(row.kind))
-  if (reportable.length) {
-    const text = reportable.map(formatNotification).join("\n\n")
-    await client.session.prompt({
-      path: { id: sessionID },
-      query: { directory },
-      body: {
-        noReply: true,
-        parts: [{ type: "text", text, synthetic: true }],
-      },
-    })
-  }
-  for (const item of reportable) {
-    await runCompany(["notifications", "ack", item.id, "--json"])
-  }
+const CONTEXT_FAILURE_NOTICE =
+  "SpielOS context unavailable for this request. Do not search the repository " +
+  "or guess company state. Run the read-only command " +
+  "`PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.agents python3 -B -m company status` " +
+  "once, tell the owner that host context injection failed, and report this " +
+  "diagnostic"
+
+const pushSystem = (system: Any[], text: string): void => {
+  // The system parts are strings in some builds and objects in others; push
+  // the shape the existing entries already use.
+  const sample = system.find((part) => typeof part !== "undefined")
+  if (typeof sample === "string") system.push(text)
+  else system.push({ type: "text", text })
 }
 
-export const SpielOSContext: Plugin = async ({ client, directory }) => {
-  const runCompany = companyRunner(directory)
-  const prompts = new Map<string, string>()
-  return {
-    "chat.message": async (input, output) => {
-      prompts.set(input.sessionID, output.parts
-        .filter((part) => part.type === "text")
-        .map((part) => "text" in part ? part.text : "")
-        .join("\n"))
-    },
-    "experimental.chat.system.transform": async (input, output) => {
-      const sessionID = input.sessionID || ""
+// Directory of the session a request belongs to, when the host exposes it.
+const sessionDirectoryFrom = (event: Any): string | undefined =>
+  event?.directory
+  ?? event?.location?.directory
+  ?? event?.session?.directory
+  ?? event?.properties?.directory
+  ?? event?.properties?.info?.directory
+  ?? undefined
+
+const setup = async (ctx: Any): Promise<(() => void) | undefined> => {
+  // The plugin ships at <home>/.opencode/plugins/, so its own folder names
+  // the home even when the server was started somewhere else.
+  const pluginDirectory: string =
+    (typeof import.meta.dir === "string" && import.meta.dir)
+    || ctx?.location?.directory
+    || process.cwd()
+  const pluginHome = pluginDirectory
+    .replace(/\/\.opencode\/plugins\/?$/, "")
+    .replace(/\/\.opencode\/?$/, "")
+
+  let currentSessionDirectory: string | undefined
+  const rememberSession = (value: string | undefined): void => {
+    if (typeof value === "string" && value.trim()) {
+      currentSessionDirectory = value
+    }
+  }
+  const runCompany = companyRunner(() => currentSessionDirectory, pluginHome)
+
+  const refreshSessionDirectory = async (sessionID: string): Promise<void> => {
+    try {
+      const session = await ctx?.session?.get?.({ path: { id: sessionID } })
+      rememberSession(
+        session?.data?.directory ?? session?.directory ?? undefined,
+      )
+    } catch {
+      // Directory resolution is best effort; candidates still cover it.
+    }
+  }
+
+  // ---- V2: inject the read-only projection on every model request -------
+  try {
+    await ctx.session.hook("context", async (event: Any) => {
+      const system = event?.system
+      if (!Array.isArray(system)) return
+      rememberSession(sessionDirectoryFrom(event))
       try {
         const projection = await runCompany([
-          "context", "--prompt", prompts.get(sessionID) || "",
-          "--owner", "director", "--json",
-        ]) as { context?: string }
-        if (!projection.context) throw new Error("empty context projection")
-        output.system.push(projection.context)
+          "context", "--owner", "director", "--json",
+        ])
+        if (typeof projection?.context !== "string" || !projection.context) {
+          throw new Error("empty context projection")
+        }
+        pushSystem(system, projection.context)
       } catch (error) {
         const detail = error instanceof Error ? error.message : "unknown host error"
-        output.system.push(
-          "SpielOS context unavailable for this request. Do not search the repository " +
-          "or guess company state. Tell the owner that host context injection failed " +
-          `and report this diagnostic: ${detail}`,
-        )
+        pushSystem(system, `${CONTEXT_FAILURE_NOTICE}: ${detail}`)
       }
-    },
-    event: async ({ event }) => {
-      if (event.type !== "session.idle") return
+    })
+  } catch (error) {
+    console.error("[spielos] context hook unavailable", error)
+  }
+
+  // ---- Idle: surface pending attention, ack only after delivery ---------
+  const controller = new AbortController()
+  void (async () => {
+    try {
+      for await (const event of ctx.event.subscribe({
+        signal: controller.signal,
+      }) as Any) {
+        if (event?.type !== "session.idle") continue
+        const sessionID =
+          event?.properties?.sessionID ?? event?.properties?.id
+        if (!sessionID) continue
+        rememberSession(sessionDirectoryFrom(event))
+        await refreshSessionDirectory(sessionID)
+        try {
+          const rows = (await runCompany([
+            "notifications", "list", "--status", "pending",
+            "--limit", "20", "--json",
+          ])) as Any[]
+          for (const item of rows.filter((row) => REPORTABLE.has(row.kind))) {
+            try {
+              await ctx.session.synthetic({
+                sessionID,
+                text: formatNotification(item),
+              })
+            } catch {
+              break // delivery failed: leave it pending for the next idle
+            }
+            await runCompany(["notifications", "ack", item.id, "--json"])
+          }
+        } catch {
+          // Persistence is the fallback. Failed delivery remains pending.
+        }
+      }
+    } catch {
+      // stream aborted during shutdown; nothing to clean up
+    }
+  })()
+  return () => controller.abort()
+}
+
+// 1.x hosts auto-load local plugins and call every exported function as a
+// plugin factory; this factory registers the same projection through the
+// legacy hook surface so old sessions keep their company state.
+const SpielOSContext = async (input: Any): Promise<Any> => {
+  const directory: string = input?.directory || pluginDirectoryFallback()
+  const runCompany = companyRunner(() => directory, directory)
+  const hooks: Any = {}
+  try {
+    hooks["experimental.chat.system.transform"] =
+      async (_input: Any, output: Any) => {
+        const system = output?.system
+        if (!Array.isArray(system)) return
+        try {
+          const projection = await runCompany([
+            "context", "--owner", "director", "--json",
+          ])
+          if (typeof projection?.context !== "string" || !projection.context) {
+            throw new Error("empty context projection")
+          }
+          system.push(projection.context)
+        } catch (error) {
+          const detail =
+            error instanceof Error ? error.message : "unknown host error"
+          system.push(`${CONTEXT_FAILURE_NOTICE}: ${detail}`)
+        }
+      }
+    hooks["event"] = async ({ event }: Any) => {
+      if (event?.type !== "session.idle") return
+      const sessionID = event?.properties?.sessionID
+      if (!sessionID) return
       try {
-        await surfacePending(client, directory, event.properties.sessionID, runCompany)
+        const client = input?.client
+        const rows = (await runCompany([
+          "notifications", "list", "--status", "pending",
+          "--limit", "20", "--json",
+        ])) as Any[]
+        for (const item of rows.filter((row) => REPORTABLE.has(row.kind))) {
+          const text = formatNotification(item)
+          try {
+            await client?.session?.prompt?.({
+              path: { id: sessionID },
+              query: { directory },
+              body: {
+                noReply: true,
+                parts: [{ type: "text", text, synthetic: true }],
+              },
+            })
+          } catch {
+            break
+          }
+          await runCompany(["notifications", "ack", item.id, "--json"])
+        }
       } catch {
         // Persistence is the fallback. Failed delivery remains pending.
       }
-    },
+    }
+  } catch {
+    // Register nothing rather than break a legacy session.
   }
+  return hooks
 }
+
+function pluginDirectoryFallback(): string {
+  return typeof import.meta.dir === "string" ? import.meta.dir : process.cwd()
+}
+
+// Default export satisfies the V2 schema (id + setup). The named export
+// keeps 1.x hosts loading, and hosts that call `mod.default` as a factory
+// find a function-shaped compatibility view via SpielOSContext.
+const plugin = { id: "spielos-notifications", setup }
+
+export default plugin
+export { SpielOSContext, setup }

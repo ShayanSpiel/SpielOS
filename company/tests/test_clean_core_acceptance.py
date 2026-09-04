@@ -33,7 +33,7 @@ class FreshHomeAcceptanceTests(unittest.TestCase):
             environment = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1",
                            "PYTHONPATH": str(home / ".agents")}
             commands = [(), ("status",), ("overview",), ("context",),
-                        ("memory", "summary"), ("profile", "list"),
+                        ("layout",), ("memory", "summary"), ("profile", "list"),
                         ("runner", "tick")]
             for command in commands:
                 result = subprocess.run(

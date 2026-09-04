@@ -24,6 +24,15 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+# After this many consecutive ESCALATE_TO_GOAL outcomes the goal parks for
+# the owner instead of churning another run (a deterministic controller
+# that re-decides the same failing intervention would otherwise livelock).
+ESCALATION_PARK_THRESHOLD = 3
+ESCALATION_PARK_MESSAGE = (
+    "goal-level decision keeps failing after repeated escalations; "
+    "owner input required")
+
+
 class GoalStage(str, Enum):
     OBSERVE = "OBSERVE"
     DECIDE = "DECIDE"
@@ -255,16 +264,40 @@ class GoalRuntime:
                 (intervention_status, result.outcome.value, json.dumps(context), stamp,
                  result.intervention.id))
             if result.outcome == ResolutionOutcome.ESCALATE_TO_GOAL:
-                evaluation = Evaluation(False, {}, result.message)
-                connection.execute("""UPDATE core_runs SET status='complete',
-                    evaluation_json=?,updated_at=? WHERE id=?""",
-                    (json.dumps(evaluation.__dict__), stamp, run.id))
-                sequence = connection.execute(
-                    "SELECT COALESCE(MAX(sequence),0)+1 FROM core_runs WHERE goal_id=?",
-                    (goal.id,)).fetchone()[0]
-                connection.execute("INSERT INTO core_runs VALUES (?,?,?,?,?,?,?,?,?,?)",
-                    (f"run-{uuid.uuid4().hex[:12]}", goal.id, sequence,
-                     GoalStage.OBSERVE.value, "ready", None, None, None, stamp, stamp))
+                consecutive = self._consecutive_escalations(
+                    connection, goal.id, run.sequence) + 1
+                if consecutive >= ESCALATION_PARK_THRESHOLD:
+                    # Stop the churn: park the run in the ASK_USER shape
+                    # (run waiting, no follow-up run) until the owner
+                    # answers, instead of opening a fresh run that a
+                    # deterministic controller would fail the same way.
+                    connection.execute("""UPDATE core_interventions
+                        SET status='waiting',context_json=?,updated_at=? WHERE id=?""",
+                        (json.dumps(context), stamp, result.intervention.id))
+                    connection.execute("""UPDATE core_runs SET status='waiting',
+                        updated_at=? WHERE id=?""", (stamp, run.id))
+                    connection.execute("""INSERT INTO core_notifications
+                        (id,goal_id,run_id,intervention_id,kind,payload_json,status,
+                         created_at,acknowledged_at) VALUES (?,?,?,?,?,?,?,?,NULL)
+                        ON CONFLICT(intervention_id,kind) DO UPDATE SET
+                          payload_json=excluded.payload_json,status='pending',
+                          acknowledged_at=NULL""",
+                        (f"notification-{uuid.uuid4().hex[:12]}", goal.id, run.id,
+                         result.intervention.id, "owner_input_required",
+                         json.dumps({"message": ESCALATION_PARK_MESSAGE,
+                                     "required_user_action": ESCALATION_PARK_MESSAGE}),
+                         "pending", stamp))
+                else:
+                    evaluation = Evaluation(False, {}, result.message)
+                    connection.execute("""UPDATE core_runs SET status='complete',
+                        evaluation_json=?,updated_at=? WHERE id=?""",
+                        (json.dumps(evaluation.__dict__), stamp, run.id))
+                    sequence = connection.execute(
+                        "SELECT COALESCE(MAX(sequence),0)+1 FROM core_runs WHERE goal_id=?",
+                        (goal.id,)).fetchone()[0]
+                    connection.execute("INSERT INTO core_runs VALUES (?,?,?,?,?,?,?,?,?,?)",
+                        (f"run-{uuid.uuid4().hex[:12]}", goal.id, sequence,
+                         GoalStage.OBSERVE.value, "ready", None, None, None, stamp, stamp))
             else:
                 connection.execute("""UPDATE core_runs SET stage=?,status=?,updated_at=?
                     WHERE id=?""", (stage.value, run_status, stamp, run.id))
@@ -280,6 +313,27 @@ class GoalRuntime:
                      json.dumps({"message": result.message,
                                  "required_user_action": result.message}),
                      "pending", stamp))
+
+    @staticmethod
+    def _consecutive_escalations(connection, goal_id: str, sequence: int) -> int:
+        """Count consecutive earlier runs of this goal that ended escalated.
+
+        An escalated run is terminal in ACT (stage never reaches
+        EVALUATE): stage='ACT' AND status='complete'. Any run that ended
+        another way — an evaluated completion (stage EVALUATE) or a park
+        for the owner (status waiting) — breaks the streak, so only
+        back-to-back ESCALATE_TO_GOAL completions accumulate.
+        """
+        rows = connection.execute("""SELECT stage,status FROM core_runs
+            WHERE goal_id=? AND sequence<? ORDER BY sequence DESC""",
+            (goal_id, sequence)).fetchall()
+        streak = 0
+        for row in rows:
+            if row["stage"] == "ACT" and row["status"] == "complete":
+                streak += 1
+            else:
+                break
+        return streak
 
     def _commit_evaluation(self, goal: Goal, run: GoalRun,
                            evaluation: Evaluation) -> None:

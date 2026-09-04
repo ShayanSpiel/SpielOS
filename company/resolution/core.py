@@ -103,6 +103,13 @@ class ApprovalRepository:
         self.database = database
 
     def status(self, run_id: str, key: str, *, intervention_id: str | None = None) -> str | None:
+        """Approval state for one key.
+
+        An intervention-scoped lookup that finds nothing falls back to a
+        run-scoped grant (intervention_id NULL, the ``core_run_approval_key``
+        index): ``approve --scope run`` satisfies every later intervention
+        of the same run. A new run never inherits a grant.
+        """
         with self.database.connect() as connection:
             if intervention_id is None:
                 row = connection.execute("""SELECT status FROM core_approvals
@@ -112,6 +119,10 @@ class ApprovalRepository:
                 row = connection.execute("""SELECT status FROM core_approvals
                     WHERE run_id=? AND key=? AND intervention_id=?""",
                     (run_id, key, intervention_id)).fetchone()
+                if row is None:
+                    row = connection.execute("""SELECT status FROM core_approvals
+                        WHERE run_id=? AND key=? AND intervention_id IS NULL""",
+                        (run_id, key)).fetchone()
         return None if row is None else row[0]
 
     def grant(self, *, goal_id: str, run_id: str, key: str,
@@ -175,6 +186,14 @@ class ResolutionCycle:
                 return self._finish(intervention, ResolutionOutcome.ASK_USER,
                                     f"approval required: {missing_approvals[0]}")
 
+            # An approval-only step (declares approval keys, produces no
+            # evidence) is a gate, not work: once its keys are granted,
+            # advance the workflow instead of parking a work order for it.
+            if step.approval_keys and not step.evidence_kinds:
+                self.workflows.set_status(workflow_run.id, "running")
+                self.workflows.advance(workflow_run.id)
+                continue
+
             prior = self.work_orders.for_workflow_run(workflow_run.id)
             completed = [item for item in prior
                          if item.step_id == step.id and item.status == "completed"]
@@ -194,7 +213,11 @@ class ResolutionCycle:
                        "connection_ids": list(step.connection_ids),
                        "requirements": dict(step.requirements)})
             if order.status == "open":
-                order = self.work_orders.claim(order.id, f"executor:{step.agent_id}")
+                # Claim with the bare agent id: the documented host flow
+                # (`tasks <id> --complete <agent_id>`) and the notification
+                # text both name the agent, so the order must be claimable
+                # under that identity.
+                order = self.work_orders.claim(order.id, step.agent_id)
             agent = self.agents.get(step.agent_id, Agent(step.agent_id))
             result = self.executor.execute(agent, order)
             if result.status == "completed":
@@ -260,7 +283,7 @@ class ResolutionCycle:
                                          "evidence_kind": intervention.context.get(
                                              "evidence_kind", "intervention_result")})
             if order.status == "open":
-                order = self.work_orders.claim(order.id, f"executor:{agent_id}")
+                order = self.work_orders.claim(order.id, agent_id)
             result = self.executor.execute(self.agents.get(agent_id, Agent(agent_id)), order)
             if result.status == "completed":
                 evidence = tuple(result.evidence) or (AgentEvidence(

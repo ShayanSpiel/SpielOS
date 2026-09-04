@@ -37,6 +37,8 @@ def build_parser():
         item = commands.add_parser(name)
         if name == "status": item.add_argument("goal_id", nargs="?")
         item.add_argument("--json", action="store_true")
+    layout = commands.add_parser("layout", help="audit the canonical home layout")
+    layout.add_argument("--json", action="store_true")
     update = commands.add_parser("update", help="refresh the vendored home in place")
     update.add_argument("--dir", default=".")
     update.add_argument("--json", action="store_true")
@@ -48,6 +50,14 @@ def build_parser():
     memory_commands = memory.add_subparsers(dest="memory_command", required=True)
     for name in ("summary", "owner", "workflows", "strategy"):
         memory_commands.add_parser(name).add_argument("--json", action="store_true")
+    memory_add = memory_commands.add_parser("add")
+    memory_add.add_argument("--scope", required=True, choices=("workflow", "strategy"))
+    memory_add.add_argument("--claim", required=True)
+    memory_add.add_argument("--evidence", action="append", default=[],
+                            help="evidence id; repeatable (required, must share lineage)")
+    memory_add.add_argument("--goal"); memory_add.add_argument("--run")
+    memory_add.add_argument("--intervention"); memory_add.add_argument("--workflow")
+    memory_add.add_argument("--json", action="store_true")
     profile = commands.add_parser("profile")
     profile_commands = profile.add_subparsers(dest="profile_command", required=True)
     profile_commands.add_parser("list").add_argument("--json", action="store_true")
@@ -71,7 +81,7 @@ def build_parser():
     add = evidence_commands.add_parser("add")
     add.add_argument("goal_id"); add.add_argument("--kind", required=True); add.add_argument("--source", required=True)
     add.add_argument("--payload", default="{}"); add.add_argument("--validity"); add.add_argument("--json", action="store_true")
-    approve = commands.add_parser("approve"); approve.add_argument("goal_id"); approve.add_argument("--note", default=""); approve.add_argument("--key", action="append", default=[]); approve.add_argument("--json", action="store_true")
+    approve = commands.add_parser("approve"); approve.add_argument("goal_id"); approve.add_argument("--note", default=""); approve.add_argument("--key", action="append", default=[]); approve.add_argument("--scope", default="step", choices=("step", "run")); approve.add_argument("--json", action="store_true")
     notifications = commands.add_parser("notifications")
     notification_commands = notifications.add_subparsers(dest="notification_command", required=True)
     notification_list = notification_commands.add_parser("list")
@@ -81,7 +91,9 @@ def build_parser():
     tasks = commands.add_parser("tasks")
     tasks.add_argument("work_order_id", nargs="?"); tasks.add_argument("--status", default="active", choices=("active", "open", "claimed"))
     tasks.add_argument("--goal"); tasks.add_argument("--limit", type=int, default=50); tasks.add_argument("--claim"); tasks.add_argument("--complete")
-    tasks.add_argument("--evidence", default="[]"); tasks.add_argument("--json", action="store_true")
+    tasks.add_argument("--evidence", default="[]")
+    tasks.add_argument("--learning", help="workflow memory claim grounded in the completion evidence")
+    tasks.add_argument("--json", action="store_true")
     runner = commands.add_parser("runner")
     runner_commands = runner.add_subparsers(dest="runner_command", required=True)
     tick = runner_commands.add_parser("tick"); tick.add_argument("--max-advances", type=int, default=100); tick.add_argument("--json", action="store_true")
@@ -118,19 +130,24 @@ def main(argv=None):
             return run_init(dir=args.dir, force=args.force, assume_yes=args.yes, as_json=args.json)
         if args.command == "update":
             # Home lifecycle: refresh the vendored spine from the installed
-            # distribution's templates. State (.spielos/) and the user
-            # Department/Agent layers are always preserved.
+            # distribution's templates. State (.spielos/), owner config,
+            # and every user layer are always preserved.
             from .runtime.onboard import run_update
             return run_update(dir=args.dir, as_json=args.json)
         if args.command in {"catalog", "departments"}:
             from .runtime.registry import departments
             output = [{"id": item.id, "version": item.version, "workflows": [flow.id for flow in item.workflows]} for item in departments().values()]
+        elif args.command == "layout":
+            from .layout import audit
+            output = audit(PROJECT_ROOT)
         elif args.command == "runner" and args.runner_command in {"start", "stop", "status", "enable"}:
             service = RunnerService(PROJECT_ROOT, Path(args.db))
             output = service.start(args.interval) if args.runner_command == "start" else getattr(service, args.runner_command)()
         else:
-            readonly = (args.command in {"status", "overview", "context", "memory",
-                                         "catalog", "departments"}
+            readonly = (args.command in {"status", "overview", "context",
+                                         "catalog", "departments", "layout"}
+                        or (args.command == "memory"
+                            and args.memory_command != "add")
                         or (args.command == "profile"
                             and args.profile_command == "list")
                         or (args.command == "notifications"
@@ -140,8 +157,15 @@ def main(argv=None):
             elif args.command == "overview": output = runtime.company_snapshot()
             elif args.command == "context": output = runtime.assemble_context(prompt=args.prompt, owner_id=args.owner, workflow_id=args.workflow, token_budget=args.token_budget)
             elif args.command == "memory":
-                summary = runtime.clean_memory_summary()
-                output = summary if args.memory_command == "summary" else summary["durable_memory"][args.memory_command.rstrip("s")]
+                if args.memory_command == "add":
+                    output = runtime.add_memory(
+                        args.scope, args.claim, evidence_ids=args.evidence,
+                        goal_id=args.goal, run_id=args.run,
+                        intervention_id=args.intervention,
+                        workflow_id=args.workflow)
+                else:
+                    summary = runtime.clean_memory_summary()
+                    output = summary if args.memory_command == "summary" else summary["durable_memory"][args.memory_command.rstrip("s")]
             elif args.command == "profile": output = runtime.owner_memory() if args.profile_command == "list" else runtime.set_profile_claim(namespace=args.namespace, claim_key=args.key, value=_json(args.value))
             elif args.command == "goal":
                 if args.goal_command == "create":
@@ -157,7 +181,7 @@ def main(argv=None):
                 payload = _json(args.payload)
                 if not isinstance(payload, dict): raise ValueError("--payload must be a JSON object")
                 output = runtime.add_evidence(args.goal_id, kind=args.kind, source=args.source, payload=payload, validity=args.validity)
-            elif args.command == "approve": output = runtime.approve(args.goal_id, args.note, args.key)
+            elif args.command == "approve": output = runtime.approve(args.goal_id, args.note, args.key, scope=args.scope)
             elif args.command == "notifications":
                 if args.notification_command == "list":
                     output = runtime.notifications(
@@ -166,7 +190,7 @@ def main(argv=None):
                     output = runtime.acknowledge_notification(args.notification_id)
             elif args.command == "tasks":
                 if args.claim: output = runtime.claim_work_order(args.work_order_id, args.claim)
-                elif args.complete: output = runtime.complete_work_order(args.work_order_id, args.complete, _json(args.evidence))
+                elif args.complete: output = runtime.complete_work_order(args.work_order_id, args.complete, _json(args.evidence), learning=args.learning)
                 else: output = runtime.work_order(args.work_order_id) if args.work_order_id else runtime.work_orders(args.status, args.goal, args.limit)
             elif args.command == "runner":
                 if args.runner_command == "tick": output = runtime.tick(args.max_advances)

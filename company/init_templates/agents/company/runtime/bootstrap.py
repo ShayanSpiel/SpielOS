@@ -27,7 +27,101 @@ import json
 import shutil
 from pathlib import Path
 
+from .config import VERSION
 from .paths import package_vendored_root, validate_home_destination
+
+# Owner-created content that `spielos update` must never touch, per tree
+# (relative paths inside that tree). Everything the release ships is
+# vendored: it is tracked in .spielos/vendored.json, refreshed on update,
+# and pruned when a newer release stops shipping it.
+USER_LAYER_PREFIXES = {
+    "agents": (
+        "company/departments/",
+        "company/skills/",
+        "company/capabilities/",
+        "company/connections/",
+        "company/strategy/",
+        "company/agents/installed/",
+    ),
+    "opencode": (
+        "agents/", "commands/", "plugins/", "skills/",
+        "package.json", "package-lock.json", "opencode.json", "opencode.jsonc",
+    ),
+    "codex": ("agents/", "hooks/", "config.toml"),
+}
+
+VENDORED_MANIFEST = Path(".spielos") / "vendored.json"
+
+
+def _template_files(src: Path) -> list[str]:
+    files: list[str] = []
+    for path in sorted(src.rglob("*")):
+        if path.is_file() and "__pycache__" not in path.parts \
+                and path.suffix != ".pyc":
+            files.append(path.relative_to(src).as_posix())
+    return files
+
+
+def _load_manifest(root: Path) -> dict[str, list[str]] | None:
+    """Vendored file list written by the previous init/update, if any."""
+    manifest = root / VENDORED_MANIFEST
+    if not manifest.is_file():
+        return None
+    try:
+        data = json.loads(manifest.read_text())
+        files = data.get("files") if isinstance(data, dict) else None
+        if not isinstance(files, dict):
+            return None
+        return {str(tree): [str(item) for item in items or []]
+                for tree, items in files.items() if isinstance(items, list)}
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
+def _write_manifest(root: Path, entries: dict[str, list[str]]) -> None:
+    path = root / VENDORED_MANIFEST
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {"schema": 1, "spielos": VERSION, "files": entries}
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+
+
+def _canonical_opencode_json() -> dict:
+    # Plugins under .opencode/plugins/ are auto-discovered by the host; the
+    # loader rejects file-path entries in the "plugin"/"plugins" keys.
+    return {"$schema": "https://opencode.ai/config.json",
+            "default_agent": "director"}
+
+
+def _merge_opencode_json(path: Path) -> list[str]:
+    """Targeted fix-up of owner configuration; never clobber other keys."""
+    try:
+        config = json.loads(path.read_text())
+        if not isinstance(config, dict):
+            config = {}
+    except (json.JSONDecodeError, OSError):
+        config = {}
+    changed: list[str] = []
+    if "default_agent" not in config:
+        config["default_agent"] = "director"
+        changed.append("default_agent")
+    for key in ("plugin", "plugins"):
+        entries = config.get(key)
+        if not isinstance(entries, list):
+            continue
+        kept = [item for item in entries
+                if not (isinstance(item, str)
+                        and item.strip().replace("./", "", 1)
+                        .startswith(".opencode/"))]
+        if kept != entries:
+            if kept:
+                config[key] = kept
+            else:
+                config.pop(key, None)
+            changed.append(key)
+    if changed:
+        path.write_text(json.dumps(config, indent=2) + "\n")
+        return [f"{path} ({', '.join(sorted(set(changed)))})"]
+    return []
 
 
 def _spielos_launcher_venv() -> Path | None:
@@ -235,37 +329,62 @@ def scaffold(target: Path | None = None, *, force: bool = False,
             "this folder already has a SpielOS home (.agents/company); "
             "re-run with --force to overwrite")
 
-    preserved_user_prefixes = (
-        "company/departments/",
-        "company/agents/installed/",
-    ) if existing_home else ()
+    manifest = _load_manifest(root) if existing_home else None
 
-    def preserve_user_layer(rel: str) -> bool:
-        return any(rel.startswith(prefix) for prefix in preserved_user_prefixes)
+    def layer_guard(tree: str):
+        """True for owner-created files in preserved layers (never vendored)."""
+        prefixes = USER_LAYER_PREFIXES.get(tree, ())
+        tracked = set(manifest.get(tree, ())) if manifest is not None else None
+
+        def is_user(rel: str) -> bool:
+            if not any(rel.startswith(prefix) for prefix in prefixes):
+                return False
+            if tracked is None:
+                # A pre-manifest home cannot distinguish user files from old
+                # vendored residue; every user-layer file is preserved.
+                return True
+            return rel not in tracked
+
+        return is_user
+
+    def vendored_entries() -> dict[str, list[str]]:
+        entries = {"agents": _template_files(templates / "agents")}
+        for name in ("opencode", "codex"):
+            source = templates / "hosts" / name
+            entries[name] = _template_files(source) if source.is_dir() else []
+        return entries
 
     notify("Vendoring harness spine")
     if existing_home and force:
         # An update removes stale vendored files so the spine matches a
-        # fresh init exactly; the preserved user layers are skipped.
+        # fresh init exactly; owner-created files in the user layers are
+        # skipped, as is anything the current release still ships.
         removed = _prune_stale(templates / "agents", root / ".agents",
-                               skip=preserve_user_layer)
+                                skip=layer_guard("agents"))
         written.extend(f"removed {item}" for item in removed)
     written += _copy_tree(templates / "agents", root / ".agents",
-                          overwrite=force, skip=preserve_user_layer)
+                          overwrite=force)
     notify("Installing host adapters (OpenCode, Codex)")
     # Host adapters.
     for name in ("opencode", "codex"):
         src = templates / "hosts" / name
-        if src.is_dir():
-            if existing_home and force:
-                written.extend(f"removed {item}" for item in _prune_stale(
-                    src, root / ("." + name)))
-            written += _copy_tree(src, root / ("." + name), overwrite=force)
+        if not src.is_dir():
+            continue
+        if existing_home and force:
+            written.extend(f"removed {item}" for item in _prune_stale(
+                src, root / ("." + name), skip=layer_guard(name)))
+        written += _copy_tree(src, root / ("." + name), overwrite=force)
 
     # Private state/data/artifact trees (empty on purpose).
     notify("Creating private state tree (.spielos)")
     for rel in (".spielos/state", ".spielos/data", ".spielos/artifacts"):
         (root / rel).mkdir(parents=True, exist_ok=True)
+
+    # Record exactly what this release vendored, so the next update can
+    # tell owner-created files from stale vendored residue.
+    notify("Recording vendored manifest")
+    _write_manifest(root, vendored_entries())
+    written.append(str(root / VENDORED_MANIFEST))
 
     # Credential contract example.
     notify("Writing credential contract")
@@ -276,21 +395,27 @@ def scaffold(target: Path | None = None, *, force: bool = False,
             shutil.copy2(env_example, dest)
             written.append(str(dest))
 
-    # Host config: generic, no analytics/provider keys baked in.
+    # Host config: generic, no analytics/provider keys baked in. Existing
+    # owner configuration is fixed up in place, never overwritten.
     notify("Writing host config (opencode.json)")
     opencode_json = root / "opencode.json"
-    if force or not opencode_json.exists():
-        opencode_json.write_text(json.dumps({
-            "$schema": "https://opencode.ai/config.json",
-            "default_agent": "director",
-            "plugin": ["./.opencode/plugins/spielos-notifications.ts"],
-        }, indent=2) + "\n")
+    if opencode_json.exists():
+        written += _merge_opencode_json(opencode_json)
+    else:
+        opencode_json.write_text(
+            json.dumps(_canonical_opencode_json(), indent=2) + "\n")
         written.append(str(opencode_json))
 
     # Harness operating doc for hosts (AGENTS.md), website-agnostic.
     notify("Writing operating doc (AGENTS.md)")
     agents_md = root / "AGENTS.md"
-    if force or not agents_md.exists():
+    if agents_md.exists():
+        current = agents_md.read_text()
+        if _LAYOUT_MARKER not in current:
+            agents_md.write_text(
+                current.rstrip("\n") + "\n\n" + _LAYOUT_CONTRACT_SECTION)
+            written.append(str(agents_md))
+    else:
         agents_md.write_text(_AGENTS_MD)
         written.append(str(agents_md))
 
@@ -318,6 +443,8 @@ def scaffold(target: Path | None = None, *, force: bool = False,
             "The Director already sees your company state; just talk to it.",
             "Create a clean Department only when its Workflow contract is ready.",
             "Set credentials in .spielos/.env (see .spielos/.env.example).",
+            "Audit layout any time: PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.agents "
+            "python3 -B -m company layout",
         ],
     }
 
@@ -353,8 +480,10 @@ Authority and full documentation: `.agents/company/README.md`.
 
 Open OpenCode (run `/agents`, select the Director agent) or Codex (talk to
 the Director agent) and just talk to it — it already sees your company state.
-The host injects fresh company state automatically; do not begin with a manual
-status probe.
+The host injects fresh company state automatically; do not begin with a
+manual status probe. If a request carries no SpielOS projection, host
+injection failed: run the read-only `company status` once, tell the owner
+that injection is broken, and never guess company state by reading files.
 
 ## OpenCode commands
 
@@ -366,9 +495,57 @@ status probe.
 | `/approve <goal>` | Approve exactly one displayed parked action |
 | `/help` | Explain the vocabulary and command surface |
 
+## Company layout contract
+
+<!-- spielos-layout-contract v1 -->
+
+Company content lives in exactly these layers under `.agents/company/`:
+
+| Layer | Contents |
+|---|---|
+| `departments/<id>/department.py` | one Department declaration per folder |
+| `skills/<id>/SKILL.md` | one reusable Skill per folder |
+| `capabilities/<id>/` | capability packages |
+| `connections/` | connection registry and client modules |
+| `strategy/` | canonical strategy documents |
+| `agents/installed/` | installed worker Agents |
+
+Never invent folders or files outside these layers (no `_lib/`,
+`_strategy/`, `declarations.py`, or a duplicate Director skill — the
+Director is the host agent prompt, not a Skill). Department-owned subfolders
+inside their package are fine. Audit drift with `company layout` and
+resolve every violation before adding new content.
+
 ## Rules
 
 - Live external actions always park for explicit approval.
 - Departments are declarations; Agents execute only claimed WorkOrders.
 - Owner, workflow, and strategy Memory must retain its required lineage.
+- Structural changes (Departments, Workflows, or the vendored spine) go
+  through one bounded system-improvement Goal with exact allowed files and
+  acceptance evidence — never improvise them directly.
+"""
+
+_LAYOUT_MARKER = "<!-- spielos-layout-contract v1 -->"
+
+_LAYOUT_CONTRACT_SECTION = """## Company layout contract
+
+<!-- spielos-layout-contract v1 -->
+
+Company content lives in exactly these layers under `.agents/company/`:
+
+| Layer | Contents |
+|---|---|
+| `departments/<id>/department.py` | one Department declaration per folder |
+| `skills/<id>/SKILL.md` | one reusable Skill per folder |
+| `capabilities/<id>/` | capability packages |
+| `connections/` | connection registry and client modules |
+| `strategy/` | canonical strategy documents |
+| `agents/installed/` | installed worker Agents |
+
+Never invent folders or files outside these layers (no `_lib/`,
+`_strategy/`, `declarations.py`, or a duplicate Director skill — the
+Director is the host agent prompt, not a Skill). Department-owned subfolders
+inside their package are fine. Audit drift with `company layout` and
+resolve every violation before adding new content.
 """
