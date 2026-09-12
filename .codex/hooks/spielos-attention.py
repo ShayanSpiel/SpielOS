@@ -72,14 +72,28 @@ def main() -> int:
             status="pending", limit=20)
         pending = [row for row in rows if row.get("kind") in REPORTABLE]
         if pending:
-            summary = "; ".join(
-                f"{row.get('payload', {}).get('message') or row.get('kind')}"
-                for row in pending[:5])
+            # Owner voice: each item renders its goal name plus its
+            # owner-facing message — never raw ids, metric keys, or CLI
+            # answer syntax (the Director surfaces machine detail on ask).
+            def _item_words(row: dict) -> str:
+                payload = row.get("payload") or {}
+                name = (payload.get("goal") or {}).get("name")
+                message = payload.get("message")
+                subject = f"'{name}'" if name else "the company"
+                if message:
+                    return f"{subject}: {message}"
+                kind = row.get("kind")
+                if kind == "host_work_required":
+                    return f"{subject}: work is running with its agent"
+                if kind == "owner_input_required":
+                    return f"{subject}: waiting on your decision"
+                return subject
+
+            summary = "; ".join(_item_words(row) for row in pending[:5])
             print(json.dumps({
                 "systemMessage": (
-                    f"SpielOS needs your input ({len(pending)} item(s)): {summary}. "
-                    "Ask the Director or run: PYTHONDONTWRITEBYTECODE=1 "
-                    "PYTHONPATH=.agents python3 -B -m company notifications list"),
+                    f"SpielOS attention ({len(pending)} item(s)): {summary}. "
+                    "Ask the Director to see each item in full."),
             }, ensure_ascii=False))
     except Exception:
         return 0

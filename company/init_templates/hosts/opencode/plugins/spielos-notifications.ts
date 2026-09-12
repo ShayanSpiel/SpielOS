@@ -108,11 +108,18 @@ const companyRunner = (
   }
 }
 
+// Owner voice: never a raw goal id — when the payload carries no goal
+// name, render attention in owner words instead of leaking the id.
+const KIND_WORDS: Record<string, string> = {
+  owner_input_required: "your decision",
+  host_work_required: "work in progress",
+}
+
 const formatNotification = (item: Any): string => {
   const payload = item.payload || {}
   const lines = [
-    `SpielOS attention · ${item.kind}`,
-    `Goal: ${payload.goal?.name || item.goal_id}`,
+    `SpielOS attention · ${KIND_WORDS[item.kind] || "company attention"}`,
+    `Goal: ${payload.goal?.name || "the company"}`,
   ]
   if (payload.message) lines.push(`Message: ${payload.message}`)
   const next = payload.required_user_action

@@ -38,9 +38,10 @@ def _now() -> str:
 
 #: Human glosses for the metric keys the runtime itself names; every
 #: other metric renders as plain numbers (value of target) with no key.
-METRIC_GLOSSES = {
-    "weekly_sales": "customers per week",
-}
+#: The shipped runtime names none: a gloss belongs to a specific home's
+#: own goals, never to the product. (Homes keep metric keys out of owner
+#: text either way — the gloss only humanizes the unit.)
+METRIC_GLOSSES: dict[str, str] = {}
 
 
 def _human_words(value) -> str:

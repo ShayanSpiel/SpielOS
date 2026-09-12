@@ -919,7 +919,7 @@ class TestContextAssembly(HarnessCase):
         # Owner voice: the goal renders with human progress and the
         # evidence as an outcome sentence; the metric key rides the
         # Machine reference line at the end, never the human lines.
-        self.assertIn("0 of 1 customers per week", projection["context"])
+        self.assertIn("0 of 1", projection["context"])
         self.assertIn("weekly sales 0", projection["context"])
         human, _, machine = projection["context"].partition(
             "Machine reference:")

@@ -1,0 +1,8 @@
+{
+  "id": "brief-writer",
+  "description": "Writes and delivers the weekly decision-ready research brief",
+  "skill_ids": ["brief_writing"],
+  "connection_ids": ["research_store"],
+  "capability_ids": ["export_render"],
+  "produces": ["brief_draft", "brief_delivered"]
+}

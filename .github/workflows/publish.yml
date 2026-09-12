@@ -6,8 +6,24 @@ on:
   workflow_dispatch:
 
 jobs:
+  tests:
+    name: Full acceptance suite
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run the test suite
+        run: |
+          set -euo pipefail
+          PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest discover company/tests
+
   pypi-publish:
     name: Build and publish
+    needs: tests
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.release.outputs.version }}

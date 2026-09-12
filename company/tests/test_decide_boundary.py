@@ -221,13 +221,13 @@ class TestDecisionRequestPark(DecideBoundaryCase):
         # its human progress with named options — no metric key, operator,
         # or target pair ever enters owner-facing text.
         self.assertIn("Weekly sales", request["message"])
-        self.assertIn("0 of 1 customers per week", request["message"])
+        self.assertIn("0 of 1", request["message"])
         self.assertIn("Run one of the candidate workflows",
                       request["message"])
         self.assertNotIn("weekly_sales", request["message"])
         self.assertNotIn("ge ", request["message"],
                          "no operator/target pair in owner-facing text")
-        self.assertEqual(request["progress"], "0 of 1 customers per week")
+        self.assertEqual(request["progress"], "0 of 1")
         for key in ("answer_syntax", "candidates", "evidence", "memory",
                     "children", "blockers", "recent_runs"):
             self.assertIn(key, request)
@@ -946,7 +946,7 @@ class TestStallBoundary(DecideBoundaryCase):
         self.assertIn("stopped moving", asks[0]["payload"]["message"])
         # Owner voice: human progress, never the metric key; the resume
         # command rides the payload's answer_syntax, not owner text.
-        self.assertIn("0 of 1 customers per week",
+        self.assertIn("0 of 1",
                       asks[0]["payload"]["message"])
         self.assertNotIn("weekly_sales", asks[0]["payload"]["message"])
         self.assertNotIn("company goal resume", asks[0]["payload"]["after"])

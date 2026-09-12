@@ -1,0 +1,1 @@
+"""Research Briefs Department package."""

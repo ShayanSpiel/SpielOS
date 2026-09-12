@@ -6,7 +6,7 @@
 
 FROM python:3.12-slim
 
-ARG SPIELOS_VERSION=10.0.2
+ARG SPIELOS_VERSION=10.3.3
 
 LABEL org.opencontainers.image.title="spielos" \
       org.opencontainers.image.description="SpielOS AI company operating system CLI" \

@@ -8,13 +8,15 @@ runtime dependency on the installed package:
     .spielos/state|data|artifacts/
     .spielos/.env.example  credential contract
     .opencode/**           host adapter (plugin, commands, agents)
-    .codex/agents/**       Codex adapter
+    .codex/agents/**        Codex adapter
+    .claude/**             Claude Code adapter (agents, commands, hooks)
+    CLAUDE.md              one-line @AGENTS.md bridge for Claude Code
     opencode.json          host config (generic; no provider keys)
     AGENTS.md              harness operating doc
 
 Template source resolution order:
 1. ``SPIELOS_TEMPLATE_DIR`` (a directory containing ``agents/``,
-   ``opencode/``, ``codex/``, ``dot-env-example``);
+   ``hosts/``, ``dot-env-example``);
 2. the bundled ``company/init_templates/`` package data;
 3. the installed ``spielos`` distribution (pipx/uv) when this code runs
    vendored inside a home — refresh reads the newest release from there;
@@ -30,28 +32,16 @@ from pathlib import Path
 from .config import VERSION
 from .paths import package_vendored_root, validate_home_destination
 
-# Owner-created content that `spielos update` must never touch, per tree
-# (relative paths inside that tree). Everything the release ships is
-# vendored: it is tracked in .spielos/vendored.json, refreshed on update,
-# and pruned when a newer release stops shipping it. In a home with no
-# manifest yet (created before the manifest era), the guard cannot know
-# what an older release vendored, so it preserves every path the current
-# release itself does not ship and refreshes the ones it does.
-USER_LAYER_PREFIXES = {
-    "agents": (
-        "company/departments/",
-        "company/skills/",
-        "company/capabilities/",
-        "company/connections/",
-        "company/strategy/",
-        "company/agents/installed/",
-    ),
-    "opencode": (
-        "agents/", "commands/", "plugins/", "skills/",
-        "package.json", "package-lock.json", "opencode.json", "opencode.jsonc",
-    ),
-    "codex": ("agents/", "hooks/", "config.toml"),
-}
+# Owner content that `spielos update` must never touch. Everything the
+# release ships is vendored: it is tracked in .spielos/vendored.json,
+# refreshed on update, and pruned when a newer release stops shipping it.
+# Only proven-vendored paths may ever refresh or prune: manifest-tracked
+# paths in a manifest home, and — in a home with no manifest yet (created
+# before the manifest era) — exactly the paths the current release itself
+# ships. Every other path, in the spine's user layers or anywhere in the
+# host trees (.codex/, .opencode/, .claude/), is owner content and is
+# preserved; the manifest an update writes resolves precise pruning on the
+# next update.
 
 VENDORED_MANIFEST = Path(".spielos") / "vendored.json"
 
@@ -93,6 +83,142 @@ def _canonical_opencode_json() -> dict:
     # loader rejects file-path entries in the "plugin"/"plugins" keys.
     return {"$schema": "https://opencode.ai/config.json",
             "default_agent": "director"}
+
+
+# The Claude Code adapter wires its hooks through an append-only merge
+# into the owner's .claude/settings.json; the release fragment names the
+# hook scripts this merge owns (and nothing else).
+CLAUDE_HOOK_SCRIPTS = ("spielos-context.py", "spielos-attention.py")
+
+
+def _claude_hook_script(command: str) -> str | None:
+    """The SpielOS hook script a command string runs, if any.
+
+    Only commands that run this home's shipped scripts under
+    ``.claude/hooks/`` are ours — an owner hook that merely mentions the
+    same filename elsewhere (a different tree, a different host) is owner
+    content and is never touched.
+    """
+    if ".claude/hooks/" not in command:
+        return None
+    for name in CLAUDE_HOOK_SCRIPTS:
+        if name in command:
+            return name
+    return None
+
+
+def _claude_skip(rel: str) -> bool:
+    """The Claude template's CLAUDE.md does not ship inside `.claude/`.
+
+    It ships at the home root next to AGENTS.md, so its one-line
+    `@AGENTS.md` import resolves in the same folder.
+    """
+    return rel == "CLAUDE.md"
+
+
+def _merge_claude_settings(root: Path) -> list[str]:
+    """Append-only merge of the Claude Code hook wiring.
+
+    The release ships the hook commands in
+    ``.claude/settings-fragment.json``; this merge lands them in the
+    owner's ``.claude/settings.json`` without ever disturbing owner
+    content: every other key (permissions, env, model, and any hooks the
+    owner or other tools registered) is preserved byte-for-byte in
+    meaning, each SpielOS hook is added exactly once (a release that
+    changes a command replaces only its own earlier wiring), an
+    unparseable settings file is left untouched, and
+    ``.claude/settings.local.json`` is never written.
+    """
+    fragment_path = root / ".claude" / "settings-fragment.json"
+    try:
+        fragment = json.loads(fragment_path.read_text())
+    except (json.JSONDecodeError, OSError):
+        return []
+    wanted = fragment.get("hooks") if isinstance(fragment, dict) else None
+    if not isinstance(wanted, dict):
+        return []
+
+    settings_path = root / ".claude" / "settings.json"
+    if settings_path.is_file():
+        try:
+            config = json.loads(settings_path.read_text())
+        except (json.JSONDecodeError, OSError):
+            return []  # owner content we cannot parse is never rewritten
+        if not isinstance(config, dict):
+            return []
+    else:
+        config = {}
+
+    hooks = config.get("hooks")
+    if hooks is None:
+        hooks = {}
+        config["hooks"] = hooks
+    if not isinstance(hooks, dict):
+        return []  # owner-shaped hooks key: leave it alone
+
+    changed = False
+    for event, groups in wanted.items():
+        existing = hooks.get(event)
+        if existing is None:
+            existing = []
+            hooks[event] = existing
+        elif not isinstance(existing, list):
+            # An owner-shaped event value is owner content: leave the
+            # whole merge alone rather than replace it.
+            return []
+        if not isinstance(groups, list):
+            continue
+        for group in groups:
+            if not isinstance(group, dict):
+                continue
+            entries = group.get("hooks")
+            if not isinstance(entries, list):
+                continue
+            target = None
+            for candidate in existing:
+                if (isinstance(candidate, dict)
+                        and candidate.get("matcher", "") == (group.get("matcher") or "")):
+                    target = candidate
+                    break
+            if target is not None and not isinstance(target.get("hooks"), list):
+                # The owner's group at this matcher is shaped differently:
+                # keep it untouched and add ours as its own group.
+                target = None
+            if target is None:
+                target = ({"matcher": group["matcher"], "hooks": []}
+                          if group.get("matcher") else {"hooks": []})
+                existing.append(target)
+            bucket = target.get("hooks")
+            if not isinstance(bucket, list):
+                continue  # unreachable by construction; never touch it
+            for entry in entries:
+                command = (entry.get("command")
+                           if isinstance(entry, dict) else None)
+                if not isinstance(command, str) or not command:
+                    continue
+                script = _claude_hook_script(command)
+                if script is None:
+                    continue
+                # Drop only this release's own stale wiring for the script
+                # (a release may change the command); never touch any
+                # other hook entry the owner or another tool registered.
+                kept = [item for item in bucket
+                        if not (isinstance(item, dict)
+                                and _claude_hook_script(
+                                    str(item.get("command") or "")) == script)]
+                if len(kept) != len(bucket):
+                    bucket[:] = kept
+                    changed = True
+                if not any(isinstance(item, dict)
+                           and item.get("command") == command
+                           for item in bucket):
+                    bucket.append(dict(entry))
+                    changed = True
+    if not changed and settings_path.is_file():
+        return []
+    settings_path.parent.mkdir(parents=True, exist_ok=True)
+    settings_path.write_text(json.dumps(config, indent=2) + "\n")
+    return [str(settings_path)]
 
 
 def _merge_opencode_json(path: Path) -> list[str]:
@@ -336,31 +462,37 @@ def scaffold(target: Path | None = None, *, force: bool = False,
 
     def vendored_entries() -> dict[str, list[str]]:
         entries = {"agents": _template_files(templates / "agents")}
-        for name in ("opencode", "codex"):
+        for name in ("opencode", "codex", "claude"):
             source = templates / "hosts" / name
-            entries[name] = _template_files(source) if source.is_dir() else []
+            files = _template_files(source) if source.is_dir() else []
+            if name == "claude":
+                # CLAUDE.md ships at the home root next to AGENTS.md (the
+                # one-line @AGENTS.md bridge must resolve in the same
+                # folder); the .claude tree carries the rest of the adapter.
+                files = [item for item in files if item != "CLAUDE.md"]
+            entries[name] = files
         return entries
 
     def layer_guard(tree: str):
-        """True for owner-created files in preserved layers (never vendored)."""
-        prefixes = USER_LAYER_PREFIXES.get(tree, ())
+        """True for owner-created files (never vendored, never pruned).
+
+        Manifest knowledge narrows what update may touch below the
+        shipped set; it never widens it. In a manifest home only
+        manifest-tracked paths are proven vendored — they refresh and,
+        when a newer release stops shipping them, prune. In a pre-manifest
+        home only the paths the current release itself ships are provably
+        vendored. Every other path is owner content and is preserved, in
+        the spine's user layers and the host trees alike.
+        """
         tracked = set(manifest.get(tree, ())) if manifest is not None else None
         # Rel paths the current release itself ships in this tree — the
         # only paths a home with no manifest can prove vendored.
         shipped = (set(vendored_entries().get(tree, ()))
                    if tracked is None else None)
+        vendored = tracked if tracked is not None else shipped
 
         def is_user(rel: str) -> bool:
-            if tracked is None:
-                # A pre-manifest home has no vendored history to consult:
-                # a path the current release itself ships is vendored and
-                # refreshes; every other path could be owner content (or
-                # stale residue that cannot be proven vendored), so it is
-                # preserved. The manifest this update writes resolves it.
-                return rel not in shipped
-            if not any(rel.startswith(prefix) for prefix in prefixes):
-                return False
-            return rel not in tracked
+            return rel not in vendored
 
         return is_user
 
@@ -374,16 +506,33 @@ def scaffold(target: Path | None = None, *, force: bool = False,
         written.extend(f"removed {item}" for item in removed)
     written += _copy_tree(templates / "agents", root / ".agents",
                           overwrite=force)
-    notify("Installing host adapters (OpenCode, Codex)")
-    # Host adapters.
-    for name in ("opencode", "codex"):
+    notify("Installing host adapters (OpenCode, Codex, Claude Code)")
+    # Host adapters. The Claude tree skips CLAUDE.md here: that file ships
+    # at the home root (below) so its @AGENTS.md import resolves.
+    for name in ("opencode", "codex", "claude"):
         src = templates / "hosts" / name
         if not src.is_dir():
             continue
         if existing_home and force:
             written.extend(f"removed {item}" for item in _prune_stale(
                 src, root / ("." + name), skip=layer_guard(name)))
-        written += _copy_tree(src, root / ("." + name), overwrite=force)
+        written += _copy_tree(src, root / ("." + name), overwrite=force,
+                              skip=(_claude_skip if name == "claude" else None))
+
+    # Claude Code reads CLAUDE.md at the project root; the one-line bridge
+    # to AGENTS.md makes all three hosts share one operating doc. It is
+    # owner-editable like AGENTS.md: written only when absent, never
+    # rewritten on update (owners may add Claude-specific notes below it).
+    claude_bridge = templates / "hosts" / "claude" / "CLAUDE.md"
+    if claude_bridge.is_file() and not (root / "CLAUDE.md").exists():
+        shutil.copy2(claude_bridge, root / "CLAUDE.md")
+        written.append(str(root / "CLAUDE.md"))
+
+    # Claude Code hook wiring: append-only merge into the owner's
+    # .claude/settings.json (owner permissions and keys untouched, each
+    # hook added exactly once, settings.local.json never written).
+    if (templates / "hosts" / "claude").is_dir():
+        written += _merge_claude_settings(root)
 
     # Private state/data/artifact trees (empty on purpose).
     notify("Creating private state tree (.spielos)")
@@ -448,8 +597,9 @@ def scaffold(target: Path | None = None, *, force: bool = False,
         "files_written": len(written),
         "next_steps": [
             "cd " + str(root),
-            "opencode (run /agents, select the Director agent) "
-            "or codex (talk to the Director agent)",
+            "opencode (run /agents, select the Director agent), "
+            "codex (talk to the Director agent), or claude "
+            "(run claude --agent director)",
             "The Director already sees your company state; just talk to it.",
             "Create a clean Department only when its Workflow contract is ready.",
             "Set credentials in .spielos/.env (see .spielos/.env.example).",
@@ -488,14 +638,18 @@ record; Departments supply Agent-owned behavior only.
 
 Authority and full documentation: `.agents/company/README.md`.
 
-Open OpenCode (run `/agents`, select the Director agent) or Codex (talk to
-the Director agent) and just talk to it — it already sees your company state.
-The host injects fresh company state automatically; do not begin with a
+Open OpenCode (run `/agents`, select the Director agent), Codex (talk to
+the Director agent), or Claude Code (run `claude --agent director`) and
+just talk to it — it already sees your company state. Claude Code reads
+this file through the one-line `CLAUDE.md` bridge. The host injects fresh
+company state automatically; do not begin with a
 manual status probe. If a request carries no SpielOS projection, host
 injection failed: run the read-only `company status` once, tell the owner
 that injection is broken, and never guess company state by reading files.
 
-## OpenCode commands
+## Host commands
+
+The same slash commands ship for OpenCode, Codex, and Claude Code:
 
 | Command | Meaning |
 |---|---|

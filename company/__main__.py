@@ -47,6 +47,16 @@ def build_parser():
     update = commands.add_parser("update", help="refresh the vendored home in place")
     update.add_argument("--dir", default=".")
     update.add_argument("--json", action="store_true")
+    export = commands.add_parser("export", help="write a Department bundle repository folder")
+    export.add_argument("department_id")
+    export.add_argument("--out", required=True, help="empty or new folder for the bundle")
+    export.add_argument("--dir", default=".", help="the SpielOS home to export from")
+    export.add_argument("--json", action="store_true")
+    import_bundle = commands.add_parser(
+        "import", help="install a Department bundle from a local folder")
+    import_bundle.add_argument("folder", help="the cloned/downloaded bundle folder")
+    import_bundle.add_argument("--dir", default=".", help="the SpielOS home to import into")
+    import_bundle.add_argument("--json", action="store_true")
     context = commands.add_parser("context")
     context.add_argument("--prompt", default=""); context.add_argument("--owner")
     context.add_argument("--workflow"); context.add_argument("--token-budget", type=int)
@@ -152,7 +162,22 @@ def main(argv=None):
             # and every user layer are always preserved.
             from .runtime.onboard import run_update
             return run_update(dir=args.dir, as_json=args.json)
-        if args.command in {"catalog", "departments"}:
+        if args.command == "export":
+            # Portability producer: walk one home Department, compute its
+            # full dependency closure, and write the complete bundle
+            # repository folder (manifest, closure, onboarding README).
+            from .commands.import_bundle import export_bundle
+            from .runtime.paths import selected_project_root
+            home = selected_project_root(args.dir)
+            output = export_bundle(home, args.department_id, Path(args.out))
+        elif args.command == "import":
+            # Portability consumer: validate then install a Department
+            # bundle from a local folder into the six owner layers only.
+            from .commands.import_bundle import import_bundle as run_import
+            from .runtime.paths import selected_project_root
+            home = selected_project_root(args.dir)
+            output = run_import(home, args.folder)
+        elif args.command in {"catalog", "departments"}:
             from .runtime.registry import departments
             output = [{"id": item.id, "version": item.version, "workflows": [flow.id for flow in item.workflows]} for item in departments().values()]
         elif args.command == "layout":

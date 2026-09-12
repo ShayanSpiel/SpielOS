@@ -194,7 +194,8 @@ def _prompt(style: _Style, question: str, default: str = "") -> str:
 
 def _detect_hosts() -> dict[str, bool]:
     return {"opencode": shutil.which("opencode") is not None,
-            "codex": shutil.which("codex") is not None}
+            "codex": shutil.which("codex") is not None,
+            "claude": shutil.which("claude") is not None}
 
 
 def _verify_home(root: Path) -> tuple[bool, str]:
@@ -241,9 +242,17 @@ def _next_steps(root: Path, hosts: dict[str, bool]) -> tuple[list[tuple[str, str
         steps.append(("codex",
                       "talk to the Director agent (@director) — it already "
                       "sees your company state"))
+    if hosts.get("claude"):
+        steps.append(("claude",
+                      "run `claude --agent director` (or just `claude`) and "
+                      "talk to the Director — it already sees your company "
+                      "state"))
     notes = [
-        "Choose OpenCode or Codex; the Director handles everything else in chat.",
+        "Choose OpenCode, Codex, or Claude Code; the Director handles "
+        "everything else in chat.",
         "Set credentials in .spielos/.env (see .spielos/.env.example).",
+        "Add a shared Department by importing its bundle folder: "
+        "`company import /path/to/bundle-folder` (see the bundle README).",
     ]
     return steps, notes
 
@@ -291,7 +300,7 @@ def _render_success(style: _Style, receipt: dict) -> None:
         else style.red("FAILED"))
     hosts_text = "  ".join(
         f"{name} {(style.green('✓') if hosts.get(name) else style.dim('—'))}"
-        for name in ("opencode", "codex"))
+        for name in ("opencode", "codex", "claude"))
     row("Hosts", hosts_text)
     print(style.cyan("└" + "─" * (width - 2) + "┘"))
     print()
@@ -389,7 +398,8 @@ def run_update(*, dir: str = ".", as_json: bool = False) -> int:
 
     Refreshes the vendored spine in an existing home from the templates of
     the distribution that is running. Private ``.spielos/`` state,
-    ``opencode.json``/``AGENTS.md`` owner edits, and every owner-created file
+    ``opencode.json``/``AGENTS.md``/``CLAUDE.md`` owner edits, the owner's
+    ``.claude/settings.json`` keys, and every owner-created file
     in the user layers (Departments, Skills, Capabilities, Connections,
     Strategy, installed Agents, host agents/commands/plugins) are always
     preserved; a missing home is an error (use ``init``).

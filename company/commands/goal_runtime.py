@@ -1138,8 +1138,19 @@ class CleanCommandRuntime:
         return self.runtime.tick(max_advances=max_advances)
 
     def watch(self, interval_seconds=5.0, goal_id=None, max_ticks=None):
+        """Advance the loop until automation is switched off.
+
+        The automation switch (``runner stop`` writes ``enabled=false``,
+        ``runner enable`` writes ``enabled=true`` beside the database)
+        is honored at every iteration: a disabled switch ends the loop
+        cleanly, so stop and enable are real controls, not display flags.
+        """
+        from ..runtime.service import automation_enabled
+
         ticks = 0
         while max_ticks is None or ticks < max_ticks:
+            if not automation_enabled(Path(self.database.path).parent):
+                return  # switched off while sleeping: exit cleanly
             result = (self.once(goal_id) if goal_id
                       else self.tick(max_advances=100))
             ticks += 1

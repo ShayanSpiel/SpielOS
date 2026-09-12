@@ -40,8 +40,19 @@ One line with curl:
 curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/SpielOS/main/install.sh | sh
 ```
 
+One line with curl and a Department bundle (local folder or git URL):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/SpielOS/main/install.sh | sh -s -- --bundle /path/to/bundle-folder
+```
+
+`--bundle` installs the product, creates the home, and imports the
+Department in one step, then prints your next steps. Bundle folders come
+from `company export` (a complete repository with a README that onboards
+you through OpenCode, Codex, or Claude Code with a paste-prompt block).
+
 The chosen folder becomes a self-contained **SpielOS home**: the runtime
-spine, Director agent + host adapters for OpenCode and Codex, and empty
+spine, Director agent + host adapters for OpenCode, Codex, and Claude Code, and empty
 private state. The `spielos` command itself is a global CLI — your company
 data always lives in the folder you chose.
 
@@ -87,7 +98,9 @@ fresh install exactly.
 
 Fresh homes start with **zero** Departments — add clean declarative packages
 only when their Goal, Workflow, Agent, Evidence, and approval contracts are
-ready.
+ready. Shareable Departments travel as bundle repositories (`company
+export` / `company import`); see
+[the bundle walkthrough](company/README.md#department-bundles-portability).
 
 Executor identity is enforced: a WorkOrder executes only for its declared
 agent (exact string, no aliases), claims are claim-then-complete, and work

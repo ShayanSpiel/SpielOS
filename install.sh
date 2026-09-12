@@ -4,6 +4,9 @@
 # One line:
 #   curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/SpielOS/main/install.sh | sh
 #
+# One line with a Department bundle (local folder or git URL):
+#   curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/SpielOS/main/install.sh | sh -s -- --bundle <path-or-url>
+#
 # The script is idempotent: re-running it upgrades an existing install.
 # Override the install source with SPIELOS_SOURCE=<name-or-path>
 # (e.g. a git URL for a branch build). SPIELOS_REPO is the older name for
@@ -13,6 +16,7 @@ set -eu
 
 SOURCE="${SPIELOS_SOURCE:-${SPIELOS_REPO:-spielos}}"
 TARGET_DIR="${SPIELOS_DIR:-$(pwd)}"
+BUNDLE=""
 
 # ---- output helpers --------------------------------------------------------
 
@@ -27,6 +31,18 @@ fi
 step() { printf '%s\n' "${GREEN}✓${RESET} $1"; }
 info() { printf '%s\n' "${DIM}→${RESET} $1"; }
 fail() { printf '%s\n' "${RED}✗ $1${RESET}" >&2; exit 1; }
+
+# ---- 0. arguments -----------------------------------------------------------
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --bundle)
+            [ $# -ge 2 ] || fail "--bundle needs a path or git URL after it"
+            BUNDLE="$2"; shift 2 ;;
+        --bundle=*) BUNDLE="${1#--bundle=}"; shift ;;
+        *) fail "unknown argument: $1 (this installer accepts only --bundle <path-or-url>)" ;;
+    esac
+done
 
 printf '%s\n' ""
 printf '%s\n' "${BOLD}${CYAN}SpielOS${RESET}${DIM} — one durable loop for your AI company${RESET}"
@@ -120,7 +136,7 @@ if [ -d "$TARGET_DIR/.agents/company" ]; then
     info "updating the existing SpielOS home ..."
     if spielos update --dir "$TARGET_DIR"; then
         HOME_VERSION=$("$PY" -c 'import re,sys; text=open(sys.argv[1], encoding="utf-8").read(); match=re.search(r"^VERSION\s*=\s*[\"'\"']([^\"'\"']+)", text, re.M); print(match.group(1) if match else "")' "$TARGET_DIR/.agents/company/runtime/config.py")
-        [ "$HOME_VERSION" = "$INSTALLED_VERSION" ] || fail "home update version mismatch: package is $INSTALLED_VERSION but home is ${HOME_VERSION:-unknown}."
+        [ "$HOME_VERSION" = "$INSTALLED_VERSION" ] || fail "home update version mismatch: package is $INSTALLED_VERSION but home is ${HOME_VERSION:-unknown}. A stale pipx venv is the usual cause — repair it with: pipx reinstall spielos && spielos update --dir $TARGET_DIR"
         HOME_UPDATED=1
         step "existing SpielOS home updated to $HOME_VERSION"
     else
@@ -139,6 +155,8 @@ elif [ ! -f "$TARGET_DIR/opencode.json" ]; then
         esac
     elif [ -z "$(ls -A "$TARGET_DIR" 2>/dev/null)" ]; then
         do_init=1  # piped install + empty directory: safe to proceed
+    else
+        info "folder is not empty and has no SpielOS home — leaving it untouched; run 'spielos init --dir $TARGET_DIR' when you want a home here"
     fi
     if [ "$do_init" = 1 ]; then
         if spielos init --dir "$TARGET_DIR" -y </dev/null; then
@@ -153,5 +171,42 @@ if [ "$INIT_RAN" = 0 ] && [ "$HOME_UPDATED" = 0 ]; then
     printf '%s\n' ""
     printf '%s\n' "${BOLD}Next:${RESET} run ${BOLD}spielos init --dir /path/to/project${RESET}"
     printf '%s\n' "${DIM}That creates the harness home (.agents/, .spielos/) — the CLI alone does not.${RESET}"
+fi
+
+# ---- 5. optional Department bundle ----------------------------------------
+#
+# --bundle <path-or-url>: import one Department bundle into the home in
+# the same step. A local folder imports directly; a git URL (including a
+# file:// remote) is cloned to a temporary folder first — the runtime
+# import itself never fetches over the network.
+
+if [ -n "$BUNDLE" ]; then
+    if [ ! -d "$TARGET_DIR/.agents/company" ]; then
+        fail "the bundle import needs a SpielOS home; init did not create one in $TARGET_DIR"
+    fi
+    BUNDLE_PATH="$BUNDLE"
+    case "$BUNDLE" in
+        *://*|*.git)
+            CLONE_DIR=$(mktemp -d)
+            if git clone --quiet --depth 1 "$BUNDLE" "$CLONE_DIR/bundle" >/dev/null 2>&1; then
+                BUNDLE_PATH="$CLONE_DIR/bundle"
+                step "bundle repository cloned from $BUNDLE"
+            else
+                rm -rf "$CLONE_DIR"
+                fail "could not clone the bundle repository $BUNDLE — check the URL or clone it yourself and pass the local folder"
+            fi ;;
+    esac
+    if [ ! -f "$BUNDLE_PATH/bundle.json" ]; then
+        fail "$BUNDLE_PATH is not a Department bundle (no bundle.json) — pass the folder that contains bundle.json"
+    fi
+    if (cd "$TARGET_DIR" && PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.agents "$PY" -B -m company import "$BUNDLE_PATH"); then
+        step "Department bundle imported into $TARGET_DIR"
+        printf '%s\n' ""
+        printf '%s\n' "${BOLD}Next:${RESET} talk to your Director to put the Department to work"
+        printf '%s\n' "${DIM}  opencode (run /agents, select the Director agent) — or codex, or claude --agent director${RESET}"
+        printf '%s\n' "${DIM}  company departments shows what imported; the bundle README lists its workflows.${RESET}"
+    else
+        fail "the bundle import failed — run it directly to see the diagnostic: cd $TARGET_DIR && PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.agents $PY -B -m company import $BUNDLE_PATH"
+    fi
 fi
 printf '%s\n' "${DIM}Docs: https://spielos.xyz · .agents/company/README.md after init${RESET}"

@@ -11,7 +11,7 @@ inform owner, workflow, or strategy Memory.
 ## Talk to your Director
 
 ```sh
-opencode    # or: codex
+opencode    # or: codex, or: claude
 ```
 
 In **OpenCode**: run `/agents`, select the **Director** agent, and talk to
@@ -19,6 +19,11 @@ it — it already sees your company state.
 
 In **Codex**: talk to the **Director** agent — it already sees your company
 state.
+
+In **Claude Code**: run `claude --agent director` (or just `claude`) and talk
+to it — Claude Code reads `CLAUDE.md`, a one-line bridge to the same
+`AGENTS.md` every host shares, and the context hook injects fresh company
+state, so the Director already sees where things stand.
 
 The host injects a fresh, read-only company projection into every model
 request; do not begin with a manual status probe.
@@ -47,6 +52,8 @@ spielos tasks             # open work orders
 spielos tasks <id> --complete <agent> --evidence '[...]' [--learning "claim"]
 spielos layout            # audit the canonical layout for drift
 spielos update --dir .    # refresh this home (global CLI, after pipx upgrade)
+spielos export <department_id> --out <folder>   # write a shareable Department bundle repo
+spielos import <folder>   # install a Department bundle from a local folder
 ```
 
 Always run `update` through the global `spielos` command — it refreshes the
@@ -54,16 +61,48 @@ home from the installed release's templates. Running
 `PYTHONPATH=.agents python3 -m company update` inside the home would try to
 copy the home's own files onto themselves. `update` overwrites the vendored
 `.agents/` spine and the host-adapter files the release itself ships
-(Director prompts, Codex hooks, the notifications plugin) — those always
+(Director prompts, Codex and Claude Code hooks, the notifications plugin) —
+those always
 refresh to the current release bytes, including in homes created before the
 vendored manifest existed. Private `.spielos/` state,
-`opencode.json`/`AGENTS.md` owner edits, and every owner-created file in the
+`opencode.json`/`AGENTS.md`/`CLAUDE.md` owner edits, the owner's
+`.claude/settings.json` (permissions and keys are only ever appended the
+SpielOS hooks, never rewritten; `.claude/settings.local.json` is never
+written), and every owner-created file in the
 user layers (Departments, Skills, Capabilities, Connections, Strategy,
 installed Agents, host agents/commands/plugins) are always preserved. In a
 home with a vendored manifest, stale files from older releases are pruned; a
 pre-manifest home has no history to consult, so it keeps every file the
 release does not ship and the manifest written by the update resolves that
 on the next one.
+
+## Department bundles (portability)
+
+A Department is portable as a repository import, not an archive download.
+
+- `company export <department_id> --out <folder>` runs in a home and
+  writes a complete bundle-repository folder: `bundle.json` (identity,
+  version, spine pin, closure file list), the department package, its
+  full dependency closure (skills, capabilities, connections, installed
+  agents, strategy documents), and a step-by-step `README.md` whose
+  per-adopter paste-prompt blocks (OpenCode, Codex, Claude Code) tell
+  the Director to import the bundle through the goal loop. An export
+  whose closure is incomplete refuses, naming every missing piece.
+- `company import <folder>` validates the manifest, the spine pin (an
+  incompatible pin fails naming the repair and installs nothing), the
+  closure (the bundle or the home must satisfy every reference), and
+  the declaration against the live contracts, then installs ONLY into
+  the six owner layers. It is idempotent: re-import refreshes
+  bundle-owned paths to bundle bytes; owner files outside the bundle
+  list are never touched; conflicting non-bundle content is never
+  overwritten. The vendored spine, host trees, and settings are never
+  writable by an import.
+- `spielos update` preserves every imported file (they are owner-layer
+  content) and the department still imports cleanly after the update.
+
+The generated README is the onboarding surface: the adopter clones or
+downloads the bundle repository, pastes the prompt for their host, and
+the Director performs the import through one bounded goal.
 
 ## Executor identity (declared-agent claims)
 
@@ -124,7 +163,7 @@ memory, and the deterministic catalog never fabricates strategy claims.
 
 Memory retrieval is topology-aware: `relevant(goal_id=B)` returns B's own
 strategy claims plus the active strategy claims of Goals B is
-structurally related to — siblings (same owner and metric), its parent,
+structurally related to — siblings (the same parent goal), its parent,
 its children, and both directions of a `supports` edge — never the
 claims of unrelated Goals. Direct-work lessons are goal-keyed: a
 workflow-scope claim with no workflow_id (written by `tasks <id>
@@ -163,7 +202,7 @@ when it has content.
 ## Owner voice
 
 Owner-facing text is human narration from start to finish: goals render by
-name with human progress ("0 of 1 customers per week"), evidence renders as
+name with human progress ("0 of 1"), evidence renders as
 outcome sentences ("replies 2, sent 10000"), the loop position renders in
 plain words ("next step: choosing the next move"), and parks ask in plain
 words with named options. Raw ids, metric keys, stage/status enums,

@@ -37,7 +37,19 @@ class RunnerService:
             self.pid_path.unlink()
         environment = os.environ.copy()
         environment["PYTHONDONTWRITEBYTECODE"] = "1"
-        environment["PYTHONPATH"] = str(self.project_root / ".agents")
+        # The child resolves `company` exactly like the host adapters do:
+        # the vendored spine (<home>/.agents) when its marker file exists,
+        # the project root itself for a flat source checkout — and keep
+        # any PYTHONPATH the owner already runs with.
+        agents = self.project_root / ".agents"
+        spine = (str(agents) if (agents / "company" / "__main__.py").is_file()
+                 else str(self.project_root))
+        existing = environment.get("PYTHONPATH")
+        environment["PYTHONPATH"] = (
+            spine + (os.pathsep + existing if existing else ""))
+        # The same interpreter that runs this service runs the child: a
+        # PATH-resolved python3 could be a foreign venv that lacks the
+        # vendored spine (or the installed package) entirely.
         command = [sys.executable, "-B", "-m", "company", "--db", str(self.db_path),
                    "runner", "watch", "--interval", str(interval)]
         with self.log_path.open("a") as log:
@@ -46,7 +58,36 @@ class RunnerService:
                                        stderr=subprocess.STDOUT, start_new_session=True)
         self.pid_path.write_text(json.dumps({"pid": process.pid, "command": command,
                                              "db_path": str(self.db_path)}) + "\n")
-        return self.status()
+        # A child that dies before its first tick (bad db path, import
+        # error) must not leave a receipt that claims a running runner:
+        # poll once so the owner sees a dead-on-arrival start with the
+        # log tail instead of a confusing status flip.
+        try:
+            process.wait(timeout=1.0)
+        except subprocess.TimeoutExpired:
+            return self.status()  # alive past the first second: healthy
+        return self._dead_on_arrival(process)
+
+    def _dead_on_arrival(self, process) -> dict:
+        """Report a spawn that died immediately, with the log tail."""
+        if self.pid_path.exists():
+            try:
+                stored = json.loads(self.pid_path.read_text())
+                if stored.get("pid") == process.pid:
+                    self.pid_path.unlink()
+            except (OSError, json.JSONDecodeError):
+                pass
+        tail = ""
+        try:
+            lines = self.log_path.read_text(errors="replace").splitlines()
+            tail = "\n".join(lines[-3:]) if lines else ""
+        except OSError:
+            tail = ""
+        state = self.status()
+        state["error"] = ("the runner process exited immediately after "
+                          "starting (exit code "
+                          f"{process.returncode}); last log lines:\n{tail}")
+        return state
 
     def stop(self) -> dict:
         current = self.status()

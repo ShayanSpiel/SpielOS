@@ -1,0 +1,7 @@
+{
+  "id": "research-analyst",
+  "description": "Collects and verifies research signals from the research store",
+  "skill_ids": ["research_method"],
+  "connection_ids": ["research_store"],
+  "produces": ["research_signals"]
+}

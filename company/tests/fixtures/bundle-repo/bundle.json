@@ -1,0 +1,37 @@
+{
+  "closure": {
+    "agents": [
+      "brief-writer",
+      "research-analyst"
+    ],
+    "capabilities": [
+      "export_render"
+    ],
+    "connections": [
+      "research_store"
+    ],
+    "skills": [
+      "brief_writing",
+      "research_method"
+    ],
+    "strategy": [
+      "brief-voice.md"
+    ]
+  },
+  "files": [
+    "agents/installed/brief-writer.json",
+    "agents/installed/research-analyst.json",
+    "capabilities/export_render/render.py",
+    "connections/research_store.py",
+    "departments/research_briefs/__init__.py",
+    "departments/research_briefs/department.py",
+    "skills/brief_writing/SKILL.md",
+    "skills/research_method/SKILL.md",
+    "strategy/brief-voice.md"
+  ],
+  "id": "research_briefs",
+  "name": "research_briefs Department",
+  "schema": 1,
+  "spine_pin": "10.3.2",
+  "version": "1.0.0"
+}
