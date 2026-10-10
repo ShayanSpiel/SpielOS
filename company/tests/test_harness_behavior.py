@@ -1,7 +1,6 @@
 """Behavioral test suite for the SpielOS clean-core harness (source tree).
 
-Ported from the SpielOS-Website home audit (2026-09-03,
-AUDIT-BEHAVIOR-REPORT.md): every test asserts one intended UX behavior
+Every test asserts one intended runtime behavior
 end-to-end against throwaway SQLite databases. Department-dependent
 classes run against fixture declarations from ``tests/fixtures/departments``
 (loaded through the ``SPIELOS_TEST_DEPARTMENTS_DIR`` seam); the shipped

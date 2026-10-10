@@ -130,8 +130,8 @@ def _validate_destination(value: Any, platform: str, campaign_id: str,
                           content_id: str) -> list[str]:
     parsed = urlparse(str(value or ""))
     errors: list[str] = []
-    if parsed.scheme != "https" or parsed.netloc != "spielos.xyz" or parsed.path.rstrip("/") not in {"/services", "/contact"}:
-        return ["destination must be https://spielos.xyz/services/ or /contact/"]
+    if parsed.scheme != "https" or parsed.netloc != "example.test" or parsed.path.rstrip("/") not in {"/services", "/contact"}:
+        return ["destination must be https://example.test/services/ or /contact/"]
     params = parse_qs(parsed.query)
     expected = {
         "utm_source": platform, "utm_medium": "social",
@@ -421,7 +421,7 @@ def _validate_rendition(manifest: dict[str, Any], item: dict[str, Any],
             url_aligned = (
                 visual.get("spoken_display_alignment") == "url-pronunciation"
                 and visual.get("component") == "cta"
-                and displayed == "spielos.xyz/services"
+                and displayed == "example.test/services"
                 and spoken == "go to spielos dot xyz slash services."
             )
             if displayed != spoken and not url_aligned:

@@ -574,8 +574,10 @@ def _declaration_imports_cleanly(bundle: Path, home: Path,
         stage.mkdir(parents=True)
         for path in (bundle / "departments" / department_id).rglob("*"):
             if path.is_file() and "__pycache__" not in path.parts:
-                shutil.copy2(path, stage / path.relative_to(
-                    bundle / "departments" / department_id))
+                destination = stage / path.relative_to(
+                    bundle / "departments" / department_id)
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(path, destination)
         (Path(staging) / "departments" / "__init__.py").write_text("")
         # Stage as an overlay on the home's departments package path so
         # relative imports (from ...workflows import ...) resolve.
@@ -621,6 +623,9 @@ def import_bundle(home: Path, folder: Path) -> dict:
     overwritten. Returns the receipt.
     """
     home = Path(home).resolve()
+    from ..runtime.boundary import require_runtime_destination
+
+    require_runtime_destination(home)
     folder = Path(folder).expanduser().resolve()
     layers = _home_layers(home)
     if not layers.is_dir():

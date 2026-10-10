@@ -146,7 +146,11 @@ notification carries.
 ## Command surface
 
 Run `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.agents python3 -B -m company ...`
-commands directly. Never add pipes, redirects, separators, `head`, `tail`, or
+from the explicitly selected company home, after checking its repository
+role. When the home provides `tools/spielos-local`, invoke that launcher by
+its absolute path instead. Never run owner commands from a source or website
+checkout.
+Run commands directly. Never add pipes, redirects, separators, `head`, `tail`, or
 other shell processing to an allowed runtime command.
 
 Use the clean command surface only:
@@ -155,7 +159,7 @@ Use the clean command surface only:
 status            overview          context           observe catalog
 departments       layout            goal create|list|topology|show|decide|resume
 evidence add       approve           tasks             runner tick|watch|start|stop|status|enable
-memory summary|owner|workflows|strategy|retire
+memory summary|owner|workflows|strategy|add|retire
 profile list|set  notifications list|ack
 ```
 

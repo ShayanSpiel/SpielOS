@@ -1,5 +1,22 @@
 # SpielOS source checkout
 
+This tree owns reusable product code, generic installation templates,
+packaging, documentation, and synthetic test fixtures only. It is not an
+installed company home. Do not install owner Departments, Skills, bundles,
+workflows, host configuration, private state, credentials, or generated media
+here. Generic core modules and synthetic fixture schemas are product code;
+they must contain no owner's production instructions, identity, or data.
+Generic host adapter templates ship under `company/init_templates/hosts/`.
+
+`.spielos-boundary.json` declares this tree as source. Runtime state writes
+and home installation inside it are refused. Run owner commands from an
+explicit, separately installed home. Never delete or relocate existing files
+without owner authorization, and never create preservation copies unless
+requested. Previously relocated originals remain preserved in their home.
+Publishing credentials may remain in an ignored local `.env` when explicitly
+authorized; never commit them. Run `python3 -B tools/check_source_boundary.py`
+to audit the working tree, including ignored owner directories.
+
 This repository is the source product used to create and update SpielOS homes. It runs from source with:
 
 ```sh

@@ -1,17 +1,4 @@
-"""Content Department — clean migrated declaration (legacy v4.3.0 → clean core).
-
-Migration notes (2026-09-03):
-- Legacy ``campaign_contract`` (schema 1.2, shared with Design/Analytics)
-  stays a shared department-layer module at ``departments/campaign_contract.py``.
-- Legacy machine step ``quality_gate`` becomes a real agent step bound to
-  the content-strategist that runs the campaign-contract validation and the
-  two eval suites mechanically (the validation code is pure functions in
-  ``content/gates.py``; no runtime loop).
-- ``platform_edit`` → ``campaign_manifest``/``design_order`` handoff and
-  the Buffer dispatch with publication-receipt contract are preserved.
-- Evidence kinds and metric names are unchanged so measurement stays
-  comparable across the migration.
-"""
+'Synthetic product acceptance fixture; never installed or executed as owner work.'
 
 from __future__ import annotations
 
@@ -30,218 +17,170 @@ def _step(step_id: str, agent_id: str, instruction: str, *,
 
 
 class ContentDepartment:
-    """Declarative content capability; execution belongs to GoalRuntime."""
+    'Synthetic product acceptance fixture; never installed or executed as owner work.'
 
     department_id = "content"
     id = "content"
     version = "4.4.0"
     description = (
-        "Preserves simulated work scenes and discoveries through drafting, "
-        "editorial gate, Design handoff, approval, and delivery."
+        'Synthetic Department for runtime acceptance checks.'
     )
     agent_ids = ("content-strategist", "content-writer", "publisher",
                  "video-producer")
     eval_suites = ("content-copy-top10", "content-story-whole")
-    production_ready = True
+    production_ready = False
 
     workflows = (
         Workflow(
             "content-package",
-            "Coordinate one evidence-backed topic idea across formats.",
+            'Synthetic workflow shape; no production implementation.',
             (
                 _step("evidence", "content-strategist",
-                      "Collect the company evidence (live record, delivered "
-                      "work, funnel facts) the idea will stand on; no "
-                      "invented facts.",
+                      'Exercise this step using synthetic input; record fixture evidence only.',
                       evidence_kind="company_evidence",
-                      skill_ids=("copywriting",)),
+                      skill_ids=()),
                 _step("idea_lock", "content-strategist",
-                      "Lock one buyer-relevant idea and its ICP reader "
-                      "before any copy is written.",
-                      skill_ids=("copywriting",)),
+                      'Exercise this step using synthetic input; record fixture evidence only.',
+                      skill_ids=()),
                 _step("brief", "content-strategist",
-                      "Write the brief (reader, moment, idea, proof, CTA) "
-                      "from the locked idea.",
-                      skill_ids=("copywriting",)),
+                      'Exercise this step using synthetic input; record fixture evidence only.',
+                      skill_ids=()),
                 _step("produce", "content-writer",
-                      "Produce the drafts for the chosen formats from the "
-                      "brief.",
-                      skill_ids=("copywriting",)),
+                      'Exercise this step using synthetic input; record fixture evidence only.',
+                      skill_ids=()),
                 _step("review", "content-strategist",
-                      "Editorial review against copywriting + voice rules.",
-                      skill_ids=("copywriting",)),
+                      'Exercise this step using synthetic input; record fixture evidence only.',
+                      skill_ids=()),
                 _step("package", "content-strategist",
-                      "Package the approved content and record evidence "
-                      "{'content_package': {...}, 'content_packages': <int>}.",
+                      'Exercise this step using synthetic input; record fixture evidence only.',
                       evidence_kind="content_package",
-                      skill_ids=("copywriting",)),
+                      skill_ids=()),
             ),
             department_id="content",
         ),
         Workflow(
             "social-post",
-            "Create a one-idea platform-native post from approved evidence.",
+            'Synthetic workflow shape; no production implementation.',
             (
                 _step("idea_lock", "content-writer",
-                      "Lock the one idea and its reader moment.",
-                      skill_ids=("copywriting",)),
+                      'Exercise this step using synthetic input; record fixture evidence only.',
+                      skill_ids=()),
                 _step("brief", "content-writer",
-                      "Write the platform-native brief.",
-                      skill_ids=("copywriting",)),
+                      'Exercise this step using synthetic input; record fixture evidence only.',
+                      skill_ids=()),
                 _step("draft", "content-writer",
-                      "Draft the post and record evidence "
-                      "{'content_draft': {...}}.",
+                      'Exercise this step using synthetic input; record fixture evidence only.',
                       evidence_kind="content_draft",
-                      skill_ids=("copywriting",)),
+                      skill_ids=()),
                 _step("edit", "content-writer",
-                      "Edit for platform fit and brevity.",
-                      skill_ids=("copywriting",)),
+                      'Exercise this step using synthetic input; record fixture evidence only.',
+                      skill_ids=()),
                 _step("approve", "content-writer",
-                      "Final self-review against voice and ICP; the "
-                      "publish workflow still parks for owner approval.",
-                      skill_ids=("copywriting",)),
+                      'Exercise this step using synthetic input; record fixture evidence only.',
+                      skill_ids=()),
             ),
             department_id="content",
         ),
         Workflow(
             "article",
-            "Create one evidence-backed, search-aware argument.",
+            'Synthetic workflow shape; no production implementation.',
             (
                 _step("idea_lock", "content-writer",
-                      "Lock the argument's one idea and search intent.",
-                      skill_ids=("copywriting", "seo")),
+                      'Exercise this step using synthetic input; record fixture evidence only.',
+                      skill_ids=()),
                 _step("brief", "content-writer",
-                      "Write the article brief (claim, proof structure, "
-                      "target query).",
-                      skill_ids=("copywriting", "seo")),
+                      'Exercise this step using synthetic input; record fixture evidence only.',
+                      skill_ids=()),
                 _step("draft", "content-writer",
-                      "Draft the article and record evidence "
-                      "{'article_draft': {...}}.",
+                      'Exercise this step using synthetic input; record fixture evidence only.',
                       evidence_kind="article_draft",
-                      skill_ids=("copywriting", "seo")),
+                      skill_ids=()),
                 _step("edit", "content-writer",
-                      "Edit for clarity, flow, and voice.",
-                      skill_ids=("copywriting",)),
+                      'Exercise this step using synthetic input; record fixture evidence only.',
+                      skill_ids=()),
                 _step("seo_review", "content-writer",
-                      "SEO review per the SEO skill invariants (title, "
-                      "description, internal links, intent match).",
-                      skill_ids=("seo",)),
+                      'Exercise this step using synthetic input; record fixture evidence only.',
+                      skill_ids=()),
                 _step("approve", "content-writer",
-                      "Final review; publishing still parks for owner "
-                      "approval in the publish workflow.",
-                      skill_ids=("copywriting",)),
+                      'Exercise this step using synthetic input; record fixture evidence only.',
+                      skill_ids=()),
             ),
             department_id="content",
         ),
         Workflow(
             "content-campaign",
-            "Preserve the work scene and discovery before drafting, then "
-            "edit for platform, Design, approval, delivery, and measurement. "
-            "publication_receipt is final; scheduled or sent is a commitment.",
+            'Synthetic workflow shape; no production implementation.',
             (
                 _step("simulation", "content-strategist",
-                      "Record the reader, situation, mechanism, consequence, "
-                      "proof, and discovery before any copy exists.",
+                      'Exercise this step using synthetic input; record fixture evidence only.',
                       evidence_kind="simulation",
-                      skill_ids=("copywriting",)),
+                      skill_ids=()),
                 _step("human_reality", "content-strategist",
-                      "Preserve the human scene: what the person checks, "
-                      "copies, switches between, waits for, fixes, and "
-                      "remembers.",
+                      'Exercise this step using synthetic input; record fixture evidence only.',
                       evidence_kind="human_reality",
-                      skill_ids=("copywriting",)),
+                      skill_ids=()),
                 _step("discovery", "content-strategist",
-                      "Add the derived insight without replacing or "
-                      "compressing the simulation or human reality.",
+                      'Exercise this step using synthetic input; record fixture evidence only.',
                       evidence_kind="discovery",
-                      skill_ids=("copywriting",)),
+                      skill_ids=()),
                 _step("draft", "content-writer",
-                      "Draft from the simulation + human reality + "
-                      "discovery as separate inputs; the first paragraph "
-                      "comes from the preserved scene.",
+                      'Exercise this step using synthetic input; record fixture evidence only.',
                       evidence_kind="content_draft",
-                      skill_ids=("copywriting",)),
+                      skill_ids=()),
                 _step("platform_edit", "content-writer",
-                      "Edit for Threads/YouTube platform fit: length, "
-                      "pacing, formatting — never rewrite into a generic "
-                      "hook/proof/CTA sequence. Produce the "
-                      "campaign_manifest and design_order handoff.",
+                      'Exercise this step using synthetic input; record fixture evidence only.',
                       evidence_kind="campaign_manifest",
-                      skill_ids=("copywriting",)),
+                      skill_ids=()),
                 _step("quality_gate", "content-strategist",
-                      "Mechanical gate: validate the campaign package "
-                      "against departments/campaign_contract.py (schema 1.2) "
-                      "and require passing eval reports for suites "
-                      "'content-copy-top10' and 'content-story-whole' "
-                      "(payload_id must equal batch_id). On success record "
-                      "evidence {'content_ready': ..., 'campaign_ready': ...}.",
+                      'Exercise this step using synthetic input; record fixture evidence only.',
                       evidence_kind="campaign_ready",
-                      skill_ids=("copywriting",),
-                      requirements={"gate": "campaign_contract + eval suites"}),
+                      skill_ids=(),
+                      requirements={}),
                 _step("render_handoff", "video-producer",
-                      "Hand the design_order to Design/rendering without "
-                      "changing the copy's substance; record the "
-                      "render_report.",
+                      'Exercise this step using synthetic input; record fixture evidence only.',
                       evidence_kind="render_report",
-                      skill_ids=("videography",),
-                      requirements={"requires": ["content_ready", "design_order"]}),
+                      skill_ids=(),
+                      requirements={}),
                 _step("approve", "content-strategist",
-                      "Park for owner approval before dispatch "
-                      "(approval key 'publish').",
+                      'Exercise this step using synthetic input; record fixture evidence only.',
                       approval_key="publish"),
                 _step("dispatch", "publisher",
-                      "Dispatch the approved package through the buffer "
-                      "Connection (social: threads/youtube-shorts) and record "
-                      "the publication_receipt (scheduled or sent is a "
-                      "commitment). Regular 16:9 YouTube publishes with "
-                      "custom thumbnails go through the youtube Connection "
-                      "(owner-authorized OAuth, scope youtube.upload only) "
-                      "instead of Buffer.",
+                      'Exercise this step using synthetic input; record fixture evidence only.',
                       evidence_kind="publication_receipt",
-                      skill_ids=("devto-publisher",),
-                      connection_ids=("buffer", "youtube")),
+                      skill_ids=(),
+                      connection_ids=()),
                 _step("measure", "publisher",
-                      "Measure the campaign through the posthog/analytics "
-                      "evidence (funnel metrics from campaign_contract).",
-                      skill_ids=("analytics",),
-                      connection_ids=("posthog",)),
+                      'Exercise this step using synthetic input; record fixture evidence only.',
+                      skill_ids=(),
+                      connection_ids=()),
                 _step("evaluate", "content-strategist",
-                      "Evaluate: apply the funnel report and record the "
-                      "optimization decision (one to three "
-                      "evidence-supported next changes).",
-                      skill_ids=("copywriting", "analytics")),
+                      'Exercise this step using synthetic input; record fixture evidence only.',
+                      skill_ids=()),
             ),
             department_id="content",
         ),
         Workflow(
             "publish",
-            "Publish or schedule an approved package through a Connection.",
+            'Synthetic workflow shape; no production implementation.',
             (
                 _step("select", "publisher",
-                      "Select the approved content_package to publish.",
-                      skill_ids=("devto-publisher",)),
+                      'Exercise this step using synthetic input; record fixture evidence only.',
+                      skill_ids=()),
                 _step("validate", "publisher",
-                      "Validate the package against the publication "
-                      "contract (campaign phase, asset URLs, tracked "
-                      "destinations).",
-                      skill_ids=("devto-publisher",)),
+                      'Exercise this step using synthetic input; record fixture evidence only.',
+                      skill_ids=()),
                 _step("approve", "publisher",
-                      "Park for owner approval before anything goes live "
-                      "(approval key 'publish').",
+                      'Exercise this step using synthetic input; record fixture evidence only.',
                       approval_key="publish"),
                 _step("dispatch", "publisher",
-                      "Dispatch through the buffer, website, or youtube "
-                      "Connection (regular 16:9 YouTube publishes use the "
-                      "youtube OAuth connection with custom 1280x720 "
-                      "thumbnails) and record the publication_receipt.",
+                      'Exercise this step using synthetic input; record fixture evidence only.',
                       evidence_kind="publication_receipt",
-                      skill_ids=("devto-publisher",),
-                      connection_ids=("buffer", "website", "youtube")),
+                      skill_ids=(),
+                      connection_ids=()),
                 _step("verify", "publisher",
-                      "Verify the published/scheduled state on the "
-                      "platform and report links and timestamps.",
-                      skill_ids=("devto-publisher",),
-                      connection_ids=("buffer", "website", "youtube")),
+                      'Exercise this step using synthetic input; record fixture evidence only.',
+                      skill_ids=(),
+                      connection_ids=()),
             ),
             department_id="content",
         ),

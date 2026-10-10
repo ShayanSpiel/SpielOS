@@ -1,4 +1,4 @@
-"""Videography Department package (declaration + real recording pipeline)."""
+"""Synthetic test fixture package; not a shipped Department."""
 
 from .department import VideographyDepartment
 

@@ -89,6 +89,9 @@ def validate_home_destination(candidate: str | Path) -> Path:
     """Reject accidental harness installation inside unsafe destinations."""
 
     path = Path(candidate).expanduser().resolve()
+    from .boundary import require_runtime_destination
+
+    require_runtime_destination(path)
     if ".Trash" in path.parts:
         raise ValueError(
             "refusing to install a SpielOS home inside macOS Trash; "

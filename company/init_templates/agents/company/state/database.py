@@ -18,6 +18,9 @@ class Database:
             if not self.path.exists():
                 raise FileNotFoundError(self.path)
         else:
+            from ..runtime.boundary import require_runtime_destination
+
+            require_runtime_destination(self.path)
             self.path.parent.mkdir(parents=True, exist_ok=True)
             self._initialize()
 

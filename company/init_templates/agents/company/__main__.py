@@ -47,6 +47,8 @@ def build_parser():
     update = commands.add_parser("update", help="refresh the vendored home in place")
     update.add_argument("--dir", default=".")
     update.add_argument("--json", action="store_true")
+    update.add_argument("--keep-stale", action="store_true",
+                        help="refresh shipped files without removing obsolete files or bytecode")
     export = commands.add_parser("export", help="write a Department bundle repository folder")
     export.add_argument("department_id")
     export.add_argument("--out", required=True, help="empty or new folder for the bundle")
@@ -134,7 +136,9 @@ def build_parser():
 
 
 def _readonly(path: str) -> bool:
-    return Path(path).exists()
+    # Read commands also snapshot an absent database; they never initialize
+    # company state in the caller's repository.
+    return True
 
 
 def _render(value):
@@ -146,6 +150,12 @@ def main(argv=None):
     if "--version" in argv or "-V" in argv:
         print(f"spielos {VERSION}"); return 0
     if not argv:
+        from .runtime.boundary import restricted_repository
+
+        boundary = restricted_repository(PROJECT_ROOT)
+        if boundary:
+            print(f"This is a {boundary[1]} repository. Run owner commands from your SpielOS home.")
+            return 0
         if not (PROJECT_ROOT / ".agents" / "company").is_dir():
             from .runtime.onboard import run_first_use
             return run_first_use(PROJECT_ROOT)
@@ -161,7 +171,7 @@ def main(argv=None):
             # distribution's templates. State (.spielos/), owner config,
             # and every user layer are always preserved.
             from .runtime.onboard import run_update
-            return run_update(dir=args.dir, as_json=args.json)
+            return run_update(dir=args.dir, as_json=args.json, keep_stale=args.keep_stale)
         if args.command == "export":
             # Portability producer: walk one home Department, compute its
             # full dependency closure, and write the complete bundle

@@ -22,7 +22,7 @@ VIDEO_CTA_LINK = EvalSuite(
     department_id="design",
     payload_kind="campaign_manifest",
     description=(
-        "CTA scene must show the proper link card spielos.xyz/services (visual), "
+        "CTA scene must show the proper link card example.test/services (visual), "
         "not the spoken pronunciation, with workflow badge and 4s hold. Gallery-faithful."
     ),
     validity="business",
@@ -34,7 +34,7 @@ VIDEO_CTA_LINK = EvalSuite(
             id="cta_visual_is_link",
             name="CTA visual is proper link",
             description=(
-                "The CTA visual headline must be exactly `spielos.xyz/services` (lowercase site canonical, slash, no dot pronunciation). "
+                "The CTA visual headline must be exactly `example.test/services` (lowercase site canonical, slash, no dot pronunciation). "
                 "The spoken line is `Go to SpielOS dot xyz slash services.` with url-pronunciation alignment. Visual must not contain `dot` or `slash` words."
             ),
             source=NARRATION,

@@ -1,11 +1,8 @@
-# SpielOS company profile
+# Company Profile
 
-- Product: SpielOS
-- Founder: Shayan Spiel
-- Website: https://spielos.xyz
-- Commercial focus: supervised AI workflow implementation and the SpielOS harness
-- Primary conversion paths: Services, Agent Brief, and Contact
+Fresh homes contain no owner identity or business strategy. The Director
+records owner preferences through `company profile set`, and evidence-backed
+strategic direction through `company memory add --scope strategy`.
 
-Use repository configuration and approved website copy for exact URLs and
-current product wording. Do not invent customer counts, revenue, performance,
-or adoption claims.
+Company-specific profile documents belong in the home's strategy layer.
+Do not invent customer counts, revenue, performance, or adoption claims.

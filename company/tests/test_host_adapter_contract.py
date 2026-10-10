@@ -21,7 +21,21 @@ PLUGIN = TEMPLATE_HOSTS / "opencode" / "plugins" / "spielos-notifications.ts"
 CLAUDE = TEMPLATE_HOSTS / "claude"
 
 
-class OpenCodePluginContractTests(unittest.TestCase):
+class InstalledHomeContractCase(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        from company.runtime.bootstrap import scaffold
+
+        cls.fixture_directory = tempfile.TemporaryDirectory()
+        cls.fixture_home = Path(cls.fixture_directory.name) / "home"
+        scaffold(cls.fixture_home)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.fixture_directory.cleanup()
+
+
+class OpenCodePluginContractTests(InstalledHomeContractCase):
     def test_plugin_uses_the_v2_default_export_contract(self):
         """The loader requires `export default { id, setup }`.
 
@@ -90,13 +104,13 @@ class OpenCodePluginContractTests(unittest.TestCase):
             self.assertNotIn(token, source)
 
     def test_repo_opencode_json_has_no_file_path_plugin_entry(self):
-        config = json.loads((REPO / "opencode.json").read_text())
+        config = json.loads((self.fixture_home / "opencode.json").read_text())
         self.assertNotIn("plugin", config)
         self.assertNotIn("plugins", config)
         self.assertEqual("director", config["default_agent"])
 
 
-class CodexHostContractTests(unittest.TestCase):
+class CodexHostContractTests(InstalledHomeContractCase):
     def test_hooks_json_registers_context_and_attention(self):
         config = json.loads(
             (TEMPLATE_HOSTS / "codex" / "hooks.json").read_text())
@@ -318,7 +332,7 @@ class CodexHostContractTests(unittest.TestCase):
         """
         targets = {
             "opencode template": TEMPLATE_HOSTS / "opencode" / "agents" / "director.md",
-            "live opencode": REPO / ".opencode" / "agents" / "director.md",
+            "installed opencode": self.fixture_home / ".opencode" / "agents" / "director.md",
             "codex": TEMPLATE_HOSTS / "codex" / "agents" / "director.toml",
             "claude": TEMPLATE_HOSTS / "claude" / "agents" / "director.md",
         }
@@ -354,7 +368,7 @@ class CodexHostContractTests(unittest.TestCase):
         """
         targets = {
             "opencode template": TEMPLATE_HOSTS / "opencode" / "agents" / "director.md",
-            "live opencode": REPO / ".opencode" / "agents" / "director.md",
+            "installed opencode": self.fixture_home / ".opencode" / "agents" / "director.md",
             "codex": TEMPLATE_HOSTS / "codex" / "agents" / "director.toml",
             "claude": TEMPLATE_HOSTS / "claude" / "agents" / "director.md",
         }
@@ -387,7 +401,7 @@ class CodexHostContractTests(unittest.TestCase):
         contract stays identical before and after `spielos update`."""
         template = (TEMPLATE_HOSTS / "opencode" / "agents" / "director.md"
                     ).read_text()
-        live = (REPO / ".opencode" / "agents" / "director.md").read_text()
+        live = (self.fixture_home / ".opencode" / "agents" / "director.md").read_text()
         template_section = template.split("## Owner voice (never break)", 1)[1]
         template_section = template_section.split("##", 1)[0]
         live_section = live.split("## Owner voice (never break)", 1)[1]
@@ -401,7 +415,7 @@ class CodexHostContractTests(unittest.TestCase):
         """L4: the command-surface line names the retire verb in every
         adopter, so owners discover the hygiene path from the prompt."""
         for path in (TEMPLATE_HOSTS / "opencode" / "agents" / "director.md",
-                     REPO / ".opencode" / "agents" / "director.md",
+                     self.fixture_home / ".opencode" / "agents" / "director.md",
                      TEMPLATE_HOSTS / "codex" / "agents" / "director.toml",
                      TEMPLATE_HOSTS / "claude" / "agents" / "director.md"):
             flat = " ".join(path.read_text().split())
@@ -409,7 +423,7 @@ class CodexHostContractTests(unittest.TestCase):
                           flat)
 
     def test_repo_codex_tree_is_byte_identical_with_template(self):
-        live = REPO / ".codex"
+        live = self.fixture_home / ".codex"
         for template_file in sorted((TEMPLATE_HOSTS / "codex").rglob("*")):
             if not template_file.is_file():
                 continue
@@ -764,7 +778,7 @@ class HomeShippingTests(unittest.TestCase):
 
     def test_repo_agent_definitions_match_shipped_templates(self):
         for name in ("system-improvement.md", "department-runner.md"):
-            live = REPO / ".opencode" / "agents" / name
+            live = self.home / ".opencode" / "agents" / name
             template = TEMPLATE_HOSTS / "opencode" / "agents" / name
             self.assertEqual(live.read_bytes(), template.read_bytes(), name)
 

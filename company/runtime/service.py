@@ -13,6 +13,9 @@ from pathlib import Path
 
 class RunnerService:
     def __init__(self, project_root: Path, db_path: Path):
+        from .boundary import require_runtime_destination
+
+        require_runtime_destination(db_path)
         self.project_root = project_root
         self.db_path = Path(db_path)
         # The stop switch, pid file, and log all live beside the DATABASE,

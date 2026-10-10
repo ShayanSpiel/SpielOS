@@ -137,7 +137,7 @@ class _Spinner:
             print(f"{self.style.mark_fail()} {self.label}", flush=True)
 
 
-def _scaffold_with_progress(target: Path, force: bool, style: _Style):
+def _scaffold_with_progress(target: Path, force: bool, style: _Style, *, keep_stale: bool = False):
     """Run the scaffold on a worker thread; animate one spinner per phase.
 
     Returns (receipt, error). Exactly one of them is None.
@@ -148,7 +148,7 @@ def _scaffold_with_progress(target: Path, force: bool, style: _Style):
     def worker() -> None:
         try:
             outcome["receipt"] = scaffold(target, force=force,
-                                           on_phase=phases.put)
+                                           on_phase=phases.put, keep_stale=keep_stale)
         except BaseException as error:  # surfaced to the caller below
             outcome["error"] = error
         finally:
@@ -393,7 +393,7 @@ def run_init(*, dir: str = ".", force: bool = False, assume_yes: bool = False,
                      hint="check folder permissions and free disk space")
 
 
-def run_update(*, dir: str = ".", as_json: bool = False) -> int:
+def run_update(*, dir: str = ".", as_json: bool = False, keep_stale: bool = False) -> int:
     """Entry point for ``spielos update``. Returns the process exit code.
 
     Refreshes the vendored spine in an existing home from the templates of
@@ -420,10 +420,10 @@ def run_update(*, dir: str = ".", as_json: bool = False) -> int:
         return 1
     try:
         if as_json:
-            receipt = scaffold(target, force=True)
+            receipt = scaffold(target, force=True, keep_stale=keep_stale)
         else:
             print(style.bold(f"SpielOS {VERSION} — refreshing {target}"))
-            receipt, error = _scaffold_with_progress(target, True, style)
+            receipt, error = _scaffold_with_progress(target, True, style, keep_stale=keep_stale)
             if error is not None:
                 raise error
     except (OSError, ValueError) as error:

@@ -439,13 +439,14 @@ def _prune_stale(src: Path, dst: Path, skip=None) -> list[str]:
 
 
 def scaffold(target: Path | None = None, *, force: bool = False,
-             on_phase=None) -> dict:
+             on_phase=None, keep_stale: bool = False) -> dict:
     """Materialize a complete harness home. Returns a receipt dict.
 
     ``on_phase(label)`` is called before each materialization chunk so an
     interactive driver can show progress; it is optional plumbing and
     never changes what gets written.
     """
+    # keep_stale disables every pruning operation, including bytecode cleanup.
     root = validate_home_destination(target or Path.cwd())
     templates = template_root()
     written: list[str] = []
@@ -497,7 +498,7 @@ def scaffold(target: Path | None = None, *, force: bool = False,
         return is_user
 
     notify("Vendoring harness spine")
-    if existing_home and force:
+    if existing_home and force and not keep_stale:
         # An update removes stale vendored files so the spine matches a
         # fresh init exactly; owner-created files in the user layers are
         # skipped, as is anything the current release still ships.
@@ -513,7 +514,7 @@ def scaffold(target: Path | None = None, *, force: bool = False,
         src = templates / "hosts" / name
         if not src.is_dir():
             continue
-        if existing_home and force:
+        if existing_home and force and not keep_stale:
             written.extend(f"removed {item}" for item in _prune_stale(
                 src, root / ("." + name), skip=layer_guard(name)))
         written += _copy_tree(src, root / ("." + name), overwrite=force,
@@ -542,7 +543,12 @@ def scaffold(target: Path | None = None, *, force: bool = False,
     # Record exactly what this release vendored, so the next update can
     # tell owner-created files from stale vendored residue.
     notify("Recording vendored manifest")
-    _write_manifest(root, vendored_entries())
+    entries = vendored_entries()
+    if keep_stale and manifest:
+        # Retained old vendored files remain known to later updates.
+        for tree, paths in manifest.items():
+            entries[tree] = sorted(set(entries.get(tree, ())) | set(paths))
+    _write_manifest(root, entries)
     written.append(str(root / VENDORED_MANIFEST))
 
     # Credential contract example.

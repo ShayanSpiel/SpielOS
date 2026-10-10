@@ -16,3 +16,12 @@ public/
 
 # OS
 .DS_Store
+
+# Installed host configuration belongs to a company home, not product source.
+.agents/
+.codex/
+.opencode/
+.claude/
+opencode.json
+bundles/
+outbound/

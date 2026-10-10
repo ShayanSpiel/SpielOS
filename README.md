@@ -138,6 +138,13 @@ spielos runner tick
 
 ## Development
 
+This checkout is product source, not a company home. Keep owner Departments,
+Skills, bundles, host configuration, and private state in a separate home.
+Repository role markers prevent current runtime commands from creating company
+state inside a source or website checkout. Synthetic test fixtures remain here.
+Run source commands with `PYTHONDONTWRITEBYTECODE=1 python3 -B -m company COMMAND`;
+choose a separate destination for `init`, `update`, and `import`.
+
 ```sh
 git clone https://github.com/ShayanSpiel/SpielOS.git
 cd SpielOS
@@ -147,3 +154,18 @@ PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest company.tests.test_clean_core_a
 - [Architecture](company/ARCHITECTURE.md) — the clean-core contract
 - [Website](https://spielos.xyz) · [GitHub](https://github.com/ShayanSpiel/SpielOS)
 - MIT licensed
+
+## Repository ownership and local source updates
+
+This repository ships reusable code and generic home/host templates. It does
+not contain an installed company, owner Skills, private Departments, company
+data, or production pipelines. Test fixture packages are synthetic, excluded
+from installation, and never production-ready. Audit the source boundary with
+`python3 -B tools/check_source_boundary.py`. An explicitly authorized ignored
+`.env` may hold publishing credentials; it must never enter Git.
+
+A home may refresh from a source checkout by running that checkout's runtime
+with `SPIELOS_TEMPLATE_DIR` set to `company/init_templates`, an explicit
+`update --dir /path/to/home`, and `--keep-stale` when removal is not authorized.
+`--keep-stale` retains obsolete vendored files and bytecode while refreshing
+shipped files. It makes no backup. Owner layers and private data remain local.

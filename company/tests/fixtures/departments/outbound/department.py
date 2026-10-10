@@ -1,25 +1,4 @@
-"""Outbound Department — clean migrated declaration (legacy v3.2.1 → clean core).
-
-Migration notes (2026-09-03):
-
-- The legacy OutboundDepartment mixed a bespoke GoalHandler loop
-  (EmailWorkflow: observe/decide/act/evaluate) with declarations. In the
-  clean core the GoalRuntime owns the loop; the email engine's domain
-  operations (providers, compose, validators, policy gates, batches,
-  submissions ledger, reply measurement) survive as the ``engine/`` library
-  executed by agent-bound steps. The loop code itself is retired with the
-  legacy runtime.
-- Supabase is the single source of truth for leads (owner directive
-  2026-09-02): the master lead list moves from the Desktop ``leads.xlsx``
-  (EMAIL_LIST_PATH) to the Supabase ``leads`` table via
-  ``company.connections.supabase``. Send/reply/bounce events append to
-  ``email_events``; lead flags roll up on the same row.
-- Live sends always park for owner approval (approval key ``send``); the
-  provider pool (Resend/Mailgun/Postmark/Brevo/EmailOctopus) runs behind
-  the ``email-delivery`` Connection.
-- ``crm_sync`` (Attio) and ``calcom_sync`` (Cal.com) survive as library
-  adapters behind the ``attio`` / ``cal-booking`` Connections.
-"""
+'Synthetic product acceptance fixture; never installed or executed as owner work.'
 
 from __future__ import annotations
 
@@ -38,163 +17,127 @@ def _step(step_id: str, agent_id: str, instruction: str, *,
 
 
 class OutboundDepartment:
-    """Declarative outbound capability; execution belongs to GoalRuntime."""
+    'Synthetic product acceptance fixture; never installed or executed as owner work.'
 
     department_id = "outbound"
     id = "outbound"
     version = "4.0.0"
     description = (
-        "Finds and researches qualified prospects, prepares email or social "
-        "outreach, and measures buyer outcomes."
+        'Synthetic Department for runtime acceptance checks.'
     )
     agent_ids = ("lead-researcher", "social-researcher", "outreach-writer")
-    production_ready = True
+    production_ready = False
 
     workflows = (
         Workflow(
             "lead-research",
-            "Discover, qualify, research, and verify ICP-matched prospects.",
+            'Synthetic workflow shape; no production implementation.',
             (
                 _step("discover", "lead-researcher",
-                      "Discover candidate prospects from permitted public "
-                      "sources (web-research); never scrape gated data.",
-                      skill_ids=("outbound-email",),
-                      connection_ids=("web-research",)),
+                      'Exercise this step using synthetic input; record fixture evidence only.',
+                      skill_ids=(),
+                      connection_ids=()),
                 _step("qualify", "lead-researcher",
-                      "Qualify each candidate against the canonical ICP "
-                      "(strategy/icp.md); reject non-ICP with reasons.",
-                      skill_ids=("outbound-email",)),
+                      'Exercise this step using synthetic input; record fixture evidence only.',
+                      skill_ids=()),
                 _step("research", "lead-researcher",
-                      "Research one operative fact per lead and its "
-                      "operational consequence (the personalization hook "
-                      "must be evidence, not invention).",
-                      skill_ids=("outbound-email",),
-                      connection_ids=("web-research",)),
+                      'Exercise this step using synthetic input; record fixture evidence only.',
+                      skill_ids=(),
+                      connection_ids=()),
                 _step("verify", "lead-researcher",
-                      "Verify the lead identity (email/domain validity, "
-                      "role, company).",
+                      'Exercise this step using synthetic input; record fixture evidence only.',
                       evidence_kind="verification_result",
-                      skill_ids=("outbound-email",)),
+                      skill_ids=()),
                 _step("record", "lead-researcher",
-                      "Record the lead in Supabase: upsert on lead_key "
-                      "(email > company_domain > normalized company) into "
-                      "the ``leads`` table with research fields; record "
-                      "evidence {'lead_dossier': {...}}. No CSVs, no local "
-                      "lead lists.",
+                      'Exercise this step using synthetic input; record fixture evidence only.',
                       evidence_kind="lead_dossier",
-                      skill_ids=("outbound-email", "crm"),
-                      connection_ids=("supabase",)),
+                      skill_ids=(),
+                      connection_ids=()),
             ),
             department_id="outbound",
         ),
         Workflow(
             "email-outreach",
-            "Compose, validate, approve, send, and measure personalized email.",
+            'Synthetic workflow shape; no production implementation.',
             (
                 _step("select", "lead-researcher",
-                      "Select eligible leads from the Supabase ``leads`` "
-                      "table (sequence_status, outreach_tier, email_status, "
-                      "12h submission cooldown, per-goal cohort filters).",
-                      skill_ids=("outbound-email",),
-                      connection_ids=("supabase",)),
+                      'Exercise this step using synthetic input; record fixture evidence only.',
+                      skill_ids=(),
+                      connection_ids=()),
                 _step("compose", "outreach-writer",
-                      "Compose personalized email per lead from its research "
-                      "fact and pain hypothesis (engine/compose rules; "
-                      "hook + pain + earned CTA, no invented claims).",
-                      skill_ids=("outbound-email", "copywriting")),
+                      'Exercise this step using synthetic input; record fixture evidence only.',
+                      skill_ids=()),
                 _step("validate", "outreach-writer",
-                      "Run the engine validators (address parse, forbidden "
-                      "content, template fit) and the policy gate "
-                      "(policy_rules on fresh data right before send).",
-                      skill_ids=("outbound-email",)),
+                      'Exercise this step using synthetic input; record fixture evidence only.',
+                      skill_ids=()),
                 _step("approve", "outreach-writer",
-                      "Park for owner approval before any live send "
-                      "(approval key 'send'; dry_run bypasses nothing — "
-                      "live mode still parks).",
+                      'Exercise this step using synthetic input; record fixture evidence only.',
                       approval_key="send"),
                 _step("send", "outreach-writer",
-                      "Execute the approved batch through the provider "
-                      "pool (email-delivery Connection: block size, "
-                      "throttle, per-provider daily caps) and record the "
-                      "provider_events evidence + append ``sent`` events to "
-                      "Supabase email_events.",
+                      'Exercise this step using synthetic input; record fixture evidence only.',
                       evidence_kind="provider_events",
-                      skill_ids=("outbound-email",),
-                      connection_ids=("email-delivery", "supabase")),
+                      skill_ids=(),
+                      connection_ids=()),
                 _step("measure", "lead-researcher",
-                      "Measure through the evidence window (opens, clicks, "
-                      "delivery, replies via gmail-inbox capture; bounces) "
-                      "and append events to Supabase; roll up lead flags; "
-                      "record evidence {'reply': ..., 'booked_call': ...} "
-                      "and the batch metrics.",
+                      'Exercise this step using synthetic input; record fixture evidence only.',
                       evidence_kind="reply",
-                      skill_ids=("outbound-email", "analytics"),
-                      connection_ids=("gmail-inbox", "supabase")),
+                      skill_ids=(),
+                      connection_ids=()),
             ),
             department_id="outbound",
         ),
         Workflow(
             "social-lead-research",
-            "Research qualified LinkedIn and X prospects from authorized "
-            "public sources.",
+            'Synthetic workflow shape; no production implementation.',
             (
                 _step("discover", "social-researcher",
-                      "Discover public LinkedIn/X signals for ICP-matched "
-                      "prospects.",
-                      skill_ids=("outbound-email", "outbound"),
-                      connection_ids=("web-research",)),
+                      'Exercise this step using synthetic input; record fixture evidence only.',
+                      skill_ids=(),
+                      connection_ids=()),
                 _step("qualify", "social-researcher",
-                      "Qualify against the canonical ICP.",
-                      skill_ids=("outbound",)),
+                      'Exercise this step using synthetic input; record fixture evidence only.',
+                      skill_ids=()),
                 _step("research", "social-researcher",
-                      "Collect the social signal (visible problem, buying "
-                      "signal) with source URLs.",
-                      skill_ids=("outbound",),
-                      connection_ids=("web-research",)),
+                      'Exercise this step using synthetic input; record fixture evidence only.',
+                      skill_ids=(),
+                      connection_ids=()),
                 _step("validate", "social-researcher",
-                      "Validate the evidence chain (public sources only).",
-                      skill_ids=("outbound",)),
+                      'Exercise this step using synthetic input; record fixture evidence only.',
+                      skill_ids=()),
                 _step("record", "social-researcher",
-                      "Upsert the social prospect into Supabase ``leads`` "
-                      "(profile_url, buying_signals) and record evidence "
-                      "{'social_prospect': {...}}.",
+                      'Exercise this step using synthetic input; record fixture evidence only.',
                       evidence_kind="social_prospect",
-                      skill_ids=("outbound", "crm"),
-                      connection_ids=("supabase",)),
+                      skill_ids=(),
+                      connection_ids=()),
             ),
             department_id="outbound",
         ),
         Workflow(
             "social-dm",
-            "Create and validate personalized LinkedIn and X DM drafts.",
+            'Synthetic workflow shape; no production implementation.',
             (
                 _step("select", "social-researcher",
-                      "Select the lead for a DM from Supabase (channel, "
-                      "sequence status).",
-                      skill_ids=("outbound",),
-                      connection_ids=("supabase",)),
+                      'Exercise this step using synthetic input; record fixture evidence only.',
+                      skill_ids=(),
+                      connection_ids=()),
                 _step("draft", "outreach-writer",
-                      "Draft the personalized DM (one idea, human, "
-                      "platform-native).",
+                      'Exercise this step using synthetic input; record fixture evidence only.',
                       evidence_kind="dm_draft",
-                      skill_ids=("outbound-email", "copywriting")),
+                      skill_ids=()),
                 _step("validate", "outreach-writer",
-                      "Validate the draft (length, tone, claims, ICP fit).",
-                      skill_ids=("outbound",)),
+                      'Exercise this step using synthetic input; record fixture evidence only.',
+                      skill_ids=()),
                 _step("approve", "outreach-writer",
-                      "Park for owner approval before any external send "
-                      "(approval key 'external_send').",
+                      'Exercise this step using synthetic input; record fixture evidence only.',
                       approval_key="external_send"),
                 _step("export", "outreach-writer",
-                      "Export the approved DM draft for manual/browser "
-                      "delivery (never auto-send on social platforms).",
-                      skill_ids=("outbound",)),
+                      'Exercise this step using synthetic input; record fixture evidence only.',
+                      skill_ids=()),
                 _step("measure", "outreach-writer",
-                      "Record replies/booked calls as evidence and in "
-                      "Supabase events.",
+                      'Exercise this step using synthetic input; record fixture evidence only.',
                       evidence_kind="reply",
-                      skill_ids=("outbound",),
-                      connection_ids=("supabase",)),
+                      skill_ids=(),
+                      connection_ids=()),
             ),
             department_id="outbound",
         ),

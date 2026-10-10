@@ -250,6 +250,22 @@ class ImportValidationTests(unittest.TestCase):
         departments = _company(self.home, "departments", "--json")
         self.assertEqual(["research_briefs"], [item["id"] for item in departments])
 
+    def test_import_accepts_nested_department_workflow_files(self):
+        """Declaration staging preserves workflow/schema directory trees."""
+        nested = Path("departments/research_briefs/workflows/reference/schema.json")
+        target = self.bundle / nested
+        target.parent.mkdir(parents=True)
+        target.write_text('{"type":"object"}\n')
+        manifest_path = self.bundle / "bundle.json"
+        manifest = json.loads(manifest_path.read_text())
+        manifest["files"].append(nested.as_posix())
+        manifest["files"].sort()
+        manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+
+        receipt = _company(self.home, "import", str(self.bundle), "--json")
+        self.assertIn(nested.as_posix(), receipt["installed"])
+        self.assertEqual(target.read_bytes(), (_layers(self.home) / nested).read_bytes())
+
     def test_bad_manifest_leaves_home_untouched(self):
         before = self._layer_files()
         (self.bundle / "bundle.json").write_text("{ not json")

@@ -132,6 +132,12 @@ class CatalogController:
                 "agent_id": agent_id, "evidence_kind": evidence_kind,
                 "instruction": instruction, "repair": repair})
         requested = (goal.config or {}).get("workflow")
+        candidates = self._candidates(goal)
+        if requested:
+            chosen = next((item for item in candidates
+                           if requested in {item.id, self._workflow_id(goal, item)}), None)
+            if chosen is not None:
+                return self._workflow_decision(goal, chosen)
         # 1. Learned structure first (issue #3): a crystallized Workflow
         #    for this goal's repeated work shape is the neural path — the
         #    next equivalent request reuses it instead of rebuilding the
@@ -141,12 +147,6 @@ class CatalogController:
             return learned
         # 2. Candidate workflows, ranked by strategy learning and run
         #    history instead of blind declaration order (issue #1/#2).
-        candidates = self._candidates(goal)
-        if requested:
-            chosen = next(
-                (item for item in candidates if item.id == requested), None)
-            if chosen is not None:
-                return self._workflow_decision(goal, chosen)
         ranked = [item for item in candidates
                   if not self._strategy_avoids(goal, item)
                   and not self._recently_escalated(goal, item)]

@@ -190,7 +190,8 @@ class UpdatePreservationTests(unittest.TestCase):
                 "@AGENTS.md\n\n# My Claude notes\n- keep this line\n")
             # Operational state must survive updates untouched.
             state = home / ".spielos" / "state" / "company.sqlite"
-            self._run_company(home, "status")
+            self._run_company(home, "goal", "create", "--name", "Preserve owner state",
+                              "--owner", "director", "--metric", "acceptance", "--target", "1")
             self.assertTrue(state.is_file())
 
             self._update(release_b, home)
