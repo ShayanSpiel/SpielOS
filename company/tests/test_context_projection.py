@@ -47,7 +47,7 @@ class ContextProjectionTests(unittest.TestCase):
             goal = command.runtime.create_goal(
                 "Ship campaign", "outcome", "ge", 1, owner_id="director")
             command.set_profile_claim(
-                namespace="identity", claim_key="name", value="Shayan")
+                namespace="identity", claim_key="name", value="Example Owner")
             _insert_notification(command, goal.id,
                                   "approve the YouTube upload")
 

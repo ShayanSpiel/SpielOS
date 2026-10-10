@@ -58,9 +58,9 @@ class OpenCodePluginContractTests(InstalledHomeContractCase):
 
     def test_plugin_resolves_the_sessions_home_not_the_servers(self):
         """A server may be started in a different folder than the session it
-        serves; the adapter must find the session's own home. The 2026-09-04
-        failure ("can't load context") was exactly a server started in
-        ShayanSpiel.Github.io serving SpielOS1 sessions with no injection.
+        serves; the adapter must find the session's own home. A server started
+        in a website or source folder must still resolve an explicitly
+        selected company home.
         """
         source = PLUGIN.read_text()
         self.assertIn("sessionDirectoryFrom", source)

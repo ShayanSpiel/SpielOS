@@ -48,7 +48,7 @@ def main(argv: list[str] | None = None) -> int:
     except FileNotFoundError:
         print(
             "SpielOS cannot continue because this shell's current folder was deleted.\n"
-            "Run `cd ~/Desktop/Projects`, then rerun SpielOS from that existing folder.",
+            "Change to an existing company home folder, then rerun SpielOS.",
             file=sys.stderr,
         )
         return 2

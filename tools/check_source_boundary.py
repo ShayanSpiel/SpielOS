@@ -33,6 +33,11 @@ if env.is_file():
     if subprocess.run(["git", "ls-files", "--error-unmatch", ".env"], cwd=ROOT,
                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
         failures.append("publishing .env must never be tracked")
+# Installed Department/Skill definitions are never part of the product spine.
+for tree in (ROOT / "company", ROOT / "company/init_templates/agents/company"):
+    for layer, filename in (("departments", "department.py"), ("skills", "SKILL.md")):
+        for path in (tree / layer).rglob(filename):
+            failures.append(f"owner definition in reusable spine: {path.relative_to(ROOT)}")
 # Synthetic fixtures may exercise core interfaces but must not carry owner copy.
 fixture_root = ROOT / "company/tests/fixtures/departments"
 for path in fixture_root.glob("*/department.py"):
