@@ -2,13 +2,14 @@
   "hooks": {
     "SessionStart": [
       {
-        "matcher": "compact",
+        "matcher": "startup|resume|compact",
         "hooks": [
           {
             "type": "command",
             "command": "python3 .codex/hooks/spielos-context.py",
             "timeout": 10,
-            "statusMessage": "Restoring SpielOS company context"
+            "statusMessage": "Restoring SpielOS company context",
+            "additionalContextLimit": 20000
           }
         ]
       }
@@ -19,7 +20,8 @@
           {
             "type": "command",
             "command": "python3 .codex/hooks/spielos-context.py",
-            "timeout": 10
+            "timeout": 10,
+            "additionalContextLimit": 20000
           }
         ]
       }

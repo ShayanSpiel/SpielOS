@@ -66,11 +66,17 @@ opencode    # or: codex
 In **OpenCode**: run `/agents`, select the **Director** agent, and talk to
 it — it already sees your company state.
 
-In **Codex**: talk to the **Director** agent — it already sees your company
-state.
+In **Codex**: start a chat in the company home. Its root `AGENTS.md` makes
+that main chat the Director and loads the canonical operating contract.
+`.codex/agents/director.toml` also defines a custom subagent; that file alone
+does not select the main chat's identity.
 
-No manual probing, no `status` commands to start: the host injects a fresh,
-read-only company projection into every model request.
+Review the company hooks before relying on automatic context (`/hooks` in
+the Codex CLI). Project trust does not approve hooks, and moved or changed
+hook definitions require fresh owner review. Approved hooks inject a fresh,
+read-only company projection at startup, resume, compaction, and each user
+prompt. Without a projection, the Director reports the missing injection and
+uses its read-only status fallback.
 
 ## Update
 

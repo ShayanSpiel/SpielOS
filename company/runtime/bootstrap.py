@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import shlex
 from pathlib import Path
 
 from .config import VERSION
@@ -520,6 +521,28 @@ def scaffold(target: Path | None = None, *, force: bool = False,
         written += _copy_tree(src, root / ("." + name), overwrite=force,
                               skip=(_claude_skip if name == "claude" else None))
 
+    # Resolve owned Codex commands at installation time. A company home need
+    # not be a Git checkout, and hook processes inherit the session cwd.
+    codex_hooks = root / ".codex/hooks.json"
+    if codex_hooks.is_file():
+        config = json.loads(codex_hooks.read_text())
+        changed = False
+        owned = {
+            "python3 .codex/hooks/spielos-context.py": "spielos-context.py",
+            "python3 .codex/hooks/spielos-attention.py": "spielos-attention.py",
+        }
+        for groups in config.get("hooks", {}).values():
+            for group in groups:
+                for hook in group.get("hooks", []):
+                    script = owned.get(hook.get("command"))
+                    if script:
+                        hook["command"] = "python3 " + shlex.quote(
+                            str(root / ".codex/hooks" / script))
+                        changed = True
+        if changed:
+            codex_hooks.write_text(json.dumps(config, indent=2) + "\n")
+            written.append(str(codex_hooks))
+
     # Claude Code reads CLAUDE.md at the project root; the one-line bridge
     # to AGENTS.md makes all three hosts share one operating doc. It is
     # owner-editable like AGENTS.md: written only when absent, never
@@ -576,9 +599,13 @@ def scaffold(target: Path | None = None, *, force: bool = False,
     agents_md = root / "AGENTS.md"
     if agents_md.exists():
         current = agents_md.read_text()
-        if _LAYOUT_MARKER not in current:
-            agents_md.write_text(
-                current.rstrip("\n") + "\n\n" + _LAYOUT_CONTRACT_SECTION)
+        updated = current
+        if _LAYOUT_MARKER not in updated:
+            updated = updated.rstrip("\n") + "\n\n" + _LAYOUT_CONTRACT_SECTION
+        if _PRIMARY_DIRECTOR_MARKER not in updated:
+            updated = updated.rstrip("\n") + "\n\n" + _PRIMARY_DIRECTOR_SECTION
+        if updated != current:
+            agents_md.write_text(updated)
             written.append(str(agents_md))
     else:
         agents_md.write_text(_AGENTS_MD)
@@ -604,9 +631,9 @@ def scaffold(target: Path | None = None, *, force: bool = False,
         "next_steps": [
             "cd " + str(root),
             "opencode (run /agents, select the Director agent), "
-            "codex (talk to the Director agent), or claude "
+            "codex (the main chat acts as Director; review company hooks first), or claude "
             "(run claude --agent director)",
-            "The Director already sees your company state; just talk to it.",
+            "After reviewing host hooks, the Director receives company context automatically.",
             "Create a clean Department only when its Workflow contract is ready.",
             "Set credentials in .spielos/.env (see .spielos/.env.example).",
             "Audit layout any time: PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.agents "
@@ -635,6 +662,38 @@ _GITIGNORE = """
 node_modules/
 """
 
+_PRIMARY_DIRECTOR_MARKER = "<!-- spielos-primary-director v1 -->"
+
+_PRIMARY_DIRECTOR_SECTION = """## Primary Director
+
+<!-- spielos-primary-director v1 -->
+
+In the main owner conversation in this company home, you are the primary
+SpielOS Director. The main chat itself holds this role; do not spawn a
+Director subagent to establish it. Delegated Agents keep their assigned
+roles and execute only their own claimed WorkOrders.
+
+Before responding or acting as Director, read `.codex/agents/director.toml`
+and follow its `developer_instructions` as the canonical operating
+contract, including owner voice, the command surface, evidence, approvals,
+and memory lineage. This instruction deliberately makes that existing
+contract apply to the main chat. Codex otherwise uses that TOML file only
+as a custom subagent definition. Do not create a duplicate Director Skill.
+
+Use the injected SpielOS projection: current Goal and evidence, owner
+profile, applicable workflow and strategy memory, attention, and layout.
+If the projection is missing, use the contract's one read-only status
+fallback and report the injection failure; never read SQLite directly or
+infer that missing injected memory means memory was deleted.
+
+Codex setup: open a new chat with this company home as its working folder.
+Project trust and hook trust are separate. Review the home's context and
+attention hooks through Codex's hook-review controls (`/hooks` in the CLI);
+new or changed definitions require owner review. Never edit global hook
+trust records, copy approvals from another path, or bypass hook review.
+"""
+
+
 _AGENTS_MD = """# Agent operating rules — harness section
 
 This repository runs on the SpielOS company harness: one durable loop
@@ -644,9 +703,10 @@ record; Departments supply Agent-owned behavior only.
 
 Authority and full documentation: `.agents/company/README.md`.
 
-Open OpenCode (run `/agents`, select the Director agent), Codex (talk to
-the Director agent), or Claude Code (run `claude --agent director`) and
-just talk to it — it already sees your company state. Claude Code reads
+Open OpenCode (run `/agents`, select the Director agent), Codex (the main
+chat acts as Director after reading this file), or Claude Code (run
+`claude --agent director`). Review host hooks before relying on automatic
+company context. Claude Code reads
 this file through the one-line `CLAUDE.md` bridge. The host injects fresh
 company state automatically; do not begin with a
 manual status probe. If a request carries no SpielOS projection, host
@@ -694,7 +754,7 @@ resolve every violation before adding new content.
 - Structural changes (Departments, Workflows, or the vendored spine) go
   through one bounded system-improvement Goal with exact allowed files and
   acceptance evidence — never improvise them directly.
-"""
+""" + "\n" + _PRIMARY_DIRECTOR_SECTION
 
 _LAYOUT_MARKER = "<!-- spielos-layout-contract v1 -->"
 
