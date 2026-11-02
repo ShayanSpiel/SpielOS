@@ -199,14 +199,23 @@ def ensure_server(home,*,open_browser=False,port=None):
             except (OSError,ValueError,KeyError):pass
         config=configuration(home);log=os.open(home/'.spielos/state/report-server.log',os.O_CREAT|os.O_APPEND|os.O_WRONLY,0o600)
         env={**os.environ,'PYTHONDONTWRITEBYTECODE':'1','PYTHONPATH':str(Path(__file__).resolve().parent.parent)}
-        subprocess.Popen([sys.executable,'-B','-m','company','report','--serve','--home',str(home),'--port',str(config['port'] if port is None else port)],cwd=home,env=env,stdout=log,stderr=log,start_new_session=True);os.close(log)
-        for _ in range(30):
+        try:
+            process=subprocess.Popen([sys.executable,'-B','-m','company','report','--serve','--home',str(home),'--port',str(config['port'] if port is None else port)],cwd=home,env=env,stdout=log,stderr=log,start_new_session=True)
+        finally:os.close(log)
+        deadline=time.monotonic()+15
+        while time.monotonic()<deadline:
+            if process.poll() is not None:
+                raise RuntimeError('Report server exited during startup (code '+str(process.returncode)+'); inspect '+str(home/'.spielos/state/report-server.log'))
             time.sleep(.1);candidate=state(home)
-            if candidate and candidate.get('pid')!=a.get('pid'):
+            if candidate and candidate.get('pid')==process.pid:
                 if open_browser:
                     import webbrowser;webbrowser.open(candidate['url'])
                 return {k:candidate[k] for k in ('url','base_url','pid','custom_ui')}
-    raise RuntimeError('Report server did not start; inspect the local report log')
+        # Do not orphan a child after a bounded startup failure.
+        process.terminate()
+        try:process.wait(timeout=5)
+        except subprocess.TimeoutExpired:process.kill();process.wait()
+    raise RuntimeError('Report server was not ready within 15 seconds; inspect '+str(home/'.spielos/state/report-server.log'))
 
 def serve(home,port=8775):
     from http.server import ThreadingHTTPServer,BaseHTTPRequestHandler

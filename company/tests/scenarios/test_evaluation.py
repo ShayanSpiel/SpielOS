@@ -94,7 +94,7 @@ class EvaluationJourneys(WorkspaceJourney):
                 'source_note':'Synthetic fixture. Business impact has not been measured.'}
         page=brand/'examples/sales-report.html'
         page.write_text(render_report(brand,values).replace('</body>',"<script>document.body.dataset.overflow=String(document.documentElement.scrollWidth>innerWidth);document.body.dataset.cards=String(document.querySelectorAll('.metric-card').length)</script></body>"))
-        import time
+        import time,signal
         node=shutil.which('node')
         if not node:self.skipTest('Node with built-in WebSocket is required for exact browser viewport checks')
         renders=[]
@@ -128,22 +128,37 @@ class EvaluationJourneys(WorkspaceJourney):
             with tempfile.TemporaryDirectory() as profile:
                 process=subprocess.Popen([browser,'--headless','--disable-gpu','--no-first-run','--no-default-browser-check',
                     '--disable-background-networking','--disable-component-update','--hide-scrollbars',
-                    '--user-data-dir='+profile,'--remote-debugging-port=0','about:blank'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+                    '--user-data-dir='+profile,'--remote-debugging-port=0','about:blank'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,start_new_session=True)
                 try:
                     port_file=Path(profile)/'DevToolsActivePort'
+                    port=None
                     for attempt in range(300):
-                        if port_file.is_file() or process.poll() is not None:break
+                        try:
+                            lines=port_file.read_text().splitlines()
+                            if len(lines)>=2 and lines[0].isdigit():
+                                port=int(lines[0]);break
+                        except FileNotFoundError:pass
+                        if process.poll() is not None:break
                         time.sleep(0.05)
-                    self.assertTrue(port_file.is_file(),'The isolated renderer did not start')
-                    port=int(port_file.read_text().splitlines()[0])
+                    self.assertIsNotNone(port,'The isolated renderer did not publish a complete endpoint')
                     settings={'port':port,'width':width,'height':height,'url':page.as_uri(),'output':str(image)}
                     result=subprocess.run([node,'-e',renderer,json.dumps(settings)],capture_output=True,text=True,timeout=20)
                     self.assertEqual(result.returncode,0,result.stderr[-500:])
                     inspected=json.loads(result.stdout)
                 finally:
-                    process.terminate()
+                    # Chrome's launcher may exit while its helpers still own the
+                    # profile. Stop the entire isolated session before cleanup.
+                    try:os.killpg(process.pid,signal.SIGTERM)
+                    except ProcessLookupError:pass
                     try:process.wait(timeout=5)
-                    except subprocess.TimeoutExpired:process.kill();process.wait()
+                    except subprocess.TimeoutExpired:
+                        os.killpg(process.pid,signal.SIGKILL);process.wait()
+                    try:os.killpg(process.pid,signal.SIGKILL)
+                    except ProcessLookupError:pass
+                    for _ in range(100):
+                        try:os.killpg(process.pid,0)
+                        except ProcessLookupError:break
+                        time.sleep(.02)
             self.assertEqual(inspected['width'],width)
             self.assertEqual(inspected['height'],height)
             self.assertFalse(inspected['overflow'])

@@ -94,7 +94,7 @@ The current target is a **trusted local pilot**. Trusted process execution is no
 
 ## Develop and verify
 
-Keep owner data and credentials outside this checkout. The operational Python runtime uses the standard library; distribution building needs setuptools/build, and launcher/scenario checks also use Node.
+Keep owner data and credentials outside this checkout. The operational Python runtime uses the standard library; distribution building needs setuptools/build, and launcher/scenario checks also use Node and Chrome. Install test dependencies with `python3 -m pip install ".[test]"`.
 
 ```sh
 python3 -B tools/check_source_boundary.py

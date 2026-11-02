@@ -13,10 +13,22 @@ class ReportTests(unittest.TestCase):
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup);self.home=Path(self.temp.name)/'home';scaffold(self.home,keep_stale=True)
         s=CompanySession();v=s.select(str(self.home));self.r=s.runtime(v['company_id'])
     def server(self):
-        result=ensure_server(self.home,port=0);self.addCleanup(lambda:os.kill(result['pid'],signal.SIGTERM));return state(self.home)
+        try:result=ensure_server(self.home,port=0)
+        except RuntimeError as exc:
+            log=self.home/'.spielos/state/report-server.log'
+            self.fail(str(exc)+'\nSynthetic server log:\n'+(log.read_text()[-4000:] if log.is_file() else 'No log created'))
+        self.addCleanup(lambda:os.kill(result['pid'],signal.SIGTERM));return state(self.home)
     def request(self,s,path,*,auth=True,method='GET',headers=None,data=None):
         h={'Authorization':'Bearer '+s['token']} if auth else {};h.update(headers or {})
         return urllib.request.urlopen(urllib.request.Request(s['base_url']+path,method=method,headers=h,data=json.dumps(data).encode() if data else None),timeout=10)
+    def test_occupied_port_reports_child_exit_instead_of_hiding_startup_failure(self):
+        import socket
+        occupied=socket.socket();self.addCleanup(occupied.close)
+        occupied.bind(('127.0.0.1',0));occupied.listen()
+        with self.assertRaisesRegex(RuntimeError,'exited during startup'):
+            ensure_server(self.home,port=occupied.getsockname()[1])
+        self.assertIn('Address already in use',(self.home/'.spielos/state/report-server.log').read_text())
+
     def test_fresh_home_report_and_plain_memory_summary_need_no_database(self):
         import subprocess,sys
         home=Path(self.temp.name)/'fresh-home';scaffold(home,keep_stale=True)
