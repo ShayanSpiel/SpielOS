@@ -311,6 +311,13 @@ class Sessions:
         return result
 
 
+
+def completion_end(connection,session_id,turn_key):
+    """First Stop is the completion boundary; a later close is fallback evidence only."""
+    row=connection.execute("SELECT record_json FROM activity_events WHERE session_id=? AND kind='end' AND json_extract(record_json,'$.turn_key')=? ORDER BY CASE WHEN json_extract(record_json,'$.payload.event')='Stop' THEN 0 ELSE 1 END,rowid ASC LIMIT 1",(session_id,turn_key)).fetchone()
+    return json.loads(row[0])['payload'] if row else None
+
+
 def capture_hook(home, request, *, host, context=None, documents=None):
     """Explicit installed hook. No transcript discovery or host trust bypass."""
     from ..mcp import CompanySession
@@ -364,8 +371,11 @@ def capture_hook(home, request, *, host, context=None, documents=None):
         elapsed=None
         from datetime import datetime,timezone
         if automatic:
-            with runtime.connect() as c:first=c.execute('SELECT created_at FROM activity_turns WHERE session_id=? AND turn_key=?',(session['id'],sessions.turn_key)).fetchone()
-            if first:elapsed=max(0,(datetime.now(timezone.utc)-datetime.fromisoformat(first[0])).total_seconds())
+            with runtime.connect() as c:
+                first=c.execute('SELECT created_at FROM activity_turns WHERE session_id=? AND turn_key=?',(session['id'],sessions.turn_key)).fetchone()
+                completed=completion_end(c,session['id'],sessions.turn_key)
+            if completed and completed.get('event')=='Stop':elapsed=completed.get('elapsed_seconds')
+            elif first:elapsed=max(0,(datetime.now(timezone.utc)-datetime.fromisoformat(first[0])).total_seconds())
         end_payload={'source':'host hook','event':event,'usage':usage,'elapsed_seconds':elapsed,'time_basis':'Observed host turn wall time including tool and waiting; not active compute','completion':'Host turn ended; quality and observability require separate evidence'}
         with runtime.connect() as c:existing_end=c.execute('SELECT record_json FROM activity_events WHERE session_id=? AND request_key=?',(session['id'],key)).fetchone()
         if existing_end:end_payload=json.loads(existing_end[0])['payload']

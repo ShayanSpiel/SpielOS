@@ -47,8 +47,9 @@ def markdown(runtime,session_id):
         counts=dict(c.execute('SELECT status,COUNT(*) FROM activity_exports WHERE id IN (SELECT id FROM activity_events WHERE session_id=? AND json_extract(record_json,\'$.turn_key\')=?) GROUP BY status',(session_id,turn))) if turn else {}
         reports=c.execute("SELECT COUNT(*) FROM host_evaluation_requests WHERE session_id=? AND turn_key=? AND status='pending'",(session_id,turn)).fetchone()[0] if turn else 0
         judgments=c.execute("SELECT COUNT(*) FROM host_evaluation_requests WHERE session_id=? AND turn_key=? AND status='reviewed'",(session_id,turn)).fetchone()[0] if turn else 0
-        usage=c.execute("SELECT record_json FROM activity_events WHERE session_id=? AND kind='end' AND json_extract(record_json,'$.turn_key')=? ORDER BY rowid DESC LIMIT 1",(session_id,turn)).fetchone() if turn else None
-    data=json.loads(usage[0])['payload'] if usage else {};u=data.get('usage',{})
+        from .sessions import completion_end
+        data=completion_end(c,session_id,turn) if turn else None
+    data=data or {};u=data.get('usage',{})
     config=policy(runtime);project=config.get('base_url','https://cloud.langfuse.com')+'/project/'+str(config.get('project_id',''))
     trace=hashlib.sha256(('spielos:'+session_id+':turn:'+turn).encode()).hexdigest()[:32] if turn else None
     url=display_url(runtime.home);workspace='[Company report]('+url+')' if url.startswith('http') else 'Open `/report` for the company report'

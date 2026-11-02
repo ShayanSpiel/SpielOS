@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "spielos",
-  "version": "10.3.11",
+  "version": "10.3.12",
   "description": "Build lead research, outbound email and recurring company workflows with lasting context, a live dashboard and real evaluation evidence.",
   "license": "MIT",
   "extensions": {
@@ -40,7 +40,7 @@
       },
       "publication": {
         "countries": [],
-        "release_notes": "SpielOS desktop tester release: real workflow prompts, shared Work & learning dashboard, first-chat tour, explicit Langfuse connection, canonical runtime, Director skills and native portability acceptance."
+        "release_notes": "Stable completion receipts: preserve original Stop elapsed time across session close, retain actual usage, and request the full canonical receipt in Codex and Claude Code with a one-pass guard."
       }
     }
   },
