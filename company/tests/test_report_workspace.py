@@ -21,6 +21,14 @@ class ReportTests(unittest.TestCase):
     def request(self,s,path,*,auth=True,method='GET',headers=None,data=None):
         h={'Authorization':'Bearer '+s['token']} if auth else {};h.update(headers or {})
         return urllib.request.urlopen(urllib.request.Request(s['base_url']+path,method=method,headers=h,data=json.dumps(data).encode() if data else None),timeout=10)
+    def test_loopback_server_starts_without_reverse_dns(self):
+        from unittest.mock import patch
+        from company.reporting import serve
+        with patch('socket.getfqdn',side_effect=AssertionError('Loopback must not require DNS')), \
+                patch('http.server.ThreadingHTTPServer.serve_forever'):
+            serve(self.home,port=0)
+        self.assertTrue(state(self.home)['base_url'].startswith('http://127.0.0.1:'))
+
     def test_occupied_port_reports_child_exit_instead_of_hiding_startup_failure(self):
         import socket
         occupied=socket.socket();self.addCleanup(occupied.close)

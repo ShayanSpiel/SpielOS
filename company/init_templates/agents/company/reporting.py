@@ -277,6 +277,15 @@ def serve(home,port=8775):
                 if sys.platform!='darwin':self._send(200,{'path':str(f),'opened':False,'message':'Copy this path into your file manager.'});return
                 subprocess.run(['/usr/bin/open','-R',str(f)],check=True,timeout=5);self._send(200,{'opened':True,'path':str(f)})
             except (ValueError,PermissionError,FileNotFoundError) as exc:self._send(403,{'error':str(exc)})
-    server=ThreadingHTTPServer(('127.0.0.1',port),Handler);base='http://127.0.0.1:'+str(server.server_port);path='/'+config['ui_root']+'/index.html' if config['ui_root'] else '/_spielos/index.html';url=base+path+'?'+urlencode({'token':token})
+    class LoopbackHTTPServer(ThreadingHTTPServer):
+        def server_bind(self):
+            # HTTPServer's default bind performs reverse DNS. A loopback-only
+            # server needs no resolver and must start on offline/slow-DNS hosts.
+            from socketserver import TCPServer
+            TCPServer.server_bind(self)
+            self.server_name='localhost'
+            self.server_port=self.server_address[1]
+    server=LoopbackHTTPServer(('127.0.0.1',port),Handler);base='http://127.0.0.1:'+str(server.server_port);path='/'+config['ui_root']+'/index.html' if config['ui_root'] else '/_spielos/index.html';url=base+path+'?'+urlencode({'token':token})
     write_json(home/'.spielos/report-server.json',{'schema':1,'pid':os.getpid(),'home':str(home),'base_url':base,'url':url,'token':token,'custom_ui':bool(config['ui_root']),'started_at':_now(),'runtime_sha256':runtime_sha});os.chmod(home/'.spielos/report-server.json',0o600)
-    server.serve_forever()
+    try:server.serve_forever()
+    finally:server.server_close()
