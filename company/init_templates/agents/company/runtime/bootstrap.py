@@ -30,6 +30,7 @@ from __future__ import annotations
 import json
 import shutil
 import shlex
+import sys
 from pathlib import Path
 
 from .config import VERSION
@@ -140,6 +141,11 @@ def _merge_owned_hooks(root: Path, host: str, desired: dict, destination: Path) 
                    f'python3 "{root/suffix}"')
             if host=='claude':forms=(*forms,f'python3 "$CLAUDE_PROJECT_DIR/{suffix}"')
             if command in forms:return True
+            try:parts=shlex.split(command)
+            except ValueError:continue
+            if host=='codex' and len(parts)==3 and parts[1]=='-B' and parts[2]==str(root/suffix):
+                import re
+                if Path(parts[0]).is_absolute() and re.fullmatch(r'python(?:3(?:\.\d+)?)?',Path(parts[0]).name):return True
         return False
     merged={}
     for event,groups in hooks.items():
@@ -504,7 +510,7 @@ def scaffold(target: Path | None = None, *, force: bool = False,
                 for hook in group.get("hooks", []):
                     script = owned.get(hook.get("command"))
                     if script:
-                        hook["command"] = "python3 " + shlex.quote(
+                        hook["command"] = shlex.quote(sys.executable)+" -B " + shlex.quote(
                             str(root / ".codex/hooks" / script))
                         changed = True
         if changed:

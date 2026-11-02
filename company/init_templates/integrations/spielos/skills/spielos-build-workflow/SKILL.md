@@ -26,7 +26,7 @@ mapping in `payload.candidate_runs`. Do not impersonate a reviewer or provision 
 second identity merely to self-approve. Explain missing review as an unresolved
 requirement. A negative case must fail its stated quality criterion.
 
-The CLI `workflow experiment` runs the pinned case set and journals Langfuse dataset/score-definition resources when approved export is configured. Inspect experiment-show for local case evidence versus remote verification; neither an HTTP success nor the experiment itself creates a production release. Unknown service/model usage stays unknown.
+The bundled runtime’s `workflow experiment` runs the pinned case set and journals Langfuse dataset/score-definition resources when approved export is configured. Inspect experiment-show for local case evidence versus remote verification; neither an HTTP success nor the experiment itself creates a production release. Unknown service/model usage stays unknown.
 
 For a company brand version, use `build_workflow` action `brand-candidate` with the version and actual files. Use the company's existing tokens/components; no report CSS class names are required. A brand/brand.json may explicitly declare contained voice/tokens/components/assets/templates/examples roles. The contract and actual bytes are pinned. Never replace an existing brand with the neutral starter just to satisfy validation.
 
@@ -35,3 +35,5 @@ Evaluation and observability are governed by `EVALUATION.md` and `spielos-evalua
 
 
 Use the selected company's live `/report` record for workflow/run counts, memory, supplied context, artifacts, evaluations and telemetry status. Read `company/evaluation-and-learning-contract.md` when present. Every new or changed workflow needs the executable evaluation pair and regression cases before qualification. Record actual host token metadata and separately sourced reference prices; never invent usage, billed cost, memory retention or independent acceptance. End meaningful work with a concise human tracking receipt and report/trace links. Keep company content in the selected home and reusable product code in source; no publication, hidden pursuit or cross-company routing is implied.
+
+For setup or a missing company, use the bundled setup skill. Resolve the launcher at scripts/launch.sh relative to the installed plugin root. Use it for report and experiment operations that are not exposed by the six MCP tools; never require a separate global SpielOS installation. The runtime operating guide is bundled at runtime/company/README.md. Keep those commands internal and give the user names, findings and next decisions.

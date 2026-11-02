@@ -1,0 +1,6 @@
+{
+  "name": "spielos",
+  "version": "10.3.6",
+  "description": "Keep your company context across chats. Build recurring workflows, test real outputs, and review the evidence before you rely on them.",
+  "skills": "./skills/"
+}

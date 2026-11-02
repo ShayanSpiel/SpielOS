@@ -3,7 +3,7 @@ name: spielos-company
 description: Inspect an explicitly selected SpielOS company and restore its durable workflow context across chats.
 ---
 
-Use the SpielOS tools over the installed runtime. First call `select_company`
+Use the SpielOS tools over the bundled runtime. First call `select_company`
 with the owner's absolute installed-home folder, then use its returned
 `company_id` for every operation. Installation never selects or creates a home.
 If the owner has not selected a company, ask for that folder; do not use the
@@ -23,3 +23,5 @@ Evaluation and observability are governed by `EVALUATION.md` and `spielos-evalua
 
 
 Use the selected company's live `/report` record for workflow/run counts, memory, supplied context, artifacts, evaluations and telemetry status. Read `company/evaluation-and-learning-contract.md` when present. Every new or changed workflow needs the executable evaluation pair and regression cases before qualification. Record actual host token metadata and separately sourced reference prices; never invent usage, billed cost, memory retention or independent acceptance. End meaningful work with a concise human tracking receipt and report/trace links. Keep company content in the selected home and reusable product code in source; no publication, hidden pursuit or cross-company routing is implied.
+
+For setup or a missing company, use the bundled setup skill. Resolve the launcher at scripts/launch.sh relative to the installed plugin root. Use it for report and experiment operations that are not exposed by the six MCP tools; never require a separate global SpielOS installation. The runtime operating guide is bundled at runtime/company/README.md. Keep those commands internal and give the user names, findings and next decisions.

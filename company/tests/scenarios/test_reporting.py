@@ -205,16 +205,21 @@ class CleanPluginDistributionJourneys(unittest.TestCase):
                 env=environment,capture_output=True,text=True,timeout=30)
             self.assertEqual(initialized.returncode,0,initialized.stderr[-500:])
             self.assertEqual(json.loads(initialized.stdout)['layout'],'lean')
-            plugin=json.loads((staging/'company/init_templates/integrations/spielos/mcp.json').read_text())
+            from tools.build_plugin import build
+            package=Path(build(root/'desktop-plugin')['package'])
+            plugin=json.loads((package/'mcp.json').read_text())
             binding=plugin['mcpServers']['spielos']
-            self.assertEqual(binding['command'],'spielos');self.assertEqual(binding['args'],['mcp'])
+            self.assertEqual(binding['command'],'/bin/sh')
+            self.assertEqual(binding['args'],['${PLUGIN_ROOT}/scripts/launch.sh','mcp'])
             self.assertNotIn(str(source),json.dumps(plugin))
             environment['PATH']=str(virtual/'bin')+os.pathsep+environment.get('PATH','')
+            environment['SPIELOS_PYTHON']=str(python)
             processes=[]
             def client(token=None):
                 env=dict(environment)
                 if token:env['SPIELOS_PRINCIPAL_TOKEN']=token
-                process=subprocess.Popen([binding['command'],*binding['args']],cwd=root,env=env,
+                args=[arg.replace('${PLUGIN_ROOT}',str(package)) for arg in binding['args']]
+                process=subprocess.Popen([binding['command'],*args],cwd=root,env=env,
                     stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
                 processes.append(process);counter=0
                 def request(method,params):

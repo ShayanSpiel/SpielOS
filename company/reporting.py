@@ -126,13 +126,21 @@ def snapshot(home):
             if 'host_evaluation_verdicts' in tables:
                 for row in c.execute('SELECT request_id,verdict_json,created_at FROM host_evaluation_verdicts ORDER BY rowid DESC LIMIT 20'):
                     a=dict(row);a['verdict']=json.loads(a.pop('verdict_json'));a['independent_acceptance']=False;result['evaluations'].append(a)
-            cfg=_json(home/'.spielos/telemetry.json',{});project=cfg.get('base_url','https://cloud.langfuse.com')+'/project/'+str(cfg.get('project_id',''))
+            result['evaluation_requests']=[]
+            if 'host_evaluation_requests' in tables:
+                for row in c.execute('SELECT subject,status,request_json,created_at FROM host_evaluation_requests ORDER BY rowid DESC LIMIT 30'):
+                    request=json.loads(row['request_json'])
+                    result['evaluation_requests'].append({'subject':row['subject'],'status':row['status'],
+                        'created_at':row['created_at'],'criteria':request.get('rubric',[]),
+                        'artifact_digest':request.get('artifact_digest'),'independent_acceptance':False})
+            cfg=_json(home/'.spielos/telemetry.json',{})
+            project=cfg['base_url']+'/project/'+str(cfg['project_id']) if cfg.get('enabled') is True and cfg.get('base_url') and cfg.get('project_id') else None
             telemetry={'enabled':cfg.get('enabled',False),'project_url':project,'activity':{},'workflow':{},'recent':[]}
             for table,label in [('activity_exports','activity'),('workflow_export_outbox','workflow')]:
                 if table not in tables:continue
                 telemetry[label]={r[0]:r[1] for r in c.execute('SELECT status,COUNT(*) FROM '+table+' GROUP BY status')}
                 for row in c.execute('SELECT id,payload_json,status,last_error,remote_reference FROM '+table+' ORDER BY rowid DESC LIMIT 12'):
-                    a=dict(row);event=json.loads(a.pop('payload_json'));trace,span=identities(event);a.update({'name':event.get('trace_name',event.get('name')),'at':event.get('at'),'trace_url':project+'/traces/'+trace,'observation_id':span,'kind':label});telemetry['recent'].append(a)
+                    a=dict(row);event=json.loads(a.pop('payload_json'));trace,span=identities(event);a.update({'name':event.get('trace_name',event.get('name')),'at':event.get('at'),'trace_url':project+'/traces/'+trace if project else None,'observation_id':span,'kind':label});telemetry['recent'].append(a)
             telemetry['native_definitions']=[dict(r) for r in c.execute('SELECT key,status,last_error,evaluator_id,rule_id FROM native_evaluation_definitions ORDER BY key')] if 'native_evaluation_definitions' in tables else []
             telemetry['native_pending']=sum(r['status']!='verified' for r in telemetry['native_definitions'])
             telemetry['pending']=sum(n for label in ['activity','workflow'] for state,n in telemetry[label].items() if state!='verified');telemetry['verified']=sum(telemetry[label].get('verified',0) for label in ['activity','workflow']);telemetry['synchronized']=telemetry['pending']==0 and telemetry['native_pending']==0;result['telemetry']=telemetry

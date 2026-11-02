@@ -1,3 +1,3 @@
 """Runtime release metadata."""
 
-VERSION = "10.3.4"
+VERSION = "10.3.6"

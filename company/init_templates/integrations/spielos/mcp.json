@@ -1,4 +1,14 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
-  "mcpServers": {"spielos": {"type": "stdio", "command": "spielos", "args": ["mcp"]}}
+  "mcpServers": {
+    "spielos": {
+      "type": "stdio",
+      "command": "/bin/sh",
+      "args": [
+        "${PLUGIN_ROOT}/scripts/launch.sh",
+        "mcp"
+      ],
+      "cwd": "${PLUGIN_ROOT}"
+    }
+  }
 }

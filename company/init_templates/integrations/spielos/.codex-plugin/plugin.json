@@ -1,0 +1,32 @@
+{
+  "name": "spielos",
+  "version": "10.3.6",
+  "description": "Keep your company context across chats. Build recurring workflows, test real outputs, and review the evidence before you rely on them.",
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "SpielOS",
+    "shortDescription": "Company work, clearly tracked.",
+    "longDescription": "Keep your company context across chats and see what happened. SpielOS brings a lasting company workspace, reusable workflows, scoped memory and a live local dashboard into Codex.\n\nUse Setup to choose a company folder, Director to operate it, Dashboard to inspect work, and Help for available skills. Setup prepares private local activity recording and bounded review; Langfuse stays disconnected until you choose a project. The desktop plugin includes the same SpielOS runtime used by the company workspace and dashboard; no separate SpielOS CLI installation is needed. Your Mac or Linux computer needs Python 3.11 or newer, and setup checks that requirement without asking you to copy Python commands.\n\nInspect workflows, runs, memory, supplied context and reported usage in the dashboard. Company hooks restore relevant context and request bounded evaluations. At the end of meaningful chats, the assistant presents a tracking receipt with actual review/delivery status, report/trace links and exposed token/cost information. These are host-rendered Markdown receipts; unavailable usage and billing remain unknown.\n\nBuild workflows with pinned implementation and evaluation criteria. Experiments run representative, held-out and negative cases. Langfuse recording requires your explicitly selected project and evidence policy; pending delivery is not remote verification. A passing test is distinct from a measured improvement, and independent release review remains separate from publication permission.\n\nCompany files stay in the folder you select. Installation alone creates no company, enables no provider and trusts no hooks automatically. The current supported target is trusted local macOS/Linux use; native Windows and enterprise isolation are not qualified.",
+    "developerName": "Shayan Spiel",
+    "category": "Business & Operations",
+    "capabilities": [],
+    "defaultPrompt": [
+      "Set up a company workspace for me.",
+      "Help me turn a recurring task into a tested workflow.",
+      "Show my company work, memory and pending decisions."
+    ],
+    "websiteURL": "https://github.com/ShayanSpiel/SpielOS",
+    "supportURL": "https://github.com/ShayanSpiel/SpielOS/issues",
+    "privacyPolicyURL": "https://github.com/ShayanSpiel/SpielOS/blob/main/docs/plugin-privacy.md",
+    "termsOfServiceURL": "https://github.com/ShayanSpiel/SpielOS/blob/main/docs/plugin-terms.md",
+    "logo": "./assets/logo.png",
+    "composerIcon": "./assets/logo.png"
+  },
+  "requires_local_executor": true,
+  "extensions": {
+    "com.openai": {
+      "onboardingSkill": "./skills/setup/SKILL.md"
+    }
+  }
+}

@@ -394,7 +394,8 @@ class UpdatePreservationTests(unittest.TestCase):
             for rel, source in shipped.items():
                 expected = source.read_text()
                 if rel == ".codex/hooks.json":
-                    expected = expected.replace("python3 .codex/", f"python3 {home.resolve()}/.codex/")
+                    import shlex,sys
+                    expected = expected.replace("python3 .codex/", f"{shlex.quote(sys.executable)} -B {home.resolve()}/.codex/")
                     # Host configuration is merged: owner settings survive.
                     actual=json.loads((home/rel).read_text())
                     self.assertTrue(actual['old'])

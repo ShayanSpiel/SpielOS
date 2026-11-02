@@ -52,7 +52,7 @@ def run(python, expected):
         voice.write_text('Synthetic owner voice survives an update.\n')
         cli('update', '--dir', home, '--keep-stale', '--json')
         assert voice.read_text() == 'Synthetic owner voice survives an update.\n'
-        cli('runner', 'tick', fail=True)
+        assert 'runner' not in cli('--help')
         assert not (home / '.spielos/state/company.sqlite').exists()
         print(json.dumps({'version': expected, 'checks': len(checks),
             'result': 'passed', 'scope': 'isolated installed-wheel local journey'}))
