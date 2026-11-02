@@ -1,6 +1,6 @@
 {
   "name": "spielos",
-  "version": "10.3.10",
+  "version": "10.3.11",
   "description": "Build lead research, outbound email and recurring company workflows with lasting context, a live dashboard and real evaluation evidence.",
   "skills": "./skills/",
   "mcpServers": "./mcp.json",
@@ -20,8 +20,11 @@
     "supportURL": "https://github.com/ShayanSpiel/SpielOS/issues",
     "privacyPolicyURL": "https://github.com/ShayanSpiel/SpielOS/blob/main/docs/plugin-privacy.md",
     "termsOfServiceURL": "https://github.com/ShayanSpiel/SpielOS/blob/main/docs/plugin-terms.md",
-    "logo": "./assets/logo.png",
-    "composerIcon": "./assets/logo.png"
+    "logo": "./assets/spielos-logo.png",
+    "composerIcon": "./assets/spielos-logo.png",
+    "logoDark": "./assets/spielos-logo.png",
+    "composerIconDark": "./assets/spielos-logo.png",
+    "brandColor": "#3B82F6"
   },
   "requires_local_executor": true,
   "extensions": {

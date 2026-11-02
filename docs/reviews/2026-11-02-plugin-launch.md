@@ -99,3 +99,7 @@ Public marketplace main ee83d43 and the v10.3.10 GitHub release contain the cano
 ## Installation documentation correction — 2026-11-03
 
 Exact allowed files: README.md, docs/tester-guide.md, tools/export_plugin_marketplace.py and this review. Restore Python interpreter prerequisites separately from bundled SpielOS code; retain CLI as an alternative with existing one-command installer, virtual-environment installation on both OS families, interactive init, real host-specific skill commands and explicit package/home updates. Validate CLI help and synthetic installed-home journey. Do not claim public directory approval or a resolved listing logo. No product/runtime behavior is changed.
+
+## Logo archive correction — 2026-11-03
+
+Exact additional allowed file: company/init_templates/integrations/spielos/assets/spielos-logo.png. Reuse the supplied official square blue logo, reference the distinct asset in the portable and Codex compatibility manifests for listing/composer and light/dark appearances, and bump package/manifests/runtime to 10.3.11. Verify actual ZIP bytes, dimensions and contained references. This package correction is not proof that the private cloud listing renders its icon; its globe remains an observed unresolved host issue until visible readback succeeds. Python-led installer work is separate and not included in this logo archive.
