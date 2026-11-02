@@ -11,6 +11,7 @@ import subprocess
 import time
 
 WINDOWS = os.name == 'nt'
+_HOOK_UTF8="[Console]::InputEncoding=[Text.UTF8Encoding]::new($false); [Console]::OutputEncoding=[Text.UTF8Encoding]::new($false); $OutputEncoding=[Console]::OutputEncoding; "
 
 
 def user_id():
@@ -223,7 +224,7 @@ def hook_command(python, script):
     # Encode only our exact argv, so Unicode, spaces and shell metacharacters
     # never become a second command. Python receives UTF-8 pipe encoding.
     args = [str(python), '-X', 'utf8', '-B', str(script)]
-    body = '& ' + ' '.join("'" + a.replace("'", "''") + "'" for a in args) + '; exit $LASTEXITCODE'
+    body = _HOOK_UTF8 + '& ' + ' '.join("'" + a.replace("'", "''") + "'" for a in args) + '; exit $LASTEXITCODE'
     return 'powershell.exe -NoProfile -NonInteractive -EncodedCommand ' + base64.b64encode(body.encode('utf-16le')).decode('ascii')
 
 
@@ -233,7 +234,7 @@ def hook_arguments(command):
         return shlex.split(command)
     body = base64.b64decode(command[len(prefix):], validate=True).decode('utf-16le')
     args = [a.replace("''", "'") for a in re.findall(r"'((?:[^']|'')*)'", body)]
-    expected = '& ' + ' '.join("'" + a.replace("'", "''") + "'" for a in args) + '; exit $LASTEXITCODE'
+    expected = _HOOK_UTF8 + '& ' + ' '.join("'" + a.replace("'", "''") + "'" for a in args) + '; exit $LASTEXITCODE'
     if body != expected or len(args) != 5 or args[1:4] != ['-X', 'utf8', '-B']:
         raise ValueError('Not an owned SpielOS hook invocation')
     return args

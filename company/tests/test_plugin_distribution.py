@@ -105,8 +105,8 @@ class PluginDistributionTests(unittest.TestCase):
             'hook_event_name':'UserPromptSubmit','prompt':'Inspect synthetic company work'}
         def hook(name):
             import shlex
-            command=next(entry['command'] for groups in hooks.values() for group in groups for entry in group['hooks'] if name in entry['command'])
             from company.platform import hook_arguments
+            command=next(entry['command'] for groups in hooks.values() for group in groups for entry in group['hooks'] if Path(hook_arguments(entry['command'])[-1]).name==name)
             self.assertEqual(hook_arguments(command)[0],sys.executable)
             result=subprocess.run(shlex.split(command),
                 input=json.dumps(request),text=True,capture_output=True,timeout=15)

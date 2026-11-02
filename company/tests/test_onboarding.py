@@ -55,3 +55,25 @@ class OnboardingTests(unittest.TestCase):
         onboarding.choose(self.home,'local')
         text,_,_=context_payload(session.inspect(value['company_id']),home=self.home)
         self.assertNotIn('ask whether to connect Langfuse now',text)
+
+    def test_authenticated_local_form_requires_same_origin_and_explicit_choices(self):
+        import os,signal,urllib.request,urllib.error
+        from company.reporting import ensure_server
+        report=ensure_server(self.home,port=0)
+        self.addCleanup(lambda:os.kill(report['pid'],signal.SIGTERM))
+        browser=urllib.request.build_opener(urllib.request.HTTPCookieProcessor())
+        with browser.open(report['url'],timeout=5) as response:
+            self.assertIn('Work &amp; learning',response.read().decode())
+        def post(path,payload,origin=True):
+            headers={'Content-Type':'application/json','X-Spielos-Report':'1'}
+            if origin:headers['Origin']=report['base_url']
+            request=urllib.request.Request(report['base_url']+path,data=json.dumps(payload).encode(),headers=headers)
+            return browser.open(request,timeout=5)
+        with self.assertRaises(urllib.error.HTTPError) as error:post('/api/onboarding/choice',{'choice':'local'},origin=False)
+        self.assertEqual(error.exception.code,403);self.assertTrue(onboarding.status(self.home)['ask_langfuse'])
+        with post('/api/onboarding/choice',{'choice':'local'}) as response:self.assertFalse(json.load(response)['ask_langfuse'])
+        with post('/api/onboarding/tour',{'report_url':report['url']}) as response:self.assertTrue(json.load(response)['dashboard_tour_shown'])
+        with self.assertRaises(urllib.error.HTTPError):post('/api/onboarding/connect',{'base_url':'https://langfuse.invalid'})
+        self.assertFalse((self.home/'.spielos/security/langfuse.json').exists())
+        with browser.open(report['base_url']+'/_spielos/workspace.js',timeout=5) as response:
+            self.assertEqual(response.headers['Cache-Control'],'no-store')

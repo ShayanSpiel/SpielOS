@@ -274,7 +274,7 @@ def serve(home,port=8775):
                     self.send_response(206);self.send_header('Content-Type',mime);self.send_header('Content-Range',f'bytes {start}-{end}/{size}');self.send_header('Content-Length',str(end-start+1));self.send_header('Accept-Ranges','bytes');self.end_headers()
                     with f.open('rb') as stream:stream.seek(start);self.wfile.write(stream.read(end-start+1))
                 else:
-                    self.send_response(200);self.send_header('Content-Type',mime);self.send_header('Content-Length',str(size));self.send_header('Accept-Ranges','bytes');self.send_header('Referrer-Policy','no-referrer');self.send_header('X-Content-Type-Options','nosniff');self.end_headers()
+                    self.send_response(200);self.send_header('Content-Type',mime);self.send_header('Content-Length',str(size));self.send_header('Accept-Ranges','bytes');self.send_header('Referrer-Policy','no-referrer');self.send_header('X-Content-Type-Options','nosniff');self.send_header('Cache-Control','no-store');self.end_headers()
                     with f.open('rb') as stream:
                         while chunk:=stream.read(1024*1024):self.wfile.write(chunk)
             except (ValueError,PermissionError,FileNotFoundError,UnicodeError) as exc:self._send(403,{'error':str(exc)})
