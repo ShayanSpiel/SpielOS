@@ -157,7 +157,9 @@ class EvaluationJourneys(WorkspaceJourney):
                     except ProcessLookupError:pass
                     for _ in range(100):
                         try:os.killpg(process.pid,0)
-                        except ProcessLookupError:break
+                        # macOS may leave unsignalable sandbox helper/zombie
+                        # groups after the owned browser has exited.
+                        except (ProcessLookupError,PermissionError):break
                         time.sleep(.02)
             self.assertEqual(inspected['width'],width)
             self.assertEqual(inspected['height'],height)
