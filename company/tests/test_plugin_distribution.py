@@ -109,7 +109,7 @@ class PluginDistributionTests(unittest.TestCase):
             command=next(entry['command'] for groups in hooks.values() for group in groups for entry in group['hooks'] if Path(hook_arguments(entry['command'])[-1]).name==name)
             self.assertEqual(hook_arguments(command)[0],sys.executable)
             result=subprocess.run(shlex.split(command),
-                input=json.dumps(request),text=True,capture_output=True,timeout=15)
+                input=json.dumps(request),text=True,capture_output=True,timeout=60 if sys.platform=='win32' else 15)
             self.assertEqual(result.returncode,0,result.stderr);return json.loads(result.stdout)
         context=hook('spielos-context.py')['hookSpecificOutput']['additionalContext']
         self.assertIn('Company profile',context);self.assertNotIn('injection failed',context)

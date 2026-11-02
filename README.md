@@ -1,5 +1,7 @@
 # SpielOS
 
+<img src="company/init_templates/integrations/spielos/assets/logo.png" alt="SpielOS logo" width="96" height="96">
+
 **Turn recurring company work into workflows you can test and improve.**
 
 Research leads, build outbound and prepare reports with Director. Keep your company facts, strategy, brand, memory and decisions together across conversations — with a dashboard showing what actually happened.

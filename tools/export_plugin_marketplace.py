@@ -34,7 +34,7 @@ def export(destination):
         shutil.copyfile(ROOT / relative, target)
     # Distribution links point to the reviewed product source rather than missing files.
     readme = output / 'README.md'
-    text = readme.read_text()
+    text = readme.read_text().replace('company/init_templates/integrations/spielos/assets/logo.png', 'spielos/assets/logo.png')
     for relative in ('company/README.md', 'company/ARCHITECTURE.md', 'company/EVALUATION.md',
                      'docs/reviews/2026-11-02-technical-review.md', 'docs/reviews/2026-11-02-ci-repair.md'):
         text = text.replace('](' + relative + ')', '](https://github.com/ShayanSpiel/SpielOS/blob/main/' + relative + ')')
