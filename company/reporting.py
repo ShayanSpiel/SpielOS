@@ -112,7 +112,12 @@ def snapshot(home):
                 result['activity_counts']={r[0]:r[1] for r in c.execute('SELECT kind,COUNT(*) FROM activity_events GROUP BY kind')}
                 result['unique_completions']=c.execute("SELECT COUNT(*) FROM (SELECT session_id,COALESCE(json_extract(record_json,'$.turn_key'),id) FROM activity_events WHERE kind='end' GROUP BY session_id,COALESCE(json_extract(record_json,'$.turn_key'),id))").fetchone()[0]
                 for row in c.execute("SELECT id,session_id,record_json,created_at FROM activity_events WHERE kind IN ('end','generation') ORDER BY rowid DESC LIMIT 2000"):
-                    a=dict(row);payload=json.loads(a.pop('record_json'));data=payload['payload'];turn=payload.get('turn_key');u=data.get('usage',{'status':'unknown'});a.update({'turn_key':turn,'usage':u,'elapsed_seconds':data.get('elapsed_seconds'),'time_basis':data.get('time_basis'),'target':payload.get('target')});host_usage.append(u);a['event_kind']=payload.get('kind');result['activity'].append(a)
+                    a=dict(row);payload=json.loads(a.pop('record_json'));data=payload['payload'];turn=payload.get('turn_key');u=data.get('usage',{'status':'unknown'});a.update({'turn_key':turn,'usage':u,'elapsed_seconds':data.get('elapsed_seconds'),'time_basis':data.get('time_basis'),'target':payload.get('target')})
+                    if payload.get('kind')=='end' and turn:
+                        from .observability.sessions import completion_end
+                        completed=completion_end(c,a['session_id'],turn) or data
+                        a['elapsed_seconds']=completed.get('elapsed_seconds');a['usage']=completed.get('usage',u)
+                    host_usage.append(a['usage']);a['event_kind']=payload.get('kind');result['activity'].append(a)
                 # Aggregates use completion totals when present; a generation is not added again to its turn total.
                 end_turns={a['session_id']+':'+str(a['turn_key']) for a in result['activity'] if a['usage'].get('scope')=='turn_total'}
                 totals=[];seen_totals=set()

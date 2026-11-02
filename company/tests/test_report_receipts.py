@@ -67,3 +67,52 @@ class ReceiptTests(unittest.TestCase):
         with patch('company.observability.evaluators.sync',side_effect=ValueError('An evaluator creation is unresolved')):
             result=drain(self.r,seconds=18,limit=40,client=BulkMemory())
         self.assertIn('unresolved',result['native_definition_issue']);self.assertTrue(result['records'])
+
+    def test_session_close_cannot_extend_a_completed_turn_or_hide_its_usage(self):
+        from unittest.mock import patch
+        from datetime import datetime,timezone
+        class Clock(datetime):
+            value=datetime(2026,11,3,0,0,5,tzinfo=timezone.utc)
+            @classmethod
+            def now(cls,tz=None):return cls.value
+        req={'session_id':'stable-duration','turn_id':'one','hook_event_name':'UserPromptSubmit','prompt':'Inspect a synthetic report'}
+        with patch('company.workflows.runs.stamp',return_value='2026-11-03T00:00:00+00:00'):
+            info=capture_hook(self.home,req,host='codex')
+        req.update(hook_event_name='Stop',last_assistant_message='Synthetic result',usage={'status':'actual','source':'synthetic host receipt','input_tokens':123,'output_tokens':21})
+        with patch('datetime.datetime',Clock):capture_hook(self.home,req,host='codex')
+        Clock.value=datetime(2026,11,3,2,0,0,tzinfo=timezone.utc)
+        req.update(hook_event_name='SessionEnd',usage={'status':'unknown'})
+        with patch('datetime.datetime',Clock):capture_hook(self.home,req,host='codex')
+        with self.r.connect() as c:
+            records=[json.loads(r[0])['payload'] for r in c.execute("SELECT record_json FROM activity_events WHERE session_id=? AND kind='end' ORDER BY rowid",(info['session_id'],))]
+        self.assertEqual([r['elapsed_seconds'] for r in records],[5,5])
+        receipt=markdown(self.r,info['session_id']);self.assertIn('| Turn elapsed | 5.0s',receipt);self.assertIn('123 in / 21 out',receipt)
+        data=snapshot(self.home);self.assertEqual(data['usage']['chat_elapsed_seconds'],5)
+        self.assertEqual(data['usage']['chat']['input_tokens'],123)
+        # An old inflated close remains immutable evidence; readers prefer the real Stop.
+        sessions=Sessions(self.r);sessions.turn_key='one'
+        sessions.record(info['session_id'],kind='end',request_key='legacy-inflated-close',payload={'event':'SessionEnd','elapsed_seconds':99999,'usage':{'status':'unknown','scope':'turn_total'}})
+        self.assertIn('| Turn elapsed | 5.0s',markdown(self.r,info['session_id']))
+        data=snapshot(self.home);self.assertEqual(data['usage']['chat_elapsed_seconds'],5)
+        self.assertEqual(data['usage']['chat']['input_tokens'],123)
+        with self.r.connect() as c:
+            stored=json.loads(c.execute("SELECT record_json FROM activity_events WHERE request_key='legacy-inflated-close'").fetchone()[0])
+        self.assertEqual(stored['payload']['elapsed_seconds'],99999)
+
+    def test_both_hosts_request_complete_receipts_even_without_pending_reviews(self):
+        for host in ('codex','claude'):
+            req={'session_id':'receipt-'+host,'cwd':str(self.home),'turn_id':host,'hook_event_name':'UserPromptSubmit','prompt':'Inspect synthetic status'}
+            info=capture_hook(self.home,req,host=host)
+            req.update(hook_event_name='Stop',last_assistant_message='Synthetic status')
+            capture_hook(self.home,req,host=host)
+            with self.r.connect() as c:c.execute("UPDATE host_evaluation_requests SET status='reviewed' WHERE session_id=?",(info['session_id'],))
+            script=self.home/('.codex' if host=='codex' else '.claude')/'hooks/spielos-observe.py'
+            def run():
+                result=subprocess.run([sys.executable,'-X','utf8','-B',str(script)],input=json.dumps(req),text=True,encoding='utf-8',capture_output=True,check=True,timeout=60)
+                return json.loads(result.stdout)
+            result=run();self.assertEqual(result.get('decision'),'block',result)
+            self.assertIn('receipt-only continuation',result['reason'])
+            for field in ('Evaluation','Langfuse','Tokens','Cost','Turn elapsed'):self.assertIn('| '+field+' |',result['reason'])
+            req['last_assistant_message']='| Turn elapsed | 5s |';self.assertEqual(run().get('decision'),'block')
+            req['stop_hook_active']=True;self.assertNotIn('decision',run())
+            req.pop('stop_hook_active');req['last_assistant_message']=markdown(self.r,info['session_id']);self.assertNotIn('decision',run())
