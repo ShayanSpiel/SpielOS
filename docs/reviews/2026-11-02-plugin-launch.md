@@ -95,3 +95,7 @@ First-use onboarding extension: new users must be asked whether to connect Langf
 ## Published tester package 10.3.10
 
 Public marketplace main ee83d43 and the v10.3.10 GitHub release contain the canonical plugin, official logo, shared compact dashboard, guided Langfuse connection and first-chat tour. Existing private account plugin updated in place to pluginrel_6ae8dff0ad708191a99460b2bcfb5e8d and manifest/MCP/dashboard read back. Local acceptance: 520 tests, 66 scenarios, 22 portability/onboarding/distribution checks. Native Windows 3.11 CI passed; Windows 3.14 hook subprocess exceeded the test harness 15-second cold-start budget. Allow 60 seconds on Windows only, retaining output/context assertions and normal POSIX budget. Public store approval remains uncompleted. README now displays the product logo; generated marketplace README uses its packaged logo path.
+
+## Installation documentation correction — 2026-11-03
+
+Exact allowed files: README.md, docs/tester-guide.md, tools/export_plugin_marketplace.py and this review. Restore Python interpreter prerequisites separately from bundled SpielOS code; retain CLI as an alternative with existing one-command installer, virtual-environment installation on both OS families, interactive init, real host-specific skill commands and explicit package/home updates. Validate CLI help and synthetic installed-home journey. Do not claim public directory approval or a resolved listing logo. No product/runtime behavior is changed.

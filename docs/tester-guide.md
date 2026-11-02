@@ -2,6 +2,12 @@
 
 SpielOS is a portable company workspace for recurring AI work you can test and improve. This desktop tester preview supports Codex and Claude Code on qualified desktop systems with Python 3.11 or newer available as `python3`. Windows setup must check the actual Python alias and local filesystem; do not assume a Unix shell. The plugin carries the SpielOS runtime; no separate SpielOS installation or Langfuse account is needed.
 
+## Python and CLI installation
+
+Python 3.11+ is required; the plugin bundles SpielOS code, not a Python interpreter. Install Python from [python.org](https://www.python.org/downloads/) or your Linux distribution, restart the host, and check `python3 --version` before plugin installation. Windows installations exposing only `py` or `python` need the normal `python3` alias configured for this plugin.
+
+The [README](../README.md#2b-python-cli-alternative) includes the one-command macOS/Linux installer, Windows PowerShell and macOS/Linux virtual-environment installs, interactive `spielos init` onboarding, command reference and updates. CLI use remains a supported alternative to the plugin.
+
 ## Install
 
 Use the [official SpielOS marketplace](https://github.com/ShayanSpiel/SpielOS-Plugin).

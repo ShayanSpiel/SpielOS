@@ -36,7 +36,7 @@ def export(destination):
     readme = output / 'README.md'
     text = readme.read_text().replace('company/init_templates/integrations/spielos/assets/logo.png', 'spielos/assets/logo.png')
     for relative in ('company/README.md', 'company/ARCHITECTURE.md', 'company/EVALUATION.md',
-                     'docs/reviews/2026-11-02-technical-review.md', 'docs/reviews/2026-11-02-ci-repair.md'):
+                     'docs/reviews/2026-11-02-technical-review.md', 'docs/reviews/2026-11-02-ci-repair.md', 'install.sh'):
         text = text.replace('](' + relative + ')', '](https://github.com/ShayanSpiel/SpielOS/blob/main/' + relative + ')')
     text += '\n## Updates and provenance\n\nThis is the generated desktop distribution of [SpielOS](https://github.com/ShayanSpiel/SpielOS), not a separate implementation. Ask Codex to refresh the SpielOS marketplace and update the plugin. Existing company folders are preserved; apply company-template updates explicitly from the selected company. Maintainers export each reviewed source release with `tools/export_plugin_marketplace.py --out <new directory>` and publish the generated inventory and package together.\n'
     readme.write_text(text)

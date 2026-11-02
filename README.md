@@ -22,15 +22,25 @@ Research leads, build outbound and prepare reports with Director. Keep your comp
 
 Director helps define the inputs, sources, permissions, examples and evaluation criteria, then builds and tests a reusable workflow. Sources and integrations are selected for your company. Nothing is sent just because a quality check passed.
 
-## Install the plugin
+## Get started
 
-Use the [official SpielOS marketplace](https://github.com/ShayanSpiel/SpielOS-Plugin). The desktop plugin includes the canonical SpielOS runtime; no separate SpielOS CLI installation or Python commands are needed from you. Setup checks the supported Python prerequisite and helps with missing software or command aliases.
+Choose the **desktop plugin** for guided setup in chat, or install the **Python CLI** for terminal use. Both use the same SpielOS core and company folder format.
 
-### ChatGPT and Codex
+### 1. Install Python
 
-Tell Codex: **“Install SpielOS from the ShayanSpiel/SpielOS-Plugin marketplace and run Setup.”** Choose your company folder. Use **Director**, **Dashboard** and **Help** from the plugin skills, or invoke `$spielos:director`, `$spielos:dashboard` and `$spielos:help`.
+**Python 3.11 or newer is required for both routes.** The plugin bundles SpielOS code, not the Python interpreter. Node.js is not required for the Python CLI or desktop plugin.
 
-### Claude Code
+- **macOS / Windows:** install Python from [python.org](https://www.python.org/downloads/), then restart your desktop host.
+- **Linux:** install Python 3.11+ through your distribution's package manager.
+- **Plugin prerequisite:** `python3 --version` must work. On Windows, if only `py` or `python` works, follow [Python's Windows alias troubleshooting](https://docs.python.org/3/using/windows.html#troubleshooting). Having Python installed under another command alone does not satisfy the current plugin launcher.
+
+### 2a. Desktop plugin
+
+[Public plugin package and installation guide](https://github.com/ShayanSpiel/SpielOS-Plugin) · [Download the ZIP](https://github.com/ShayanSpiel/SpielOS-Plugin/releases/latest)
+
+**Codex:** ask it to install from the **ShayanSpiel/SpielOS-Plugin** GitHub marketplace. Then choose **SpielOS → Setup** in the installed plugin's skills, or type `$spielos:setup`. This is a manual marketplace installation; the public ChatGPT store listing is not approved yet.
+
+**Claude Code:** run these in Claude Code:
 
 ```text
 /plugin marketplace add ShayanSpiel/SpielOS-Plugin
@@ -38,9 +48,72 @@ Tell Codex: **“Install SpielOS from the ShayanSpiel/SpielOS-Plugin marketplace
 /spielos:setup
 ```
 
-Then use `/spielos:director`, `/spielos:dashboard` and `/spielos:help`. Director is the role of your main chat; you do not need to spawn another agent.
+Setup helps you select or create a company folder, checks prerequisites and offers Langfuse connection. Open the selected folder as your host workspace and review its hooks. These instructions apply to Codex and Claude Code with local execution, not ChatGPT web or Claude web.
 
-The GitHub marketplace is the public tester distribution. A public ChatGPT or Anthropic directory listing is a separate approval process. This local runtime is for desktop execution, not ChatGPT web or Claude web.
+### 2b. Python CLI alternative
+
+The CLI and its interactive onboarding remain available. On macOS/Linux, install or update from current GitHub source with one command (requires Python 3.11+ and Git):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/SpielOS/main/install.sh | SPIELOS_SOURCE=git+https://github.com/ShayanSpiel/SpielOS.git sh
+```
+
+The [installer](install.sh) uses an isolated pipx environment. It installs the CLI; it does not create a company until you select a folder.
+
+For a virtual environment on **macOS/Linux**:
+
+```sh
+python3 -m venv .venv
+.venv/bin/python -m pip install --upgrade "git+https://github.com/ShayanSpiel/SpielOS.git"
+.venv/bin/spielos init --dir ./my-company
+```
+
+For **Windows PowerShell**:
+
+```powershell
+py -3 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install --upgrade "git+https://github.com/ShayanSpiel/SpielOS.git"
+.\.venv\Scripts\spielos.exe init --dir .\my-company
+```
+
+Run these from a working folder outside the SpielOS source checkout. The Windows example uses the `py` launcher; if your installation exposes `python` instead, use that for the first line. Native Windows qualification is tracked in [CI](https://github.com/ShayanSpiel/SpielOS/actions).
+
+If you used the one-command installer, start interactive onboarding with:
+
+```sh
+spielos init --dir ./my-company
+```
+
+Then open `my-company` in Codex or Claude Code and ask Director to introduce your company workspace and build your first workflow. CLI initialization creates the home and host configuration; plugin Setup additionally guides the local recording and Langfuse choices.
+
+## Commands you'll use
+
+| Action | Codex plugin | Claude Code plugin | Python CLI |
+| --- | --- | --- | --- |
+| Create or select a company | `$spielos:setup` | `/spielos:setup` | `spielos init --dir ./my-company` creates one |
+| Work with Director | `$spielos:director` | `/spielos:director` | Open the company folder in your host |
+| Open the dashboard | `$spielos:dashboard` | `/spielos:dashboard` | `spielos report --home ./my-company` |
+| Check company status | Ask Director | Ask Director | `spielos status --home ./my-company` |
+| Help | `$spielos:help` | `/spielos:help` | `spielos --help` |
+
+For a virtual-environment installation, replace `spielos` with `.venv/bin/spielos` on macOS/Linux or `.\.venv\Scripts\spielos.exe` on Windows. Codex's `$…` skill invocations and Claude Code's `/…` commands are different host interfaces.
+
+## Updates
+
+**Plugin:** refresh the SpielOS marketplace and update the installed plugin. In Claude Code:
+
+```text
+/plugin marketplace update spielos
+/plugin update spielos@spielos
+```
+
+**Python CLI:** rerun the one-command installer, or rerun your virtual environment's `pip install --upgrade` command above. Then explicitly refresh an existing company:
+
+```sh
+spielos update --dir ./my-company
+```
+
+Your company folder is separate from the plugin and CLI installation. Company updates preserve owner content; review changed hooks through your host's normal controls.
 
 ## Your first conversation
 
