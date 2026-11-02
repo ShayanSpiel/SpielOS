@@ -26,8 +26,8 @@ class PluginDistributionTests(unittest.TestCase):
     def cli(self,*args,fail=False):
         env={**os.environ,'SPIELOS_PYTHON':sys.executable,'PYTHONPATH':'/missing/untrusted/source','PYTHONDONTWRITEBYTECODE':'1'}
         for key in ('SPIELOS_HOME','SPIELOS_TEMPLATE_DIR','SPIELOS_PRINCIPAL_TOKEN'):env.pop(key,None)
-        result=subprocess.run(['/bin/sh',str(self.package/'scripts/launch.sh'),*map(str,args)],
-            cwd=self.root,env=env,text=True,capture_output=True,timeout=45)
+        result=subprocess.run([sys.executable,'-I','-X','utf8','-B',str(self.package/'scripts/entry.py'),*map(str,args)],
+            cwd=self.root,env=env,text=True,encoding='utf-8',capture_output=True,timeout=45)
         if fail:self.assertNotEqual(result.returncode,0,result.stdout)
         else:self.assertEqual(result.returncode,0,result.stderr)
         return result
@@ -41,7 +41,8 @@ class PluginDistributionTests(unittest.TestCase):
         width,height=struct.unpack('>II',image.read_bytes()[16:24]);self.assertEqual(width,height);self.assertGreaterEqual(width,256)
         self.assertEqual(ext['interface']['logo'],ext['interface']['composerIcon'])
         config=json.loads((self.package/'mcp.json').read_text())['mcpServers']['spielos']
-        self.assertEqual(config['command'],'/bin/sh');self.assertIn('${PLUGIN_ROOT}/scripts/launch.sh',config['args'])
+        self.assertEqual(config['command'],'python3');self.assertIn('scripts/entry.py',config['args'])
+        self.assertEqual(config['cwd'],'.')
         self.assertFalse((self.package/'hooks').exists())
         with zipfile.ZipFile(self.result['archive']) as z:
             names=z.namelist();self.assertTrue(all(n.startswith('spielos/') for n in names))
@@ -86,20 +87,27 @@ class PluginDistributionTests(unittest.TestCase):
         finally:os.kill(result['pid'],signal.SIGTERM)
 
     def test_packaged_context_stop_evaluation_and_token_receipt_share_one_home(self):
-        home=self.root/'receipt-company';self.cli('init','--dir',home,'-y','--json')
+        self.check_host_capture('codex')
+
+    def test_claude_context_stop_evaluation_and_token_receipt_share_one_home(self):
+        self.check_host_capture('claude')
+
+    def check_host_capture(self,host):
+        home=self.root/('receipt-company-'+host);self.cli('init','--dir',home,'-y','--json')
         setup=json.loads(self.cli('setup-local-capture','--home',home).stdout)
         self.assertTrue(setup['local_capture']);self.assertTrue(setup['bounded_review'])
         self.assertFalse(setup['export_enabled'])
         self.assertIn('primary Director',(home/'AGENTS.md').read_text())
         self.assertTrue((home/'.codex/agents/director.toml').is_file())
-        hooks=json.loads((home/'.codex/hooks.json').read_text())['hooks']
+        hooks=json.loads((home/('.codex/hooks.json' if host=='codex' else '.claude/settings.json')).read_text())['hooks']
         self.assertTrue({'SessionStart','UserPromptSubmit','PostToolUse','Stop'}<=set(hooks))
         request={'session_id':'packaged-synthetic','turn_id':'one','cwd':str(home),'model':'synthetic-model',
             'hook_event_name':'UserPromptSubmit','prompt':'Inspect synthetic company work'}
         def hook(name):
             import shlex
             command=next(entry['command'] for groups in hooks.values() for group in groups for entry in group['hooks'] if name in entry['command'])
-            self.assertEqual(shlex.split(command)[0],sys.executable)
+            from company.platform import hook_arguments
+            self.assertEqual(hook_arguments(command)[0],sys.executable)
             result=subprocess.run(shlex.split(command),
                 input=json.dumps(request),text=True,capture_output=True,timeout=15)
             self.assertEqual(result.returncode,0,result.stderr);return json.loads(result.stdout)
@@ -143,6 +151,21 @@ class PluginDistributionTests(unittest.TestCase):
         self.cli('setup-local-capture','--home',self.package,fail=True)
         self.assertFalse((self.package/'.spielos/telemetry.json').exists())
 
+    def test_public_marketplace_exports_both_hosts_and_distinct_mcp_path_contracts(self):
+        output=self.root/'both-host-marketplace'
+        result=subprocess.run([sys.executable,'-B',str(ROOT/'tools/export_plugin_marketplace.py'),'--out',str(output)],
+            cwd=self.root,capture_output=True,text=True,encoding='utf-8',timeout=15)
+        self.assertEqual(result.returncode,0,result.stderr)
+        codex=json.loads((output/'.agents/plugins/marketplace.json').read_text())
+        claude=json.loads((output/'.claude-plugin/marketplace.json').read_text())
+        self.assertEqual(codex['plugins'][0]['source']['path'],claude['plugins'][0]['source'])
+        self.assertTrue((output/'docs/tester-guide.md').is_file())
+        config=json.loads((output/'spielos/.mcp.json').read_text())['mcpServers']['spielos']
+        self.assertIn('${CLAUDE_PLUGIN_ROOT}/scripts/entry.py',config['args'])
+        self.assertNotIn('cwd',config)
+        manifest=json.loads((output/'spielos/.codex-plugin/plugin.json').read_text())
+        self.assertEqual(manifest['mcpServers'],'./mcp.json')
+
     def test_cache_and_source_are_refused_as_company_destinations(self):
         for home in (self.package/'accidental-company',ROOT/'accidental-company'):
             result=self.cli('init','--dir',home,'-y',fail=True)
@@ -155,8 +178,9 @@ class PluginDistributionTests(unittest.TestCase):
             {'jsonrpc':'2.0','id':2,'method':'tools/list','params':{}},
             {'jsonrpc':'2.0','id':3,'method':'tools/call','params':{'name':'inspect_company','arguments':{'company_id':'not-selected'}}}])+'\n'
         env={**os.environ,'SPIELOS_PYTHON':sys.executable,'PYTHONPATH':'/missing/untrusted/source'}
-        result=subprocess.run(['/bin/sh',str(self.package/'scripts/launch.sh'),'mcp'],input=request,cwd=self.root,
-            env=env,capture_output=True,text=True,timeout=15)
+        config=json.loads((self.package/'mcp.json').read_text())['mcpServers']['spielos']
+        result=subprocess.run([config['command'],*config['args']],input=request,cwd=self.package/config['cwd'],
+            env=env,capture_output=True,text=True,encoding='utf-8',timeout=15)
         self.assertEqual(result.returncode,0,result.stderr)
         rows={row['id']:row for row in map(json.loads,result.stdout.splitlines())}
         self.assertEqual(len(rows[2]['result']['tools']),6)

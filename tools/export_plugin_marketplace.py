@@ -20,9 +20,15 @@ def export(destination):
         'plugins': [{'name': 'spielos', 'category': 'Business & Operations', 'source': {'source': 'local', 'path': './spielos'},
                      'policy': {'installation': 'AVAILABLE', 'authentication': 'ON_USE'}}],
     }, indent=2) + '\n')
+    claude = output / '.claude-plugin/marketplace.json'
+    claude.parent.mkdir(parents=True)
+    claude.write_text(json.dumps({'name':'spielos','owner':{'name':'Shayan Spiel'},
+        'metadata':{'description':'The official SpielOS company workspace and workflow plugin.'},
+        'plugins':[{'name':'spielos','source':'./spielos',
+                    'description':'Lasting company context, Director, dashboard and tested workflows.'}]},indent=2)+'\n')
     shutil.copyfile(ROOT / 'README.md', output / 'README.md')
     shutil.copyfile(ROOT / 'LICENSE', output / 'LICENSE')
-    for relative in ('docs/images/spielos-in-codex.png', 'docs/plugin-privacy.md', 'docs/plugin-terms.md'):
+    for relative in ('docs/images/spielos-in-codex.png', 'docs/plugin-privacy.md', 'docs/plugin-terms.md', 'docs/tester-guide.md'):
         target = output / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(ROOT / relative, target)

@@ -429,7 +429,7 @@ class InstallSurfaceTests(unittest.TestCase):
                 if path.is_file():
                     expected = (pristine / host /
                          path.relative_to(self.home / host)).read_text()
-                    if path.name == "hooks.json":
+                    if path.name == "hooks.json" or (host=='.claude' and path.name=='settings.json'):
                         expected = expected.replace(str(pristine.resolve()), str(self.home.resolve()))
                     self.assertEqual(expected.encode(), path.read_bytes(), str(path))
         for rel in ("opencode.json", "AGENTS.md", "CLAUDE.md"):

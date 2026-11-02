@@ -1,6 +1,18 @@
 {
   "name": "spielos",
-  "version": "10.3.6",
+  "version": "10.4.0",
   "description": "Keep your company context across chats. Build recurring workflows, test real outputs, and review the evidence before you rely on them.",
-  "skills": "./skills/"
+  "displayName": "SpielOS",
+  "author": {
+    "name": "Shayan Spiel",
+    "url": "https://github.com/ShayanSpiel"
+  },
+  "homepage": "https://github.com/ShayanSpiel/SpielOS",
+  "repository": "https://github.com/ShayanSpiel/SpielOS",
+  "license": "MIT",
+  "icon": "./assets/logo.png",
+  "documentationUrl": "https://github.com/ShayanSpiel/SpielOS/blob/main/docs/tester-guide.md",
+  "supportUrl": "https://github.com/ShayanSpiel/SpielOS/issues",
+  "privacyPolicyUrl": "https://github.com/ShayanSpiel/SpielOS/blob/main/docs/plugin-privacy.md",
+  "termsOfServiceUrl": "https://github.com/ShayanSpiel/SpielOS/blob/main/docs/plugin-terms.md"
 }

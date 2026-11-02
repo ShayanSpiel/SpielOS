@@ -1,8 +1,14 @@
 """Isolated desktop plugin entrypoint; data never belongs to this package."""
 import sys
+if sys.version_info < (3,11):
+    print('SpielOS needs Python 3.11 or newer. Run the Setup skill for help.',file=sys.stderr)
+    raise SystemExit(1)
+for stream in (sys.stdin,sys.stdout,sys.stderr):
+    if hasattr(stream,'reconfigure'):stream.reconfigure(encoding='utf-8')
 import argparse
 import json
 import os
+os.environ.setdefault('PYTHONUTF8','1')
 from pathlib import Path
 
 root=Path(__file__).resolve().parents[1]

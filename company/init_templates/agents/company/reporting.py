@@ -4,6 +4,7 @@ import argparse, hashlib, json, mimetypes, os, secrets, subprocess, sys, time
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs, urlencode, unquote
+from .platform import protect_private
 
 VERSION='spielos-report/1'
 
@@ -186,12 +187,13 @@ def report_fingerprint():
     return h.hexdigest()
 
 def ensure_server(home,*,open_browser=False,port=None):
-    import urllib.request,fcntl
+    import urllib.request
+    from .platform import locked_file,detached_process
     from .runtime.paths import validate_home_destination
     from .home import write_json
     home=validate_home_destination(home);folder=home/'.spielos/state';folder.mkdir(exist_ok=True)
-    with (folder/'report-start.lock').open('a') as lock:
-        fcntl.flock(lock,fcntl.LOCK_EX);a=state(home)
+    with locked_file(folder/'report-start.lock'):
+        a=state(home)
         if a:
             try:
                 req=urllib.request.Request(a['base_url']+'/api/health',headers={'Authorization':'Bearer '+a['token']})
@@ -208,7 +210,7 @@ def ensure_server(home,*,open_browser=False,port=None):
         config=configuration(home);log=os.open(home/'.spielos/state/report-server.log',os.O_CREAT|os.O_APPEND|os.O_WRONLY,0o600)
         env={**os.environ,'PYTHONDONTWRITEBYTECODE':'1','PYTHONPATH':str(Path(__file__).resolve().parent.parent)}
         try:
-            process=subprocess.Popen([sys.executable,'-B','-m','company','report','--serve','--home',str(home),'--port',str(config['port'] if port is None else port)],cwd=home,env=env,stdout=log,stderr=log,start_new_session=True)
+            process=subprocess.Popen([sys.executable,'-B','-m','company','report','--serve','--home',str(home),'--port',str(config['port'] if port is None else port)],cwd=home,env=env,stdout=log,stderr=log,**detached_process())
         finally:os.close(log)
         deadline=time.monotonic()+15
         while time.monotonic()<deadline:
@@ -255,7 +257,7 @@ def serve(home,port=8775):
                     target='/'+config['ui_root']+'/index.html' if config['ui_root'] else '/_spielos/index.html';self.send_response(303);self.send_header('Location',target);self.end_headers();return
                 if route.startswith('/_spielos/'):
                     f=Path(__file__).parent/'report_ui'/route.rsplit('/',1)[1]
-                    if f.name not in {'index.html','report.js','report.css'}:raise PermissionError('Unknown report asset')
+                    if f.name not in {'index.html','report.js','report.css','workspace.js','workspace.css','logo.png'}:raise PermissionError('Unknown report asset')
                 else:f=permitted_file(home,route)
                 mime=mimetypes.guess_type(f.name)[0] or 'application/octet-stream'
                 # Range playback supports actual full films without returning whole media for every seek.
@@ -294,6 +296,6 @@ def serve(home,port=8775):
             self.server_name='localhost'
             self.server_port=self.server_address[1]
     server=LoopbackHTTPServer(('127.0.0.1',port),Handler);base='http://127.0.0.1:'+str(server.server_port);path='/'+config['ui_root']+'/index.html' if config['ui_root'] else '/_spielos/index.html';url=base+path+'?'+urlencode({'token':token})
-    write_json(home/'.spielos/report-server.json',{'schema':1,'pid':os.getpid(),'home':str(home),'base_url':base,'url':url,'token':token,'custom_ui':bool(config['ui_root']),'started_at':_now(),'runtime_sha256':runtime_sha});os.chmod(home/'.spielos/report-server.json',0o600)
+    write_json(home/'.spielos/report-server.json',{'schema':1,'pid':os.getpid(),'home':str(home),'base_url':base,'url':url,'token':token,'custom_ui':bool(config['ui_root']),'started_at':_now(),'runtime_sha256':runtime_sha});protect_private(home/'.spielos/report-server.json')
     try:server.serve_forever()
     finally:server.server_close()

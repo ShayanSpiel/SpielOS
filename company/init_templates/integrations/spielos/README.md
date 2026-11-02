@@ -4,7 +4,7 @@
 
 Turn recurring AI work into workflows you can test and improve. SpielOS keeps your company facts, strategy, brand, memory and decisions together in a folder you control.
 
-## Start in Codex
+## Start in Codex or Claude Code
 
 Install the desktop plugin and run **Set up SpielOS**. Choose an existing company folder or a new workspace, then describe the recurring job you want help with. The plugin includes its runtime; a separate SpielOS CLI installation is not needed. Local execution requires macOS/Linux and Python 3.11 or newer. Setup helps check that requirement and explains any missing prerequisite.
 
@@ -20,7 +20,7 @@ Choose **Director**, **Dashboard** or **Help** from the plugin's skills. In Code
 
 A company workspace that lasts beyond the chat; reusable workflow definitions; real case executions and evaluations; a local dashboard for work, memory, context and reported usage; and explicit review before consequential releases or external actions.
 
-Langfuse recording is optional and needs your selected project and evidence policy. Tests and experiments retain their actual versions and cases. A passing evaluation is distinct from proof that a workflow improved; compare baseline/candidate evidence before making that claim. The dashboard currently shows records and review status rather than a complete before/after improvement scorecard.
+Langfuse is optional for local tracking, drafts and candidate experiments. Qualifying a new production workflow requires verified Langfuse evidence and independent review under the current runtime policy. Connecting requires your selected project and evidence policy. Tests and experiments retain their actual versions and cases. A passing evaluation is distinct from proof that a workflow improved; compare baseline/candidate evidence before making that claim. The dashboard currently shows records and review status rather than a complete before/after improvement scorecard.
 
 ## Your workspace stays yours
 
@@ -35,3 +35,5 @@ The GitHub marketplace and private account install are separate from OpenAI univ
 ## Dashboard, context and chat receipts
 
 Setup explains and prepares local activity recording while preserving any existing policy. Open your selected company folder in Codex and review its company hooks using the host's normal controls. The same runtime supplies context tracking, the authenticated dashboard, bounded evaluation requests and the end-of-chat tracking receipt. Local tracking works without Langfuse; setup enables no exporter. The receipt shows actual evaluation/delivery status and reported tokens/cost, with real report/trace links where available. Unknown billing stays unknown. It is assistant-rendered Markdown, not a promise of arbitrary native rich cards.
+
+Claude Code: `/plugin marketplace add ShayanSpiel/SpielOS-Plugin`, `/plugin install spielos@spielos`, then `/spielos:setup`. Use `/spielos:director`, `/spielos:dashboard` and `/spielos:help` for the main actions. [Tester guide](https://github.com/ShayanSpiel/SpielOS/blob/main/docs/tester-guide.md).

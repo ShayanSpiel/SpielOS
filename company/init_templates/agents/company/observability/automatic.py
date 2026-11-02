@@ -168,7 +168,7 @@ def workflow_output(runtime,run_id):
 
 def drain(runtime,*,seconds=18,limit=80,reconcile_exhausted=False,client=None):
     """One bounded host wake, batching observation transport. No resident worker."""
-    import fcntl
+    from ..platform import open_lock,acquire_lock
     from pathlib import Path
     from .sessions import policy
     from .langfuse import LangfuseClient,ExportError,observation
@@ -177,9 +177,9 @@ def drain(runtime,*,seconds=18,limit=80,reconcile_exhausted=False,client=None):
     if not config.get('enabled'):return {'state':'disabled'}
     if not 1<=seconds<=25 or not 1<=limit<=100:raise ValueError('Automatic delivery must have a bounded time and record budget')
     lock_path=runtime.path.parent/'activity-export.lock'
-    fd=os.open(lock_path,os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
+    fd=open_lock(lock_path)
     try:
-        try:fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        try:acquire_lock(fd,blocking=False)
         except BlockingIOError:return {'state':'another wake is delivering; evidence remains journaled'}
         client=client or LangfuseClient.from_configuration(runtime.home,config)
         client.timeout=min(client.timeout,4);client.deadline=time.monotonic()+seconds;client.begin_batch()

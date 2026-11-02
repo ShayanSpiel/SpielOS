@@ -1,6 +1,6 @@
 {
   "name": "spielos",
-  "version": "10.3.6",
+  "version": "10.4.0",
   "description": "SpielOS: portable company context, bounded workflows, versioned evaluations and exact-action approvals.",
   "bin": {
     "spielos": "bin/spielos.js"

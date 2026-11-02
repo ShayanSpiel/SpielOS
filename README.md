@@ -10,7 +10,7 @@ SpielOS gives recurring AI work a lasting home. Keep your company facts, strateg
 
 ## Start with the plugin
 
-[**Get SpielOS for Codex desktop →**](https://github.com/ShayanSpiel/SpielOS-Plugin)
+[**Get SpielOS for Codex & Claude Code →**](https://github.com/ShayanSpiel/SpielOS-Plugin)
 
 Tell Codex:
 
@@ -19,6 +19,10 @@ Tell Codex:
 Then choose a company folder and tell it the work you want help with. The plugin carries the SpielOS runtime, so you do not need to install a separate SpielOS CLI or copy Python commands. Desktop execution requires macOS/Linux and Python 3.11 or newer; setup checks for a supported interpreter and helps explain missing prerequisites.
 
 Use **Director** to operate your company, **Dashboard** to see its work, or **Help** for the available actions. In Codex, choose these from the plugin's skills or type `$spielos:director`, `$spielos:dashboard` or `$spielos:help`. Director is the role of your main chat. Plugin skills do not replace Codex's built-in slash commands.
+
+**Claude Code:** use `/plugin marketplace add ShayanSpiel/SpielOS-Plugin`, then `/plugin install spielos@spielos` and `/spielos:setup`. Use `/spielos:director`, `/spielos:dashboard` and `/spielos:help` afterward.
+
+[Tester guide: install, first workflow, hooks, receipts and updates](docs/tester-guide.md)
 
 Distribution is through the public GitHub marketplace. An OpenAI universal-directory listing is a separate review process; it is not implied by marketplace availability.
 
@@ -49,7 +53,7 @@ The local dashboard shows workflows, actual runs, memory, supplied context, repo
 
 Setup explains and prepares private local activity recording. Open the selected company folder in Codex and review its shipped hooks. They restore relevant context, capture supplied-context evidence and request bounded evaluations. Meaningful chats end with a concise tracking receipt: evaluation and delivery status, dashboard/trace links and actual exposed token/cost information. Host-rendered Markdown is the supported baseline; missing usage or billing remains unknown. Local tracking works without a Langfuse account; no exporter is connected by setup.
 
-**Optional Langfuse recording** retains approved execution and evaluation evidence: scoped inputs/outputs, artifact provenance, criteria and reviewer rationale. Experiments run representative, held-out and negative cases against pinned versions. Pending export remains pending until remote readback confirms it. Reported tokens, reference price estimates and actual billing remain distinct.
+**Langfuse recording** is optional for local tracking, drafts and experiments. The current runtime requires verified Langfuse evidence and independent review to qualify a new production workflow release. Recording retains approved execution and evaluation evidence: scoped inputs/outputs, artifact provenance, criteria and reviewer rationale. Experiments run representative, held-out and negative cases against pinned versions. Pending export remains pending until remote readback confirms it. Reported tokens, reference price estimates and actual billing remain distinct.
 
 The current dashboard is an inspection view. A complete workflow before/after improvement scorecard is not yet implemented. We do not manufacture improvement percentages or business impact from activity counts.
 
