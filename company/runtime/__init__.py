@@ -1,5 +1,4 @@
-"""Canonical clean Goal runtime."""
+"""Home discovery and distribution lifecycle for the bounded workflow product."""
+from .paths import find_project_root,selected_project_root,validate_home_destination
 
-from .engine import Decision, Evaluation, GoalRuntime, GoalStage
-
-__all__ = ["Decision", "Evaluation", "GoalRuntime", "GoalStage"]
+__all__=['find_project_root','selected_project_root','validate_home_destination']

@@ -1,260 +1,110 @@
-# SpielOS
+# SpielOS operating guide
 
-SpielOS is a local clean-core runtime for durable Goals.
+A Company owns its profile, strategy, responsibilities, boundaries and brand. A Workflow is a versioned business capability. A Run is one bounded invocation. An Improvement records a bounded GODAE change with its business need, exact file scope, observations, architecture and acceptance evidence.
 
-[spielos.xyz](https://spielos.xyz) · `GoalRuntime` owns the persisted loop:
-observe, decide, act, and evaluate. Departments are declarative packages;
-Agents, Skills, Connections, Capabilities, and Hosts provide replaceable
-execution declarations. Every material result is recorded as Evidence and can
-inform owner, workflow, or strategy Memory.
+Company content lives in `company/`; runtime code is pinned under `.spielos/runtime/company/`. Private state and generated work live under `.spielos/state/` and `.spielos/artifacts/`. `.agents/company` is a compatibility alias, not the editable content home. Optional Departments group ownership; they do not run a control loop.
 
-## Talk to your Director
+## Working through the Director
+
+Use the main company chat in Codex, the Director in OpenCode, or `claude --agent director`. Review hooks with your host's supported controls. Context injection is read-only and restores pending work after a restart or compaction. If absent, read `status` once and explain the injection failure. A status read never initializes a missing company or dispatches work.
+
+Speak in names, outcomes and clear next decisions. Keep raw identifiers, enum values and JSON in tool payloads; the final Machine reference line is for the Director. The owner answers in plain language and the Director records the decision. No periodic runner, Goal tick, autonomous pursuit or repair process is part of new operation. A selected host or provider owns scheduling and notifications. Without a wake/callback, unattended reconciliation is not promised.
+
+## Definitions and development
+
+`company/profile.md` is the canonical typed identity document. `profile set --fields <json-file> --source <owner-direction>` records explicit facts and audit hashes while preserving notes. Unknowns remain unknown. Put strategic positioning in `strategy/`; operational tokens, real components, approved assets, voice, examples and templates belong in `brand/`. Avoid copying contradictory policy into both places.
+
+A workflow package contains `workflow.json`, a readable `brief.md`, `execution/`, `evaluation/rubric.json`, `evaluation/cases/` and example input/output. The manifest references the canonical rubric and case files. The shipped sales-report is a neutral draft demonstrating actual computation, held-out inputs and a negative refund case; it is not an approved company process.
+
+The Improvement sequence is `create`, `observe`, `agree-architecture`, `attach-candidate`, `decide`. Agree the acceptance brief and architecture in proportion to the change; the runtime does not force five owner interruptions. Independent accept/revise/reject uses real candidate execution evidence. Structural changes need exact allowed files and actual checks. Never silently change a production release, permissions or rubric.
+
+## CLI
+
+The installed `spielos` launcher and `python3 -B -m company` use the same core. Use an explicit installed `--home /absolute/path` on company operations. In a vendored home use `PYTHONPATH=.agents python3 -B -m company`. `--json` is machine output; ordinary output is owner language. See each command's `--help` for required file arguments.
+
+| Command family | Purpose |
+| --- | --- |
+| `status`, `context`, `overview`, `catalog`, `layout` | Inspect company, definitions and unfinished work without dispatch |
+| `profile show/set`, `memory summary/add/retire` | Record explicit facts, direction and causal operational learning |
+| `improvement create/observe/agree-architecture/attach-candidate/decide` | Bounded GODAE development |
+| `workflow candidate`, `experiment`, `experiment-show`, `release` | Pin harnesses, run real case evidence, independently qualify a release |
+| `workflow run/show/claim/deliver/evaluate/review` | Invoke, execute host work, evaluate and review a bounded run |
+| `workflow reconcile/cancel/wake` | Recover a named run or handle one host wake |
+| `workflow approve-action` | Record the separately authorized exact action; does not publish |
+| `workflow calibrate-judge/measure/scorecard/export` | Independent judge ratings, explicit business observations and telemetry |
+| `export`, `import` | Preview and transfer a hashed declarative workflow closure |
+| `migrate`, `history` | Review an exact legacy move plan and inspect preserved history |
+| `mcp` | Serve the same core over local standard input/output |
+
+To try the generic draft in a disposable installed home:
 
 ```sh
-opencode    # or: codex, or: claude
+spielos workflow candidate --home /absolute/path/my-company   --manifest /absolute/path/my-company/company/workflows/sales-report/workflow.json --json
 ```
 
-In **OpenCode**: run `/agents`, select the **Director** agent, and talk to
-it — it already sees your company state.
+The candidate pins implementation bytes and context. Use the returned release in `workflow experiment --release ... --name ... --request-key ...` to execute its real cases. An experiment does not release a workflow. Release requires the exact case-to-run map and a separate authenticated reviewer; changing a reviewer string cannot impersonate that reviewer. Do not provision a second identity just to self-approve.
 
-In **Codex**: talk to the **Director** agent — it already sees your company
-state.
+## Evaluation and approvals
 
-In **Claude Code**: run `claude --agent director` (or just `claude`) and talk
-to it — Claude Code reads `CLAUDE.md`, a one-line bridge to the same
-`AGENTS.md` every host shares, and the context hook injects fresh company
-state, so the Director already sees where things stand.
+Criteria have stable identities, sources, observable anchors, severity and justified thresholds. Cases include representative, held-out and negative splits. Check actual new inputs with deterministic rules; subjective criteria use pinned model/human verdicts with artifact evidence. Missing, error and not-applicable are distinct; an empty population or absent blocking criterion cannot pass. A hard failure cannot disappear into an average. Media review inspects rendered output at relevant sizes, with the actual artifact digest.
 
-The host injects a fresh, read-only company projection into every model
-request; do not begin with a manual status probe.
+Model judge calibration requires independent human ratings of actual delivered run artifacts. A producer cannot supply fake reviewer labels. Reviewer revisions preserve the prior evaluation events. Execution completion, output quality, policy permission, operational performance and business outcome remain separate. An elapsed observation window, sample population and source are necessary for a business measurement; a quality score does not prove revenue impact.
 
-## Commands
+Exact-action approval binds action, destination, accepted content digest and scope. Changed content requires a new decision. The effect ledger records intent before dispatch and will not blindly replay an unknown external result. Only a qualified configured adapter can dispatch; this release enables no Activepieces flow.
 
-```sh
-spielos status            # one Goal or the company snapshot
-spielos overview          # the full company projection
-spielos observe           # read-only dashboard (health, goals, attention, repetition)
-spielos observe --goal <id> # causal trace: Goal -> Runs -> Interventions
-spielos context           # the same context your host injects
-spielos memory summary    # owner, workflow, and strategy memory
-spielos memory add --scope workflow --claim "..." --evidence <id> --goal <id> --run <id>
-spielos memory retire <memory_id>   # flip one stale claim out of the active set
-spielos profile list      # owner profile claims
-spielos notifications list
-spielos runner tick       # advance every ready Run once
-spielos goal create --name "..." --owner director --metric ... --target ...
-spielos goal list          # every Goal with its Run and stage
-spielos goal decide <goal_id> --kind execute_workflow --workflow <department>:<workflow>
-spielos goal decide <goal_id> --kind request_agent --agent <id> --instruction "..." --evidence-kind <kind>
-spielos goal resume <goal_id>   # open the next run of a stalled or review-parked goal
-spielos approve <goal_id> --note "..." [--key legal] [--scope run]
-spielos tasks             # open work orders
-spielos tasks <id> --complete <agent> --evidence '[...]' [--learning "claim"]
-spielos layout            # audit the canonical layout for drift
-spielos update --dir .    # refresh this home (global CLI, after pipx upgrade)
-spielos export <department_id> --out <folder>   # write a shareable Department bundle repo
-spielos import <folder>   # install a Department bundle from a local folder
-```
+## Memory and context
 
-Always run `update` through the global `spielos` command — it refreshes the
-home from the installed release's templates. Running
-`PYTHONPATH=.agents python3 -m company update` inside the home would try to
-copy the home's own files onto themselves. `update` overwrites the vendored
-`.agents/` spine and the host-adapter files the release itself ships
-(Director prompts, Codex and Claude Code hooks, the notifications plugin) —
-those always
-refresh to the current release bytes, including in homes created before the
-vendored manifest existed. Private `.spielos/` state,
-`opencode.json`/`AGENTS.md`/`CLAUDE.md` owner edits, the owner's
-`.claude/settings.json` (permissions and keys are only ever appended the
-SpielOS hooks, never rewritten; `.claude/settings.local.json` is never
-written), and every owner-created file in the
-user layers (Departments, Skills, Capabilities, Connections, Strategy,
-installed Agents, host agents/commands/plugins) are always preserved. In a
-home with a vendored manifest, stale files from older releases are pruned; a
-pre-manifest home has no history to consult, so it keeps every file the
-release does not ship and the manifest written by the update resolves that
-on the next one.
+Owner preferences are explicit owner-scope memory; strategic direction is explicit strategy scope. Workflow lessons cite evaluated runs of that workflow. Runtime code invents none of them. Retire stale claims without erasing their provenance. Summaries report actual scope counts plus a bounded sample. Host work receives the release's pinned declared documents, agent, skills, brand and selected causal lessons within a context budget. Critical constraints cannot be silently trimmed.
 
-## Department bundles (portability)
+Legacy direct-work and strategy lessons remain in the historical database and migration review inventory until their exact workflow context is agreed. Only explicitly classified active owner preferences migrate automatically, with original lineage. Old approvals remain historical; they do not authorize new content or destinations.
 
-A Department is portable as a repository import, not an archive download.
+## Recovery, portability and updates
 
-- `company export <department_id> --out <folder>` runs in a home and
-  writes a complete bundle-repository folder: `bundle.json` (identity,
-  version, spine pin, closure file list), the department package, its
-  full dependency closure (skills, capabilities, connections, installed
-  agents, strategy documents), and a step-by-step `README.md` whose
-  per-adopter paste-prompt blocks (OpenCode, Codex, Claude Code) tell
-  the Director to import the bundle through the goal loop. An export
-  whose closure is incomplete refuses, naming every missing piece.
-- `company import <folder>` validates the manifest, the spine pin (an
-  incompatible pin fails naming the repair and installs nothing), the
-  closure (the bundle or the home must satisfy every reference), and
-  the declaration against the live contracts, then installs ONLY into
-  the six owner layers. It is idempotent: re-import refreshes
-  bundle-owned paths to bundle bytes; owner files outside the bundle
-  list are never touched; conflicting non-bundle content is never
-  overwritten. The vendored spine, host trees, and settings are never
-  writable by an import.
-- `spielos update` preserves every imported file (they are owner-layer
-  content) and the department still imports cleanly after the update.
+Requests commit a stable identity before dispatch. Duplicate identities with changed content fail. Current claim tokens, lease generation and deadlines fence late results. Local code has a hard deadline; remote uncertainty requires inspection of the original provider handle rather than blind redispatch. A host assignment requires an actual claim and output delivery; no agent is silently started. Sequential composition uses explicit earlier-step JSON mappings and durable child runs; it is not a general DAG engine.
 
-The generated README is the onboarding surface: the adopter clones or
-downloads the bundle repository, pastes the prompt for their host, and
-the Director performs the import through one bounded goal.
+A migration plan inventories legacy state and hashes exact owner moves before applying. Recoverable journals handle interruption; integrity and collision checks refuse ambiguous state. Existing owner files are never silently replaced. Rollback must not replay an external action. Snapshot/restore is explicit and includes committed WAL records. A copied company database cannot be used under another company's identity.
 
-## Executor identity (declared-agent claims)
+Updates refresh only shipped runtime/host files, preserve untracked owner content and merge only the selected home's owned hooks. Use `--keep-stale` when deletion was not authorized. Owner documents are additive templates, never overwritten by product updates. Portable imports inspect static declarations and hashes, refuse secret/hidden/escape paths, and preview collisions. Imports execute no submitted code and inherit no production approvals.
 
-WorkOrder execution is bound to the declared agent. A step's order belongs
-to the agent its workflow step declares; a direct order belongs to the
-agent the owner named. Only that exact identity — matched as an exact
-string, with no aliases or normalization — can claim, renew, fail, or
-complete the order, and an expired lease can be re-claimed only by the same
-declared agent. The documented flow is claim-then-complete
-(`tasks <id> --claim <agent>`, then `tasks <id> --complete <agent>`):
-completing an open order is refused until it is claimed, and work for an
-undeclared executor is refused upfront — a workflow step (or direct
-assignment) whose agent is neither installed, nor the goal owner, nor
-declared by the owning Department escalates to the owner with a message
-naming the agent, and no WorkOrder is created for it. The goal owner
-completes a direct order whose declared agent is the owner by
-construction, not by override.
+## Telemetry and local plugin
 
-## The DECIDE boundary
+Langfuse is the observation and evaluation record; local state journals execution and approvals for recovery. Configure the exact project and approved reviewed-evidence policy before qualification. Credentials stay in environment/private connection settings. The outbox uses stable event IDs, bounded retry and exact remote readback. A transport response alone does not mark verification. Under reviewed evidence, dataset items carry approved inspectable inputs and expected results; historical digest-only datasets remain historical. Experiments link actual case root observations and score definitions. Usage is actual, estimated or unknown with source and currency; unknown is never zero.
 
-`DECIDE` is the reasoning seam: a Run the runtime cannot decide for the
-owner parks a structured decision request instead of inventing work.
+The optional local plugin exposes select_company, inspect_company, build_workflow, run_workflow, review_output and approve_action. It stores no home in the plugin cache, has no lifecycle hooks and never initializes a company during selection. The local OS owner is its trust root unless a scoped revocable bearer principal is supplied. This is not a hosted multitenant service or enterprise certification. Activepieces preparation stays offline until the owner explicitly authorizes live work.
 
-- A Goal whose owner is not a Department (or whose Department declares no
-  workflow) parks a decision request: the Run stays at DECIDE/waiting, one
-  owner notification carries what is needed, why, the candidate Departments
-  and workflows that declare the metric, and the installed Agents. No
-  Intervention and no WorkOrder is created — no content-free "choose
-  bounded work" order can exist. The owner-facing fields are owner prose
-  (goal name, human progress, named options); the exact answer syntax rides
-  the payload for the Director, which records the owner's plain-words
-  answer through the CLI itself.
-- The owner answers with `goal decide`: `--kind execute_workflow` adopts
-  one of the candidate workflows, or `--kind request_agent` assigns bounded
-  direct work whose instruction is mandatory (an empty instruction is
-  refused).
-- Stalls park: when a Goal's evaluated metric holds the same value across
-  `stall_threshold` runs (default 3) and a run produced no new evidence,
-  the next run is created parked with a continue/adjust/pause ask; a
-  `review_every` config parks at that cadence. `goal resume` opens the next
-  run; a DECIDE park is refused until it is decided.
-- Progressing runs chain automatically. There are no per-run owner gates:
-  EVALUATE opens the next Run on its own, and the loop parks only at
-  approval or authority boundaries, a decision request, a stall or review
-  threshold, or when a goal-level decision keeps escalating.
+## Declaring a company brand release
 
-## Memory taxonomy, retrieval, and causal injection
+`brand candidate --version <version> --files <json-list> --home <home>` pins actual files; `brand release --candidate <json-file> --inspection <json-file>` requires an independent authenticated reviewer and a PNG example included in the pinned files. `brand show` resolves an immutable release. The same operations are `build_workflow` action `brand-candidate` and `review_output` action `brand-release` in MCP.
 
-Memory has one classification: owner preferences, constraints, and
-authority live in owner scope (written with `profile set`, no evidence
-needed); operational lessons live in workflow scope (written with
-`tasks <id> --complete --learning`, conditional on something genuinely
-reusable being learned); owner strategic direction stated during tasks
-lives in strategy scope (written with `memory add --scope strategy`, or
-distilled at an evaluation boundary when the evidence genuinely changes
-a future Goal-level choice). Completing work without a lesson writes no
-memory, and the deterministic catalog never fabricates strategy claims.
+The starter convention uses voice.md, design-system/tokens.json and components.css, plus assets/templates/examples. It imposes no report-specific CSS classes. An actual company may instead declare brand/brand.json with schema 1 and roles: voice, tokens, components, assets, templates and examples. Each role is a nonempty list of contained brand-relative files included in the candidate; the contract is pinned automatically. Tokens can be JSON or CSS, and real assets can live within an existing design-system snapshot. CSS custom properties with valid fallbacks are allowed. Framework/rendering quality belongs to the paired harness and attributable rendered review, not a fixed component naming convention.
 
-Memory retrieval is topology-aware: `relevant(goal_id=B)` returns B's own
-strategy claims plus the active strategy claims of Goals B is
-structurally related to — siblings (the same parent goal), its parent,
-its children, and both directions of a `supports` edge — never the
-claims of unrelated Goals. Direct-work lessons are goal-keyed: a
-workflow-scope claim with no workflow_id (written by `tasks <id>
---complete --learning` on a direct order) reaches future direct orders
-of that same Goal exactly. Owner and workflow scoping are otherwise
-unchanged.
+A workflow may declare execution.brand_context as a distinct nonempty list of text paths inside its approved brand release. Only those immutable bytes enter the assignment; unknown or binary paths fail. The full brand digest and file references remain pinned for both harnesses. Without an explicit subset, a declared brand contract contributes its voice/token/component/template roles, not unrelated manifests or examples. Critical-context and token-budget checks still apply; selecting a subset never silently trims a required constraint.
 
-Memory is causal, not decorative: every WorkOrder brief carries a
-bounded `memory` list — the workflow's own recorded learning for
-workflow orders, the goal-relevant claims (never owner profile claims)
-for direct ones, including the goal's own direct-work lessons
-(workflow_id NULL, written by `tasks --complete --learning`), so the
-executor's next execution builds on what the last one learned. Parked
-asks render the same learning as
-`Workflow learning: <claims>` / `Relevant memory: <claims>` lines; with
-no claims recorded the brief key and the line stay empty.
+## Operational readiness
 
-A retired claim (`memory retire <id>`) keeps its row and evidence but
-leaves the active set, so retrieval and briefs stop carrying it.
+Context includes scoped memory claim text and provenance, unfinished Improvements, candidate reviews, expected negative-case rejection and telemetry state. The selected host passes the current prompt for relevant retrieval. Mandatory constraints survive topic filtering and cannot be silently omitted to fit a budget. Canonical strategy files are distinct from strategy-memory claims. Historical permissions never grant a new external action. Use memory classify to specify topics, category and mandatory constraints; critical claims cannot silently disappear under a budget.
 
-`spielos observe` also surfaces a repetition signal: three or more
-completed direct work orders with the same instruction on one goal appear
-as a bounded `repetition` entry suggesting the work may merit a reusable
-Workflow proposed through adoption.
+Workflow candidates are drafts. Release requires an Improvement with that exact candidate attached, actual evaluated cases and independent review. The release and Improvement acceptance commit together. Preserved Department ready flags do not qualify a workflow. Direct file/tool work remains draft and cannot be reported as a qualified production run.
 
-## Context projection
+For product or system changes, improvement attach-change records actual file hashes and acceptance evidence under the agreed file boundary; improvement decide requires an independent reviewer and refuses changed evidence. improvement reconcile attaches historical evidence without granting acceptance. No reviewer identity should be invented to self-approve.
 
-`spielos context` focuses the Goal the scheduler would run next: the
-focus follows `runs.ready()` priority order (deadline/priority aware —
-the same order the loop schedules in), falling back to the most recently
-updated active Goal when nothing is ready. For the focus goal the
-projection renders a `Recent decisions` line (each of the last 3 runs in
-plain words) and a `Departments that can move this goal` line, each only
-when it has content.
+workflow configure-telemetry accepts an explicit enabled Langfuse destination, reviewed_evidence policy, mandatory require_verified_release=true and optional private credential_ref inside .spielos. The credential file must be owner-private and contain authorization or public_key/secret_key; credentials never enter workflow definitions or export events. A required release remains blocked until every candidate event is verified in that exact project. Status makes disabled or unsynchronized telemetry visible.
 
-## Owner voice
+## Evaluation and activity standard
 
-Owner-facing text is human narration from start to finish: goals render by
-name with human progress ("0 of 1"), evidence renders as
-outcome sentences ("replies 2, sent 10000"), the loop position renders in
-plain words ("next step: choosing the next move"), and parks ask in plain
-words with named options. Raw ids, metric keys, stage/status enums,
-payloads, and CLI answer syntax never enter owner-facing text: the
-projection carries them in one compact `Machine reference` line at the
-end, and parked asks carry them in their payload machine fields — the
-Director quotes them only when the owner asks for technical detail. The
-owner answers in plain words; the Director records the answer through the
-CLI (`goal decide`, `goal resume`, `approve`).
+See [EVALUATION.md](EVALUATION.md). New candidates require `spielos-evaluation/2`: meaningful cases, observable criterion questions, explicit anchors and exact negative-failure expectations. Recorded activity distinguishes host sessions from Director/agent roles, retains supplied context changes, feedback targets and measured artifact lineage. Approved `reviewed_evidence` telemetry exports inspectable evidence into Langfuse. Local passes remain unqualified until exact remote readback; software tests never certify model or creative quality.
 
-## Owner-ask hygiene
+Continuous evaluation uses the selected host model. `evaluation pending --home <home> --session <session> --json` reads frozen reviews; `evaluation judge --home <home> --payload <verdict-file> --json` records actual criterion verdicts and model provenance. The Stop hook requests one bounded review pass. Tool wakes batch and reconcile telemetry, and every delivered workflow output runs its executable rubric automatically. Native Langfuse rules and workflow/agent definitions are mandatory for qualified releases. See EVALUATION.md for limits, human review and hook trust.
 
-`approve` answers the current intervention's pending ask — the
-notification is acknowledged before the run resumes, so an approved ask
-stops re-delivering while a new gate's own ask stays pending. Approving
-`--scope step` without an active intervention is refused with the right
-answer path: a DECIDE park is answered with `goal decide`, a stalled or
-review-parked run with `goal resume`. Topology audits no longer flag a
-healthy home with several independent root goals — the root ids are
-reported, and only genuine defects (cycles, missing parents, missing
-edge goals, abandoned blockers) count. Unknown comparison operators
-raise instead of silently failing closed.
+## Live company reports and chat receipts
 
-## Canonical layout
+`report --home /explicit/home --json` opens or reuses an authenticated loopback dashboard. `--no-open` returns the URL without opening a browser; `--snapshot` reads the structured company report; `--serve --port 0` serves on an assigned loopback port. `/report` in configured Codex/Claude company context runs the same operation. Do not use a source checkout as a company home.
 
-Company content lives in exactly these layers under `.agents/company/`:
+The report exposes current workflow/run counts, scoped usage subtotals, categorized memory, actual supplied-context receipts, telemetry confirmations and current profile/strategy files. Unknown tokens, costs and active execution time stay unknown. Observed turn/run elapsed time includes waiting. Host and workflow charges are not silently combined. Existing candidate/release gates require the actual paired evaluation, independently reviewed release and configured telemetry; a dashboard or same-host diagnostic cannot qualify a workflow.
 
-| Layer | Contents |
-|---|---|
-| `departments/<id>/department.py` | one Department declaration per folder |
-| `skills/<id>/SKILL.md` | one reusable Skill per folder |
-| `capabilities/<id>/` | capability packages |
-| `connections/` | connection registry and client modules |
-| `strategy/` | canonical strategy documents |
-| `agents/installed/` | installed worker Agents |
+The generic UI ships with the runtime. A home may explicitly declare `.spielos/report.json` with `schema:1`, `ui_root:".spielos/artifacts/<custom-ui>"`, `custom_name` and `port`. Company visuals and reference galleries remain owner content; source contains generic renderer and synthetic tests only. The server rejects traversal, private state, secret roots and symlinks; native file reveal is an authenticated same-origin explicit action. No arbitrary command endpoint exists.
 
-Never invent folders or files outside these layers; the Director is the host
-agent prompt, not a Skill. Run `spielos layout` to audit drift.
+Codex/Claude hooks capture scoped context and supply concise owner-message instructions. At Stop, one bounded same-host review requests a Markdown tracking receipt with real report/trace links and pending/confirmed status. This is assistant-rendered chat delivery, not a claim that the host implements arbitrary rich cards. No hook trust record is edited. Restart or review host hook configuration when required by that host.
 
-## Vocabulary
 
-| Concept | What it is |
-|---|---|
-| **GoalRuntime** | The one durable control loop |
-| **Goal** | A measurable outcome with an owner, metric, and target |
-| **Department** | A declarative, Agent-owned capability package |
-| **Workflow** | Ordered steps with declared evidence and approval keys |
-| **Agent** | Performs claimed work orders through a Host |
-| **Evidence** | Immutable proof attached to Goals and Runs |
-| **Memory** | owner / workflow / strategy scopes only |
-| **Approval** | Explicit owner keys; external actions park first |
-
-A new home starts with no bundled Departments. Add clean declarative packages
-only when their Goal, Workflow, Agent, Evidence, and approval contracts are
-ready.
+Codex usage can be imported from an explicitly bound current-chat log through `activity import-usage --session <session> --payload <private JSON containing path> --home <home>`. Hooks use only their supplied path or that registered source; no directory discovery occurs. Session identity and company cwd must match. The adapter stores model/turn/time/token metadata, never messages or reasoning bodies. Cached input and reasoning output remain included in their parent totals. `/report` shows actual tokens, actual bill unknown, and separately labelled current Standard-rate reference credits/API equivalents with official sources and verification dates.

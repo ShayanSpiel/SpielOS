@@ -26,25 +26,32 @@ CORE_TABLES = {
 
 
 class FreshHomeAcceptanceTests(unittest.TestCase):
-    def test_fresh_home_has_only_clean_core_tables(self):
+    def test_fresh_home_reads_do_not_initialize_legacy_tables_or_a_scheduler(self):
+        from contextlib import closing
+        import json
         with tempfile.TemporaryDirectory() as directory:
-            home = Path(directory) / "home"
-            self.assertEqual(0, main(["init", "--dir", str(home), "-y", "--json"]))
-            environment = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1",
-                           "PYTHONPATH": str(home / ".agents")}
-            commands = [(), ("status",), ("overview",), ("context",),
-                        ("layout",), ("memory", "summary"), ("profile", "list"),
-                        ("runner", "tick")]
+            home=Path(directory)/'home'
+            self.assertEqual(0,main(['init','--dir',str(home),'-y','--json']))
+            environment={**os.environ,'PYTHONDONTWRITEBYTECODE':'1','PYTHONPATH':str(home/'.agents')}
+            commands=[(),('status',),('overview',),('context',),('layout',),
+                      ('memory','summary','--home',str(home))]
             for command in commands:
-                result = subprocess.run(
-                    [sys.executable, "-B", "-m", "company", *command], cwd=home,
-                    env=environment, capture_output=True, text=True, timeout=30)
-                self.assertEqual(0, result.returncode, result.stderr or result.stdout)
-            database = home / ".spielos" / "state" / "company.sqlite"
-            with sqlite3.connect(database) as connection:
-                tables = {row[0] for row in connection.execute(
-                    "SELECT name FROM sqlite_master WHERE type='table'")}
-            self.assertEqual(CORE_TABLES, tables)
+                result=subprocess.run([sys.executable,'-B','-m','company',*command],cwd=home,env=environment,capture_output=True,text=True,timeout=10)
+                self.assertEqual(result.returncode,0,result.stderr)
+            self.assertFalse((home/'.spielos/state/company.sqlite').exists())
+            self.assertFalse((home/'.spielos/state/workflows.sqlite').exists())
+            for command in [('goal','create'),('runner','tick'),('runner','start')]:
+                result=subprocess.run([sys.executable,'-B','-m','company',*command],cwd=home,env=environment,capture_output=True,text=True,timeout=10)
+                self.assertNotEqual(result.returncode,0)
+                self.assertIn('retired',result.stderr)
+            candidate=subprocess.run([sys.executable,'-B','-m','company','workflow','candidate',
+                '--home',str(home),'--manifest',str(home/'company/workflows/sales-report/workflow.json'),'--json'],
+                cwd=home,env=environment,capture_output=True,text=True,timeout=10)
+            self.assertEqual(candidate.returncode,0,candidate.stderr)
+            with closing(sqlite3.connect(home/'.spielos/state/workflows.sqlite')) as connection:
+                tables={row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+            self.assertTrue(tables)
+            self.assertFalse(any(name.startswith('core_') for name in tables))
 
 
 class _WorkflowController:

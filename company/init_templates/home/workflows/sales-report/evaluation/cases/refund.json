@@ -1,0 +1,20 @@
+{
+  "id": "refund",
+  "split": "negative",
+  "input": {
+    "title": "refund",
+    "sales": [
+      -5
+    ]
+  },
+  "reference": {
+    "title": "refund",
+    "total": -5,
+    "rows": 1
+  },
+  "expected": "fail",
+  "intent": "Verify exact arithmetic and row counts for refund",
+  "failure_criteria": [
+    "positive"
+  ]
+}

@@ -1,0 +1,1 @@
+Open the live report for the explicitly selected SpielOS home. Run its local `report --home <home> --json` command, use the returned clickable URL, and explain any telemetry or measurement gaps. This opens a read-only loopback dashboard, not a workflow run. Never select another company. Custom dashboard extensions are declared in the home's private report configuration.

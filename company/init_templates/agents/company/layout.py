@@ -1,7 +1,8 @@
 """Canonical home layout contract and drift audit.
 
-The layout is the product contract: owner content lives in exactly six user
-layers under ``.agents/company/``; everything else is the vendored spine.
+The schema-2 layout separates visible ``company/`` owner content from the
+pinned runtime under ``.spielos/runtime/company/``. The historical six-layer
+audit remains available only for an unmigrated home.
 :func:`audit` reports structural drift without executing anything, and
 :func:`layout_summary` renders the one-line status injected into every model
 request.
@@ -15,7 +16,7 @@ from pathlib import Path
 # the six canonical user layers (user layers survive `spielos update`).
 VENDORED_ROOT_FOLDERS = frozenset({
     "agents", "assets", "capabilities", "commands", "connections", "context",
-    "departments", "evidence", "evals", "goals", "memory",
+    "departments", "evidence", "evals", "goals", "memory", "integration_templates",
     "observability", "resolution", "runtime", "skills", "state", "strategy",
     "work_orders", "workflows",
 })
@@ -80,6 +81,26 @@ def _layer_counts(company: Path) -> dict:
 def audit(root: Path) -> dict:
     """Return the structural layout report for one home root (read-only)."""
     root = Path(root)
+    from .home import CompanyHome,VISIBLE_LAYERS
+    home=CompanyHome(root)
+    if home.lean:
+        company=home.content;violations=[]
+        for layer in VISIBLE_LAYERS:
+            path=company/layer
+            if not path.is_dir():violations.append(_violation('missing_layer',root,path,'The declared owner layer is missing','Restore the canonical company layer without replacing owner files'))
+            elif path.is_symlink() or not path.resolve().is_relative_to(company.resolve()):violations.append(_violation('external_layer',root,path,'Company ownership escaped the selected home','Review the external reference explicitly'))
+        if not (company/'profile.md').is_file():violations.append(_violation('missing_profile',root,company/'profile.md','Company profile is missing','Restore the owner profile'))
+        for layer,marker in [('skills','SKILL.md'),('workflows','workflow.json')]:
+            for path in (company/layer).iterdir():
+                if not path.is_dir():continue
+                if not (path/marker).is_file():violations.append(_violation('missing_declaration',root,path,'Reusable content needs its declaration','Add the named declaration after reviewing the content'))
+        # Department-private build assets may use framework folders such as
+        # _astro. Only canonical ownership boundaries are audited here.
+        layers={key:value for key,value in _layer_counts(company).items() if key!='capabilities'}
+        layers['workflows']=sum(1 for path in (company/'workflows').glob('*/workflow.json') if path.is_file())
+        layers['brand']=sum(1 for path in (company/'brand').iterdir() if path.is_dir())
+        return {'ok':not violations,'violations':violations,'layers':layers,
+                'layout':'lean','content':'company','runtime':'.spielos/runtime/company'}
     company = root / ".agents" / "company"
     if not company.is_dir():
         return {"ok": True, "violations": [], "layers": {}}

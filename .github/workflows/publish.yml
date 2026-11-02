@@ -16,10 +16,16 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
       - name: Run the test suite
         run: |
           set -euo pipefail
-          PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest discover company/tests
+          python3 -B tools/check_source_boundary.py
+          python3 -B tools/sync_runtime_templates.py
+          PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest discover -s company/tests -t .
+          python3 -B tools/test_acceptance.py --out "$RUNNER_TEMP/acceptance.json"
 
   pypi-publish:
     name: Build and publish
@@ -62,51 +68,9 @@ jobs:
           set -euo pipefail
           python -m venv "$RUNNER_TEMP/spielos-smoke"
           "$RUNNER_TEMP/spielos-smoke/bin/python" -m pip install dist/*.whl
-          SMOKE_HOME="$RUNNER_TEMP/spielos-home"
-          "$RUNNER_TEMP/spielos-smoke/bin/spielos" init --dir "$SMOKE_HOME" -y
-          (
-            cd "$SMOKE_HOME"
-            "$RUNNER_TEMP/spielos-smoke/bin/spielos"
-            "$RUNNER_TEMP/spielos-smoke/bin/spielos" status
-            "$RUNNER_TEMP/spielos-smoke/bin/spielos" overview
-            "$RUNNER_TEMP/spielos-smoke/bin/spielos" context
-            "$RUNNER_TEMP/spielos-smoke/bin/spielos" memory summary
-            "$RUNNER_TEMP/spielos-smoke/bin/spielos" profile list
-            "$RUNNER_TEMP/spielos-smoke/bin/spielos" runner tick
-            "$RUNNER_TEMP/spielos-smoke/bin/spielos" notifications list
-            "$RUNNER_TEMP/spielos-smoke/bin/spielos" update --dir "$SMOKE_HOME" --json
-          )
-          EXPECTED="${{ steps.release.outputs.version }}" SMOKE_HOME="$SMOKE_HOME" \
-          "$RUNNER_TEMP/spielos-smoke/bin/python" - "$SMOKE_HOME" <<'PY'
-          import os
-          import re
-          import sqlite3
-          import subprocess
-          import sys
-          from pathlib import Path
-
-          home = Path(sys.argv[1])
-          config = (home / ".agents/company/runtime/config.py").read_text(encoding="utf-8")
-          match = re.search(r'^VERSION\s*=\s*"([^"]+)"', config, re.MULTILINE)
-          actual = match.group(1) if match else None
-          expected = os.environ["EXPECTED"]
-          assert actual == expected, (actual, expected)
-          expected_tables = {
-              "core_goals", "core_goal_metadata", "core_goal_edges", "core_runs",
-              "core_interventions", "core_workflows", "core_workflow_runs",
-              "core_work_orders", "core_evidence", "core_memory", "core_approvals",
-              "core_notifications",
-          }
-          database = home / ".spielos/state/company.sqlite"
-          with sqlite3.connect(database) as connection:
-              actual_tables = {row[0] for row in connection.execute(
-                  "SELECT name FROM sqlite_master WHERE type='table'")}
-          assert actual_tables == expected_tables, actual_tables
-          command = Path(sys.executable).with_name("spielos")
-          reported = subprocess.check_output(
-              [command, "--version"], cwd=home, text=True).strip()
-          assert reported == f"spielos {expected}", reported
-          PY
+          python -B tools/smoke_distribution.py \
+            --python "$RUNNER_TEMP/spielos-smoke/bin/python" \
+            --expected "${{ steps.release.outputs.version }}"
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:

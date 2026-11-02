@@ -4,7 +4,9 @@ Creates a vendored copy of the harness spine plus the private state tree in
 a target directory (default: cwd), so the resulting repository has zero
 runtime dependency on the installed package:
 
-    .agents/company/**     runtime spine + optional Departments
+    company/**             editable owner context and workflow definitions
+    .spielos/runtime/company/** pinned runtime spine
+    .agents/company         runtime compatibility alias
     .spielos/state|data|artifacts/
     .spielos/.env.example  credential contract
     .opencode/**           host adapter (plugin, commands, agents)
@@ -89,7 +91,7 @@ def _canonical_opencode_json() -> dict:
 # The Claude Code adapter wires its hooks through an append-only merge
 # into the owner's .claude/settings.json; the release fragment names the
 # hook scripts this merge owns (and nothing else).
-CLAUDE_HOOK_SCRIPTS = ("spielos-context.py", "spielos-attention.py")
+CLAUDE_HOOK_SCRIPTS = ("spielos-context.py", "spielos-attention.py", "spielos-observe.py")
 
 
 def _claude_hook_script(command: str) -> str | None:
@@ -117,109 +119,53 @@ def _claude_skip(rel: str) -> bool:
     return rel == "CLAUDE.md"
 
 
-def _merge_claude_settings(root: Path) -> list[str]:
-    """Append-only merge of the Claude Code hook wiring.
-
-    The release ships the hook commands in
-    ``.claude/settings-fragment.json``; this merge lands them in the
-    owner's ``.claude/settings.json`` without ever disturbing owner
-    content: every other key (permissions, env, model, and any hooks the
-    owner or other tools registered) is preserved byte-for-byte in
-    meaning, each SpielOS hook is added exactly once (a release that
-    changes a command replaces only its own earlier wiring), an
-    unparseable settings file is left untouched, and
-    ``.claude/settings.local.json`` is never written.
-    """
-    fragment_path = root / ".claude" / "settings-fragment.json"
-    try:
-        fragment = json.loads(fragment_path.read_text())
-    except (json.JSONDecodeError, OSError):
-        return []
-    wanted = fragment.get("hooks") if isinstance(fragment, dict) else None
-    if not isinstance(wanted, dict):
-        return []
-
-    settings_path = root / ".claude" / "settings.json"
-    if settings_path.is_file():
-        try:
-            config = json.loads(settings_path.read_text())
-        except (json.JSONDecodeError, OSError):
-            return []  # owner content we cannot parse is never rewritten
-        if not isinstance(config, dict):
-            return []
-    else:
-        config = {}
-
-    hooks = config.get("hooks")
-    if hooks is None:
-        hooks = {}
-        config["hooks"] = hooks
-    if not isinstance(hooks, dict):
-        return []  # owner-shaped hooks key: leave it alone
-
-    changed = False
-    for event, groups in wanted.items():
-        existing = hooks.get(event)
-        if existing is None:
-            existing = []
-            hooks[event] = existing
-        elif not isinstance(existing, list):
-            # An owner-shaped event value is owner content: leave the
-            # whole merge alone rather than replace it.
-            return []
-        if not isinstance(groups, list):
-            continue
+def _merge_owned_hooks(root: Path, host: str, desired: dict, destination: Path) -> list[str]:
+    """Replace/retire only this home's known hooks; preserve owner wiring."""
+    if destination.exists():
+        try:config=json.loads(destination.read_text())
+        except (ValueError,OSError):return []
+        if not isinstance(config,dict):return []
+    else:config={}
+    hooks=config.get('hooks',{})
+    if not isinstance(hooks,dict):return []
+    wanted=desired.get('hooks',{})
+    if not isinstance(wanted,dict):return []
+    original=json.dumps(config,sort_keys=True)
+    def owned(command):
+        if not isinstance(command,str):return False
+        for name in CLAUDE_HOOK_SCRIPTS:
+            suffix=f'.{host}/hooks/{name}'
+            forms=(f'python3 {suffix}',f'python3 "{suffix}"',
+                   'python3 '+shlex.quote(str(root/suffix)),
+                   f'python3 "{root/suffix}"')
+            if host=='claude':forms=(*forms,f'python3 "$CLAUDE_PROJECT_DIR/{suffix}"')
+            if command in forms:return True
+        return False
+    merged={}
+    for event,groups in hooks.items():
+        if not isinstance(groups,list):return []
+        retained=[]
         for group in groups:
-            if not isinstance(group, dict):
-                continue
-            entries = group.get("hooks")
-            if not isinstance(entries, list):
-                continue
-            target = None
-            for candidate in existing:
-                if (isinstance(candidate, dict)
-                        and candidate.get("matcher", "") == (group.get("matcher") or "")):
-                    target = candidate
-                    break
-            if target is not None and not isinstance(target.get("hooks"), list):
-                # The owner's group at this matcher is shaped differently:
-                # keep it untouched and add ours as its own group.
-                target = None
-            if target is None:
-                target = ({"matcher": group["matcher"], "hooks": []}
-                          if group.get("matcher") else {"hooks": []})
-                existing.append(target)
-            bucket = target.get("hooks")
-            if not isinstance(bucket, list):
-                continue  # unreachable by construction; never touch it
-            for entry in entries:
-                command = (entry.get("command")
-                           if isinstance(entry, dict) else None)
-                if not isinstance(command, str) or not command:
-                    continue
-                script = _claude_hook_script(command)
-                if script is None:
-                    continue
-                # Drop only this release's own stale wiring for the script
-                # (a release may change the command); never touch any
-                # other hook entry the owner or another tool registered.
-                kept = [item for item in bucket
-                        if not (isinstance(item, dict)
-                                and _claude_hook_script(
-                                    str(item.get("command") or "")) == script)]
-                if len(kept) != len(bucket):
-                    bucket[:] = kept
-                    changed = True
-                if not any(isinstance(item, dict)
-                           and item.get("command") == command
-                           for item in bucket):
-                    bucket.append(dict(entry))
-                    changed = True
-    if not changed and settings_path.is_file():
-        return []
-    settings_path.parent.mkdir(parents=True, exist_ok=True)
-    settings_path.write_text(json.dumps(config, indent=2) + "\n")
-    return [str(settings_path)]
+            if not isinstance(group,dict) or not isinstance(group.get('hooks'),list):
+                retained.append(group);continue
+            entries=[entry for entry in group['hooks'] if not isinstance(entry,dict) or not owned(entry.get('command'))]
+            if entries==group['hooks']:retained.append(group)
+            elif entries:retained.append({**group,'hooks':entries})
+        if retained:merged[event]=retained
+    for event,groups in wanted.items():
+        merged.setdefault(event,[]).extend(groups)
+    config['hooks']=merged
+    if json.dumps(config,sort_keys=True)==original:return []
+    destination.parent.mkdir(parents=True,exist_ok=True)
+    destination.write_text(json.dumps(config,indent=2)+'\n')
+    return [str(destination)]
+
+
+def _merge_claude_settings(root: Path) -> list[str]:
+    fragment=root/'.claude/settings-fragment.json'
+    try:desired=json.loads(fragment.read_text())
+    except (OSError,ValueError):return []
+    return _merge_owned_hooks(root,'claude',desired,root/'.claude/settings.json')
 
 
 def _merge_opencode_json(path: Path) -> list[str]:
@@ -394,7 +340,7 @@ def _copy_tree(src: Path, dst: Path, overwrite: bool = False,
     return written
 
 
-def _prune_stale(src: Path, dst: Path, skip=None) -> list[str]:
+def _prune_stale(src: Path, dst: Path, skip=None, tracked=None) -> list[str]:
     """Delete vendored files that the current templates no longer ship.
 
     An ``update`` must leave the vendored spine exactly like a fresh init:
@@ -412,7 +358,10 @@ def _prune_stale(src: Path, dst: Path, skip=None) -> list[str]:
                 keep.add(rel)
     if not dst.is_dir():
         return removed
-    for path in sorted(dst.rglob("*")):
+    # Explicit receipt paths work through the recorded runtime alias. Path.rglob
+    # intentionally does not traverse directory symlinks on supported Python.
+    candidates=([dst/relative for relative in tracked] if tracked is not None else dst.rglob('*'))
+    for path in sorted(candidates):
         if not path.is_file():
             continue
         rel = path.relative_to(dst).as_posix()
@@ -428,14 +377,6 @@ def _prune_stale(src: Path, dst: Path, skip=None) -> list[str]:
             continue
         path.unlink(missing_ok=True)
         removed.append(str(path))
-    for path in sorted((p for p in dst.rglob("*") if p.is_dir()),
-                       reverse=True):
-        if "node_modules" in path.parts:
-            continue
-        try:
-            path.rmdir()
-        except OSError:
-            pass
     return removed
 
 
@@ -447,6 +388,8 @@ def scaffold(target: Path | None = None, *, force: bool = False,
     interactive driver can show progress; it is optional plumbing and
     never changes what gets written.
     """
+    from ..home import CompanyHome, fingerprint
+
     # keep_stale disables every pruning operation, including bytecode cleanup.
     root = validate_home_destination(target or Path.cwd())
     templates = template_root()
@@ -461,6 +404,10 @@ def scaffold(target: Path | None = None, *, force: bool = False,
             "re-run with --force to overwrite")
 
     manifest = _load_manifest(root) if existing_home else None
+    home = CompanyHome(root)
+    lean = home.lean
+    if lean and (root / ".agents/company").resolve() != home.runtime.resolve():
+        raise ValueError("Runtime compatibility alias changed; inspect the home before updating")
 
     def vendored_entries() -> dict[str, list[str]]:
         entries = {"agents": _template_files(templates / "agents")}
@@ -498,13 +445,29 @@ def scaffold(target: Path | None = None, *, force: bool = False,
 
         return is_user
 
+    # Refuse newly shipped paths that collide with untracked owner files.
+    # This preflight runs before any update write; an update cannot claim
+    # ownership of an existing owner file merely by shipping its filename.
+    if existing_home:
+        for tree, source in [("agents", templates / "agents"), *[
+                (name, templates / "hosts" / name) for name in ("opencode", "codex", "claude")]]:
+            destination = root / ("." + tree)
+            tracked = set(manifest.get(tree, ())) if manifest is not None else set(_template_files(source))
+            for relative in _template_files(source):
+                if tree == "claude" and _claude_skip(relative): continue
+                candidate = destination / relative
+                if not candidate.resolve().is_relative_to(root):
+                    raise ValueError(f"Installation path escapes the company: {candidate}")
+                if candidate.exists() and relative not in tracked:
+                    raise FileExistsError(f"New product file collides with owner content: {candidate}")
+
     notify("Vendoring harness spine")
     if existing_home and force and not keep_stale:
         # An update removes stale vendored files so the spine matches a
         # fresh init exactly; owner-created files in the user layers are
         # skipped, as is anything the current release still ships.
         removed = _prune_stale(templates / "agents", root / ".agents",
-                                skip=layer_guard("agents"))
+                                skip=layer_guard("agents"), tracked=(manifest or {}).get("agents", []))
         written.extend(f"removed {item}" for item in removed)
     written += _copy_tree(templates / "agents", root / ".agents",
                           overwrite=force)
@@ -517,9 +480,13 @@ def scaffold(target: Path | None = None, *, force: bool = False,
             continue
         if existing_home and force and not keep_stale:
             written.extend(f"removed {item}" for item in _prune_stale(
-                src, root / ("." + name), skip=layer_guard(name)))
+                src, root / ("." + name), skip=layer_guard(name),tracked=(manifest or {}).get(name,[])))
         written += _copy_tree(src, root / ("." + name), overwrite=force,
-                              skip=(_claude_skip if name == "claude" else None))
+                              skip=(_claude_skip if name == "claude" else (lambda relative:relative=="hooks.json") if name=="codex" else None))
+
+    codex_source=templates/'hosts/codex/hooks.json'
+    if codex_source.is_file():
+        written += _merge_owned_hooks(root,'codex',json.loads(codex_source.read_text()),root/'.codex/hooks.json')
 
     # Resolve owned Codex commands at installation time. A company home need
     # not be a Git checkout, and hook processes inherit the session cwd.
@@ -530,6 +497,7 @@ def scaffold(target: Path | None = None, *, force: bool = False,
         owned = {
             "python3 .codex/hooks/spielos-context.py": "spielos-context.py",
             "python3 .codex/hooks/spielos-attention.py": "spielos-attention.py",
+            "python3 .codex/hooks/spielos-observe.py": "spielos-observe.py",
         }
         for groups in config.get("hooks", {}).values():
             for group in groups:
@@ -599,11 +567,7 @@ def scaffold(target: Path | None = None, *, force: bool = False,
     agents_md = root / "AGENTS.md"
     if agents_md.exists():
         current = agents_md.read_text()
-        updated = current
-        if _LAYOUT_MARKER not in updated:
-            updated = updated.rstrip("\n") + "\n\n" + _LAYOUT_CONTRACT_SECTION
-        if _PRIMARY_DIRECTOR_MARKER not in updated:
-            updated = updated.rstrip("\n") + "\n\n" + _PRIMARY_DIRECTOR_SECTION
+        updated = _merge_operating_doc(current)
         if updated != current:
             agents_md.write_text(updated)
             written.append(str(agents_md))
@@ -624,7 +588,20 @@ def scaffold(target: Path | None = None, *, force: bool = False,
         gitignore.write_text(ignore_block)
         written.append(str(gitignore))
 
+    # New homes start lean. Existing legacy homes require the separately
+    # reviewed migration; ordinary update never relocates owner content.
+    if not existing_home:
+        plan = home.migration_plan()
+        home.apply_migration(plan, expected_digest=fingerprint(plan))
+        lean = True
+    elif lean:
+        home.initialize_content()
+    if lean:
+        from ..security import CompanyAuthority
+        CompanyAuthority(root).bootstrap()
+
     return {
+        "layout": "lean" if lean else "legacy; explicit migration required",
         "root": str(root),
         "template_source": str(templates),
         "files_written": len(written),
@@ -634,8 +611,8 @@ def scaffold(target: Path | None = None, *, force: bool = False,
             "codex (the main chat acts as Director; review company hooks first), or claude "
             "(run claude --agent director)",
             "After reviewing host hooks, the Director receives company context automatically.",
-            "Create a clean Department only when its Workflow contract is ready.",
-            "Set credentials in .spielos/.env (see .spielos/.env.example).",
+            "Start with company/profile.md, strategy/ and brand/; build a bounded workflow with both harnesses.",
+            "Keep credentials private; connecting a provider is a separate explicit action.",
             "Audit layout any time: PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.agents "
             "python3 -B -m company layout",
         ],
@@ -644,6 +621,7 @@ def scaffold(target: Path | None = None, *, force: bool = False,
 
 _GITIGNORE = """
 # Company runtime: credentials, private inputs, state, generated work
+.spielos/security/
 .spielos/.env
 .spielos/.env.*
 .spielos/data/
@@ -662,120 +640,88 @@ _GITIGNORE = """
 node_modules/
 """
 
-_PRIMARY_DIRECTOR_MARKER = "<!-- spielos-primary-director v1 -->"
+_PRIMARY_DIRECTOR_MARKER = "<!-- spielos-primary-director v2 -->"
 
 _PRIMARY_DIRECTOR_SECTION = """## Primary Director
 
-<!-- spielos-primary-director v1 -->
+<!-- spielos-primary-director v2 -->
 
-In the main owner conversation in this company home, you are the primary
-SpielOS Director. The main chat itself holds this role; do not spawn a
-Director subagent to establish it. Delegated Agents keep their assigned
-roles and execute only their own claimed WorkOrders.
-
-Before responding or acting as Director, read `.codex/agents/director.toml`
-and follow its `developer_instructions` as the canonical operating
-contract, including owner voice, the command surface, evidence, approvals,
-and memory lineage. This instruction deliberately makes that existing
-contract apply to the main chat. Codex otherwise uses that TOML file only
-as a custom subagent definition. Do not create a duplicate Director Skill.
-
-Use the injected SpielOS projection: current Goal and evidence, owner
-profile, applicable workflow and strategy memory, attention, and layout.
-If the projection is missing, use the contract's one read-only status
-fallback and report the injection failure; never read SQLite directly or
-infer that missing injected memory means memory was deleted.
-
-Codex setup: open a new chat with this company home as its working folder.
-Project trust and hook trust are separate. Review the home's context and
-attention hooks through Codex's hook-review controls (`/hooks` in the CLI);
-new or changed definitions require owner review. Never edit global hook
-trust records, copy approvals from another path, or bypass hook review.
+The main owner chat is the primary Director; no Director subagent is needed.
+The Director operates only the explicitly selected company. Authority comes from that home's AGENTS.md, installed host contract and selected runtime. Other workspaces, plugins and preview companies confer no authority: never import their identities, approvals or state. Use the local SpielOS CLI when its optional MCP is unavailable; never select another company implicitly.
+Delegated agents keep only their explicitly assigned bounded workflow role.
+Read `.codex/agents/director.toml` for the shared operating contract. Use the
+injected read-only company projection; if missing, run status once for this
+explicit home and explain the injection failure. Missing injected memory does
+not imply deletion. Never bypass the selected host's hook review or copy trust
+records from another path. Host configuration controls supported wakeups; no
+SpielOS polling daemon is enabled.
 """
 
-
-_AGENTS_MD = """# Agent operating rules — harness section
-
-This repository runs on the SpielOS company harness: one durable loop
-(GOAL -> OBSERVE -> DECIDE -> ACT -> EVALUATE) persisted in SQLite under
-`.spielos/state/`. The runtime owns every Goal, approval, run, and evidence
-record; Departments supply Agent-owned behavior only.
-
-Authority and full documentation: `.agents/company/README.md`.
-
-Open OpenCode (run `/agents`, select the Director agent), Codex (the main
-chat acts as Director after reading this file), or Claude Code (run
-`claude --agent director`). Review host hooks before relying on automatic
-company context. Claude Code reads
-this file through the one-line `CLAUDE.md` bridge. The host injects fresh
-company state automatically; do not begin with a
-manual status probe. If a request carries no SpielOS projection, host
-injection failed: run the read-only `company status` once, tell the owner
-that injection is broken, and never guess company state by reading files.
-
-## Host commands
-
-The same slash commands ship for OpenCode, Codex, and Claude Code:
-
-| Command | Meaning |
-|---|---|
-| `/start [request or goal]` | Create, resume, or continue one Goal |
-| `/stop [goal]` | Persistently stop automation |
-| `/status [goal]` | Compact Company Snapshot or one Goal |
-| `/approve <goal>` | Approve exactly one displayed parked action |
-| `/help` | Explain the vocabulary and command surface |
-
-## Company layout contract
-
-<!-- spielos-layout-contract v1 -->
-
-Company content lives in exactly these layers under `.agents/company/`:
-
-| Layer | Contents |
-|---|---|
-| `departments/<id>/department.py` | one Department declaration per folder |
-| `skills/<id>/SKILL.md` | one reusable Skill per folder |
-| `capabilities/<id>/` | capability packages |
-| `connections/` | connection registry and client modules |
-| `strategy/` | canonical strategy documents |
-| `agents/installed/` | installed worker Agents |
-
-Never invent folders or files outside these layers (no `_lib/`,
-`_strategy/`, `declarations.py`, or a duplicate Director skill — the
-Director is the host agent prompt, not a Skill). Department-owned subfolders
-inside their package are fine. Audit drift with `company layout` and
-resolve every violation before adding new content.
-
-## Rules
-
-- Live external actions always park for explicit approval.
-- Departments are declarations; Agents execute only claimed WorkOrders.
-- Owner, workflow, and strategy Memory must retain its required lineage.
-- Structural changes (Departments, Workflows, or the vendored spine) go
-  through one bounded system-improvement Goal with exact allowed files and
-  acceptance evidence — never improvise them directly.
-""" + "\n" + _PRIMARY_DIRECTOR_SECTION
-
-_LAYOUT_MARKER = "<!-- spielos-layout-contract v1 -->"
+_LAYOUT_MARKER = "<!-- spielos-layout-contract v2 -->"
 
 _LAYOUT_CONTRACT_SECTION = """## Company layout contract
 
-<!-- spielos-layout-contract v1 -->
+<!-- spielos-layout-contract v2 -->
 
-Company content lives in exactly these layers under `.agents/company/`:
+Editable company content lives in the visible `company/` folder:
 
-| Layer | Contents |
-|---|---|
-| `departments/<id>/department.py` | one Department declaration per folder |
-| `skills/<id>/SKILL.md` | one reusable Skill per folder |
-| `capabilities/<id>/` | capability packages |
-| `connections/` | connection registry and client modules |
-| `strategy/` | canonical strategy documents |
-| `agents/installed/` | installed worker Agents |
+| Path | Ownership |
+| --- | --- |
+| `profile.md` | explicit identity, users, owner, responsibilities and boundaries |
+| `strategy/` | canonical owner direction and positioning |
+| `brand/` | assets, design-system tokens/components, voice, templates and examples |
+| `workflows/<id>/` | workflow.json, brief.md, execution, evaluation rubric/cases, examples |
+| `agents/installed/`, `skills/` | reusable workflow implementation declarations |
+| `connections/` | non-secret provider references |
+| `departments/` | optional ownership groupings |
 
-Never invent folders or files outside these layers (no `_lib/`,
-`_strategy/`, `declarations.py`, or a duplicate Director skill — the
-Director is the host agent prompt, not a Skill). Department-owned subfolders
-inside their package are fine. Audit drift with `company layout` and
-resolve every violation before adding new content.
+Pinned runtime code lives in `.spielos/runtime/company/`; `.agents/company` is
+only its compatibility alias. Private state and artifacts live in `.spielos/`.
+Do not put company content into runtime internals or credentials into definitions.
+Audit with `company layout --home <this-home>`. Department-private build assets
+may stay in their package. Updates never replace owner content templates.
 """
+
+_PRODUCT_MARKER = "<!-- spielos-product-contract v2 -->"
+_PRODUCT_CONTRACT_SECTION = """## Product operating contract
+
+<!-- spielos-product-contract v2 -->
+
+The current product concepts are Company, Workflow, Run and Improvement. This
+section supersedes older generated instructions for Goal pursuit, WorkOrders,
+six hidden content layers and runner commands; those records are historical.
+One production Run invokes a pinned independently accepted workflow release,
+uses scoped context, evaluates actual output and obtains its required review.
+GODAE is the bounded development process for an Improvement, never a repeated
+production pursuit. Structural edits require exact allowed files and actual
+acceptance evidence. No product scheduler, tick/watch or autonomous repair runs.
+
+Owner preferences and strategic direction are explicit; workflow lessons cite
+evaluated runs of that workflow. Never fabricate facts, strategy, learning,
+metrics or business impact. Show names, progress, outcomes and clear named
+options; keep raw IDs, enums and JSON in machine payloads. Record the owner's
+plain-language answer yourself. Exact external-action approval is separate from
+quality and binds action, destination, content and scope. Do not send/publish or
+enable a held integration merely because output passed evaluation.
+
+Slash commands: /start invokes or builds bounded work; /stop cancels a named
+run; /status inspects; /approve records the displayed exact-action decision;
+/update refreshes reviewed product files. No command enables global pursuit.
+Read `.agents/company/README.md` for the CLI/MCP contract and recovery limits.
+"""
+
+_AGENTS_MD = ("# Agent operating rules — harness section\n\n" + _PRODUCT_CONTRACT_SECTION
+              + "\n" + _LAYOUT_CONTRACT_SECTION + "\n" + _PRIMARY_DIRECTOR_SECTION)
+
+
+def _merge_operating_doc(current: str) -> str:
+    """Refresh only explicitly marked generated sections, preserve owner notes."""
+    import re
+    updated=current
+    for prefix,section in (("spielos-layout-contract",_LAYOUT_CONTRACT_SECTION),
+                           ("spielos-primary-director",_PRIMARY_DIRECTOR_SECTION),
+                           ("spielos-product-contract",_PRODUCT_CONTRACT_SECTION)):
+        pattern=r"(?m)^## [^\n]+\n\n<!-- "+re.escape(prefix)+r" v[0-9]+ -->[\s\S]*?(?=^## |^# |\Z)"
+        if re.search(pattern,updated):updated=re.sub(pattern,lambda match:section+"\n",updated,count=1)
+        else:updated=updated.rstrip("\n")+"\n\n"+section
+    return updated

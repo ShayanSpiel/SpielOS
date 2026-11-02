@@ -52,6 +52,11 @@ class WorkOrder:
     attempt: int = 1
     result: dict[str, Any] | None = None
 
+    @property
+    def claim_token(self) -> str | None:
+        return (f"{self.id}:{self.attempt}:{self.claimed_at}"
+                if self.claimed_at else None)
+
 
 class WorkOrderRepository:
     def __init__(self, database: Database):
@@ -110,9 +115,12 @@ class WorkOrderRepository:
         who may execute the order. A claim held by a foreign identity
         (only reachable by pre-F4 databases) stays untouched.
         """
+        if lease_seconds <= 0:
+            raise ValueError("lease_seconds must be positive")
         stamp = datetime.now(timezone.utc)
         expires = stamp + timedelta(seconds=lease_seconds)
         with self.database.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
             row = connection.execute(
                 "SELECT agent_id FROM core_work_orders WHERE id=?",
                 (order_id,)).fetchone()
@@ -123,25 +131,24 @@ class WorkOrderRepository:
                     f"work order is declared for agent {row['agent_id']!r}, "
                     f"not {executor_id!r}")
             changed = connection.execute("""UPDATE core_work_orders
-                SET status='claimed',claimed_by=?,claimed_at=?,lease_expires_at=?,updated_at=?
+                SET attempt=attempt+CASE WHEN status='claimed' THEN 1 ELSE 0 END,
+                    status='claimed',claimed_by=?,claimed_at=?,lease_expires_at=?,updated_at=?
                 WHERE id=? AND agent_id=? AND (status='open' OR (status='claimed' AND
                   (lease_expires_at IS NULL OR lease_expires_at<=?)))""",
                 (executor_id, stamp.isoformat(), expires.isoformat(), stamp.isoformat(),
                  order_id, executor_id, stamp.isoformat())).rowcount
         if changed != 1:
-            current = self.get(order_id)
-            if (current.status == "claimed"
-                    and _claimant_matches(current.claimed_by, executor_id)):
-                return current
             raise RuntimeError("work order is not open")
         return self.get(order_id)
 
-    def renew(self, order_id: str, executor_id: str, *, lease_seconds: int = 300) -> WorkOrder:
+    def renew(self, order_id: str, executor_id: str, *, lease_seconds: int = 300,
+              claim_token: str | None = None) -> WorkOrder:
         stamp = datetime.now(timezone.utc)
         expires = stamp + timedelta(seconds=lease_seconds)
         with self.database.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
             row = connection.execute(
-                "SELECT status,claimed_by,agent_id FROM core_work_orders WHERE id=?",
+                "SELECT * FROM core_work_orders WHERE id=?",
                 (order_id,)).fetchone()
             if row is None:
                 raise KeyError(f"unknown work order: {order_id}")
@@ -149,6 +156,12 @@ class WorkOrderRepository:
                 raise RuntimeError(
                     f"work order is declared for agent {row['agent_id']!r}, "
                     f"not {executor_id!r}")
+            expected_token = f"{order_id}:{row['attempt']}:{row['claimed_at']}"
+            if claim_token != expected_token:
+                raise RuntimeError("current execution claim token required")
+            if (row["status"] == "claimed" and row["lease_expires_at"]
+                    and row["lease_expires_at"] <= _now()):
+                raise RuntimeError("execution claim has expired")
             if (row["status"] != "claimed"
                     or not _claimant_matches(row["claimed_by"], executor_id)):
                 raise RuntimeError("only the claiming Agent executor can renew a WorkOrder")
@@ -157,10 +170,12 @@ class WorkOrderRepository:
                 WHERE id=?""", (expires.isoformat(), stamp.isoformat(), order_id))
         return self.get(order_id)
 
-    def complete(self, order_id: str, result: dict, *, executor_id: str) -> WorkOrder:
+    def complete(self, order_id: str, result: dict, *, executor_id: str,
+                 claim_token: str | None = None) -> WorkOrder:
         with self.database.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
             row = connection.execute(
-                "SELECT status,claimed_by,agent_id FROM core_work_orders WHERE id=?",
+                "SELECT * FROM core_work_orders WHERE id=?",
                 (order_id,)).fetchone()
             if row is None:
                 raise KeyError(f"unknown work order: {order_id}")
@@ -168,12 +183,17 @@ class WorkOrderRepository:
                 raise RuntimeError(
                     f"work order is declared for agent {row['agent_id']!r}, "
                     f"not {executor_id!r}")
+            expected_token = f"{order_id}:{row['attempt']}:{row['claimed_at']}"
+            if claim_token != expected_token:
+                raise RuntimeError("current execution claim token required")
+            if (row["status"] == "claimed" and row["lease_expires_at"]
+                    and row["lease_expires_at"] <= _now()):
+                raise RuntimeError("execution claim has expired")
             if (row["status"] == "claimed"
                     and _claimant_matches(row["claimed_by"], executor_id)):
                 connection.execute("""UPDATE core_work_orders
                     SET status='completed',result_json=?,updated_at=? WHERE id=?""",
                     (json.dumps(result), _now(), order_id))
-                return self.get(order_id)
         current = self.get(order_id)
         if current.status == "completed":
             return current
@@ -183,7 +203,8 @@ class WorkOrderRepository:
                                kind: str, payload: dict,
                                evidence_items: list[tuple[str, dict]] | None = None,
                                advance_workflow: bool = False,
-                               wake_run: bool = False) -> tuple[WorkOrder, tuple[str, ...]]:
+                               wake_run: bool = False,
+                               claim_token: str | None = None) -> tuple[WorkOrder, tuple[str, ...]]:
         """Atomically complete an order, record Evidence, and advance its execution."""
 
         items = evidence_items or [(kind, payload)]
@@ -205,6 +226,12 @@ class WorkOrderRepository:
                 raise RuntimeError(
                     f"work order is declared for agent {row['agent_id']!r}, "
                     f"not {executor_id!r}")
+            expected_token = f"{order_id}:{row['attempt']}:{row['claimed_at']}"
+            if claim_token != expected_token:
+                raise RuntimeError("current execution claim token required")
+            if (row["status"] == "claimed" and row["lease_expires_at"]
+                    and row["lease_expires_at"] <= _now()):
+                raise RuntimeError("execution claim has expired")
             if row["status"] == "completed" and _claimant_matches(
                     row["claimed_by"], executor_id):
                 # A concurrent completion won first (issue #14): this
@@ -272,10 +299,12 @@ class WorkOrderRepository:
                     WHERE id=? AND status='waiting'""", (stamp, row["run_id"]))
         return self.get(order_id), evidence_ids
 
-    def fail(self, order_id: str, error: str, *, executor_id: str) -> WorkOrder:
+    def fail(self, order_id: str, error: str, *, executor_id: str,
+             claim_token: str | None = None) -> WorkOrder:
         with self.database.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
             row = connection.execute(
-                "SELECT status,claimed_by,agent_id FROM core_work_orders WHERE id=?",
+                "SELECT * FROM core_work_orders WHERE id=?",
                 (order_id,)).fetchone()
             if row is None:
                 raise KeyError(f"unknown work order: {order_id}")
@@ -283,6 +312,12 @@ class WorkOrderRepository:
                 raise RuntimeError(
                     f"work order is declared for agent {row['agent_id']!r}, "
                     f"not {executor_id!r}")
+            expected_token = f"{order_id}:{row['attempt']}:{row['claimed_at']}"
+            if claim_token != expected_token:
+                raise RuntimeError("current execution claim token required")
+            if (row["status"] == "claimed" and row["lease_expires_at"]
+                    and row["lease_expires_at"] <= _now()):
+                raise RuntimeError("execution claim has expired")
             if (row["status"] != "claimed"
                     or not _claimant_matches(row["claimed_by"], executor_id)):
                 raise RuntimeError("only the claiming Agent executor can fail a WorkOrder")

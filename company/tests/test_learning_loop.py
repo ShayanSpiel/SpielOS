@@ -634,7 +634,8 @@ class TestRepetitionSignal(LearningLoopCase):
             self.goal_id, "request_agent", agent="director",
             instruction=instruction)
         order = self.active_orders()[0]
-        self.runtime.claim_work_order(order["id"], "director")
+        if order["status"] == "open":
+            self.runtime.claim_work_order(order["id"], "director")
         self.runtime.complete_work_order(
             order["id"], "director",
             [{"kind": "weekly_sales", "payload": {"weekly_sales": 0}}])
@@ -704,7 +705,8 @@ class TestRepetitionSignal(LearningLoopCase):
                 instruction=f"unrelated task {index}",
                 evidence_kind=f"unrelated_{index}")
             order = self.active_orders()[0]
-            self.runtime.claim_work_order(order["id"], "director")
+            if order["status"] == "open":
+                self.runtime.claim_work_order(order["id"], "director")
             self.runtime.complete_work_order(
                 order["id"], "director",
                 [{"kind": f"unrelated_{index}",

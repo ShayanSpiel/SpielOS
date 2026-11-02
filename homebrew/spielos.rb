@@ -7,7 +7,7 @@
 class Spielos < Formula
   include Language::Python::Virtualenv
 
-  desc "AI company operating system with durable Goals, Departments, and approvals"
+  desc "Portable company workflows with versioned evaluations and approvals"
   homepage "https://spielos.xyz"
   # Content-addressed source sdist published by PyPI.
   url "https://files.pythonhosted.org/packages/10/98/90b3df7d260b1e251f9df45feafd5f78d9bfc2ba0e5b4697f7005fe2118b/spielos-10.3.3.tar.gz"
@@ -24,7 +24,7 @@ class Spielos < Formula
     # Thin wrapper: exec the vendored python running `python3 -m company`.
     (bin/"spielos").write <<~EOS
       #!/bin/bash
-      exec "#{libexec}/bin/python3" -m company "$@"
+      exec "#{libexec}/bin/python3" -B -m company.cli "$@"
     EOS
     chmod 0755, bin/"spielos"
   end

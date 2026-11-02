@@ -1,9 +1,5 @@
 ---
-description: Explain the SpielOS clean-core vocabulary and commands
-agent: director
+description: Explain company workflows and available operations
 ---
 
-Explain the vocabulary—Goal, Department, Workflow, Agent, Skill, Connection,
-Evidence, and Memory—and the commands `/start`, `/stop`, `/status`, `/approve`,
-`/help`, and `company observe` (the read-only dashboard). Mention that Escape cancels the current OpenCode response while
-`/stop` persistently disables company automation.
+Explain Company, Workflow, Run and Improvement with concrete examples. GODAE is bounded development; production invokes pinned releases. Show start, stop, status, approve and update according to their actual behavior. Use the installed README and command help; do not suggest Goal/runner commands or imply an inactive integration is connected.

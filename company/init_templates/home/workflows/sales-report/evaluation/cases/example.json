@@ -1,0 +1,18 @@
+{
+  "id": "example",
+  "split": "representative",
+  "input": {
+    "title": "example",
+    "sales": [
+      10,
+      20
+    ]
+  },
+  "reference": {
+    "title": "example",
+    "total": 30,
+    "rows": 2
+  },
+  "expected": "pass",
+  "intent": "Verify exact arithmetic and row counts for example"
+}

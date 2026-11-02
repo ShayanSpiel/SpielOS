@@ -1,22 +1,18 @@
 #!/bin/sh
-# SpielOS installer — installs everything needed, then offers first-run init.
-#
-# One line:
-#   curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/SpielOS/main/install.sh | sh
-#
-# One line with a Department bundle (local folder or git URL):
-#   curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/SpielOS/main/install.sh | sh -s -- --bundle <path-or-url>
-#
-# The script is idempotent: re-running it upgrades an existing install.
-# Override the install source with SPIELOS_SOURCE=<name-or-path>
-# (e.g. a git URL for a branch build). SPIELOS_REPO is the older name for
-# the same override and still works.
+# Install the CLI; company creation and migrations are explicit operations.
+# Local source: SPIELOS_SOURCE=/absolute/path/SpielOS1 sh install.sh
+# Explicit home: sh install.sh --init --dir /absolute/path/my-company
+# Portable package: --package /inspected/local/package previews only.
+# SPIELOS_REPO remains an alias for SPIELOS_SOURCE.
 
 set -eu
 
 SOURCE="${SPIELOS_SOURCE:-${SPIELOS_REPO:-spielos}}"
 TARGET_DIR="${SPIELOS_DIR:-$(pwd)}"
-BUNDLE=""
+PACKAGE=""
+INIT_REQUESTED=0
+TARGET_SELECTED=0
+[ -z "${SPIELOS_DIR:-}" ] || TARGET_SELECTED=1
 
 # ---- output helpers --------------------------------------------------------
 
@@ -36,16 +32,18 @@ fail() { printf '%s\n' "${RED}✗ $1${RESET}" >&2; exit 1; }
 
 while [ $# -gt 0 ]; do
     case "$1" in
-        --bundle)
-            [ $# -ge 2 ] || fail "--bundle needs a path or git URL after it"
-            BUNDLE="$2"; shift 2 ;;
-        --bundle=*) BUNDLE="${1#--bundle=}"; shift ;;
-        *) fail "unknown argument: $1 (this installer accepts only --bundle <path-or-url>)" ;;
+        --init) INIT_REQUESTED=1; TARGET_SELECTED=1; shift ;;
+        --dir) [ $# -ge 2 ] || fail "--dir needs a folder"; TARGET_DIR="$2"; TARGET_SELECTED=1; shift 2 ;;
+        --dir=*) TARGET_DIR="${1#--dir=}"; TARGET_SELECTED=1; shift ;;
+        --package|--bundle) [ $# -ge 2 ] || fail "$1 needs an inspected local package folder"; PACKAGE="$2"; TARGET_SELECTED=1; shift 2 ;;
+        --package=*|--bundle=*) PACKAGE="${1#*=}"; TARGET_SELECTED=1; shift ;;
+        --help|-h) printf '%s\n' "Usage: install.sh [--init --dir FOLDER] [--package LOCAL_FOLDER]" "Default: install/upgrade the CLI only. Package import is preview-only."; exit 0 ;;
+        *) fail "unknown argument: $1 (use --help)" ;;
     esac
 done
 
 printf '%s\n' ""
-printf '%s\n' "${BOLD}${CYAN}SpielOS${RESET}${DIM} — one durable loop for your AI company${RESET}"
+printf '%s\n' "${BOLD}${CYAN}SpielOS${RESET}${DIM} — portable company workflows${RESET}"
 printf '%s\n' ""
 
 # ---- 1. python -------------------------------------------------------------
@@ -72,8 +70,7 @@ else
     installed_via=""
     if command -v brew >/dev/null 2>&1 && brew install pipx >/dev/null 2>&1; then
         installed_via=brew
-    elif $PY -m pip install --user pipx >/dev/null 2>&1 \
-        || $PY -m pip install --user --break-system-packages pipx >/dev/null 2>&1; then
+    elif $PY -m pip install --user pipx >/dev/null 2>&1; then
         installed_via=pip
         # ~/.local/bin must be reachable before we can call the fresh pipx.
         case ":$PATH:" in
@@ -90,6 +87,13 @@ else
     fi
 fi
 
+# pipx may already exist while its application directory is absent from PATH.
+PIPX_APP_BIN="${PIPX_BIN_DIR:-$HOME/.local/bin}"
+case ":$PATH:" in
+    *":$PIPX_APP_BIN:"*) ;;
+    *) export PATH="$PIPX_APP_BIN:$PATH" ;;
+esac
+
 # ---- 3. spielos ------------------------------------------------------------
 
 printf '%s' "${DIM}   installing/updating spielos ...${RESET}"
@@ -98,7 +102,7 @@ printf '%s' "${DIM}   installing/updating spielos ...${RESET}"
 # Run from a neutral directory: inside a project that has its own .venv,
 # pipx/uv tooling can otherwise land the environment into that project.
 INSTALL_CWD=$(mktemp -d)
-if (cd "$INSTALL_CWD" && pipx install --force "$SOURCE") >/dev/null 2>&1; then
+if (cd "$INSTALL_CWD" && pipx install --force --python "$PY" "$SOURCE") >/dev/null 2>&1; then
     rmdir "$INSTALL_CWD" 2>/dev/null || rm -rf "$INSTALL_CWD"
     printf '%s\n' " done"
     INSTALLED_VERSION=$(spielos --version 2>/dev/null | sed -n 's/^spielos //p')
@@ -115,98 +119,34 @@ case ":$PATH:" in
     *) info "note: '$HOME/.local/bin' is not on your PATH; add it to your shell profile." ;;
 esac
 
-# ---- 4. the home: selected project folder ---------------------------------
-#
-# pipx installs the CLI globally; the SpielOS HOME (the files that matter)
-# is created by init in the folder you are standing in. Auto-create it here
-# when safe: interactively we ask; through a pipe (curl | sh) we proceed
-# only in an empty directory so nothing of yours is ever touched.
+# ---- 4. explicit selected home ---------------------------------------------
 
-if [ -t 0 ]; then
-    printf '\n%s\n' "${BOLD}SpielOS project folder${RESET}"
-    printf '%s' "Path [${TARGET_DIR}]: "
-    read -r selected_dir < /dev/tty || selected_dir=""
-    if [ -n "$selected_dir" ]; then TARGET_DIR="$selected_dir"; fi
-fi
 TARGET_DIR=$("$PY" -c 'import os,sys; print(os.path.abspath(os.path.expanduser(sys.argv[1])))' "$TARGET_DIR")
-
-INIT_RAN=0
-HOME_UPDATED=0
-if [ -d "$TARGET_DIR/.agents/company" ]; then
-    info "updating the existing SpielOS home ..."
-    if spielos update --dir "$TARGET_DIR"; then
-        HOME_VERSION=$("$PY" -c 'import re,sys; text=open(sys.argv[1], encoding="utf-8").read(); match=re.search(r"^VERSION\s*=\s*[\"'\"']([^\"'\"']+)", text, re.M); print(match.group(1) if match else "")' "$TARGET_DIR/.agents/company/runtime/config.py")
-        [ "$HOME_VERSION" = "$INSTALLED_VERSION" ] || fail "home update version mismatch: package is $INSTALLED_VERSION but home is ${HOME_VERSION:-unknown}. A stale pipx venv is the usual cause — repair it with: pipx reinstall spielos && spielos update --dir $TARGET_DIR"
-        HOME_UPDATED=1
-        step "existing SpielOS home updated to $HOME_VERSION"
+HOME_READY=0
+if [ "$TARGET_SELECTED" = 1 ]; then
+    if [ -f "$TARGET_DIR/.agents/company/__main__.py" ]; then
+        spielos update --dir "$TARGET_DIR" --keep-stale || fail "selected home refresh failed; inspect the runtime diagnostic"
+        HOME_READY=1
+        step "selected home product files refreshed; owner content preserved"
+    elif [ "$INIT_REQUESTED" = 1 ]; then
+        spielos init --dir "$TARGET_DIR" -y </dev/null || fail "explicit company initialization failed"
+        HOME_READY=1
     else
-        fail "the CLI was upgraded, but the existing home update failed. Run 'spielos update --dir $TARGET_DIR' to see the diagnostic."
-    fi
-elif [ ! -f "$TARGET_DIR/opencode.json" ]; then
-    do_init=0
-    if [ -t 0 ]; then
-        printf '\n%s\n' "${BOLD}Create your SpielOS home in this folder?${RESET}"
-        printf '%s\n' "${DIM}  $TARGET_DIR${RESET}"
-        printf '%s' "Proceed? [Y/n] "
-        read -r answer < /dev/tty || answer=""
-        case "$answer" in
-            n|N|no|No) ;;
-            *) do_init=1 ;;
-        esac
-    elif [ -z "$(ls -A "$TARGET_DIR" 2>/dev/null)" ]; then
-        do_init=1  # piped install + empty directory: safe to proceed
-    else
-        info "folder is not empty and has no SpielOS home — leaving it untouched; run 'spielos init --dir $TARGET_DIR' when you want a home here"
-    fi
-    if [ "$do_init" = 1 ]; then
-        if spielos init --dir "$TARGET_DIR" -y </dev/null; then
-            INIT_RAN=1
-        else
-            info "init failed — run 'spielos init' to retry."
-        fi
+        info "no initialized home selected; use --init --dir $TARGET_DIR when you want to create it"
     fi
 fi
-
-if [ "$INIT_RAN" = 0 ] && [ "$HOME_UPDATED" = 0 ]; then
-    printf '%s\n' ""
-    printf '%s\n' "${BOLD}Next:${RESET} run ${BOLD}spielos init --dir /path/to/project${RESET}"
-    printf '%s\n' "${DIM}That creates the harness home (.agents/, .spielos/) — the CLI alone does not.${RESET}"
+if [ "$HOME_READY" = 0 ]; then
+    printf '%s\n' "Next: spielos init --dir /absolute/path/my-company" "No company home was created or changed automatically."
+else
+    printf '%s\n' "Editable content: $TARGET_DIR/company/; pinned runtime: .spielos/runtime/company/." "Legacy content moves require a separate exact reviewed migration plan."
 fi
 
-# ---- 5. optional Department bundle ----------------------------------------
-#
-# --bundle <path-or-url>: import one Department bundle into the home in
-# the same step. A local folder imports directly; a git URL (including a
-# file:// remote) is cloned to a temporary folder first — the runtime
-# import itself never fetches over the network.
-
-if [ -n "$BUNDLE" ]; then
-    if [ ! -d "$TARGET_DIR/.agents/company" ]; then
-        fail "the bundle import needs a SpielOS home; init did not create one in $TARGET_DIR"
-    fi
-    BUNDLE_PATH="$BUNDLE"
-    case "$BUNDLE" in
-        *://*|*.git)
-            CLONE_DIR=$(mktemp -d)
-            if git clone --quiet --depth 1 "$BUNDLE" "$CLONE_DIR/bundle" >/dev/null 2>&1; then
-                BUNDLE_PATH="$CLONE_DIR/bundle"
-                step "bundle repository cloned from $BUNDLE"
-            else
-                rm -rf "$CLONE_DIR"
-                fail "could not clone the bundle repository $BUNDLE — check the URL or clone it yourself and pass the local folder"
-            fi ;;
-    esac
-    if [ ! -f "$BUNDLE_PATH/bundle.json" ]; then
-        fail "$BUNDLE_PATH is not a Department bundle (no bundle.json) — pass the folder that contains bundle.json"
-    fi
-    if (cd "$TARGET_DIR" && PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.agents "$PY" -B -m company import "$BUNDLE_PATH"); then
-        step "Department bundle imported into $TARGET_DIR"
-        printf '%s\n' ""
-        printf '%s\n' "${BOLD}Next:${RESET} talk to your Director to put the Department to work"
-        printf '%s\n' "${DIM}  opencode (run /agents, select the Director agent) — or codex, or claude --agent director${RESET}"
-        printf '%s\n' "${DIM}  company departments shows what imported; the bundle README lists its workflows.${RESET}"
-    else
-        fail "the bundle import failed — run it directly to see the diagnostic: cd $TARGET_DIR && PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.agents $PY -B -m company import $BUNDLE_PATH"
-    fi
+# ---- 5. static package preview; never install or execute package code -------
+if [ -n "$PACKAGE" ]; then
+    [ "$HOME_READY" = 1 ] || fail "package preview needs an explicitly selected initialized home"
+    case "$PACKAGE" in *://*|*.git) fail "clone and inspect the package yourself, then pass its local folder" ;; esac
+    [ -f "$PACKAGE/package.json" ] || fail "use a new portable package folder containing package.json; legacy Department bundles need reviewed conversion"
+    spielos import "$PACKAGE" --home "$TARGET_DIR" --json || fail "portable package preview failed"
+    printf '%s\n' "Package preview only: no definitions installed, hooks executed or permissions granted." "Review the exact plan and digest before the separate import apply command."
 fi
-printf '%s\n' "${DIM}Docs: https://spielos.xyz · .agents/company/README.md after init${RESET}"
+printf '%s\n' "Docs: https://spielos.xyz; .agents/company/README.md in an initialized home."

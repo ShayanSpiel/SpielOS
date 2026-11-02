@@ -1,0 +1,56 @@
+{
+  "id": "sales-report",
+  "version": "1",
+  "purpose": "Give the finance lead an accurate bounded sales summary",
+  "owner": "finance-lead",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "title": {
+        "type": "string"
+      },
+      "sales": {
+        "type": "array",
+        "items": {
+          "type": "number"
+        }
+      }
+    },
+    "required": [
+      "title",
+      "sales"
+    ]
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "title": {
+        "type": "string"
+      },
+      "total": {
+        "type": "number"
+      },
+      "rows": {
+        "type": "integer"
+      }
+    },
+    "required": [
+      "title",
+      "total",
+      "rows"
+    ]
+  },
+  "dependencies": {},
+  "context_versions": {},
+  "execution": {
+    "provider": "local",
+    "binding": "execution/report.py",
+    "timeout_seconds": 5,
+    "retry_budget": 0,
+    "effect_permissions": []
+  },
+  "evaluation": {
+    "rubric": "evaluation/rubric.json",
+    "cases": "evaluation/cases"
+  }
+}

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from contextlib import closing
 import shutil
 import sqlite3
 import tempfile
@@ -42,11 +43,9 @@ def _declared_metrics(handler) -> set[str]:
 class CatalogController:
     """Translate portable Department declarations into clean Workflows.
 
-    The intelligent DECIDE/EVALUATE boundary: deterministic mechanics,
-    reasoning over goal/observation/evidence/memory/topology/candidates/
-    history, one concrete typed Decision, and evidence-backed strategy
-    distillation. Writes happen only through the engine's committed
-    boundaries.
+    Legacy Goal compatibility adapter. Observations remain measurements;
+    strategic direction is supplied explicitly by a reviewer. New bounded
+    workflow invocations use workflows.runs.WorkflowRuntime.
     """
 
     def __init__(self, database: Database, *, agents: dict | None = None,
@@ -76,28 +75,32 @@ class CatalogController:
             # Departmentless owner (director): every evidence item is a
             # direct answer to the goal.
             matching = list(context.evidence)
+        matching = [item for item in matching
+                    if item.payload.get("validity", "business") in
+                    ((goal.config or {}).get("accepted_validities") or ["business"])]
         candidates = [item.payload[goal.metric] for item in matching
                       if isinstance(item.payload.get(goal.metric), (int, float, bool))]
         aggregation = goal.aggregation
         if aggregation == "count":
-            value = len(matching)
+            value = len(matching) if matching else None
         elif aggregation == "sum":
-            value = sum(item for item in candidates if not isinstance(item, bool))
+            numeric = [item for item in candidates if not isinstance(item, bool)]
+            value = sum(numeric) if numeric else None
         elif aggregation == "latest":
-            value = candidates[-1] if candidates else 0
+            value = candidates[-1] if candidates else None
         elif aggregation == "max":
             numeric = [item for item in candidates if not isinstance(item, bool)]
-            value = max(numeric) if numeric else 0
+            value = max(numeric) if numeric else None
         elif aggregation == "min":
             numeric = [item for item in candidates if not isinstance(item, bool)]
-            value = min(numeric) if numeric else 0
+            value = min(numeric) if numeric else None
         elif aggregation == "boolean_all":
-            value = bool(candidates) and all(item is True for item in candidates)
+            value = all(item is True for item in candidates) if candidates else None
         else:
-            value = any(item is True for item in candidates)
+            value = any(item is True for item in candidates) if candidates else None
         if goal.owner_id == "director" and goal.metric == "all_children_achieved":
             children = [item for item in self.goals.list() if item.parent_id == goal.id]
-            value = bool(children) and all(item.status == "complete" for item in children)
+            value = all(item.status == "complete" for item in children) if children else None
         return {goal.metric: value, "evidence_ids": [item.id for item in matching]}
 
     def decide(self, context, observation: dict) -> Decision:
@@ -138,15 +141,8 @@ class CatalogController:
                            if requested in {item.id, self._workflow_id(goal, item)}), None)
             if chosen is not None:
                 return self._workflow_decision(goal, chosen)
-        # 1. Learned structure first (issue #3): a crystallized Workflow
-        #    for this goal's repeated work shape is the neural path — the
-        #    next equivalent request reuses it instead of rebuilding the
-        #    procedure from zero.
-        learned = self._crystallized_workflow(context, observation)
-        if learned is not None:
-            return learned
-        # 2. Candidate workflows, ranked by strategy learning and run
-        #    history instead of blind declaration order (issue #1/#2).
+        # Only declared workflows and explicit strategic direction can rank
+        # candidates. Repetition does not authorize a workflow release.
         ranked = [item for item in candidates
                   if not self._strategy_avoids(goal, item)
                   and not self._recently_escalated(goal, item)]
@@ -305,51 +301,13 @@ class CatalogController:
             entry = {"order_id": row[0], "agent_id": row[1],
                      "evidence_kind": evidence_kind,
                      "instruction": instruction}
-            shapes.setdefault(shape, []).append(entry)
+            entries = shapes.setdefault(shape, [])
+            if not any(item["order_id"] == entry["order_id"] for item in entries):
+                entries.append(entry)
         return shapes
 
     def _crystallized_workflow(self, context, observation: dict) -> Decision | None:
-        """DECIDE over learned structure: return the Decision that reuses
-        a crystallized Workflow for this goal's repeated work shape, or
-        None when no shape has enough evidence yet.
-
-        The fourth equivalent request does not rebuild the procedure:
-        DECIDE declares the Workflow (adoption and provenance happen at
-        ACT, exactly like any other declared workflow), and every later
-        order's brief carries the workflow's operational learning.
-        """
-        goal = context.goal
-        shapes = self._repetition_shapes(goal.id)
-        for shape, entries in shapes.items():
-            if len(entries) < self.REPETITION_THRESHOLD:
-                continue
-            agent_id, evidence_kind, _ = shape
-            workflow_id = f"learned:{goal.id}:{evidence_kind or 'work'}"
-            latest = entries[-1]["instruction"] or (
-                f"produce {evidence_kind or 'the goal'} evidence for "
-                f"'{goal.name}'")
-            instruction = (f"{latest} (reusing the learned procedure formed "
-                           f"from {len(entries)} equivalent executions)")
-            step = {"id": "execute", "agent_id": agent_id,
-                    "instruction": instruction,
-                    "evidence_kind": evidence_kind,
-                    "evidence_kinds": [evidence_kind] if evidence_kind else [],
-                    "skill_ids": [], "connection_ids": [],
-                    "requirements": {}, "approval_keys": []}
-            return Decision(
-                "execute_workflow",
-                f"reuse the learned workflow for {goal.name}", workflow_id,
-                context={"workflow": {
-                    "id": workflow_id,
-                    "name": f"Learned {evidence_kind or 'direct'} procedure",
-                    "steps": [step], "department_id": None, "version": 1},
-                    "crystallized": {
-                        "from_orders": [item["order_id"] for item in entries],
-                        "shape": {"agent_id": agent_id,
-                                  "evidence_kind": evidence_kind},
-                        "reason": (f"{len(entries)} materially equivalent "
-                                   "direct executions formed this reusable "
-                                   "workflow")}})
+        """Repetition alone cannot authorize a reusable workflow release."""
         return None
 
     def decision_request(self, context, observation: dict) -> dict:
@@ -434,138 +392,20 @@ class CatalogController:
         }
 
     def evaluate(self, context, decision: Decision, evidence: tuple) -> Evaluation:
-        """The intelligent EVALUATE boundary (issue #2): determine whether
-        anything strategically reusable was ACTUALLY learned, and persist
-        exactly one evidence-backed strategy lesson when it was.
-
-        Distillation rules (deterministic over the goal's own history —
-        never fabricated, never written merely because a run completed):
-        - This run executed approach X; an earlier run executed a
-          different approach Y with a known outcome: the better approach
-          gets one ``prefer``/``avoid`` lesson naming both outcomes.
-        - No other approach ran yet, and X completed real work without
-          moving the metric: one ``avoid`` lesson (a different approach
-          is required for this goal).
-        - Otherwise: no lesson — ordinary execution teaches nothing.
-        """
+        """Evaluate measured outcomes without fabricating causal strategy."""
         goal = context.goal
         observation = self.observe(context)
         value = observation.get(goal.metric, 0)
-        learning, workflow_id = self._strategy_learning(
-            goal, decision, evidence, value,
-            baseline=self._run_baseline(context))
+        # Metrics are observations, not causal proof or owner strategy.
         return Evaluation(
             compare(value, goal.operator, goal.target),
             {goal.metric: value}, "clean-core evidence evaluated",
-            strategy_learning=learning,
-            strategy_workflow_id=workflow_id,
             evidence_ids=tuple(item.id for item in evidence))
 
-    def _strategy_learning(self, goal, decision, evidence, value,
-                           baseline=None):
-        """Distill at most one justified strategy lesson for this run.
+    def _strategy_learning(self, goal, decision, evidence, value, baseline=None):
+        """Only an explicit reviewer can propose a causal strategy claim."""
+        return None, None
 
-        Returns ``(claim, workflow_id)`` — the claim text carries the
-        machine-checkable ``prefer``/``avoid`` prefix and the workflow id
-        links the lesson to the approach it judges; ``(None, None)`` when
-        nothing was learned.
-        """
-        if not evidence or decision is None or decision.kind != "execute_workflow":
-            return None, None  # direct work and evaluate-only runs teach no strategy
-        approach = decision.workflow_id
-        history = self._approach_history(goal)
-        prior = self._prior_approach(history, approach, goal.metric)
-        if prior is not None:
-            other, other_value = prior
-            if self._materially_better(value, other_value):
-                return (f"prefer {approach} for '{goal.name}': it moved "
-                        f"{goal.metric} to {json.dumps(value)} versus "
-                        f"{other}'s {json.dumps(other_value)}; prefer this "
-                        "approach for this goal"), approach
-            if self._materially_better(other_value, value):
-                return (f"avoid {approach} for '{goal.name}': {other} moved "
-                        f"{goal.metric} to {json.dumps(other_value)} versus "
-                        f"this approach's {json.dumps(value)}; prefer {other} "
-                        "for this goal"), approach
-            # No approach distinguished itself: both completed real work
-            # and neither moved the metric further. The comparative rule
-            # teaches nothing here, but the flat-outcome rule below may
-            # still condemn this approach — falling through keeps an
-            # every-candidate-exhausted goal able to park for the owner.
-        # Flat-outcome rule (the first approach and every tie that
-        # followed it): a lesson is justified only when this run
-        # completed real work and the metric did not move at all from
-        # where this run started (its own OBSERVE value, else the last
-        # earlier evaluation).
-        if baseline is not None and baseline != value:
-            return None, None  # the metric moved; nothing learned yet
-        if baseline is None and value not in (None, 0, False):
-            return None, None
-        return (f"avoid {approach} for '{goal.name}': it completed its work "
-                f"and {goal.metric} stayed at {json.dumps(value)}; prefer a "
-                "different approach for this goal"), approach
-
-    def _approach_history(self, goal) -> list[dict]:
-        """Every decided, evaluated run of this goal: (sequence, approach
-        identity, metric outcome) newest first."""
-        history = []
-        with self.database.connect() as connection:
-            rows = connection.execute("""SELECT sequence,decision_json,
-                evaluation_json FROM core_runs
-                WHERE goal_id=? AND decision_json IS NOT NULL
-                  AND evaluation_json IS NOT NULL
-                ORDER BY sequence DESC""", (goal.id,)).fetchall()
-        for row in rows:
-            try:
-                decision = json.loads(row[1])
-                evaluation = json.loads(row[2])
-            except (TypeError, json.JSONDecodeError):
-                continue
-            approach = decision.get("workflow_id")
-            if approach is None:
-                continue  # direct/evaluate runs are not approach comparisons
-            history.append({
-                "sequence": row[0], "approach": approach,
-                "value": (evaluation.get("metrics") or {}).get(goal.metric)})
-        return history
-
-    def _prior_approach(self, history, approach, metric):
-        """The most recent earlier run that executed a DIFFERENT
-        approach with a known outcome, as ``(approach, value)``."""
-        for item in history:
-            if item["approach"] != approach and item["value"] is not None:
-                return item["approach"], item["value"]
-        return None
-
-    def _run_baseline(self, context):
-        """The metric value this run started from: its own OBSERVE value,
-        else the most recent earlier evaluation. The honest zero-movement
-        baseline — never a fabricated expectation."""
-        goal = context.goal
-        with self.database.connect() as connection:
-            row = connection.execute(
-                "SELECT observation_json FROM core_runs WHERE id=?",
-                (context.run_id,)).fetchone()
-        if row and row[0]:
-            try:
-                observed = json.loads(row[0]).get(goal.metric)
-                if observed is not None:
-                    return observed
-            except (TypeError, json.JSONDecodeError):
-                pass
-        for item in self._approach_history(goal):
-            if item["value"] is not None:
-                return item["value"]
-        return None
-
-    @staticmethod
-    def _materially_better(candidate, other) -> bool:
-        """One outcome is strictly better than another on a shared
-        numeric scale. Non-numeric comparisons never qualify."""
-        if (isinstance(candidate, (int, float)) and not isinstance(candidate, bool)
-                and isinstance(other, (int, float)) and not isinstance(other, bool)):
-            return candidate > other
-        return False
 
 
 class AssignmentExecutor:
@@ -636,7 +476,6 @@ class CleanCommandRuntime:
 
     # Read-only scratch snapshots are cached per (path, mtime, size) at
     # process scope: every model request used to copy the whole database.
-    _SNAPSHOT_CACHE: dict[tuple[str, float, int], Path] = {}
     _SNAPSHOT_ROOT: Path | None = None
 
     def __init__(self, path: str | Path, *, readonly: bool = False,
@@ -695,29 +534,16 @@ class CleanCommandRuntime:
 
     @classmethod
     def _cached_snapshot(cls, live: Path) -> Path:
-        """One scratch copy of the live database per (path, mtime, size).
+        """Read a new consistent SQLite snapshot, including committed WAL data.
 
-        Falls back to an empty snapshot when the database does not exist
-        yet (fresh homes). Stale entries are evicted so a changed database
-        is re-copied; each runtime still reads its snapshot read-write via
-        SQLite while the live file is never opened for writing.
+        File metadata cannot establish freshness. Each reader owns a separate
+        snapshot so another read cannot replace its database underneath it.
         """
-        stamp = ((live.stat().st_mtime, live.stat().st_size)
-                 if live.exists() else (0.0, 0))
-        key = (str(live), *stamp)
-        cached = cls._SNAPSHOT_CACHE.get(key)
-        if cached is not None and (cached / "empty.sqlite").is_file():
-            return cached
         if cls._SNAPSHOT_ROOT is None:
             cls._SNAPSHOT_ROOT = Path(tempfile.mkdtemp(prefix="spielos-readonly-"))
             import atexit
             atexit.register(shutil.rmtree, cls._SNAPSHOT_ROOT, True)
-        # Evict stale snapshots of the same database (bounded cache).
-        for other in [k for k in cls._SNAPSHOT_CACHE
-                      if k[0] == key[0] and k != key]:
-            cls._SNAPSHOT_CACHE.pop(other, None)
-        scratch = cls._SNAPSHOT_ROOT / f"snapshot-{abs(hash(key))}"
-        scratch.mkdir(parents=True, exist_ok=True)
+        scratch = Path(tempfile.mkdtemp(prefix="snapshot-", dir=cls._SNAPSHOT_ROOT))
         destination_path = scratch / "empty.sqlite"
         if live.exists():
             source = sqlite3.connect(f"file:{live}?mode=ro", uri=True)
@@ -729,7 +555,6 @@ class CleanCommandRuntime:
                 source.close()
         else:
             destination_path.touch()
-        cls._SNAPSHOT_CACHE[key] = scratch
         return scratch
 
     #: The core tables a current-schema company database must carry.
@@ -749,7 +574,7 @@ class CleanCommandRuntime:
         company database and never gets silently re-initialized into
         looking like one.
         """
-        with sqlite3.connect(snapshot_database) as connection:
+        with closing(sqlite3.connect(snapshot_database)) as connection:
             tables = {row[0] for row in connection.execute(
                 "SELECT name FROM sqlite_master WHERE type='table'")}
         missing = sorted(cls.REQUIRED_TABLES - tables)
@@ -1137,26 +962,8 @@ class CleanCommandRuntime:
         self._require_writable()
         return self.runtime.tick(max_advances=max_advances)
 
-    def watch(self, interval_seconds=5.0, goal_id=None, max_ticks=None):
-        """Advance the loop until automation is switched off.
-
-        The automation switch (``runner stop`` writes ``enabled=false``,
-        ``runner enable`` writes ``enabled=true`` beside the database)
-        is honored at every iteration: a disabled switch ends the loop
-        cleanly, so stop and enable are real controls, not display flags.
-        """
-        from ..runtime.service import automation_enabled
-
-        ticks = 0
-        while max_ticks is None or ticks < max_ticks:
-            if not automation_enabled(Path(self.database.path).parent):
-                return  # switched off while sleeping: exit cleanly
-            result = (self.once(goal_id) if goal_id
-                      else self.tick(max_advances=100))
-            ticks += 1
-            yield result
-            if max_ticks is None or ticks < max_ticks:
-                time.sleep(interval_seconds)
+    def watch(self, *args, **kwargs):
+        raise RuntimeError('The product watch loop is retired. Use a bounded workflow and an explicit host wake.')
 
     def work_order(self, order_id):
         return self._order(self.work_orders_repository.get(order_id))
@@ -1176,7 +983,7 @@ class CleanCommandRuntime:
         return [self.work_order(item) for item in ids]
 
     def _order(self, order):
-        return {**asdict(order), "needed": 1,
+        return {**asdict(order), "claim_token": order.claim_token, "needed": 1,
                 "accepts_evidence": [order.brief.get("evidence_kind")]
                 if order.brief.get("evidence_kind") else [], "why_next": "Agent assignment"}
 
@@ -1216,6 +1023,7 @@ class CleanCommandRuntime:
         first = evidence[0]
         order, evidence_ids = self.work_orders_repository.complete_with_evidence(
             work_order_id, {"evidence": evidence}, executor_id=agent_id,
+            claim_token=order.claim_token,
             kind=first["kind"], payload=first.get("payload") or {},
             evidence_items=[(item["kind"], item.get("payload") or {})
                             for item in evidence],

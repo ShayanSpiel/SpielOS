@@ -204,8 +204,10 @@ def _verify_home(root: Path) -> tuple[bool, str]:
                PYTHONPATH=str(root / ".agents"),
                PYTHONDONTWRITEBYTECODE="1")
     try:
+        lean=(root/'.spielos/layout.json').is_file()
+        command=['catalog','--home',str(root),'--json'] if lean else ['--version']
         result = subprocess.run(
-            [sys.executable, "-B", "-m", "company", "catalog"],
+            [sys.executable, "-B", "-m", "company", *command],
             cwd=root, env=env, capture_output=True, text=True, timeout=120)
     except subprocess.TimeoutExpired:
         return False, "verification timed out after 120s"
@@ -214,10 +216,10 @@ def _verify_home(root: Path) -> tuple[bool, str]:
     if result.returncode != 0:
         tail = (result.stderr or result.stdout or "").strip().splitlines()
         return False, tail[-1] if tail else f"exit code {result.returncode}"
-    try:
-        json.loads(result.stdout)
-    except json.JSONDecodeError:
-        return False, "catalog did not return valid JSON"
+    if lean:
+        try:json.loads(result.stdout)
+        except json.JSONDecodeError:return False,'Company inspection did not return valid JSON'
+    elif not result.stdout.startswith('spielos '):return False,'Runtime version could not be verified'
     return True, ""
 
 
@@ -237,11 +239,11 @@ def _next_steps(root: Path, hosts: dict[str, bool]) -> tuple[list[tuple[str, str
     if hosts.get("opencode"):
         steps.append(("opencode",
                       "run /agents, select the Director agent, and talk to it — "
-                      "it already sees your company state"))
+                      "it already receives company context"))
     if hosts.get("codex"):
         steps.append(("codex",
-                      "talk to the Director agent (@director) — it already "
-                      "sees your company state"))
+                      "use the main company chat as Director after reviewing hooks — it "
+                      "receives company context"))
     if hosts.get("claude"):
         steps.append(("claude",
                       "run `claude --agent director` (or just `claude`) and "
@@ -250,9 +252,8 @@ def _next_steps(root: Path, hosts: dict[str, bool]) -> tuple[list[tuple[str, str
     notes = [
         "Choose OpenCode, Codex, or Claude Code; the Director handles "
         "everything else in chat.",
-        "Set credentials in .spielos/.env (see .spielos/.env.example).",
-        "Add a shared Department by importing its bundle folder: "
-        "`company import /path/to/bundle-folder` (see the bundle README).",
+        "Keep credentials private; connection and external actions require explicit scope.",
+        "Review company/profile.md, strategy/ and brand/, then build or safely import a draft workflow.",
     ]
     return steps, notes
 

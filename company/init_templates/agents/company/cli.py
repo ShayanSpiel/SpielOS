@@ -36,7 +36,7 @@ def _uses_installed_package(argv: list[str]) -> bool:
             continue
         if token.startswith("-"):
             return False
-        return token in {"init", "update"}
+        return token in {"init", "update", "mcp"}
     return False
 
 
@@ -44,7 +44,14 @@ def main(argv: list[str] | None = None) -> int:
     """Run the local home's runtime, or the installed package outside a home."""
     argv = list(sys.argv[1:] if argv is None else argv)
     try:
-        home = _vendored_home()
+        explicit_home = next((token.split('=',1)[1] for token in argv if token.startswith('--home=')),None)
+        if '--home' in argv:
+            index=argv.index('--home')
+            explicit_home=argv[index+1] if index+1<len(argv) else None
+        if explicit_home is not None:
+            selected=Path(explicit_home).expanduser().resolve()
+            home=selected if (selected/'.agents/company/__main__.py').is_file() else None
+        else:home = _vendored_home()
     except FileNotFoundError:
         print(
             "SpielOS cannot continue because this shell's current folder was deleted.\n"

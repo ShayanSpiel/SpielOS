@@ -1,0 +1,19 @@
+{
+  "id": "unseen",
+  "split": "held_out",
+  "input": {
+    "title": "unseen",
+    "sales": [
+      3,
+      8,
+      1
+    ]
+  },
+  "reference": {
+    "title": "unseen",
+    "total": 12,
+    "rows": 3
+  },
+  "expected": "pass",
+  "intent": "Verify exact arithmetic and row counts for unseen"
+}

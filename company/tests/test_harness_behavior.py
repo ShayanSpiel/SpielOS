@@ -568,6 +568,7 @@ class TestWorkflowExecution(HarnessCase):
             with self.assertRaises(ValueError):
                 repo.complete_with_evidence(
                     order.id, {}, executor_id=order.claimed_by,
+                    claim_token=order.claim_token,
                     kind="wrong_kind", payload={})
 
 
@@ -936,15 +937,9 @@ class TestContextAssembly(HarnessCase):
         self.assertEqual(before, self.db.read_bytes(),
                          "readonly context must not touch the database file")
 
-    def test_readonly_snapshot_is_cached_per_database_version(self):
-        # D8 fixed: repeated read-only projections over an unchanged
-        # database reuse one scratch snapshot instead of copying per request.
-        CleanCommandRuntime._SNAPSHOT_CACHE.clear()
-        for _ in range(3):
-            CleanCommandRuntime(self.db, readonly=True).assemble_context(
-                prompt="x", owner_id="director")
-        self.assertEqual(len(CleanCommandRuntime._SNAPSHOT_CACHE), 1,
-                         "one unchanged database must yield one snapshot")
+    def test_readonly_snapshot_is_fresh_per_read(self):
+        snapshots = [CleanCommandRuntime._cached_snapshot(self.db) for _ in range(3)]
+        self.assertEqual(len(set(snapshots)), 3)
         # and a mutated database is re-copied, never stale.
         self.runtime.add_evidence(self.goal_id, kind="weekly_sales",
                                   source="host", payload={"weekly_sales": 1})
@@ -1647,35 +1642,16 @@ class TestDecideFromHistory(HarnessCase):
             if run.sequence >= sequence and run.stage == GoalStage.OBSERVE:
                 return
 
-    def test_flat_workflow_is_excluded_and_the_next_candidate_runs(self):
-        # F6 pin: workflow A's first execution leaves twin_metric at 0, so
-        # the next DECIDE excludes A and selects B in declaration order.
+    def test_flat_workflow_does_not_create_strategy_claims(self):
         self._drive_to_park_or_sequence(2)
-        decisions = self._workflow_decisions()
-        self.assertEqual(decisions.get(1), "history-lab:alpha",
-                         "a fresh goal binds the first declared candidate")
-        self.assertEqual(decisions.get(2), "history-lab:beta",
-                         "after A left the metric flat, DECIDE selects B")
+        self.assertEqual(set(self._workflow_decisions().values()), {"history-lab:alpha"})
+        self.assertEqual(self.runtime.memory.relevant(scope="strategy", goal_id=self.goal_id), [])
 
-    def test_when_every_candidate_is_excluded_decide_parks(self):
-        # F6 pin: after A and B both leave the metric flat, no candidate
-        # remains and DECIDE parks a decision_request instead of forcing
-        # a choice.
+    def test_flat_workflow_stalls_without_condemning_other_candidates(self):
         self._drive_to_park_or_sequence(3)
-        decisions = self._workflow_decisions()
-        self.assertEqual(sorted(decisions.values()),
-                         ["history-lab:alpha", "history-lab:beta"])
-        run = self.current_run()
-        self.assertEqual((run.stage, run.status), (GoalStage.DECIDE, "waiting"))
-        self.assertEqual(run.decision.kind, "decision_request")
-        attention = self.runtime.attention(goal_id=self.goal_id)
-        self.assertEqual(len(attention), 1, "one owner ask for the park")
-        request = (run.decision.context or {}).get("decision_request") or {}
-        offered = [f"{item['id']}:{workflow_id}"
-                   for item in request.get("candidates", {}).get("departments", [])
-                   for workflow_id in item.get("workflows", [])]
-        self.assertIn("history-lab:alpha", offered,
-                      "the owner may still choose an excluded candidate")
+        self.assertEqual(set(self._workflow_decisions().values()), {"history-lab:alpha"})
+        self.assertEqual(self.current_run().status, "waiting")
+        self.assertEqual(self.runtime.memory.relevant(scope="strategy", goal_id=self.goal_id), [])
 
     def test_decide_never_writes_the_workflow_definition(self):
         # F6 pin: core_workflows stays empty through a department-owned
@@ -1693,28 +1669,13 @@ class TestDecideFromHistory(HarnessCase):
         self.assertEqual(self._workflow_definitions(), ["history-lab:alpha"],
                          "ACT persists the definition the Decision declared")
 
-    def test_a_parked_decide_adds_no_workflow_rows_until_adoption(self):
-        # F6 pin: through a parked decision_request the table never grows;
-        # `goal decide` adoption is what binds and writes next.
+    def test_a_stalled_run_does_not_create_workflow_definitions(self):
         self._drive_to_park_or_sequence(3)
-        self.assertEqual(sorted(self._workflow_decisions().values()),
-                         ["history-lab:alpha", "history-lab:beta"])
         definitions = self._workflow_definitions()
+        self.assertEqual(definitions, ["history-lab:alpha"])
         for _ in range(3):
-            self.runtime.tick(max_advances=30)  # the park is idempotent
-        self.assertEqual(self._workflow_definitions(), definitions,
-                         "a parked DECIDE writes no workflow definitions")
-        # Adoption binds the owner's chosen workflow and parks its work.
-        self.engine.resolution.executor = AssignmentExecutor()
-        self.runtime.decide_goal(self.goal_id, "execute_workflow",
-                                 workflow="history-lab:alpha")
-        run = self.current_run()
-        self.assertEqual((run.decision.kind, run.decision.workflow_id),
-                         ("execute_workflow", "history-lab:alpha"),
-                         "adoption binds the owner's chosen workflow")
-        orders = self.active_orders()
-        self.assertEqual([order["step_id"] for order in orders], ["a-one"],
-                         "the adopted workflow parks its first step")
+            self.runtime.tick(max_advances=30)
+        self.assertEqual(self._workflow_definitions(), definitions)
 
     def test_a_moved_workflow_is_not_excluded(self):
         # F6 pin: exclusion compares the metric before and after the
@@ -2356,144 +2317,92 @@ class TestShippedEvalSuites(unittest.TestCase):
 # =========================================================================
 
 class TestCLISurface(unittest.TestCase):
+    """Current public behavior, replacing the retired pursuit-loop CLI."""
+    def setUp(self):
+        from company.runtime.bootstrap import scaffold
+        self.directory=tempfile.TemporaryDirectory();self.addCleanup(self.directory.cleanup)
+        self.home=Path(self.directory.name).resolve()/'home';scaffold(self.home,keep_stale=True)
 
-    @classmethod
-    def setUpClass(cls):
-        import json as jsonlib
-        import subprocess
-        cls.json = jsonlib
-        cls.subprocess = subprocess
-        handle = tempfile.NamedTemporaryFile(suffix=".sqlite", delete=False)
-        handle.close()
-        cls.db = Path(handle.name)
-        cls.db.unlink()
-        cls.run_cli("goal", "create", "--name", "CLI goal",
-                    "--owner", "director", "--metric", "m",
-                    "--target", "1")
+    def run_cli(self,*args,expect_ok=True):
+        import subprocess,json
+        environment={**os.environ,'PYTHONPATH':str(REPO),'PYTHONDONTWRITEBYTECODE':'1'}
+        result=subprocess.run([sys.executable,'-B','-m','company',*args],cwd=self.home,env=environment,capture_output=True,text=True,timeout=15)
+        if not expect_ok:return result
+        self.assertEqual(result.returncode,0,result.stderr)
+        try:return json.loads(result.stdout)
+        except ValueError:return result.stdout
 
-    @classmethod
-    def run_cli(cls, *args, expect_ok=True):
-        env = dict(os.environ, PYTHONPATH=str(REPO),
-                   PYTHONDONTWRITEBYTECODE="1",
-                   SPIELOS_HOME=str(REPO))
-        result = cls.subprocess.run(
-            [sys.executable, "-B", "-m", "company", "--db", str(cls.db), *args],
-            cwd=str(REPO), env=env, capture_output=True, text=True,
-            timeout=180)
-        if expect_ok:
-            assert result.returncode == 0, f"CLI {args} failed: {result.stderr}"
-            try:
-                return cls.json.loads(result.stdout)
-            except cls.json.JSONDecodeError:
-                return result.stdout
-        return result
+    def candidate(self):
+        return self.run_cli('workflow','candidate','--home',str(self.home),'--manifest',
+            str(self.home/'company/workflows/sales-report/workflow.json'),'--json')['release_digest']
 
-    @classmethod
-    def tearDownClass(cls):
-        cls.db.unlink(missing_ok=True)
+    def run_example(self,key='example'):
+        release=self.candidate()
+        return self.run_cli('workflow','run','--home',str(self.home),'--release',release,
+            '--inputs',str(self.home/'company/workflows/sales-report/examples/input.json'),
+            '--request-key',key,'--candidate-case','example','--json')
 
-    def test_goal_create_through_cli(self):
-        listing = self.run_cli("goal", "list", "--json")
-        self.assertEqual(len(listing), 1)
-        self.assertEqual(listing[0]["name"], "CLI goal")
+    def test_goal_and_runner_commands_are_retired(self):
+        for command in [('goal','create'),('runner','tick'),('runner','start')]:
+            result=self.run_cli(*command,expect_ok=False)
+            self.assertNotEqual(result.returncode,0);self.assertIn('retired',result.stderr)
+        self.assertFalse((self.home/'.spielos/state/company.sqlite').exists())
 
     def test_status_snapshot_json(self):
-        snapshot = self.run_cli("status", "--json")
-        self.assertIn("counts", snapshot)
-        self.assertEqual(snapshot["counts"]["active"], 1)
+        snapshot=self.run_cli('status','--home',str(self.home),'--json')
+        self.assertEqual(snapshot['context']['counts'],{})
+        self.assertTrue(snapshot['workflows'])
+        self.assertFalse((self.home/'.spielos/state/workflows.sqlite').exists())
 
-    def test_context_command_json(self):
-        projection = self.run_cli("context", "--prompt", "hello", "--json")
-        self.assertIn("hello", projection["context"])
+    def test_context_contains_company_profile_and_workflows(self):
+        projection=self.run_cli('context','--home',str(self.home),'--json')
+        self.assertIn('needs owner input',projection['profile'])
+        self.assertEqual(projection['workflows'][0]['id'],'sales-report')
 
-    def test_runner_tick_quiesces_after_park(self):
-        tick = self.run_cli("runner", "tick", "--json")
-        self.assertTrue(tick["quiescent"],
-                        "tick parks work for the host and then goes quiet")
+    def test_local_candidate_executes_real_code(self):
+        run=self.run_example()
+        self.assertEqual(run['output'],{'title':'example','total':30,'rows':2})
+        self.assertEqual(run['status'],'awaiting_evaluation')
 
-    def test_notifications_list_json(self):
-        # Intentional semantic change (issue #5 of goal-d62825bb0b23):
-        # an ordinary DECIDE park for a goal nothing can decide is HOST
-        # reasoning — the Director agent answers it with `goal decide` —
-        # so its notification kind is host_work_required, never an
-        # owner ask.
-        self.run_cli("runner", "tick", "--json")
-        rows = self.run_cli("notifications", "list", "--json")
-        self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0]["kind"], "host_work_required")
+    def test_quality_evaluation_uses_the_actual_output(self):
+        run=self.run_example()
+        checked=self.run_cli('workflow','evaluate',run['id'],'--home',str(self.home),'--json')
+        self.assertEqual(checked['evaluation']['state'],'pass')
+        self.assertEqual(checked['status'],'awaiting_review')
 
-    def test_tasks_complete_by_agent_id_documented_flow_succeeds(self):
-        # D1 fixed (inverted pin): the documented host flow completes an
-        # order the runtime claimed, using the agent id, first try. The
-        # DECIDE boundary parks a decision_request first, so the flow goes
-        # through `goal decide` before the order exists.
-        goal_id = self.run_cli("goal", "list", "--json")[0]["id"]
-        self.run_cli("goal", "decide", goal_id, "--kind", "request_agent",
-                     "--agent", "director",
-                     "--instruction", "produce the metric evidence")
-        orders = self.run_cli("tasks", "--json")
-        order_id, agent_id = orders[0]["id"], orders[0]["agent_id"]
-        result = self.run_cli("tasks", order_id, "--complete", agent_id,
-                              "--evidence", '[{"kind":"m","payload":{"m":1}}]')
-        self.assertEqual(result["work_order"]["status"], "completed")
+    def test_duplicate_cli_request_returns_the_same_execution(self):
+        first=self.run_example('same');second=self.run_example('same')
+        self.assertEqual(first['id'],second['id'])
 
-    def test_memory_summary_scopes(self):
-        summary = self.run_cli("memory", "summary", "--json")
-        self.assertEqual(set(summary["durable_memory"]),
-                         {"owner", "workflow", "strategy"})
+    def test_memory_preferences_are_explicit_and_classified(self):
+        self.run_cli('memory','add','--home',str(self.home),'--scope','owner','--claim','Prefer concise reports',
+            '--source','Explicit owner direction','--json')
+        value=self.run_cli('memory','summary','--home',str(self.home),'--json')
+        self.assertEqual(value['claims'][0]['scope'],'owner')
+        self.assertEqual(value['claims'][0]['claim'],'Prefer concise reports')
 
-    def test_profile_set_and_list(self):
-        self.run_cli("profile", "set", "--namespace", "ns", "--key", "k",
-                     "--value", '"v"')
-        listing = self.run_cli("profile", "list", "--json")
-        self.assertTrue(any(item["claim_key"] == "k" for item in listing))
+    def test_workflow_learning_requires_real_evaluation_evidence(self):
+        run=self.run_example()
+        failed=self.run_cli('memory','add','--home',str(self.home),'--scope','workflow','--workflow','sales-report',
+            '--claim','Keep receipt counts explicit','--run',run['id'],'--json',expect_ok=False)
+        self.assertNotEqual(failed.returncode,0)
+        self.run_cli('workflow','evaluate',run['id'],'--home',str(self.home),'--json')
+        value=self.run_cli('memory','add','--home',str(self.home),'--scope','workflow','--workflow','sales-report',
+            '--claim','Keep receipt counts explicit','--run',run['id'],'--json')
+        self.assertEqual(value['evidence'][0]['run_id'],run['id'])
 
-    def test_tasks_complete_learning_flag_writes_workflow_memory(self):
-        # D2 fixed, through the real CLI: --learning persists workflow
-        # memory grounded in the evidence just recorded. Uses its own goal
-        # so other CLI tests' completed orders do not consume the park. The
-        # DECIDE boundary is answered with `goal decide` first.
-        self.run_cli("goal", "create", "--name", "Learning goal",
-                     "--owner", "director", "--metric", "m",
-                     "--target", "1")
-        self.run_cli("runner", "tick", "--json")
-        goals = [goal for goal in self.run_cli("goal", "list", "--json")
-                 if goal["name"] == "Learning goal"]
-        self.run_cli("goal", "decide", goals[0]["id"], "--kind", "request_agent",
-                     "--agent", "director",
-                     "--instruction", "produce learning evidence")
-        orders = [o for o in self.run_cli("tasks", "--json")
-                  if o["goal_id"] != "CLI goal" or o["status"] in ("open", "claimed")]
-        orders = [o for o in orders if o["agent_id"] == "director"]
-        self.assertTrue(orders, "a parked order must exist to complete")
-        order_id, agent_id = orders[0]["id"], orders[0]["agent_id"]
-        self.run_cli("tasks", order_id, "--complete", agent_id,
-                     "--evidence", '[{"kind":"m","payload":{"m":2}}]',
-                     "--learning", "CLI completions should surface learning")
-        memories = self.run_cli("memory", "workflows", "--json")
-        self.assertTrue(any("CLI completions" in item["claim"]
-                            for item in memories),
-                        "tasks --complete --learning must persist workflow "
-                        "memory reachable from memory workflows")
+    def test_owner_output_hides_internal_ids(self):
+        run=self.run_example()
+        result=self.run_cli('workflow','show',run['id'],'--home',str(self.home))
+        self.assertIn('quality checks',result)
+        self.assertNotIn(run['id'],result);self.assertNotIn('awaiting_evaluation',result)
 
-    def test_goal_create_rejects_undeclared_department_metric_via_cli(self):
-        # D3 fixed through the real CLI with fixture departments.
-        env_fixture = dict(os.environ)
-        env_fixture["SPIELOS_TEST_DEPARTMENTS_DIR"] = str(
-            FIXTURES / "departments")
-        import subprocess
-        result = self.subprocess.run(
-            [sys.executable, "-B", "-m", "company", "--db", str(self.db),
-             "goal", "create", "--name", "Bad metric", "--owner", "seo",
-             "--metric", "articles_published", "--target", "1"],
-            cwd=str(REPO),
-            env=dict(env_fixture, PYTHONPATH=str(REPO),
-                     PYTHONDONTWRITEBYTECODE="1",
-                     SPIELOS_HOME=str(REPO)),
-            capture_output=True, text=True, timeout=60)
-        self.assertNotEqual(result.returncode, 0,
-                             "goal create must refuse undeclared metrics")
-        self.assertIn("does not declare metric", result.stderr)
+    def test_production_is_blocked_before_actual_candidate_acceptance(self):
+        release=self.candidate()
+        result=self.run_cli('workflow','run','--home',str(self.home),'--release',release,
+            '--inputs',str(self.home/'company/workflows/sales-report/examples/input.json'),'--request-key','premature',expect_ok=False)
+        self.assertNotEqual(result.returncode,0)
+        self.assertIn('accepted candidate evidence',result.stderr)
 
 
 if __name__ == "__main__":

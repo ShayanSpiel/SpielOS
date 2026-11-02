@@ -1,0 +1,2448 @@
+{
+  "schema_version": 1,
+  "id": "spielos-source-architecture-inspection",
+  "version": "1",
+  "input_schema": {
+    "type": "object",
+    "properties": {},
+    "required": []
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "company_home": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "authority": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "director": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "builder_skill": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "agent_catalog": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "workflow_package": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "improvement": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "candidate": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "evaluation_contract": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "release": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "memory_input": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "invocation": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "local_adapter": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "host_adapter": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "sequential_adapter": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "output_evaluation": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "review": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "exact_action_approval": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "external_effect": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "memory_next_version": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "activity": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "artifacts": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "langfuse_export": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "evaluation_experiments": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "activepieces_offline_preparation": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "legacy_goal_compatibility": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      }
+    },
+    "required": [
+      "company_home",
+      "authority",
+      "director",
+      "builder_skill",
+      "agent_catalog",
+      "workflow_package",
+      "improvement",
+      "candidate",
+      "evaluation_contract",
+      "release",
+      "memory_input",
+      "invocation",
+      "local_adapter",
+      "host_adapter",
+      "sequential_adapter",
+      "output_evaluation",
+      "review",
+      "exact_action_approval",
+      "external_effect",
+      "memory_next_version",
+      "activity",
+      "artifacts",
+      "langfuse_export",
+      "evaluation_experiments",
+      "activepieces_offline_preparation",
+      "legacy_goal_compatibility"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "company_home",
+      "type": "runtime",
+      "version": "source-v1",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "dependencies": [],
+      "status": "pending",
+      "evaluation_requirements": [
+        {
+          "id": "regression-coverage",
+          "question": "Which existing tests cover this implementation? Source inspection verifies the reference; test execution is separate.",
+          "implementation": {
+            "path": "company/tests/test_operational_contract.py",
+            "symbol": "OperationalContractTests"
+          }
+        }
+      ],
+      "implementation": {
+        "path": "company/home.py",
+        "symbol": "CompanyHome"
+      },
+      "execution": {
+        "kind": "inspect",
+        "retry_safe": true
+      },
+      "bindings": {},
+      "capabilities": [
+        "inspect.company_home"
+      ],
+      "group": "installation",
+      "availability": "implemented"
+    },
+    {
+      "id": "authority",
+      "type": "runtime",
+      "version": "source-v1",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "dependencies": [
+        "company_home"
+      ],
+      "status": "pending",
+      "evaluation_requirements": [
+        {
+          "id": "regression-coverage",
+          "question": "Which existing tests cover this implementation? Source inspection verifies the reference; test execution is separate.",
+          "implementation": {
+            "path": "company/tests/test_operational_contract.py",
+            "symbol": "OperationalContractTests"
+          }
+        }
+      ],
+      "implementation": {
+        "path": "company/security.py",
+        "symbol": "CompanyAuthority"
+      },
+      "execution": {
+        "kind": "inspect",
+        "retry_safe": true
+      },
+      "bindings": {},
+      "capabilities": [
+        "inspect.authority"
+      ],
+      "group": "installation",
+      "availability": "implemented"
+    },
+    {
+      "id": "director",
+      "type": "agent",
+      "version": "source-v1",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "dependencies": [],
+      "status": "pending",
+      "evaluation_requirements": [
+        {
+          "id": "regression-coverage",
+          "question": "Which existing tests cover this implementation? Source inspection verifies the reference; test execution is separate.",
+          "implementation": {
+            "path": "company/tests/test_host_adapter_contract.py"
+          }
+        }
+      ],
+      "implementation": {
+        "path": "company/init_templates/hosts/codex/agents/director.toml"
+      },
+      "execution": {
+        "kind": "inspect",
+        "retry_safe": true
+      },
+      "bindings": {},
+      "capabilities": [
+        "inspect.director"
+      ],
+      "group": "authoring",
+      "availability": "implemented"
+    },
+    {
+      "id": "builder_skill",
+      "type": "skill",
+      "version": "source-v1",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "dependencies": [
+        "director"
+      ],
+      "status": "pending",
+      "evaluation_requirements": [
+        {
+          "id": "regression-coverage",
+          "question": "Which existing tests cover this implementation? Source inspection verifies the reference; test execution is separate.",
+          "implementation": {
+            "path": "company/tests/test_graph_architecture.py",
+            "symbol": "GraphArchitectureTests"
+          }
+        }
+      ],
+      "implementation": {
+        "path": "company/init_templates/integrations/spielos/skills/spielos-build-workflow/SKILL.md"
+      },
+      "execution": {
+        "kind": "inspect",
+        "retry_safe": true
+      },
+      "bindings": {},
+      "capabilities": [
+        "inspect.builder_skill"
+      ],
+      "group": "authoring",
+      "availability": "implemented"
+    },
+    {
+      "id": "agent_catalog",
+      "type": "agent",
+      "version": "source-v1",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "dependencies": [
+        "authority"
+      ],
+      "status": "pending",
+      "evaluation_requirements": [
+        {
+          "id": "regression-coverage",
+          "question": "Which existing tests cover this implementation? Source inspection verifies the reference; test execution is separate.",
+          "implementation": {
+            "path": "company/tests/test_bounded_workflow_runs.py",
+            "symbol": "BoundedWorkflowTests"
+          }
+        }
+      ],
+      "implementation": {
+        "path": "company/agents/loader.py",
+        "symbol": "AgentCatalog"
+      },
+      "execution": {
+        "kind": "inspect",
+        "retry_safe": true
+      },
+      "bindings": {},
+      "capabilities": [
+        "inspect.agent_catalog"
+      ],
+      "group": "authoring",
+      "availability": "implemented"
+    },
+    {
+      "id": "workflow_package",
+      "type": "input",
+      "version": "source-v1",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "dependencies": [],
+      "status": "pending",
+      "evaluation_requirements": [
+        {
+          "id": "regression-coverage",
+          "question": "Which existing tests cover this implementation? Source inspection verifies the reference; test execution is separate.",
+          "implementation": {
+            "path": "company/tests/test_bounded_workflow_runs.py",
+            "symbol": "BoundedWorkflowCommandTests"
+          }
+        }
+      ],
+      "implementation": {
+        "path": "company/commands/workflows.py",
+        "symbol": "read_package"
+      },
+      "execution": {
+        "kind": "inspect",
+        "retry_safe": true
+      },
+      "bindings": {},
+      "capabilities": [
+        "inspect.workflow_package"
+      ],
+      "group": "authoring",
+      "availability": "implemented"
+    },
+    {
+      "id": "improvement",
+      "type": "improvement",
+      "version": "source-v1",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "dependencies": [
+        "authority"
+      ],
+      "status": "pending",
+      "evaluation_requirements": [
+        {
+          "id": "regression-coverage",
+          "question": "Which existing tests cover this implementation? Source inspection verifies the reference; test execution is separate.",
+          "implementation": {
+            "path": "company/tests/test_operational_contract.py",
+            "symbol": "OperationalContractTests"
+          }
+        }
+      ],
+      "implementation": {
+        "path": "company/improvements.py",
+        "symbol": "Improvements"
+      },
+      "execution": {
+        "kind": "inspect",
+        "retry_safe": true
+      },
+      "bindings": {},
+      "capabilities": [
+        "inspect.improvement"
+      ],
+      "group": "authoring",
+      "availability": "implemented"
+    },
+    {
+      "id": "candidate",
+      "type": "workflow",
+      "version": "source-v1",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "dependencies": [
+        "agent_catalog",
+        "workflow_package",
+        "improvement",
+        "evaluation_contract"
+      ],
+      "status": "pending",
+      "evaluation_requirements": [
+        {
+          "id": "regression-coverage",
+          "question": "Which existing tests cover this implementation? Source inspection verifies the reference; test execution is separate.",
+          "implementation": {
+            "path": "company/tests/test_bounded_workflow_runs.py",
+            "symbol": "BoundedWorkflowTests"
+          }
+        }
+      ],
+      "implementation": {
+        "path": "company/workflows/runs.py",
+        "symbol": "WorkflowRuntime.candidate"
+      },
+      "execution": {
+        "kind": "inspect",
+        "retry_safe": true
+      },
+      "bindings": {},
+      "capabilities": [
+        "inspect.candidate"
+      ],
+      "group": "release",
+      "availability": "implemented"
+    },
+    {
+      "id": "evaluation_contract",
+      "type": "evaluation",
+      "version": "source-v1",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "dependencies": [],
+      "status": "pending",
+      "evaluation_requirements": [
+        {
+          "id": "regression-coverage",
+          "question": "Which existing tests cover this implementation? Source inspection verifies the reference; test execution is separate.",
+          "implementation": {
+            "path": "company/tests/test_evaluation_standard.py",
+            "symbol": "EvaluationStandardTests"
+          }
+        }
+      ],
+      "implementation": {
+        "path": "company/evals/standard.py",
+        "symbol": "validate_standard"
+      },
+      "execution": {
+        "kind": "inspect",
+        "retry_safe": true
+      },
+      "bindings": {},
+      "capabilities": [
+        "inspect.evaluation_contract"
+      ],
+      "group": "release",
+      "availability": "implemented"
+    },
+    {
+      "id": "release",
+      "type": "workflow",
+      "version": "source-v1",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "dependencies": [
+        "candidate",
+        "evaluation_contract"
+      ],
+      "status": "pending",
+      "evaluation_requirements": [
+        {
+          "id": "regression-coverage",
+          "question": "Which existing tests cover this implementation? Source inspection verifies the reference; test execution is separate.",
+          "implementation": {
+            "path": "company/tests/test_operational_contract.py",
+            "symbol": "OperationalContractTests"
+          }
+        }
+      ],
+      "implementation": {
+        "path": "company/workflows/runs.py",
+        "symbol": "WorkflowRuntime.release"
+      },
+      "execution": {
+        "kind": "inspect",
+        "retry_safe": true
+      },
+      "bindings": {},
+      "capabilities": [
+        "inspect.release"
+      ],
+      "group": "release",
+      "availability": "implemented"
+    },
+    {
+      "id": "memory_input",
+      "type": "memory",
+      "version": "source-v1",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "dependencies": [
+        "authority"
+      ],
+      "status": "pending",
+      "evaluation_requirements": [
+        {
+          "id": "regression-coverage",
+          "question": "Which existing tests cover this implementation? Source inspection verifies the reference; test execution is separate.",
+          "implementation": {
+            "path": "company/tests/test_operational_contract.py",
+            "symbol": "OperationalContractTests"
+          }
+        }
+      ],
+      "implementation": {
+        "path": "company/context/workflow.py",
+        "symbol": "WorkflowMemory.active"
+      },
+      "execution": {
+        "kind": "inspect",
+        "retry_safe": true
+      },
+      "bindings": {},
+      "capabilities": [
+        "inspect.memory_input"
+      ],
+      "group": "execution",
+      "availability": "implemented"
+    },
+    {
+      "id": "invocation",
+      "type": "runtime",
+      "version": "source-v1",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "dependencies": [
+        "release",
+        "memory_input"
+      ],
+      "status": "pending",
+      "evaluation_requirements": [
+        {
+          "id": "regression-coverage",
+          "question": "Which existing tests cover this implementation? Source inspection verifies the reference; test execution is separate.",
+          "implementation": {
+            "path": "company/tests/test_bounded_workflow_runs.py",
+            "symbol": "BoundedWorkflowTests"
+          }
+        }
+      ],
+      "implementation": {
+        "path": "company/workflows/runs.py",
+        "symbol": "WorkflowRuntime.run"
+      },
+      "execution": {
+        "kind": "inspect",
+        "retry_safe": true
+      },
+      "bindings": {},
+      "capabilities": [
+        "inspect.invocation"
+      ],
+      "group": "execution",
+      "availability": "implemented"
+    },
+    {
+      "id": "local_adapter",
+      "type": "tool",
+      "version": "source-v1",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "dependencies": [],
+      "status": "pending",
+      "evaluation_requirements": [
+        {
+          "id": "regression-coverage",
+          "question": "Which existing tests cover this implementation? Source inspection verifies the reference; test execution is separate.",
+          "implementation": {
+            "path": "company/tests/test_bounded_workflow_runs.py",
+            "symbol": "BoundedWorkflowTests"
+          }
+        }
+      ],
+      "implementation": {
+        "path": "company/workflows/runs.py",
+        "symbol": "LocalFileAdapter"
+      },
+      "execution": {
+        "kind": "inspect",
+        "retry_safe": true
+      },
+      "bindings": {},
+      "capabilities": [
+        "inspect.local_adapter"
+      ],
+      "group": "adapters",
+      "availability": "implemented"
+    },
+    {
+      "id": "host_adapter",
+      "type": "tool",
+      "version": "source-v1",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "dependencies": [],
+      "status": "pending",
+      "evaluation_requirements": [
+        {
+          "id": "regression-coverage",
+          "question": "Which existing tests cover this implementation? Source inspection verifies the reference; test execution is separate.",
+          "implementation": {
+            "path": "company/tests/test_bounded_workflow_runs.py",
+            "symbol": "BoundedWorkflowTests"
+          }
+        }
+      ],
+      "implementation": {
+        "path": "company/workflows/runs.py",
+        "symbol": "HostAdapter"
+      },
+      "execution": {
+        "kind": "inspect",
+        "retry_safe": true
+      },
+      "bindings": {},
+      "capabilities": [
+        "inspect.host_adapter"
+      ],
+      "group": "adapters",
+      "availability": "implemented"
+    },
+    {
+      "id": "sequential_adapter",
+      "type": "runtime",
+      "version": "source-v1",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "dependencies": [],
+      "status": "pending",
+      "evaluation_requirements": [
+        {
+          "id": "regression-coverage",
+          "question": "Which existing tests cover this implementation? Source inspection verifies the reference; test execution is separate.",
+          "implementation": {
+            "path": "company/tests/test_explicit_workflow.py",
+            "symbol": "ExplicitWorkflowTests"
+          }
+        }
+      ],
+      "implementation": {
+        "path": "company/workflows/runs.py",
+        "symbol": "SequentialAdapter"
+      },
+      "execution": {
+        "kind": "inspect",
+        "retry_safe": true
+      },
+      "bindings": {},
+      "capabilities": [
+        "inspect.sequential_adapter"
+      ],
+      "group": "adapters",
+      "availability": "implemented"
+    },
+    {
+      "id": "output_evaluation",
+      "type": "evaluation",
+      "version": "source-v1",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "dependencies": [
+        "invocation"
+      ],
+      "status": "pending",
+      "evaluation_requirements": [
+        {
+          "id": "regression-coverage",
+          "question": "Which existing tests cover this implementation? Source inspection verifies the reference; test execution is separate.",
+          "implementation": {
+            "path": "company/tests/test_evaluation_standard.py",
+            "symbol": "EvaluationStandardTests"
+          }
+        }
+      ],
+      "implementation": {
+        "path": "company/workflows/runs.py",
+        "symbol": "WorkflowRuntime.evaluate_run"
+      },
+      "execution": {
+        "kind": "inspect",
+        "retry_safe": true
+      },
+      "bindings": {},
+      "capabilities": [
+        "inspect.output_evaluation"
+      ],
+      "group": "execution",
+      "availability": "implemented"
+    },
+    {
+      "id": "review",
+      "type": "evaluation",
+      "version": "source-v1",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "dependencies": [
+        "output_evaluation"
+      ],
+      "status": "pending",
+      "evaluation_requirements": [
+        {
+          "id": "regression-coverage",
+          "question": "Which existing tests cover this implementation? Source inspection verifies the reference; test execution is separate.",
+          "implementation": {
+            "path": "company/tests/test_bounded_workflow_runs.py",
+            "symbol": "BoundedWorkflowTests"
+          }
+        }
+      ],
+      "implementation": {
+        "path": "company/workflows/runs.py",
+        "symbol": "WorkflowRuntime.review"
+      },
+      "execution": {
+        "kind": "inspect",
+        "retry_safe": true
+      },
+      "bindings": {},
+      "capabilities": [
+        "inspect.review"
+      ],
+      "group": "execution",
+      "availability": "implemented"
+    },
+    {
+      "id": "exact_action_approval",
+      "type": "runtime",
+      "version": "source-v1",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "dependencies": [
+        "review"
+      ],
+      "status": "pending",
+      "evaluation_requirements": [
+        {
+          "id": "regression-coverage",
+          "question": "Which existing tests cover this implementation? Source inspection verifies the reference; test execution is separate.",
+          "implementation": {
+            "path": "company/tests/test_bounded_workflow_runs.py",
+            "symbol": "BoundedWorkflowTests"
+          }
+        }
+      ],
+      "implementation": {
+        "path": "company/workflows/runs.py",
+        "symbol": "WorkflowRuntime.approve_action"
+      },
+      "execution": {
+        "kind": "inspect",
+        "retry_safe": true
+      },
+      "bindings": {},
+      "capabilities": [
+        "inspect.exact_action_approval"
+      ],
+      "group": "effects",
+      "availability": "implemented"
+    },
+    {
+      "id": "external_effect",
+      "type": "tool",
+      "version": "source-v1",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "dependencies": [
+        "exact_action_approval"
+      ],
+      "status": "pending",
+      "evaluation_requirements": [
+        {
+          "id": "regression-coverage",
+          "question": "Which existing tests cover this implementation? Source inspection verifies the reference; test execution is separate.",
+          "implementation": {
+            "path": "company/tests/test_bounded_workflow_runs.py",
+            "symbol": "BoundedWorkflowTests"
+          }
+        }
+      ],
+      "implementation": {
+        "path": "company/workflows/runs.py",
+        "symbol": "WorkflowRuntime.execute_action"
+      },
+      "execution": {
+        "kind": "inspect",
+        "retry_safe": true
+      },
+      "bindings": {},
+      "capabilities": [
+        "inspect.external_effect"
+      ],
+      "group": "effects",
+      "availability": "implemented"
+    },
+    {
+      "id": "memory_next_version",
+      "type": "memory",
+      "version": "source-v1",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "dependencies": [
+        "output_evaluation"
+      ],
+      "status": "pending",
+      "evaluation_requirements": [
+        {
+          "id": "regression-coverage",
+          "question": "Which existing tests cover this implementation? Source inspection verifies the reference; test execution is separate.",
+          "implementation": {
+            "path": "company/tests/test_operational_contract.py",
+            "symbol": "OperationalContractTests"
+          }
+        }
+      ],
+      "implementation": {
+        "path": "company/context/workflow.py",
+        "symbol": "WorkflowMemory.add"
+      },
+      "execution": {
+        "kind": "inspect",
+        "retry_safe": true
+      },
+      "bindings": {},
+      "capabilities": [
+        "inspect.memory_next_version"
+      ],
+      "group": "evidence",
+      "availability": "implemented"
+    },
+    {
+      "id": "activity",
+      "type": "runtime",
+      "version": "source-v1",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "dependencies": [],
+      "status": "pending",
+      "evaluation_requirements": [
+        {
+          "id": "regression-coverage",
+          "question": "Which existing tests cover this implementation? Source inspection verifies the reference; test execution is separate.",
+          "implementation": {
+            "path": "company/tests/test_session_evidence.py",
+            "symbol": "SessionEvidenceTests"
+          }
+        }
+      ],
+      "implementation": {
+        "path": "company/observability/sessions.py",
+        "symbol": "Sessions"
+      },
+      "execution": {
+        "kind": "inspect",
+        "retry_safe": true
+      },
+      "bindings": {},
+      "capabilities": [
+        "inspect.activity"
+      ],
+      "group": "evidence",
+      "availability": "implemented"
+    },
+    {
+      "id": "artifacts",
+      "type": "artifact",
+      "version": "source-v1",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "dependencies": [
+        "activity"
+      ],
+      "status": "pending",
+      "evaluation_requirements": [
+        {
+          "id": "regression-coverage",
+          "question": "Which existing tests cover this implementation? Source inspection verifies the reference; test execution is separate.",
+          "implementation": {
+            "path": "company/tests/test_session_evidence.py",
+            "symbol": "SessionEvidenceTests"
+          }
+        }
+      ],
+      "implementation": {
+        "path": "company/observability/sessions.py",
+        "symbol": "Sessions.artifact"
+      },
+      "execution": {
+        "kind": "inspect",
+        "retry_safe": true
+      },
+      "bindings": {},
+      "capabilities": [
+        "inspect.artifacts"
+      ],
+      "group": "evidence",
+      "availability": "implemented"
+    },
+    {
+      "id": "langfuse_export",
+      "type": "connection",
+      "version": "source-v1",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "dependencies": [
+        "activity",
+        "output_evaluation"
+      ],
+      "status": "pending",
+      "evaluation_requirements": [
+        {
+          "id": "regression-coverage",
+          "question": "Which existing tests cover this implementation? Source inspection verifies the reference; test execution is separate.",
+          "implementation": {
+            "path": "company/tests/test_langfuse_export.py",
+            "symbol": "LangfuseExportTests"
+          }
+        }
+      ],
+      "implementation": {
+        "path": "company/observability/langfuse.py",
+        "symbol": "LangfuseClient"
+      },
+      "execution": {
+        "kind": "inspect",
+        "retry_safe": true
+      },
+      "bindings": {},
+      "capabilities": [
+        "inspect.langfuse_export"
+      ],
+      "group": "evidence",
+      "availability": "implemented"
+    },
+    {
+      "id": "evaluation_experiments",
+      "type": "evaluation",
+      "version": "source-v1",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "dependencies": [
+        "evaluation_contract"
+      ],
+      "status": "pending",
+      "evaluation_requirements": [
+        {
+          "id": "regression-coverage",
+          "question": "Which existing tests cover this implementation? Source inspection verifies the reference; test execution is separate.",
+          "implementation": {
+            "path": "company/tests/test_evaluation_standard.py",
+            "symbol": "EvaluationStandardTests"
+          }
+        }
+      ],
+      "implementation": {
+        "path": "company/evals/harness.py",
+        "symbol": "EvaluationHarness"
+      },
+      "execution": {
+        "kind": "inspect",
+        "retry_safe": true
+      },
+      "bindings": {},
+      "capabilities": [
+        "inspect.evaluation_experiments"
+      ],
+      "group": "evidence",
+      "availability": "implemented"
+    },
+    {
+      "id": "activepieces_offline_preparation",
+      "type": "connection",
+      "version": "source-v1",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "dependencies": [],
+      "status": "pending",
+      "evaluation_requirements": [
+        {
+          "id": "regression-coverage",
+          "question": "Which existing tests cover this implementation? Source inspection verifies the reference; test execution is separate.",
+          "implementation": {
+            "path": "company/tests/test_activepieces_preparation.py",
+            "symbol": "ActivepiecesPreparationTests"
+          }
+        }
+      ],
+      "implementation": {
+        "path": "company/integration_templates/activepieces/configure.py",
+        "symbol": "prepare"
+      },
+      "execution": {
+        "kind": "inspect",
+        "retry_safe": true
+      },
+      "bindings": {},
+      "capabilities": [
+        "inspect.activepieces_offline_preparation"
+      ],
+      "group": "adapters",
+      "availability": "implemented"
+    },
+    {
+      "id": "legacy_goal_compatibility",
+      "type": "runtime",
+      "version": "source-v1",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "verified": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "verified"
+        ]
+      },
+      "dependencies": [],
+      "status": "pending",
+      "evaluation_requirements": [
+        {
+          "id": "regression-coverage",
+          "question": "Which existing tests cover this implementation? Source inspection verifies the reference; test execution is separate.",
+          "implementation": {
+            "path": "company/tests/test_architecture_stabilization.py",
+            "symbol": "ArchitectureStabilizationTests"
+          }
+        }
+      ],
+      "implementation": {
+        "path": "company/commands/goal_runtime.py",
+        "symbol": "CleanCommandRuntime"
+      },
+      "execution": {
+        "kind": "inspect",
+        "retry_safe": true
+      },
+      "bindings": {},
+      "capabilities": [
+        "inspect.legacy_goal_compatibility"
+      ],
+      "group": "compatibility",
+      "availability": "implemented"
+    }
+  ],
+  "edges": [
+    {
+      "source": "company_home",
+      "target": "authority",
+      "relationship": "requires"
+    },
+    {
+      "source": "director",
+      "target": "builder_skill",
+      "relationship": "context"
+    },
+    {
+      "source": "authority",
+      "target": "agent_catalog",
+      "relationship": "requires"
+    },
+    {
+      "source": "authority",
+      "target": "improvement",
+      "relationship": "requires"
+    },
+    {
+      "source": "agent_catalog",
+      "target": "candidate",
+      "relationship": "requires"
+    },
+    {
+      "source": "workflow_package",
+      "target": "candidate",
+      "relationship": "requires"
+    },
+    {
+      "source": "improvement",
+      "target": "candidate",
+      "relationship": "requires"
+    },
+    {
+      "source": "candidate",
+      "target": "release",
+      "relationship": "requires"
+    },
+    {
+      "source": "evaluation_contract",
+      "target": "release",
+      "relationship": "requires"
+    },
+    {
+      "source": "authority",
+      "target": "memory_input",
+      "relationship": "requires"
+    },
+    {
+      "source": "release",
+      "target": "invocation",
+      "relationship": "requires"
+    },
+    {
+      "source": "memory_input",
+      "target": "invocation",
+      "relationship": "context"
+    },
+    {
+      "source": "invocation",
+      "target": "output_evaluation",
+      "relationship": "requires"
+    },
+    {
+      "source": "output_evaluation",
+      "target": "review",
+      "relationship": "evaluates"
+    },
+    {
+      "source": "review",
+      "target": "exact_action_approval",
+      "relationship": "requires"
+    },
+    {
+      "source": "exact_action_approval",
+      "target": "external_effect",
+      "relationship": "requires"
+    },
+    {
+      "source": "output_evaluation",
+      "target": "memory_next_version",
+      "relationship": "records"
+    },
+    {
+      "source": "activity",
+      "target": "artifacts",
+      "relationship": "records"
+    },
+    {
+      "source": "activity",
+      "target": "langfuse_export",
+      "relationship": "requires"
+    },
+    {
+      "source": "output_evaluation",
+      "target": "langfuse_export",
+      "relationship": "requires"
+    },
+    {
+      "source": "evaluation_contract",
+      "target": "evaluation_experiments",
+      "relationship": "requires"
+    },
+    {
+      "source": "evaluation_contract",
+      "target": "candidate",
+      "relationship": "evaluates"
+    }
+  ],
+  "entrypoints": [
+    "company_home",
+    "director",
+    "workflow_package",
+    "evaluation_contract",
+    "local_adapter",
+    "host_adapter",
+    "sequential_adapter",
+    "activity",
+    "activepieces_offline_preparation",
+    "legacy_goal_compatibility"
+  ],
+  "outputs": {
+    "company_home": {
+      "node": "company_home",
+      "path": ""
+    },
+    "authority": {
+      "node": "authority",
+      "path": ""
+    },
+    "director": {
+      "node": "director",
+      "path": ""
+    },
+    "builder_skill": {
+      "node": "builder_skill",
+      "path": ""
+    },
+    "agent_catalog": {
+      "node": "agent_catalog",
+      "path": ""
+    },
+    "workflow_package": {
+      "node": "workflow_package",
+      "path": ""
+    },
+    "improvement": {
+      "node": "improvement",
+      "path": ""
+    },
+    "candidate": {
+      "node": "candidate",
+      "path": ""
+    },
+    "evaluation_contract": {
+      "node": "evaluation_contract",
+      "path": ""
+    },
+    "release": {
+      "node": "release",
+      "path": ""
+    },
+    "memory_input": {
+      "node": "memory_input",
+      "path": ""
+    },
+    "invocation": {
+      "node": "invocation",
+      "path": ""
+    },
+    "local_adapter": {
+      "node": "local_adapter",
+      "path": ""
+    },
+    "host_adapter": {
+      "node": "host_adapter",
+      "path": ""
+    },
+    "sequential_adapter": {
+      "node": "sequential_adapter",
+      "path": ""
+    },
+    "output_evaluation": {
+      "node": "output_evaluation",
+      "path": ""
+    },
+    "review": {
+      "node": "review",
+      "path": ""
+    },
+    "exact_action_approval": {
+      "node": "exact_action_approval",
+      "path": ""
+    },
+    "external_effect": {
+      "node": "external_effect",
+      "path": ""
+    },
+    "memory_next_version": {
+      "node": "memory_next_version",
+      "path": ""
+    },
+    "activity": {
+      "node": "activity",
+      "path": ""
+    },
+    "artifacts": {
+      "node": "artifacts",
+      "path": ""
+    },
+    "langfuse_export": {
+      "node": "langfuse_export",
+      "path": ""
+    },
+    "evaluation_experiments": {
+      "node": "evaluation_experiments",
+      "path": ""
+    },
+    "activepieces_offline_preparation": {
+      "node": "activepieces_offline_preparation",
+      "path": ""
+    },
+    "legacy_goal_compatibility": {
+      "node": "legacy_goal_compatibility",
+      "path": ""
+    }
+  },
+  "required_capabilities": [
+    "inspect.invocation",
+    "inspect.output_evaluation",
+    "inspect.exact_action_approval",
+    "inspect.memory_next_version"
+  ]
+}

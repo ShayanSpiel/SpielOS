@@ -34,6 +34,7 @@ Run:  PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.agents python3 -B -m unittest \\
 """
 
 from __future__ import annotations
+from contextlib import closing
 
 import json
 import os
@@ -215,19 +216,19 @@ class TestDecisionRequestPark(DecideBoundaryCase):
         self.assertEqual(request["goal"]["id"], self.goal_id)
         self.assertEqual(request["goal"]["metric"], "weekly_sales")
         self.assertEqual(request["metric"], "weekly_sales")
-        self.assertEqual(request["observation_value"], 0)
+        self.assertIsNone(request["observation_value"])
         self.assertEqual(request["valid_answers"], ["execute_workflow", "request_agent"])
         # Owner voice (goal-director-voice): the message names the goal and
         # its human progress with named options — no metric key, operator,
         # or target pair ever enters owner-facing text.
         self.assertIn("Weekly sales", request["message"])
-        self.assertIn("0 of 1", request["message"])
+        self.assertIn("no reading yet", request["message"])
         self.assertIn("Run one of the candidate workflows",
                       request["message"])
         self.assertNotIn("weekly_sales", request["message"])
         self.assertNotIn("ge ", request["message"],
                          "no operator/target pair in owner-facing text")
-        self.assertEqual(request["progress"], "0 of 1")
+        self.assertEqual(request["progress"], "no reading yet")
         for key in ("answer_syntax", "candidates", "evidence", "memory",
                     "children", "blockers", "recent_runs"):
             self.assertIn(key, request)
@@ -1523,7 +1524,7 @@ class TestUpdatePreservesParkedState(unittest.TestCase):
 
     @staticmethod
     def _parked_state(database: Path) -> dict:
-        with sqlite3.connect(database) as connection:
+        with closing(sqlite3.connect(database)) as connection, connection:
             connection.row_factory = sqlite3.Row
             order = dict(connection.execute(
                 "SELECT status,result_json FROM core_work_orders"

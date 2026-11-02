@@ -1,0 +1,472 @@
+{
+  "schema": 1,
+  "completion_requires_all": true,
+  "external_gates": {
+    "activepieces": "held_by_owner",
+    "enterprise_deployment": "requires_real_staged_acceptance"
+  },
+  "scenarios": [
+    {
+      "id": "home.fresh_visible_lean_structure",
+      "journey": "home",
+      "requirement": "fresh visible lean structure",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "home.update_preserves_owner_content",
+      "journey": "home",
+      "requirement": "update preserves owner content",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "home.reviewed_hash_bound_migration",
+      "journey": "home",
+      "requirement": "reviewed hash bound migration",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "home.migration_collision_refused",
+      "journey": "home",
+      "requirement": "migration collision refused",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "home.migration_restart_recovery",
+      "journey": "home",
+      "requirement": "migration restart recovery",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "home.source_boundary_refused",
+      "journey": "home",
+      "requirement": "source boundary refused",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "home.runtime_hidden_and_legacy_aliases",
+      "journey": "home",
+      "requirement": "runtime hidden and legacy aliases",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "home.brand_is_owner_owned",
+      "journey": "home",
+      "requirement": "brand is owner owned",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "context.profile_strategy_brand_scoped",
+      "journey": "context",
+      "requirement": "profile strategy brand scoped",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "context.memory_citations_and_versions",
+      "journey": "context",
+      "requirement": "memory citations and versions",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "context.owner_preferences_do_not_starve_learning",
+      "journey": "context",
+      "requirement": "owner preferences do not starve learning",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "context.retired_unrelated_memory_excluded",
+      "journey": "context",
+      "requirement": "retired unrelated memory excluded",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "context.restart_restores_pending_work",
+      "journey": "context",
+      "requirement": "restart restores pending work",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "context.owner_voice_and_machine_reference",
+      "journey": "context",
+      "requirement": "owner voice and machine reference",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "context.context_budget_preserves_critical_constraints",
+      "journey": "context",
+      "requirement": "context budget preserves critical constraints",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "creation.bounded_godae_improvement",
+      "journey": "creation",
+      "requirement": "bounded godae improvement",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "creation.workflow_brief_examples_and_rubric",
+      "journey": "creation",
+      "requirement": "workflow brief examples and rubric",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "creation.agent_creation_validates_skills_permissions",
+      "journey": "creation",
+      "requirement": "agent creation validates skills permissions",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "creation.skill_creation_and_execution_context",
+      "journey": "creation",
+      "requirement": "skill creation and execution context",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "creation.negative_and_held_out_examples",
+      "journey": "creation",
+      "requirement": "negative and held out examples",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "creation.real_candidate_execution_provenance",
+      "journey": "creation",
+      "requirement": "real candidate execution provenance",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "creation.immutable_release_resolves_dependencies",
+      "journey": "creation",
+      "requirement": "immutable release resolves dependencies",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "runtime.new_inputs_execute_and_evaluate",
+      "journey": "runtime",
+      "requirement": "new inputs execute and evaluate",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "runtime.no_goal_or_daemon_needed",
+      "journey": "runtime",
+      "requirement": "no goal or daemon needed",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "runtime.duplicate_request_one_dispatch",
+      "journey": "runtime",
+      "requirement": "duplicate request one dispatch",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "runtime.timeout_enforced",
+      "journey": "runtime",
+      "requirement": "timeout enforced",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "runtime.active_lease_not_preempted",
+      "journey": "runtime",
+      "requirement": "active lease not preempted",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "runtime.stale_completion_fenced",
+      "journey": "runtime",
+      "requirement": "stale completion fenced",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "runtime.unknown_execution_not_blindly_replayed",
+      "journey": "runtime",
+      "requirement": "unknown execution not blindly replayed",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "runtime.cancel_and_restart_recovery",
+      "journey": "runtime",
+      "requirement": "cancel and restart recovery",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "runtime.host_agent_real_assignment",
+      "journey": "runtime",
+      "requirement": "host agent real assignment",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "runtime.sequential_input_output_mapping",
+      "journey": "runtime",
+      "requirement": "sequential input output mapping",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "evaluation.empty_duplicate_missing_coverage_blocked",
+      "journey": "evaluation",
+      "requirement": "empty duplicate missing coverage blocked",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "evaluation.criterion_specific_checks_and_thresholds",
+      "journey": "evaluation",
+      "requirement": "criterion specific checks and thresholds",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "evaluation.error_and_not_applicable_policy",
+      "journey": "evaluation",
+      "requirement": "error and not applicable policy",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "evaluation.independent_review_and_self_judging_label",
+      "journey": "evaluation",
+      "requirement": "independent review and self judging label",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "evaluation.model_judge_contract_and_calibration",
+      "journey": "evaluation",
+      "requirement": "model judge contract and calibration",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "evaluation.rendered_brand_artifact_inspected",
+      "journey": "evaluation",
+      "requirement": "rendered brand artifact inspected",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "evaluation.reference_output_reproducible",
+      "journey": "evaluation",
+      "requirement": "reference output reproducible",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "evaluation.technical_quality_not_business_impact",
+      "journey": "evaluation",
+      "requirement": "technical quality not business impact",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "portability.no_submitted_code_executes_on_import",
+      "journey": "portability",
+      "requirement": "no submitted code executes on import",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "portability.contained_paths_and_symlinks",
+      "journey": "portability",
+      "requirement": "contained paths and symlinks",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "portability.ownership_receipt_and_collision_preview",
+      "journey": "portability",
+      "requirement": "ownership receipt and collision preview",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "portability.pinned_closure_and_brand_export",
+      "journey": "portability",
+      "requirement": "pinned closure and brand export",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "portability.clean_adopter_reproduces_example",
+      "journey": "portability",
+      "requirement": "clean adopter reproduces example",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "portability.atomic_install_and_recovery",
+      "journey": "portability",
+      "requirement": "atomic install and recovery",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "portability.legacy_history_readonly",
+      "journey": "portability",
+      "requirement": "legacy history readonly",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "security.authenticated_company_principals",
+      "journey": "security",
+      "requirement": "authenticated company principals",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "security.cross_company_and_role_denial",
+      "journey": "security",
+      "requirement": "cross company and role denial",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "security.exact_action_content_destination_scope",
+      "journey": "security",
+      "requirement": "exact action content destination scope",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "security.immutable_actor_audit",
+      "journey": "security",
+      "requirement": "immutable actor audit",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "security.secret_references_not_exported",
+      "journey": "security",
+      "requirement": "secret references not exported",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "security.restoration_preserves_history_and_no_effect_replay",
+      "journey": "security",
+      "requirement": "restoration preserves history and no effect replay",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "reporting.actual_estimated_unknown_usage",
+      "journey": "reporting",
+      "requirement": "actual estimated unknown usage",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "reporting.provider_evaluator_retry_costs",
+      "journey": "reporting",
+      "requirement": "provider evaluator retry costs",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "reporting.outbox_readback_and_bounded_recovery",
+      "journey": "reporting",
+      "requirement": "outbox readback and bounded recovery",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "reporting.normal_host_wake_export",
+      "journey": "reporting",
+      "requirement": "normal host wake export",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "reporting.workflow_scorecard_denominators",
+      "journey": "reporting",
+      "requirement": "workflow scorecard denominators",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "reporting.history_load_measurements",
+      "journey": "reporting",
+      "requirement": "history load measurements",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "reporting.thin_plugin_company_selection",
+      "journey": "reporting",
+      "requirement": "thin plugin company selection",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "reporting.business_measurement_contract",
+      "journey": "reporting",
+      "requirement": "Observed outcomes define population, unit, direction, window and minimum evidence without fabricated baseline or causality",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "context.typed_profile_and_owner_boundaries",
+      "journey": "context",
+      "requirement": "Typed company facts retain explicit responsibility and boundaries without invented owner identity or overwritten notes",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "reporting.langfuse_experiment_datasets",
+      "journey": "reporting",
+      "requirement": "Actual case executions map to versioned datasets, score definitions and read-back verified experiment items without duplicate uncertain creates",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "home.legacy_state_and_memory_inventory",
+      "journey": "home",
+      "requirement": "Migration inventories historical intent, decisions, evidence and memory; preferences retain owner scope and task lessons are never broadened implicitly",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "branding.generic_declared_reference_roles",
+      "journey": "branding",
+      "requirement": "actual company CSS/JSON token and component references are not restricted to report templates; CLI/MCP share authenticated immutable review",
+      "status": "pending",
+      "tests": []
+    },
+    {
+      "id": "home.explicit_installer_and_public_entrypoints",
+      "journey": "home",
+      "requirement": "installer never creates homes silently, explicit home updates preserve owner content, package flow is preview-only, npm delegates to the same selected-home Python core",
+      "status": "pending",
+      "tests": []
+    }
+  ]
+}

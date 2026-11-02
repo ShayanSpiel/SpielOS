@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "verified_at": "2026-11-02",
+  "basis": "Current published Standard reference rates; not an invoice or historical billing reconstruction",
+  "models": {
+    "gpt-6.1-sol": {
+      "api_source": "https://developers.openai.com/api/docs/models/gpt-6.1-sol",
+      "codex_source": "https://learn.chatgpt.com/docs/pricing",
+      "currency": "USD",
+      "api_per_million": {"input": 2.0, "cached_input": 0.10, "cache_write_input": 2.50, "output": 10.0},
+      "api_long_context": {"above_input_tokens": 272000, "input_and_cache_multiplier": 2.0, "output_multiplier": 1.5},
+      "codex_standard_credits_per_million": {"input": 50.0, "cached_input": 2.5, "output": 250.0},
+      "assumptions": "Standard speed. Codex subscription has no long-context surcharge or separate cache-write charge. Actual speed, plan discounts, tool charges and purchased-credit billing are not inferred. Reasoning output is already part of output."
+    }
+  }
+}

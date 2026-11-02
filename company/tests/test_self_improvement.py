@@ -259,100 +259,29 @@ class TestStrategyLearningLoop(SelfImprovementCase):
                 chosen.append(None)
         return chosen
 
-    def test_run_two_chooses_b_because_of_the_lesson_from_a(self):
+    def test_flat_runs_do_not_invent_strategy(self):
         chosen = self._run_scenario([0, 0])
-        self.assertEqual(chosen[0], "strategy-lab:alpha",
-                         "run 1 selects the first declared approach")
-        self.assertEqual(len(chosen), 2, "two runs executed")
-        self.assertEqual(chosen[1], "strategy-lab:beta",
-                         "run 2 switches to B because of the lesson")
-        # One lesson per genuinely underperforming run — never per event.
-        # Run 1 (alpha flat) wrote the lesson that flipped run 2; run 2
-        # (beta also flat) wrote its own, so with both approaches
-        # exhausted the goal parks for a genuine owner choice next.
-        lessons = self.strategy_claims(self.goal_id)
-        self.assertEqual(len(lessons), 2,
-                         "one evidence-backed lesson per underperforming "
-                         "run, exactly: alpha's from run 1, beta's from "
-                         "run 2 — never per event")
-        avoided = {item["workflow_id"]: item["claim"] for item in lessons}
-        self.assertTrue(avoided["strategy-lab:alpha"].startswith(
-            "avoid strategy-lab:alpha"),
-            "the lesson names the underperforming approach")
-        self.assertTrue(avoided["strategy-lab:beta"].startswith(
-            "avoid strategy-lab:beta"))
-        # Every persisted learning is explained by evidence of its run.
-        for item in lessons:
-            self.assertTrue(json.loads(item["evidence_ids_json"]),
-                            "each lesson cites its causal evidence")
-        # And with both approaches avoided, run 3 parks for the owner as
-        # a genuine material strategic choice — not host work.
-        self.engine.advance(self.goal_id)
-        self.engine.advance(self.goal_id)
-        self.engine.advance(self.goal_id)
-        run3 = self.current_run()
-        self.assertEqual((run3.stage, run3.status), (GoalStage.DECIDE, "waiting"))
-        self.assertEqual(len(self.owner_asks()), 1,
-                         "an exhausted strategy space is a genuine owner "
-                         "boundary")
+        self.assertEqual(chosen, ["strategy-lab:alpha", "strategy-lab:alpha"])
+        self.assertEqual(self.strategy_claims(self.goal_id), [])
 
-    def test_the_lesson_is_causal_not_incidental(self):
-        # Control variant: identical scenario, the lesson removed after
-        # run 1's evaluation — DECIDE must then pick A again for run 2.
-        # Proves B was chosen BECAUSE of the strategy memory, not by any
-        # other mechanism.
-        chosen = self._run_scenario([0, 0])
-        self.assertEqual(chosen, ["strategy-lab:alpha", "strategy-lab:beta"])
 
-        self.tearDown()
-        self.setUp()
-        self.install_lab()
-        self.new_goal(name="Control", owner="strategy-lab",
-                      metric="customers", target=2, aggregation="latest")
-        executor = _OutcomeExecutor(payloads=[{"customers": 0}])
-        executor.payload = {"customers": 0}
-        self.engine.resolution.executor = executor
-        picked = []
-        retired = False
-        while len(picked) < 2:
-            run = self.current_run()
-            if (run.decision is not None and run.decision.workflow_id
-                    and len(picked) < run.sequence):
-                picked.append(run.decision.workflow_id)
-            if self.runtime.goals.get(self.goal_id).status == "complete":
-                break
-            if (not retired and len(picked) == 1
-                    and run.stage == GoalStage.OBSERVE and run.sequence == 2):
-                # Run 1 evaluated and run 2 opened: strip every strategy
-                # lesson so the control starts run 2 with none.
-                for claim in self.strategy_claims(self.goal_id):
-                    self.runtime.retire_memory(claim["id"])
-                retired = True
-            self.engine.advance(self.goal_id)
-        self.assertEqual(picked, ["strategy-lab:alpha", "strategy-lab:alpha"],
-                         "without the lesson DECIDE returns to declaration "
-                         "order — the lesson alone flips run 2 to B")
+    def test_reviewer_direction_remains_evidence_backed(self):
+        self._run_scenario([0])
+        evidence = self.runtime.evidence.for_goal(self.goal_id)[-1]
+        self.runtime.memory.remember("strategy", "prefer strategy-lab:beta: reviewer direction",
+            evidence_ids=(evidence.id,), goal_id=self.goal_id, run_id=evidence.run_id,
+            workflow_id="strategy-lab:beta")
+        from company.workflows import Workflow
+        self.assertTrue(self.engine.controller._strategy_prefers(
+            self.runtime.goals.get(self.goal_id), Workflow("beta", "Beta", (), "strategy-lab")))
+        self.assertEqual(len(self.strategy_claims(self.goal_id)), 1)
 
-    def test_prefer_lesson_flips_choice_to_the_winner(self):
-        # Run 1 alpha flat; run 2 beta moves 0 -> 1. EVALUATE distills a
-        # prefer-beta lesson; run 3 must choose beta again because alpha
-        # stays avoided and beta is preferred.
+
+    def test_improved_outcomes_do_not_prove_causal_strategy(self):
         chosen = self._run_scenario([0, 1, 1])
-        self.assertEqual(chosen[0], "strategy-lab:alpha")
-        self.assertEqual(chosen[1], "strategy-lab:beta",
-                          "run 2 switches after alpha's avoid lesson")
-        lessons = self.strategy_claims(self.goal_id)
-        self.assertTrue(any(
-            item["claim"].startswith("prefer strategy-lab:beta")
-            for item in lessons),
-            "beta outperforming alpha distills a prefer lesson")
-        self.assertEqual(chosen[2], "strategy-lab:beta",
-                         "run 3 keeps the preferred winner")
+        self.assertEqual(chosen, ["strategy-lab:alpha"] * 3)
+        self.assertEqual(self.strategy_claims(self.goal_id), [])
 
-
-# =========================================================================
-# 3. Repetition crystallizes reusable structure
-# =========================================================================
 
 class TestRepetitionCrystallization(SelfImprovementCase):
     """Three materially equivalent direct executions form a Workflow; the
@@ -373,36 +302,17 @@ class TestRepetitionCrystallization(SelfImprovementCase):
                 "companies_researched": 20, "notes": "ok"}}])
         return order
 
-    def test_three_equivalent_requests_crystallize_a_reusable_workflow(self):
-        # Three materially equivalent requests with different wording:
-        # "Research these 20 prospects." / "Find information on this new
-        # lead list." / "Enrich these companies before outreach."
-        self.new_goal(name="Lead research", metric="customers",
-                      target=999)
-        self._do_direct("Research these 20 prospects.")
-        self._do_direct("Find information on this new lead list.")
-        self._do_direct("Enrich these companies before outreach.")
-        # The next equivalent request: DECIDE must NOT rebuild the
-        # procedure — it executes the learned workflow instead.
+    def test_repeated_work_does_not_release_itself(self):
+        self.new_goal(name="Lead research", metric="customers", target=999)
+        for instruction in ("Research prospects", "Find lead information", "Enrich companies"):
+            self._do_direct(instruction)
         self.runtime.tick(max_advances=20)
-        run = self.current_run()
-        self.assertEqual(run.decision.kind, "execute_workflow",
-                         "the fourth equivalent request reuses the learned "
-                         "structure instead of recreating direct work")
-        self.assertIn("learned:", run.decision.workflow_id or "")
-        # Provenance: the formation claim explains WHY the workflow
-        # exists and cites evidence.
-        claims = self.workflow_claims(run.decision.workflow_id)
-        self.assertTrue(claims,
-                        "crystallization persists a provenance claim")
-        self.assertIn("3 materially equivalent", claims[0]["claim"])
+        self.assertEqual(self.current_run().decision.kind, "decision_request")
         with self.runtime.connect() as connection:
-            provenance = connection.execute(
-                """SELECT COUNT(*) FROM core_evidence
-                   WHERE kind='workflow_crystallized'""").fetchone()[0]
-        self.assertEqual(provenance, 1,
-                         "one provenance evidence row explains the "
-                         "formation causally")
+            self.assertEqual(connection.execute(
+                "SELECT COUNT(*) FROM core_workflows WHERE id LIKE 'learned:%'"
+            ).fetchone()[0], 0)
+
 
     def test_two_equivalent_requests_do_not_crystallize(self):
         self.new_goal(name="Barely repeated", metric="customers",
@@ -431,65 +341,17 @@ class TestRepetitionCrystallization(SelfImprovementCase):
                             "three unrelated orders must NOT become a "
                             "workflow")
 
-    def test_learned_workflow_reuses_its_operational_memory(self):
-        # After crystallization, the learned workflow's step completing
-        # with a genuinely reusable lesson persists it with the
-        # workflow's own scope; the NEXT equivalent execution (the next
-        # run of the same learned workflow) receives it in its brief.
+    def test_direct_work_lessons_survive_without_automatic_promotion(self):
         self.new_goal(name="Memory path", metric="customers", target=999)
-        for wording in ("Research these 20 prospects.",
-                        "Find information on this new lead list.",
-                        "Enrich these companies before outreach."):
-            self._do_direct(wording)
-        self.runtime.tick(max_advances=20)
-        learned_id = self.current_run().decision.workflow_id
-        self.assertIn("learned:", learned_id)
-        order = self.active_orders()[0]
-        self.runtime.complete_work_order(
-            order["id"], order["agent_id"],
-            [{"kind": order["brief"].get("evidence_kind") or "lead_research",
-              "payload": {"companies_researched": 20, "customers": 1}}],
-            learning="validate domains before enrichment; malformed "
-                     "domains caused failures")
-        # The lesson is persisted with the learned workflow's own scope.
-        claims = self.workflow_claims(learned_id)
-        self.assertTrue(claims, "the lesson persists on the learned "
-                                "workflow")
-        self.assertTrue(any("validate domains" in item["claim"]
-                            for item in claims))
-        # The next run: the same execution shape still matches the
-        # learned workflow, so the next equivalent request reuses it —
-        # and its brief carries the operational memory. The completing
-        # executor captures the briefs it executes.
-        captured: list[dict] = []
-        counter = {"value": 1}
+        first = self._do_direct("Research prospects")
+        order = self.runtime.work_orders_repository.get(first["id"])
+        evidence = self.runtime.evidence.for_run(order.run_id)
+        self.engine.resolution.remember_workflow_learning(order,
+            "Validate domains before enrichment", tuple(item.id for item in evidence))
+        second = self._do_direct("Enrich another list")
+        self.assertIn("Validate domains before enrichment", second["brief"]["memory"])
+        self.assertIsNone(second["workflow_run_id"])
 
-        def capturing(_agent, order):
-            captured.append(dict(order.brief))
-            counter["value"] += 1
-            return AgentResult(
-                "completed",
-                evidence=(AgentEvidence("lead_research", {
-                    "companies_researched": 20,
-                    "customers": counter["value"]}),))
-
-        self.engine.resolution.executor = type(
-            "Capturing", (), {"execute": staticmethod(capturing)})()
-        self.tick_until(lambda: len(captured) >= 1, budget=20)
-        self.assertTrue(captured, "the next equivalent request reuses the "
-                                  "learned workflow")
-        brief = captured[0]
-        self.assertEqual(brief.get("evidence_kind"), "lead_research")
-        self.assertTrue(any("validate domains before enrichment" in claim
-                            for claim in brief.get("memory") or []),
-                        "the learned workflow's operational memory reaches "
-                        "the next equivalent execution's brief: "
-                        + json.dumps(brief.get("memory")))
-
-
-# =========================================================================
-# 4. Structural defects self-repair immediately
-# =========================================================================
 
 BROKEN_LAB = '''
 from ...workflows import Workflow, WorkflowStep
@@ -853,10 +715,12 @@ class TestConcurrentCompletionSafety(SelfImprovementCase):
         # Worker A completes first.
         _, ids_a = self.runtime.work_orders_repository.complete_with_evidence(
             order["id"], {"m": 1}, executor_id="director", kind="m",
+            claim_token=order["claim_token"],
             payload={"m": 1})
         # Worker B (stale, concurrent) completes the same order.
         _, ids_b = self.runtime.work_orders_repository.complete_with_evidence(
             order["id"], {"m": 1}, executor_id="director", kind="m",
+            claim_token=order["claim_token"],
             payload={"m": 1})
         self.assertEqual(tuple(ids_a), tuple(ids_b),
                          "the loser returns the winner's evidence ids")
@@ -873,6 +737,7 @@ class TestConcurrentCompletionSafety(SelfImprovementCase):
         self.assertIn(final.stage, (GoalStage.EVALUATE, GoalStage.OBSERVE))
         self.runtime.work_orders_repository.complete_with_evidence(
             order["id"], {"m": 1}, executor_id="director", kind="m",
+            claim_token=order["claim_token"],
             payload={"m": 1})
         with self.runtime.connect() as connection:
             stage = connection.execute(
@@ -1060,13 +925,13 @@ class TestAcceptanceSimulation(SelfImprovementCase):
         note_owner_asks()
         self.assertEqual(owner_ask_count[0], 0,
                          "steps 1-2: zero owner asks")
-        # -- 12-13. ONE evidence-backed strategy lesson from A.
-        lessons = self.strategy_claims(goal_id)
-        self.assertEqual(len(lessons), 1,
-                         "exactly one strategy lesson from A's "
-                         "underperformance")
-        self.assertTrue(lessons[0]["claim"].startswith(
-            "avoid acceptance-lab:strategy-a"))
+        # An explicit reviewer decision, not deterministic inference, selects B.
+        self.assertEqual(self.strategy_claims(goal_id), [])
+        evidence = self.runtime.evidence.for_goal(goal_id)[-1]
+        self.runtime.memory.remember("strategy",
+            "avoid acceptance-lab:strategy-a: synthetic reviewer chooses strategy B",
+            evidence_ids=(evidence.id,), goal_id=goal_id, run_id=evidence.run_id,
+            workflow_id="acceptance-lab:strategy-a")
         # -- 14. The next DECIDE chooses B BECAUSE of that lesson.
         second_decision = None
         for _ in range(12):
@@ -1258,10 +1123,9 @@ class TestAcceptanceSimulation(SelfImprovementCase):
                               "researched_companies": 20}}])
         self.runtime.tick(max_advances=20)
         decision = self.current_run().decision
-        self.assertEqual(decision.kind, "execute_workflow",
-                         "repeated equivalent work became a reusable "
-                         "Workflow")
-        self.assertIn("learned:", decision.workflow_id)
+        self.assertEqual(decision.kind, "decision_request",
+                         "repetition requires a reviewed workflow build")
+        self.assertIsNone(decision.workflow_id)
         # Negative: unrelated memory did not leak into this decision.
         self.assertNotIn("acceptance-lab:strategy-a",
                         json.dumps(decision.context or {}),

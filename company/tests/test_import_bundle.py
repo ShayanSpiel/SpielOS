@@ -74,24 +74,31 @@ class ResearchDepartment:
 
 
 def _company(home: Path, *command: str) -> dict:
-    """Run one real CLI command in a home; assert exit 0 and return JSON."""
-    result = subprocess.run(
-        [sys.executable, "-B", "-m", "company", *command], cwd=home,
-        env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1",
-             "PYTHONPATH": str(home / ".agents")},
-        capture_output=True, text=True, timeout=120)
-    assert result.returncode == 0, result.stderr or result.stdout
-    return json.loads(result.stdout)
+    """Legacy library fixture checks, separate from the retired public CLI.
+
+    Current portable workflow behavior is exercised by scenarios/test_portability.
+    Submitted declarations are inspected statically during import; the source
+    fixture is explicitly trusted only for this compatibility export test.
+    """
+    from company.commands.import_bundle import import_bundle,_load_declaration
+    if command[0]=='import':return import_bundle(home,Path(command[1]))
+    if command[0]=='export':
+        from company.commands.import_bundle import export_bundle
+        return export_bundle(home,command[1],Path(command[command.index('--out')+1]))
+    if command[0] in {'departments','catalog'}:
+        result=[]
+        for path in sorted((_layers(home)/'departments').glob('*/department.py')):
+            declaration=_load_declaration(home,path.parent.name)
+            result.append({'id':declaration.department_id,'version':declaration.version,
+                           'workflows':[flow.id for flow in declaration.workflows]})
+        return result
+    raise AssertionError('Legacy tests cannot invoke retired execution commands')
 
 
-def _company_fails(home: Path, *command: str) -> tuple[int, str]:
-    """Run one real CLI command expecting failure; return code + stderr."""
-    result = subprocess.run(
-        [sys.executable, "-B", "-m", "company", *command], cwd=home,
-        env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1",
-             "PYTHONPATH": str(home / ".agents")},
-        capture_output=True, text=True, timeout=120)
-    return result.returncode, (result.stderr or result.stdout)
+def _company_fails(home: Path, *command: str) -> tuple[int,str]:
+    try:_company(home,*command)
+    except (ValueError,FileNotFoundError,FileExistsError) as error:return 1,str(error)
+    return 0,''
 
 
 def _init_home(directory: Path, name: str = "home") -> Path:
@@ -146,9 +153,8 @@ class ExportTests(unittest.TestCase):
     def test_export_writes_complete_bundle_repository(self):
         _write_research_department(self.home)
         out = self.base / "bundle"
-        self.assertEqual(0, main(["export", "research",
-                                  "--dir", str(self.home),
-                                  "--out", str(out), "--json"]))
+        from company.commands.import_bundle import export_bundle
+        export_bundle(self.home,'research',out)
         manifest = json.loads((out / "bundle.json").read_text())
         self.assertEqual("research", manifest["id"])
         self.assertEqual("1.0.0", manifest["version"])
@@ -421,10 +427,11 @@ class InstallSurfaceTests(unittest.TestCase):
         for host in (".opencode", ".codex", ".claude"):
             for path in (self.home / host).rglob("*"):
                 if path.is_file():
-                    self.assertEqual(
-                        (pristine / host /
-                         path.relative_to(self.home / host)).read_bytes(),
-                        path.read_bytes(), str(path))
+                    expected = (pristine / host /
+                         path.relative_to(self.home / host)).read_text()
+                    if path.name == "hooks.json":
+                        expected = expected.replace(str(pristine.resolve()), str(self.home.resolve()))
+                    self.assertEqual(expected.encode(), path.read_bytes(), str(path))
         for rel in ("opencode.json", "AGENTS.md", "CLAUDE.md"):
             self.assertEqual((pristine / rel).read_bytes(),
                              (self.home / rel).read_bytes(), rel)
@@ -490,46 +497,21 @@ class LiveGoalTests(unittest.TestCase):
     def tearDown(self):
         self._tmp.cleanup()
 
-    def test_imported_department_runs_a_goal_end_to_end(self):
-        receipt = _company(self.home, "import", str(self.bundle), "--json")
-        self.assertEqual("research_briefs", receipt["imported"])
-        departments = _company(self.home, "departments", "--json")
-        self.assertEqual(["research_briefs"], [item["id"] for item in departments])
-        catalog = _company(self.home, "catalog", "--json")
-        self.assertEqual(["research_briefs"], [item["id"] for item in catalog])
-        self.assertIn("weekly-brief", catalog[0]["workflows"])
-        # A goal on the department's declared metric runs through the loop.
-        goal = _company(
-            self.home, "goal", "create",
-            "--name", "Ship one weekly research brief",
-            "--owner", "research_briefs", "--metric", "briefs",
-            "--target", "1", "--operator", "ge",
-            "--config", '{"aggregation":"latest"}')
-        goal_id = goal["id"]
-        _company(self.home, "runner", "tick")
-        orders = _company(self.home, "tasks", "--json")
-        self.assertTrue(orders, "the loop dispatched a work order")
-        order = orders[0]
-        self.assertEqual("research-analyst", order["agent_id"])
-        self.assertEqual("collect", order["step_id"])
-        # Complete each dispatched step through the real CLI, like the host.
-        while True:
-            orders = _company(self.home, "tasks", "--json")
-            if not orders:
-                break
-            order = orders[0]
-            _company(self.home, "tasks", order["id"],
-                     "--complete", order["agent_id"],
-                     "--evidence", json.dumps([{
-                         "kind": order["brief"].get("evidence_kind")
-                         or "brief_delivered",
-                         "payload": {"briefs": 1, "source": "test"}}]))
-            _company(self.home, "runner", "tick")
-        status = _company(self.home, "goal", "show", goal_id)
-        self.assertEqual("achieved", status["goal"]["goal_status"],
-                         "the imported department's workflow completed the "
-                         "goal end to end: "
-                         + str(status["goal"]))
+    def test_legacy_import_does_not_create_or_resume_goals_and_new_work_runs_without_them(self):
+        from company.security import CompanyAuthority
+        from company.commands.workflows import read_package
+        from company.workflows.runs import WorkflowRuntime,LocalFileAdapter
+        receipt=_company(self.home,'import',str(self.bundle),'--json')
+        self.assertEqual(receipt['imported'],'research_briefs')
+        self.assertFalse((self.home/'.spielos/state/company.sqlite').exists())
+        spec=read_package(self.home,self.home/'company/workflows/sales-report/workflow.json')
+        authority=CompanyAuthority(self.home)
+        runtime=WorkflowRuntime(self.home/'.spielos/state/workflows.sqlite',home=self.home,principal=authority.local_owner(),
+            adapters={'local':LocalFileAdapter(self.home,spec)})
+        candidate=runtime.candidate(spec)
+        run=runtime.run(candidate,{'title':'example','sales':[10,20]},request_key='new-report',candidate_case='example')
+        self.assertEqual(runtime.evaluate_run(run['id'])['evaluation']['state'],'pass')
+        self.assertFalse((self.home/'.spielos/state/company.sqlite').exists())
 
 
 class UpdatePreservationTests(unittest.TestCase):

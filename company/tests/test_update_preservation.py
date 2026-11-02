@@ -190,8 +190,10 @@ class UpdatePreservationTests(unittest.TestCase):
                 "@AGENTS.md\n\n# My Claude notes\n- keep this line\n")
             # Operational state must survive updates untouched.
             state = home / ".spielos" / "state" / "company.sqlite"
-            self._run_company(home, "goal", "create", "--name", "Preserve owner state",
-                              "--owner", "director", "--metric", "acceptance", "--target", "1")
+            # Seed a historical fixture directly. Current public operation
+            # cannot create or resume a legacy Goal.
+            from company.commands import CleanCommandRuntime
+            CleanCommandRuntime(state).runtime.create_goal('Preserve historical evidence','acceptance','ge',1,owner_id='director')
             self.assertTrue(state.is_file())
 
             self._update(release_b, home)
@@ -267,11 +269,11 @@ class UpdatePreservationTests(unittest.TestCase):
             context = [command for command in
                        commands["UserPromptSubmit"] + commands["SessionStart"]
                        if "spielos-context.py" in command]
-            attention = [command for command in commands["Stop"]
+            attention = [command for command in commands.get("Stop",[])
                          if "spielos-attention.py" in command]
             self.assertEqual(2, len(context),
                              "context hook wired once per event, not duplicated")
-            self.assertEqual(1, len(attention))
+            self.assertEqual(0, len(attention))
             self.assertFalse(
                 (home / ".claude" / "settings.local.json").exists())
             # Owner AGENTS.md rules survive and gain the layout contract.
@@ -390,8 +392,16 @@ class UpdatePreservationTests(unittest.TestCase):
                     release / "hosts" / "claude" / "settings-fragment.json",
             }
             for rel, source in shipped.items():
+                expected = source.read_text()
+                if rel == ".codex/hooks.json":
+                    expected = expected.replace("python3 .codex/", f"python3 {home.resolve()}/.codex/")
+                    # Host configuration is merged: owner settings survive.
+                    actual=json.loads((home/rel).read_text())
+                    self.assertTrue(actual['old'])
+                    self.assertEqual(json.loads(expected)['hooks'],actual['hooks'])
+                    continue
                 self.assertEqual(
-                    source.read_text(), (home / rel).read_text(),
+                    expected, (home / rel).read_text(),
                     f"{rel} must equal the release template bytes")
             # Every non-template owner file survives byte-identical.
             for rel, content in owner.items():
@@ -546,7 +556,7 @@ class UpdatePreservationTests(unittest.TestCase):
                                      if "spielos-context.py" in c]))
             self.assertEqual(1, len([c for c in commands["SessionStart"]
                                      if "spielos-context.py" in c]))
-            self.assertEqual(1, len([c for c in commands["Stop"]
+            self.assertEqual(0, len([c for c in commands.get("Stop",[])
                                      if "spielos-attention.py" in c]))
             self.assertFalse(
                 (home / ".claude" / "settings.local.json").exists())
@@ -635,7 +645,7 @@ class UpdatePreservationTests(unittest.TestCase):
             self.assertEqual({"hooks"}, set(settings))
             commands = _claude_hook_commands(home)
             self.assertEqual(
-                {"SessionStart", "UserPromptSubmit", "Stop"},
+                {"SessionStart", "UserPromptSubmit", "PostToolUse", "PostToolUseFailure", "Stop", "SessionEnd"},
                 set(commands))
 
     def test_fresh_init_writes_manifest_and_canonical_config(self):

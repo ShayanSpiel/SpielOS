@@ -1,0 +1,75 @@
+{
+  "version": "1",
+  "criteria": [
+    {
+      "id": "named",
+      "source": "report brief v1",
+      "anchors": {
+        "pass": "The named accounting constraint is satisfied",
+        "fail": "The named accounting constraint is violated"
+      },
+      "severity": "block",
+      "evaluator": "check",
+      "check": {
+        "kind": "nonempty",
+        "path": "/title"
+      },
+      "question": "Does the report satisfy the named accounting constraint?",
+      "dimension": "output"
+    },
+    {
+      "id": "total",
+      "source": "report brief v1",
+      "anchors": {
+        "pass": "The total accounting constraint is satisfied",
+        "fail": "The total accounting constraint is violated"
+      },
+      "severity": "block",
+      "evaluator": "check",
+      "check": {
+        "kind": "sum_input",
+        "path": "/total",
+        "input_path": "/sales"
+      },
+      "question": "Does the report satisfy the total accounting constraint?",
+      "dimension": "output"
+    },
+    {
+      "id": "rows",
+      "source": "report brief v1",
+      "anchors": {
+        "pass": "The rows accounting constraint is satisfied",
+        "fail": "The rows accounting constraint is violated"
+      },
+      "severity": "block",
+      "evaluator": "check",
+      "check": {
+        "kind": "length_input",
+        "path": "/rows",
+        "input_path": "/sales"
+      },
+      "question": "Does the report satisfy the rows accounting constraint?",
+      "dimension": "output"
+    },
+    {
+      "id": "positive",
+      "source": "report brief v1",
+      "anchors": {
+        "pass": "The positive accounting constraint is satisfied",
+        "fail": "The positive accounting constraint is violated"
+      },
+      "severity": "block",
+      "evaluator": "check",
+      "check": {
+        "kind": "range",
+        "path": "/total",
+        "min": 0
+      },
+      "question": "Does the report satisfy the positive accounting constraint?",
+      "dimension": "output"
+    }
+  ],
+  "standard": "spielos-evaluation/2",
+  "subject": "workflow",
+  "objective": "Report accurate sums and row counts; preserve the title and flag negative totals"
+}

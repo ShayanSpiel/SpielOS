@@ -107,7 +107,8 @@ class MemoryRepository:
 
     def relevant(self, *, limit: int = 20, scope: str | None = None,
                  goal_id: str | None = None,
-                 workflow_id: str | None = None) -> list[Memory]:
+                 workflow_id: str | None = None,
+                 exclude_scopes: tuple[str, ...] = ()) -> list[Memory]:
         """Active memory claims that apply to one Goal or Workflow.
 
         Owner claims always apply (owner memory is company-global by
@@ -171,6 +172,11 @@ class MemoryRepository:
         if scope:
             clauses.append("scope=?")
             values.append(scope)
+        for excluded_scope in exclude_scopes:
+            if excluded_scope not in {"owner", "workflow", "strategy"}:
+                raise ValueError(f"invalid memory scope: {excluded_scope}")
+            clauses.append("scope<>?")
+            values.append(excluded_scope)
         values.append(limit)
         with self.database.connect() as connection:
             ids = [row[0] for row in connection.execute(

@@ -94,9 +94,9 @@ class ContextProjectionTests(unittest.TestCase):
             self.assertIn("Attention:", projection["context"])
             self.assertIn("Profile: identity.tone=", projection["context"])
             # Read-only means byte-for-byte: the database file is untouched.
-            self.assertEqual(sqlite3.connect(database).execute(
-                "SELECT COUNT(*) FROM core_notifications"
-            ).fetchone()[0], 1)
+            from contextlib import closing
+            with closing(sqlite3.connect(database)) as connection:
+                self.assertEqual(connection.execute('SELECT COUNT(*) FROM core_notifications').fetchone()[0],1)
 
     def test_owner_profile_renders_across_categories(self):
         with tempfile.TemporaryDirectory() as directory:

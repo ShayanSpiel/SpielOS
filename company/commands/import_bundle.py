@@ -114,6 +114,8 @@ def _load_declaration(home: Path, department_id: str):
     department_package.__path__ = [overlay, *live]
     module_name = f"{department_package.__name__}.{department_id}.department"
     cached = sys.modules.pop(module_name, None)
+    sys.modules.pop(f"{department_package.__name__}.{department_id}",None)
+    importlib.invalidate_caches()
     try:
         module = importlib.import_module(module_name)
         candidates = [value for value in vars(module).values()
@@ -496,7 +498,7 @@ def _validate_layers(files: list[str]) -> None:
     problems = []
     for rel in files:
         parts = Path(rel).parts
-        if not parts or parts[0] in ("..", ".") or any(
+        if Path(rel).is_absolute() or '..' in parts or Path(rel).as_posix()!=rel or not parts or parts[0] in ("..", ".") or any(
                 part in _EXCLUDE_PARTS or part.startswith(".")
                 for part in parts):
             problems.append(f"{rel} (reserved or hidden path)")
@@ -554,63 +556,31 @@ def _import_closure_status(bundle: Path, home: Path,
     return satisfied, missing
 
 
-def _declaration_imports_cleanly(bundle: Path, home: Path,
-                                 department_id: str) -> str:
-    """Import the bundle's declaration against the live contracts.
+def _declaration_imports_cleanly(bundle: Path, home: Path, department_id: str) -> str:
+    """Inspect legacy declaration syntax without importing any submitted code.
 
-    Runs against a throwaway staging copy of the bundle's department
-    package so the home itself stays untouched while validating;
-    returns the declaration's version.
+    Compatibility does not grant trust to execute it. A separately invoked
+    trusted execution path must resolve live contracts after owner review.
     """
-    import tempfile
-
-    source = bundle / "departments" / department_id / "department.py"
-    if not source.is_file():
-        raise ValueError(
-            f"bundle ships no declaration for {department_id!r} at "
-            f"departments/{department_id}/department.py")
-    with tempfile.TemporaryDirectory() as staging:
-        stage = Path(staging) / "departments" / department_id
-        stage.mkdir(parents=True)
-        for path in (bundle / "departments" / department_id).rglob("*"):
-            if path.is_file() and "__pycache__" not in path.parts:
-                destination = stage / path.relative_to(
-                    bundle / "departments" / department_id)
-                destination.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(path, destination)
-        (Path(staging) / "departments" / "__init__.py").write_text("")
-        # Stage as an overlay on the home's departments package path so
-        # relative imports (from ...workflows import ...) resolve.
-        import company.departments as department_package
-        original = list(department_package.__path__)
-        try:
-            department_package.__path__ = [
-                str(Path(staging) / "departments"), *original]
-            module_name = (f"{department_package.__name__}.{department_id}"
-                           ".department")
-            sys.modules.pop(module_name, None)
-            module = importlib.import_module(module_name)
-            candidates = [value for value in vars(module).values()
-                          if isinstance(value, type)
-                          and value.__module__ == module.__name__
-                          and getattr(value, "department_id", None)]
-            if len(candidates) != 1:
-                raise ValueError(
-                    f"bundle declaration for {department_id!r} must export "
-                    f"exactly one Department (found {len(candidates)})")
-            declaration = candidates[0]()
-            if getattr(declaration, "department_id", None) != department_id:
-                raise ValueError(
-                    f"bundle declares department "
-                    f"{declaration.department_id!r} inside the "
-                    f"{department_id!r} folder")
-            return getattr(declaration, "version", "0.0.0")
-        except (ImportError, AttributeError, SyntaxError) as error:
-            raise ValueError(
-                f"bundle declaration for {department_id!r} does not import "
-                f"cleanly against this home's contracts: {error}") from error
-        finally:
-            department_package.__path__ = original
+    import ast
+    source=bundle/'departments'/department_id/'department.py'
+    if not source.is_file() or source.is_symlink():raise ValueError('Bundle ships no contained declaration')
+    try:tree=ast.parse(source.read_text(),filename=str(source))
+    except SyntaxError as error:raise ValueError('Declaration import validation failed: invalid syntax') from error
+    candidates=[]
+    for node in tree.body:
+        if not isinstance(node,ast.ClassDef):continue
+        attributes={}
+        for statement in node.body:
+            if isinstance(statement,ast.Assign):
+                for target in statement.targets:
+                    if isinstance(target,ast.Name) and target.id in {'department_id','version'}:
+                        try:attributes[target.id]=ast.literal_eval(statement.value)
+                        except (ValueError,TypeError):raise ValueError('Legacy declaration identity must be literal')
+        if attributes.get('department_id'):candidates.append(attributes)
+    if len(candidates)!=1 or candidates[0]['department_id']!=department_id:
+        raise ValueError('Declaration import validation requires exactly one matching literal Department identity')
+    return candidates[0].get('version','0.0.0')
 
 
 def import_bundle(home: Path, folder: Path) -> dict:
@@ -635,9 +605,17 @@ def import_bundle(home: Path, folder: Path) -> dict:
 
     manifest = _bundle_files(folder)
     department_id = manifest["id"]
+    import re
+    if not isinstance(department_id,str) or not re.fullmatch(r'[a-z][a-z0-9_-]{0,62}',department_id):
+        raise ValueError('Invalid legacy Department identity')
     _validate_pin(manifest.get("spine_pin"))
     files = list(manifest["files"])
     _validate_layers(files)
+    if len(files)!=len(set(files)):raise ValueError('Bundle file identities must be distinct')
+    for relative in files:
+        source=folder/relative;target=layers/relative
+        if source.is_symlink() or not source.resolve().is_relative_to(folder) or not target.resolve().is_relative_to(layers.resolve()):
+            raise ValueError('Bundle paths must remain inside their selected source and owner layers')
 
     closure = {key: tuple(value or ())
                for key, value in (manifest.get("closure") or {}).items()}

@@ -12,8 +12,7 @@ Generic host adapter templates ship under `company/init_templates/hosts/`.
 and home installation inside it are refused. Run owner commands from an
 explicit, separately installed home. Never delete or relocate existing files
 without owner authorization, and never create preservation copies unless
-requested. Previously relocated originals remain preserved in their home.
-Publishing credentials may remain in an ignored local `.env` when explicitly
+requested. Publishing credentials may remain in an ignored local `.env` when explicitly
 authorized; never commit them. Run `python3 -B tools/check_source_boundary.py`
 to audit the working tree, including ignored owner directories.
 
@@ -23,38 +22,18 @@ This repository is the source product used to create and update SpielOS homes. I
 PYTHONDONTWRITEBYTECODE=1 python3 -B -m company COMMAND
 ```
 
-The public product uses one runtime-owned Goal loop and portable Agent-owned Departments. Do not reintroduce retired Workgroups, Workers, Workbooks, or Workkits into docs, commands, templates, or onboarding.
+The public product uses Company, Workflow, Run and Improvement. GODAE is bounded development, not an autonomous pursuit loop. New execution uses company.workflows.runs.WorkflowRuntime and requires no Goal tables or product scheduler. Historical Goal code is a compatibility library only; do not reintroduce its commands, polling, repair or pursuit into new operation. Departments are optional ownership groupings; Agents and Skills are workflow implementation choices.
 
-`company/init_templates/` is what `spielos init` ships. Keep executable spine files byte-identical between `company/` and `company/init_templates/agents/company/`. Private `.spielos/` runtime state is ignored by Git.
+`company/init_templates/` is what `spielos init` ships. Keep runtime files byte-identical between `company/` and `company/init_templates/agents/company/` using `tools/sync_runtime_templates.py`. Private `.spielos/` runtime state is ignored by Git.
 
-DECIDE is the reasoning seam of the one Goal loop: a Run the runtime cannot
-decide for the owner parks a structured decision request (run DECIDE/waiting,
-one owner notification, no Intervention and no WorkOrder) that the owner
-answers with `company goal decide` — adopting a candidate Department workflow
-or assigning bounded direct work whose instruction is mandatory. Stalled goals
-(a metric flat across `stall_threshold` evaluated runs with no new evidence)
-and `review_every` checkpoints park for `company goal resume`. Progressing
-runs chain automatically: there are no per-run owner gates.
+Owner voice is the default: names, human progress and outcome sentences. Raw identifiers, metric keys, enums, JSON dumps and CLI answer syntax belong in payloads and the final Machine reference for the Director. The owner answers in plain words; the Director records the answer.
 
-Owner voice is the default on every owner-facing surface: goals, evidence,
-memory, and asks render as names, human progress, and outcome sentences
-with named options. Raw goal/evidence ids, metric keys, stage or decision
-enums, JSON dumps, and CLI answer syntax never enter owner-facing text;
-they ride the payload machine fields and one `Machine reference` line at
-the end of the context projection for the Director alone, quoted only when
-the owner asks for technical detail. The owner answers in plain words; the
-Director records the answer through the CLI itself.
+Memory is explicit and classified. Owner preferences use owner scope; owner strategic direction uses strategy scope; operational workflow lessons cite evaluated runs of that same workflow. Never fabricate a baseline, strategy, learning or business impact. Retire stale claims without erasing evidence. Historical direct-work lessons stay scoped and require reviewed mapping before reuse.
 
-Memory is causal and classified: WorkOrder briefs carry the bounded active
-learning for the work they open (workflow-scope claims for workflow orders,
-goal-relevant claims for direct ones — including the goal's own direct-work
-lessons, which are goal-keyed and reach future direct orders of the same
-Goal), so the next execution builds on the
-last one's evidence-backed lesson. Owner preferences write owner scope
-(`profile set`), operational lessons write workflow scope
-(`tasks --complete --learning`, only when something reusable was learned),
-and owner strategic direction writes strategy scope (`memory add --scope
-strategy`). The deterministic runtime fabricates none of these; a stale
-claim is retired with `company memory retire` (row and evidence preserved).
+System changes require a bounded Improvement, exact allowed files and actual acceptance evidence. External actions—including publishing or sending—remain separately approval-gated for the exact action, destination, content and scope. A quality pass grants no external permission.
 
-System changes require a bounded system-improvement Goal, exact allowed files, and actual acceptance evidence. External actions—including publishing or sending—remain approval-gated.
+Activepieces remains inactive under the owner's current instruction. Offline MCP preparation and local contract tests are allowed; live connection, execution, publishing and enabling are held.
+
+Public documentation and screenshots use neutral synthetic companies unless the owner explicitly requests a supplied reference image. Do not ship machine paths, customer names, private chat transcripts, historical owner approvals or instructions copied from a development conversation. Public repository URLs and author/license attribution are product metadata, not company context. Generated diagnostic evidence stays outside source; reviewed synthetic documentation images may live in `docs/images/`.
+
+For reviews, record a bounded source Improvement with exact allowed files and inspectable acceptance evidence. Preserve unrelated working-tree edits. Run boundary/parity checks, behavior tests, scenario acceptance and an isolated installed-wheel smoke journey before claiming release readiness. Do not invoke retired commands even in release CI. `docs/reviews/` records review findings and limits; a passing suite does not establish independent acceptance or remote qualification.

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "spielos",
+  "version": "10.3.4",
+  "description": "Selected-company workflow execution, mandatory evaluation and live report links through the installed SpielOS runtime.",
+  "license": "MIT",
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "SpielOS",
+        "shortDescription": "Governed company workflows",
+        "capabilities": []
+      }
+    }
+  }
+}

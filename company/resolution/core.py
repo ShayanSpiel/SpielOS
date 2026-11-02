@@ -277,7 +277,8 @@ class ResolutionCycle:
                 limit=self.BRIEF_MEMORY_LIMIT)
         else:
             claims = [item for item in self.memory.relevant(
-                goal_id=goal_id, limit=20) if item.scope != "owner"]
+                goal_id=goal_id, exclude_scopes=("owner",),
+                limit=self.BRIEF_MEMORY_LIMIT)]
             claims = claims[:self.BRIEF_MEMORY_LIMIT]
         return [item.claim for item in claims]
 
@@ -389,12 +390,11 @@ class ResolutionCycle:
                        "requirements": dict(step.requirements),
                        "memory": self._brief_memory(
                            workflow_id=workflow.id)})
-            if order.status == "open":
-                # Claim with the bare agent id: the documented host flow
-                # (`tasks <id> --complete <agent_id>`) and the notification
-                # text both name the agent, so the order must be claimable
-                # under that identity.
+            try:
                 order = self.work_orders.claim(order.id, step.agent_id)
+            except RuntimeError:
+                return self._finish(intervention, ResolutionOutcome.HOST_WORK,
+                                    "work is held by its current execution")
             agent = self.agents.get(step.agent_id, Agent(step.agent_id))
             result = self.executor.execute(agent, order)
             if result.status == "completed":
@@ -409,7 +409,8 @@ class ResolutionCycle:
                     # behavior contradicts. Repair the definition, do
                     # not retry the same broken shape.
                     self.work_orders.fail(order.id, "step evidence contract mismatch",
-                                          executor_id=order.claimed_by or "")
+                                          executor_id=order.claimed_by or "",
+                                          claim_token=order.claim_token)
                     return self._defect(intervention, StructuralDefect(
                         "step_contract",
                         f"step {step.id!r} declares evidence kinds "
@@ -419,7 +420,7 @@ class ResolutionCycle:
                         workflow_id=workflow_run.workflow_id, step_id=step.id))
                 order, evidence_ids = self.work_orders.complete_with_evidence(
                     order.id, result.payload, executor_id=order.claimed_by or "",
-                    kind=evidence[0].kind, payload=evidence[0].payload,
+                    claim_token=order.claim_token, kind=evidence[0].kind, payload=evidence[0].payload,
                     evidence_items=[(item.kind, item.payload) for item in evidence],
                     advance_workflow=True)
                 if result.workflow_learning:
@@ -428,7 +429,8 @@ class ResolutionCycle:
                 continue
             if result.status == "fixable":
                 self.work_orders.fail(order.id, result.message or "local failure",
-                                      executor_id=order.claimed_by or "")
+                                      executor_id=order.claimed_by or "",
+                                          claim_token=order.claim_token)
                 self.evidence.record(
                     goal_id=intervention.goal_id, run_id=intervention.run_id,
                     intervention_id=intervention.id, workflow_run_id=workflow_run.id,
@@ -500,8 +502,11 @@ class ResolutionCycle:
                                              "evidence_kind", "intervention_result"),
                                          "memory": self._brief_memory(
                                              goal_id=intervention.goal_id)})
-            if order.status == "open":
+            try:
                 order = self.work_orders.claim(order.id, agent_id)
+            except RuntimeError:
+                return self._finish(intervention, ResolutionOutcome.HOST_WORK,
+                                    "work is held by its current execution")
             result = self.executor.execute(self.agents.get(agent_id, Agent(agent_id)), order)
             if result.status == "completed":
                 evidence = tuple(result.evidence) or (AgentEvidence(
@@ -509,7 +514,7 @@ class ResolutionCycle:
                         "evidence_kind", "intervention_result"), result.payload),)
                 order, evidence_ids = self.work_orders.complete_with_evidence(
                     order.id, result.payload, executor_id=order.claimed_by or "",
-                    kind=evidence[0].kind, payload=evidence[0].payload,
+                    claim_token=order.claim_token, kind=evidence[0].kind, payload=evidence[0].payload,
                     evidence_items=[(item.kind, item.payload) for item in evidence])
                 if result.workflow_learning:
                     # Issue #10: direct AgentResult learning goes through
@@ -522,7 +527,8 @@ class ResolutionCycle:
                                     "direct intervention completed and validated")
             if result.status == "fixable":
                 self.work_orders.fail(order.id, result.message or "local failure",
-                                      executor_id=order.claimed_by or "")
+                                      executor_id=order.claimed_by or "",
+                                          claim_token=order.claim_token)
                 self.evidence.record(
                     goal_id=intervention.goal_id, run_id=intervention.run_id,
                     intervention_id=intervention.id, work_order_id=order.id,

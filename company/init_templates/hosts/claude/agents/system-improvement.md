@@ -21,3 +21,6 @@ Rules:
    invent retired legacy concepts or names.
 5. External actions, including publishing or sending, remain approval-gated;
    finish with a report instead of acting.
+
+
+Use the selected company's live `/report` record for workflow/run counts, memory, supplied context, artifacts, evaluations and telemetry status. Read `company/evaluation-and-learning-contract.md` when present. Every new or changed workflow needs the executable evaluation pair and regression cases before qualification. Record actual host token metadata and separately sourced reference prices; never invent usage, billed cost, memory retention or independent acceptance. End meaningful work with a concise human tracking receipt and report/trace links. Keep company content in the selected home and reusable product code in source; no publication, hidden pursuit or cross-company routing is implied.

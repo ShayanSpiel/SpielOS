@@ -1,14 +1,5 @@
 ---
-description: Start or resume a SpielOS goal
-agent: director
+description: Run an accepted workflow or develop one bounded improvement
 ---
 
-Enable company automation first by running the runner start command — there is
-no plugin hook that does it for you:
-
-    PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=.agents python3 -B -m company runner start
-
-This re-enables deterministic Runner advancement. Then treat `$ARGUMENTS` as either a Goal ID to resume or
-a business outcome to create. Inspect persisted state, start exactly one
-appropriate Goal or proposed next run, and advance only to its next real
-approval, evidence wait, blocker, or completion.
+Inspect `$ARGUMENTS` and the selected company context. If it names an accepted workflow, validate inputs and start one bounded run with a stable request key. If it names unfinished work, inspect and reconcile that exact run without blind redispatch. If it describes a new business capability, record a bounded Improvement and agree the paired execution/evaluation contract before building. Never enable a runner or resume historical Goal pursuit.

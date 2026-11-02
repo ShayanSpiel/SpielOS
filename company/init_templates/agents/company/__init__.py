@@ -1,5 +1,5 @@
-"""SpielOS: one durable Goal loop with Agent-owned Departments."""
+"""SpielOS: portable company context and governed bounded workflows."""
+from .home import CompanyHome
+from .workflows.runs import WorkflowRuntime,LocalAdapter,LocalFileAdapter
 
-from .runtime import Decision, Evaluation, GoalRuntime, GoalStage
-
-__all__ = ["Decision", "Evaluation", "GoalRuntime", "GoalStage"]
+__all__=['CompanyHome','WorkflowRuntime','LocalAdapter','LocalFileAdapter']

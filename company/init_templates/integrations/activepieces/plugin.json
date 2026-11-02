@@ -1,0 +1,7 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "spielos-activepieces",
+  "version": "0.1.0",
+  "description": "Prepare and build reviewed Activepieces workflows with paired execution and evaluation harnesses. Connects to the official project MCP server only after explicit setup.",
+  "author": {"name": "SpielOS"}
+}

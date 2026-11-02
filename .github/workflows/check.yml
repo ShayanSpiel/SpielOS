@@ -1,0 +1,39 @@
+name: Check product
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  local-acceptance:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python: ['3.11', '3.12', '3.14']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Source contracts and behavior
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          python -B tools/check_source_boundary.py
+          python -B tools/sync_runtime_templates.py
+          python -B -m unittest discover -s company/tests -t .
+          python -B tools/test_acceptance.py --out "$RUNNER_TEMP/acceptance.json"
+      - name: Build and exercise the installed wheel
+        run: |
+          python -m pip install build
+          python -B -m build
+          python -m venv "$RUNNER_TEMP/wheel-smoke"
+          "$RUNNER_TEMP/wheel-smoke/bin/python" -m pip install dist/*.whl
+          VERSION="$(python -B -c 'from company.runtime.config import VERSION; print(VERSION)')"
+          python -B tools/smoke_distribution.py --python "$RUNNER_TEMP/wheel-smoke/bin/python" --expected "$VERSION"

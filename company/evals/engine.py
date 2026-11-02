@@ -68,6 +68,10 @@ def validate_verdicts(suite: EvalSuite, payload: dict[str, Any],
         return ["judge response needs an 'items' object keyed by item_id"]
     expected_items = [item_id for item_id, _ in suite.select_items(payload)]
     expected_ids = set(expected_items)
+    if not expected_items:
+        errors.append("evaluation population is empty")
+    if len(expected_items) != len(expected_ids):
+        errors.append("evaluation population has duplicate item identities")
     for item_id in items_raw:
         if item_id not in expected_ids:
             errors.append(f"verdicts include unknown item '{item_id}'")

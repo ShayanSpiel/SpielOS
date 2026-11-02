@@ -35,6 +35,10 @@ def package_vendored_root() -> Path | None:
       flat:      <repo>/company/runtime/paths.py           -> <repo>  (this product repo)
     """
     file = Path(__file__).resolve()
+    # The physical path resolves through the transitional .agents alias.
+    lean = file.parents[4]
+    if file.relative_to(lean).as_posix() == ".spielos/runtime/company/runtime/paths.py":
+        return lean
     vendored = file.parents[3]
     if (vendored / ".agents" / "company").is_dir() and _looks_like_home(vendored):
         return vendored

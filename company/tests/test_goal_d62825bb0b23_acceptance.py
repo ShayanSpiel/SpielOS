@@ -8,6 +8,7 @@ is the test run itself.
 """
 
 from __future__ import annotations
+from contextlib import closing
 
 import json
 import os
@@ -178,18 +179,7 @@ class TestItem2EvaluateDistills(AcceptanceCase):
             self.runtime.tick(max_advances=20)
         claims = [item.claim for item in self.runtime.memory.relevant(
             goal_id=self.goal_id, limit=20) if item.scope == "strategy"]
-        self.assertTrue(any(claim.startswith("prefer probe:beta") for claim in claims),
-                        f"the prefer lesson must exist, got {claims}")
-        # Causality: the DECIDE ranking consults exactly that memory row —
-        # `prefer` ranks B above declaration order, `avoid` excludes A.
-        from company.workflows import Workflow as _Workflow
-        goal = self.runtime.goals.get(self.goal_id)
-        beta = _Workflow("beta", "Beta", (), "probe")
-        alpha = _Workflow("alpha", "Alpha", (), "probe")
-        self.assertTrue(self.engine.controller._strategy_prefers(goal, beta),
-                       "the prefer lesson ranks the better approach")
-        self.assertTrue(self.engine.controller._strategy_avoids(goal, alpha),
-                        "the flat first approach carries an avoid lesson")
+        self.assertEqual(claims, [], "execution must not invent owner strategy")
 
 
 # =========================================================================
@@ -216,37 +206,17 @@ class TestItem3Crystallization(AcceptanceCase):
               "payload": payload or {evidence_kind: 0}}])
         self.runtime.tick(max_advances=50)
 
-    def test_three_equivalent_orders_crystallize_a_reusable_workflow(self):
+    def test_repetition_needs_review_before_workflow_release(self):
         self.new_goal(name="Repeated", metric="weekly_sales")
         for index in range(3):
             self._complete_direct(f"close deal number {index}")
-        # The stall boundary parks the fourth run (three flat identical
-        # decisions); resuming lets DECIDE reason over learned structure.
-        run = self.current_run()
-        self.assertEqual(run.status, "waiting",
-                        "the flat goal parks for the owner at stall")
-        self.runtime.resume_goal(self.goal_id)
-        decision = self.current_run().decision
-        self.assertEqual(decision.kind, "execute_workflow")
-        self.assertTrue(decision.workflow_id.startswith(f"learned:{self.goal_id}"),
-                        "the next equivalent request reuses the learned workflow")
-        self.runtime.tick(max_advances=10)
         with self.runtime.connect() as connection:
-            workflow = connection.execute(
-                "SELECT id FROM core_workflows WHERE id LIKE 'learned:%'").fetchone()
-            self.assertIsNotNone(workflow,
-                                  "the learned workflow persisted")
-            crystallized = connection.execute(
-                """SELECT payload_json FROM core_evidence
-                   WHERE kind='workflow_crystallized'""").fetchone()
-            self.assertIsNotNone(crystallized,
-                                 "provenance evidence records the formation")
-            provenance = json.loads(crystallized[0])
-            self.assertEqual(len(provenance["from_orders"]), 3)
-            claim = connection.execute(
-                """SELECT claim FROM core_memory
-                   WHERE workflow_id LIKE 'learned:%'""").fetchone()
-            self.assertIsNotNone(claim, "the formation claim persisted")
+            self.assertEqual(connection.execute(
+                "SELECT COUNT(*) FROM core_workflows WHERE id LIKE 'learned:%'"
+            ).fetchone()[0], 0)
+            self.assertEqual(connection.execute(
+                "SELECT COUNT(*) FROM core_evidence WHERE kind='workflow_crystallized'"
+            ).fetchone()[0], 0)
 
     def test_three_unrelated_orders_do_not_crystallize(self):
         self.new_goal(name="Unrelated", metric="weekly_sales")
@@ -557,10 +527,12 @@ class TestItem13CompletionSafety(AcceptanceCase):
         evidence = [{"kind": "m", "payload": {"m": 1}}]
         first = repository.complete_with_evidence(
             order.id, {"evidence": evidence}, executor_id="director",
+            claim_token=order.claim_token,
             kind="m", payload={"m": 1},
             evidence_items=[("m", {"m": 1})], wake_run=True)
         second = repository.complete_with_evidence(
             order.id, {"evidence": evidence}, executor_id="director",
+            claim_token=order.claim_token,
             kind="m", payload={"m": 1},
             evidence_items=[("m", {"m": 1})], wake_run=True)
         with self.runtime.connect() as connection:
@@ -588,7 +560,7 @@ class TestItem14SchemaRefusal(AcceptanceCase):
         handle.close()
         foreign = Path(handle.name)
         foreign.unlink()
-        with sqlite3.connect(foreign) as connection:
+        with closing(sqlite3.connect(foreign)) as connection, connection:
             connection.execute("CREATE TABLE unrelated (id TEXT)")
         try:
             with self.assertRaises(ValueError) as caught:

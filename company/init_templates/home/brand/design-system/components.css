@@ -1,0 +1,11 @@
+/* Neutral draft components. Company approval is required before brand release. */
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--color-paper); color: var(--color-ink); font-family: var(--font-body); }
+.report { max-width: 68rem; margin: auto; padding: var(--space-large); }
+.report-title { font-size: clamp(1.75rem, 4vw, 3rem); line-height: 1.12; margin: 0 0 var(--space-medium); }
+.report-description { max-width: 65ch; color: var(--color-muted); }
+.metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); gap: var(--space-medium); }
+.metric-card { padding: var(--space-large); border: 1px solid var(--color-border); border-radius: var(--radius-card); }
+.metric-value { display: block; font-size: 2rem; font-weight: 650; color: var(--color-accent); }
+.source-note { margin-top: var(--space-large); color: var(--color-muted); font-size: 0.9rem; }
+@media print { .report { max-width: none; } .metric-card { break-inside: avoid; } }

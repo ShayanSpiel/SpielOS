@@ -1,160 +1,31 @@
-"""Repository-local lifecycle for the durable company runner process."""
-
+"""Read-only inventory of the retired product runner; no process launcher."""
 from __future__ import annotations
-
-import json
-import os
-import signal
-import subprocess
-import sys
-from datetime import datetime, timezone
+import json,os
 from pathlib import Path
 
 
 class RunnerService:
-    def __init__(self, project_root: Path, db_path: Path):
+    """Compatibility inventory only. Scheduling belongs to the selected host."""
+    def __init__(self,project_root,db_path):
         from .boundary import require_runtime_destination
-
         require_runtime_destination(db_path)
-        self.project_root = project_root
-        self.db_path = Path(db_path)
-        # The stop switch, pid file, and log all live beside the DATABASE,
-        # matching how the runner derives its state directory
-        # (automation_enabled(store.path.parent)). Deriving from the db path
-        # keeps `company runner stop` effective for a custom --db too: the
-        # flag is written and read at the same location, so for the default
-        # db (.spielos/state/company.sqlite) the control files live in the
-        # private state tree.
-        self.state_dir = self.db_path.parent
-        self.pid_path = self.state_dir / "runner.pid"
-        self.log_path = self.state_dir / "runner.log"
-        self.control_path = self.state_dir / "automation.json"
+        self.project_root=Path(project_root);self.db_path=Path(db_path)
+        self.state_dir=self.db_path.parent;self.pid_path=self.state_dir/'runner.pid'
+        self.log_path=self.state_dir/'runner.log';self.control_path=self.state_dir/'automation.json'
 
-    def start(self, interval: float = 2.0) -> dict:
-        self.enable()
-        current = self.status()
-        if current["running"]:
-            return current
-        self.state_dir.mkdir(parents=True, exist_ok=True)
-        if self.pid_path.exists():
-            self.pid_path.unlink()
-        environment = os.environ.copy()
-        environment["PYTHONDONTWRITEBYTECODE"] = "1"
-        # The child resolves `company` exactly like the host adapters do:
-        # the vendored spine (<home>/.agents) when its marker file exists,
-        # the project root itself for a flat source checkout — and keep
-        # any PYTHONPATH the owner already runs with.
-        agents = self.project_root / ".agents"
-        spine = (str(agents) if (agents / "company" / "__main__.py").is_file()
-                 else str(self.project_root))
-        existing = environment.get("PYTHONPATH")
-        environment["PYTHONPATH"] = (
-            spine + (os.pathsep + existing if existing else ""))
-        # The same interpreter that runs this service runs the child: a
-        # PATH-resolved python3 could be a foreign venv that lacks the
-        # vendored spine (or the installed package) entirely.
-        command = [sys.executable, "-B", "-m", "company", "--db", str(self.db_path),
-                   "runner", "watch", "--interval", str(interval)]
-        with self.log_path.open("a") as log:
-            process = subprocess.Popen(command, cwd=self.project_root, env=environment,
-                                       stdin=subprocess.DEVNULL, stdout=log,
-                                       stderr=subprocess.STDOUT, start_new_session=True)
-        self.pid_path.write_text(json.dumps({"pid": process.pid, "command": command,
-                                             "db_path": str(self.db_path)}) + "\n")
-        # A child that dies before its first tick (bad db path, import
-        # error) must not leave a receipt that claims a running runner:
-        # poll once so the owner sees a dead-on-arrival start with the
-        # log tail instead of a confusing status flip.
-        try:
-            process.wait(timeout=1.0)
-        except subprocess.TimeoutExpired:
-            return self.status()  # alive past the first second: healthy
-        return self._dead_on_arrival(process)
+    def start(self,*args,**kwargs):raise RuntimeError('The product runner is retired. Use an explicit host wake for a bounded workflow.')
+    def enable(self,*args,**kwargs):raise RuntimeError('The product runner is retired; scheduling belongs to the selected host.')
+    def stop(self,*args,**kwargs):raise RuntimeError('Inventory the recorded process and retire that exact obsolete schedule explicitly; no unrelated process was stopped.')
 
-    def _dead_on_arrival(self, process) -> dict:
-        """Report a spawn that died immediately, with the log tail."""
-        if self.pid_path.exists():
-            try:
-                stored = json.loads(self.pid_path.read_text())
-                if stored.get("pid") == process.pid:
-                    self.pid_path.unlink()
-            except (OSError, json.JSONDecodeError):
-                pass
-        tail = ""
-        try:
-            lines = self.log_path.read_text(errors="replace").splitlines()
-            tail = "\n".join(lines[-3:]) if lines else ""
-        except OSError:
-            tail = ""
-        state = self.status()
-        state["error"] = ("the runner process exited immediately after "
-                          "starting (exit code "
-                          f"{process.returncode}); last log lines:\n{tail}")
-        return state
-
-    def stop(self) -> dict:
-        current = self.status()
-        if current["running"]:
-            os.kill(current["pid"], signal.SIGTERM)
-        if self.pid_path.exists():
-            self.pid_path.unlink()
-        self._set_enabled(False)
-        return self.status()
-
-    def enable(self) -> dict:
-        self._set_enabled(True)
-        return self.status()
-
-    def status(self) -> dict:
-        metadata = self._metadata()
-        pid = metadata.get("pid")
-        running = bool(pid and _alive(pid))
-        started_at = None
-        if running:
-            # The pid file is rewritten on every runner start, so its mtime is
-            # the launch time of the currently-alive local background process.
-            # No new state file is introduced.
-            try:
-                started_at = datetime.fromtimestamp(self.pid_path.stat().st_mtime,
-                                                    tz=timezone.utc).isoformat()
-            except OSError:
-                started_at = None
-        return {"enabled": automation_enabled(self.state_dir),
-                "running": running, "pid": pid if running else None,
-                "started_at": started_at,
-                "pid_path": str(self.pid_path), "log_path": str(self.log_path),
-                "db_path": metadata.get("db_path", str(self.db_path))}
-
-    def _set_enabled(self, enabled: bool) -> None:
-        self.state_dir.mkdir(parents=True, exist_ok=True)
-        self.control_path.write_text(json.dumps({"enabled": enabled}) + "\n")
-
-    def _metadata(self) -> dict:
-        if not self.pid_path.exists():
-            return {}
-        try:
-            value = json.loads(self.pid_path.read_text())
-            value["pid"] = int(value["pid"])
-            return value
-        except (KeyError, ValueError, json.JSONDecodeError):
-            return {}
+    def status(self):
+        metadata={}
+        if self.pid_path.is_file():
+            try:metadata=json.loads(self.pid_path.read_text())
+            except (ValueError,OSError):metadata={'issue':'Unreadable historical runner record'}
+        return {'retired':True,'enabled':False,'recorded_process':metadata,
+                'policy':'read-only inventory; no process started, signalled or replayed'}
 
 
-def _alive(pid: int) -> bool:
-    try:
-        os.kill(pid, 0)
-        return True
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True
-
-
-def automation_enabled(state_dir: Path) -> bool:
-    path = state_dir / "automation.json"
-    if not path.exists():
-        return True
-    try:
-        return bool(json.loads(path.read_text()).get("enabled", True))
-    except (OSError, json.JSONDecodeError):
-        return False
+def automation_enabled(state_dir):
+    """Historical callers cannot enable the retired product scheduler."""
+    return False

@@ -1,177 +1,108 @@
-# SpielOS
+# SpielOS — AI Company Operating System
 
-**The operating system for AI-run companies.**
+**Give your AI company a workspace that lasts beyond the chat.**
 
-[spielos.xyz](https://spielos.xyz) · one durable Goal loop, Agent-owned
-Departments, approvals, evidence, and memory — all local, all on disk.
+SpielOS is an open-source local workspace for company context, repeatable workflows and evidence-backed improvement. Work with a Director in **Codex, Claude Code or OpenCode**. Keep your strategy, brand, memory, outputs and decisions together, even when the conversation ends.
 
-```text
-GOAL → OBSERVE → DECIDE → ACT → EVALUATE
-```
+![SpielOS in Codex with the company dashboard and work tracking](docs/images/spielos-in-codex.png)
 
-Turn business intent into measurable Goals. The Director Agent (in OpenCode or
-Codex) owns the conversation; SpielOS owns the durable loop behind it: every
-run, work order, approval, evidence record, and memory item is persisted in a
-local SQLite database — never lost when a chat session ends.
+*Owner-supplied product reference: SpielOS in Codex beside a company dashboard. This company uses a custom dashboard; the screenshot's historical counts are not release benchmarks.*
 
-## Install
+## Install — one command
 
-One line with [pipx](https://pipx.pypa.io) (requires Python 3.11+):
+Requires **Python 3.11+** and **pipx** on macOS or Linux:
 
 ```sh
-pipx install spielos && spielos init --dir my-company -y
+pipx install spielos && spielos init --dir "$HOME/my-company" -y
 ```
 
-One line with Homebrew:
+Open your company folder in your preferred host:
 
 ```sh
-brew install shayanspiel/spielos/spielos && spielos init --dir my-company -y
-```
-
-One line with npm (thin launcher; needs the Python package too):
-
-```sh
-npm i -g spielos && pipx install spielos && spielos init --dir my-company -y
-```
-
-One line with curl:
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/SpielOS/main/install.sh | sh
-```
-
-One line with curl and a Department bundle (local folder or git URL):
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/SpielOS/main/install.sh | sh -s -- --bundle /path/to/bundle-folder
-```
-
-`--bundle` installs the product, creates the home, and imports the
-Department in one step, then prints your next steps. Bundle folders come
-from `company export` (a complete repository with a README that onboards
-you through OpenCode, Codex, or Claude Code with a paste-prompt block).
-
-The chosen folder becomes a self-contained **SpielOS home**: the runtime
-spine, Director agent + host adapters for OpenCode, Codex, and Claude Code, and empty
-private state. The `spielos` command itself is a global CLI — your company
-data always lives in the folder you chose.
-
-## Talk to your Director
-
-```sh
-cd my-company
-opencode    # or: codex
-```
-
-In **OpenCode**: run `/agents`, select the **Director** agent, and talk to
-it — it already sees your company state.
-
-In **Codex**: start a chat in the company home. Its root `AGENTS.md` makes
-that main chat the Director and loads the canonical operating contract.
-`.codex/agents/director.toml` also defines a custom subagent; that file alone
-does not select the main chat's identity.
-
-Review the company hooks before relying on automatic context (`/hooks` in
-the Codex CLI). Project trust does not approve hooks, and moved or changed
-hook definitions require fresh owner review. Approved hooks inject a fresh,
-read-only company projection at startup, resume, compaction, and each user
-prompt. Without a projection, the Director reports the missing injection and
-uses its read-only status fallback.
-
-## Update
-
-```sh
-pipx upgrade spielos && spielos update --dir /path/to/your/home
-```
-
-`update` refreshes only the vendored spine and host adapters; your private
-`.spielos/` state, owner profile, memory, and user Departments are always
-preserved. Stale files from older releases are pruned so the home matches a
-fresh install exactly.
-
-## What's inside
-
-| Concept | What it is |
-|---|---|
-| **GoalRuntime** | The one durable control loop: observe, decide, act, evaluate |
-| **Goal** | A measurable outcome with an owner, metric, and target |
-| **Department** | A declarative, Agent-owned capability package |
-| **Workflow** | Ordered steps with declared evidence and approval keys |
-| **Agent** | Performs claimed work orders through a Host |
-| **Evidence** | Immutable proof attached to Goals and Runs |
-| **Memory** | Three scopes: owner profile, workflow learning, strategy learning |
-| **Approval** | Explicit owner keys — external actions always park first |
-
-Fresh homes start with **zero** Departments — add clean declarative packages
-only when their Goal, Workflow, Agent, Evidence, and approval contracts are
-ready. Shareable Departments travel as bundle repositories (`company
-export` / `company import`); see
-[the bundle walkthrough](company/README.md#department-bundles-portability).
-
-Executor identity is enforced: a WorkOrder executes only for its declared
-agent (exact string, no aliases), claims are claim-then-complete, and work
-for an agent that is neither installed, nor the goal owner, nor declared by
-the owning Department is refused upfront and escalated to the owner instead.
-
-Memory retrieval is topology-aware: a Goal's relevant memory carries the
-strategy claims of Goals it is structurally related to (same owner and
-metric, parent, child, or supports edge), parked asks append the workflow
-or goal-relevant learning they should build on, and every WorkOrder brief
-carries that bounded `memory` list so the next execution differs from the
-last — memory is causal, not decorative. Direct-work lessons are
-goal-keyed: a lesson learned completing a direct order (workflow_id NULL)
-reaches future direct orders of that same Goal. Strategy memory stays
-selective —
-completing a goal writes no new strategy claims; owners and evidence-backed
-host distillation are the only strategy writers, operational lessons are
-the only per-completion writes, and stale claims retire with
-`memory retire` without losing their evidence. Approvals acknowledge
-their answered asks, and unknown comparison operators raise instead of
-silently failing closed.
-
-Useful commands:
-
-```sh
+cd "$HOME/my-company"
 spielos status
-spielos overview
-spielos context
-spielos memory summary
-spielos memory retire <memory_id>
-spielos profile list
-spielos notifications list
-spielos runner tick
+spielos report --home "$PWD"
 ```
 
-## Development
+In Codex, the main company chat acts as Director. In Claude Code, use `claude --agent director`; in OpenCode, select the Director agent. Review the host's hook configuration first. If automatic context is missing, use `spielos status --home "$PWD"` to restore the explicit company view.
 
-This checkout is product source, not a company home. Keep owner Departments,
-Skills, bundles, host configuration, and private state in a separate home.
-Repository role markers prevent current runtime commands from creating company
-state inside a source or website checkout. Synthetic test fixtures remain here.
-Run source commands with `PYTHONDONTWRITEBYTECODE=1 python3 -B -m company COMMAND`;
-choose a separate destination for `init`, `update`, and `import`.
+The dashboard runs locally with authentication. Keep its access URL private. Installation creates no scheduler and connects no external service.
+
+**Trying this source version before publication?** Registries may contain an older release. From an inspected checkout, use:
 
 ```sh
-git clone https://github.com/ShayanSpiel/SpielOS.git
-cd SpielOS
-PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest company.tests.test_clean_core_acceptance
+pipx install --force /absolute/path/to/SpielOS && spielos init --dir "$HOME/spielos-preview" -y
 ```
 
-- [Architecture](company/ARCHITECTURE.md) — the clean-core contract
-- [Website](https://spielos.xyz) · [GitHub](https://github.com/ShayanSpiel/SpielOS)
-- MIT licensed
+Keep your company home outside the product source. The npm package is a launcher for an existing Python runtime. Native Windows is not currently qualified.
 
-## Repository ownership and local source updates
+## Update — one command
 
-This repository ships reusable code and generic home/host templates. It does
-not contain an installed company, owner Skills, private Departments, company
-data, or production pipelines. Test fixture packages are synthetic, excluded
-from installation, and never production-ready. Audit the source boundary with
-`python3 -B tools/check_source_boundary.py`. An explicitly authorized ignored
-`.env` may hold publishing credentials; it must never enter Git.
+```sh
+pipx upgrade spielos && spielos update --dir "$HOME/my-company" --keep-stale
+```
 
-A home may refresh from a source checkout by running that checkout's runtime
-with `SPIELOS_TEMPLATE_DIR` set to `company/init_templates`, an explicit
-`update --dir /path/to/home`, and `--keep-stale` when removal is not authorized.
-`--keep-stale` retains obsolete vendored files and bytecode while refreshing
-shipped files. It makes no backup. Owner layers and private data remain local.
+This refreshes product runtime and host files in the selected company while preserving editable company content and untracked owner files. `--keep-stale` avoids pruning retired shipped files. Legacy content moves require a separate reviewed migration.
+
+For a source installation, replace `pipx upgrade spielos` with `pipx install --force /absolute/path/to/SpielOS`.
+
+## Start with the work you need
+
+Tell the Director in ordinary language:
+
+> Help me build a weekly sales report. Check the totals, use our voice, and show me a draft before anything is sent.
+
+The Director helps agree the inputs, examples, constraints and acceptance criteria. Build a candidate, test the real implementation, review the evidence, then release the exact version. Each production Run uses a pinned release. Sending or publishing needs its own exact-action approval.
+
+A new company includes a synthetic **sales-report draft** with an executable implementation and example cases. To pin a candidate:
+
+```sh
+spielos workflow candidate --home "$PWD" \
+  --manifest "$PWD/company/workflows/sales-report/workflow.json" --json
+```
+
+Use the returned release digest with `workflow experiment`; see `spielos workflow experiment --help` and [the operating guide](company/README.md). The draft needs local qualification, verified configured telemetry and independent review before production use.
+
+## Four ideas, one workspace
+
+| Concept | Purpose |
+| --- | --- |
+| **Company** | Your shared facts, strategy, brand and boundaries |
+| **Workflow** | A versioned capability with execution and evaluation contracts |
+| **Run** | One bounded invocation with durable output and review |
+| **Improvement** | A scoped change with observations, design and acceptance evidence |
+
+Agents and skills implement workflows. Departments optionally group ownership. GODAE guides bounded Improvements; production does not start an autonomous Goal pursuit or self-repair loop.
+
+Your editable files live in `company/`: profile, strategy, brand, workflows, agents and skills. Pinned runtime, private state and generated artifacts live under `.spielos/`. You keep the workspace when you switch conversations or supported hosts.
+
+## Recorded work, real evaluations, proper experiments
+
+**Langfuse records approved execution and evaluation evidence**: scoped inputs and outputs, supplied context, artifact provenance, criterion scores, reviewer rationale and delivery status. Local state remains the execution and approval journal. Export needs an explicitly configured destination and evidence policy; queued records stay pending until remote readback confirms them.
+
+**Experiments run actual workflow cases against a pinned version.** Representative, held-out and negative cases map to versioned datasets, real runs and declared evaluation criteria. Comparisons retain their case and version evidence. Missing criteria cannot pass, and a high average cannot hide a blocking failure. Model judges require independently recorded calibration. A test pass or same-host judgment never substitutes for independent acceptance.
+
+Use `/report` in configured company context, or `spielos report --home "$PWD"`, to inspect runs, memory, supplied context, usage and Langfuse delivery. Reported tokens, reference price estimates and actual billing stay separate; unavailable usage remains unknown.
+
+## Inspect the architecture
+
+CLI, host adapters and the optional MCP plugin use the same workflow core. Releases pin implementation and context. Company-scoped identities, execution claims and exact-action approvals make decisions attributable. Portable imports preview collisions, execute no installation code and inherit no production approval.
+
+The current target is a **trusted local pilot**. Trusted process execution is not an untrusted-code sandbox. Enterprise isolation, shared network SQLite and untested remote deployments are outside the current claim. Activepieces preparation stays offline; live connection and activation require separate authorization.
+
+[Operating guide](company/README.md) · [Architecture](company/ARCHITECTURE.md) · [Graph explorer](company/GRAPH.md) · [Evaluation standard](company/EVALUATION.md) · [Technical review](docs/reviews/2026-11-02-technical-review.md)
+
+## Develop and verify
+
+Keep owner data and credentials outside this checkout. The operational Python runtime uses the standard library; distribution building needs setuptools/build, and launcher/scenario checks also use Node.
+
+```sh
+python3 -B tools/check_source_boundary.py
+python3 -B tools/sync_runtime_templates.py
+python3 -B -m unittest discover -s company/tests -t .
+python3 -B tools/test_acceptance.py --out /tmp/spielos-acceptance.json
+```
+
+CI is configured for macOS/Linux and Python 3.11/3.12/3.14, including an isolated installed-wheel journey. Local passes establish their tested scope, not creative quality, business impact or enterprise certification.
+
+MIT licensed. [Source and releases](https://github.com/ShayanSpiel/SpielOS).

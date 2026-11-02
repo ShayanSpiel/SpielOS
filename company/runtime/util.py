@@ -21,4 +21,6 @@ def compare(value, operator: str, target) -> bool:
     operation = _COMPARE_OPERATORS.get(operator)
     if operation is None:
         raise ValueError(f"unknown comparison operator: {operator!r}")
+    if value is None:
+        return False
     return operation(value, target)

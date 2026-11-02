@@ -1,8 +1,5 @@
-# Company Profile
+# Company profile
 
-Fresh homes contain no owner identity or business strategy. The Director
-records owner preferences through `company profile set`, and evidence-backed
-strategic direction through `company memory add --scope strategy`.
+An installed company's canonical identity is `company/profile.md`: Company, Intended customers, Accountable owner, Responsibilities and Boundaries. Unknown facts remain unknown. `profile set --fields <json-file> --source <explicit-owner-direction>` records facts and before/after audit hashes while preserving owner notes.
 
-Company-specific profile documents belong in the home's strategy layer.
-Do not invent customer counts, revenue, performance, or adoption claims.
+Owner preferences are separate owner-scope memory; strategic direction is explicit strategy-scope memory. Do not infer customer counts, revenue, performance or adoption from a technical test.
