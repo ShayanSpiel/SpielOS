@@ -34,6 +34,10 @@ def main():
                         'Use the model identity exposed by the host; if unavailable, explicitly say host model identity not exposed. Never invent a model or call a human-only criterion independently accepted. '+
                         'Do not repair or replace the frozen artifact. Return the owner-facing answer followed by a concise, current human tracking receipt with report/trace links, review and delivery status, tokens/cost only when reported. Refresh the receipt after recording judgments using company.observability.receipts.markdown; do not claim independent acceptance or cloud confirmation without evidence. '+
                         'This continuation is limited to one pass; remaining requests stay visibly pending. Receipt before review (refresh counts):\n'+receipt}
+            if output.get('reason'):
+                from company.onboarding import status as onboarding_status
+                if not onboarding_status(home)['dashboard_tour_shown']:
+                    output['reason']+='\nFirst-chat dashboard tour: obtain and present the actual local report URL. Explain Home, History & examples, Quality & learning and Activity & cost; distinguish pending reviews, self-judgments, remote delivery and unknown usage. Ask about Langfuse if no choice is recorded. Record company.onboarding.tour_shown(home, report_url) only after actually presenting that link and guide. This stays inside the same one-pass continuation.'
             if event in {'PostToolUse','PostToolUseFailure'}:
                 drain(runtime,seconds=18,limit=80)
     except Exception:

@@ -11,7 +11,7 @@ import json
 import os
 from pathlib import Path
 import uuid
-from .platform import create_alias,is_link
+from .platform import create_alias,is_link,protect_private
 
 OWNER_LAYERS = ('departments','skills','capabilities','connections','strategy','brand','agents/installed')
 VISIBLE_LAYERS = ('strategy','brand','workflows','agents','skills','connections','departments')
@@ -60,6 +60,7 @@ def write_json(path,value):
         stream.write(json.dumps(value,indent=2)+'\n')
         stream.flush();os.fsync(stream.fileno())
     os.replace(temporary,path)
+    protect_private(path)
 
 
 def legacy_inventory(root):

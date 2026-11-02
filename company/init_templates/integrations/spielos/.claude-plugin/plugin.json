@@ -1,7 +1,7 @@
 {
   "name": "spielos",
-  "version": "10.4.0",
-  "description": "Keep your company context across chats. Build recurring workflows, test real outputs, and review the evidence before you rely on them.",
+  "version": "10.3.10",
+  "description": "Build lead research, outbound email and recurring company workflows with lasting context, a live dashboard and real evaluation evidence.",
   "displayName": "SpielOS",
   "author": {
     "name": "Shayan Spiel",

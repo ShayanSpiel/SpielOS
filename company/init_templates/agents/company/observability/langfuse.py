@@ -219,7 +219,8 @@ class LangfuseClient:
         root=Path(home).resolve();relative=Path(reference);path=root/relative
         if relative.is_absolute() or '..' in relative.parts or not relative.parts or relative.parts[0]!='.spielos' or path.is_symlink() or not path.resolve().is_relative_to(root/'.spielos'):
             raise ValueError('Telemetry credential reference must be a private company file')
-        if path.stat().st_mode & 0o077:raise PermissionError('Telemetry credential file must be owner-private')
+        from ..platform import is_private
+        if not is_private(path):raise PermissionError('Telemetry credential file must be owner-private')
         credentials=json.loads(path.read_text())
         client=cls(base_url=config['base_url'],project_id=config['project_id'],authorization=credentials.get('authorization'),public_key=credentials.get('public_key'),secret_key=credentials.get('secret_key'))
         client._rate_path=root/'.spielos/telemetry-rate-limit.json'

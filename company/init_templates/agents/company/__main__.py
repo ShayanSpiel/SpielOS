@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse,json,os,sqlite3,sys
 from pathlib import Path
 if not __package__:
-    sys.path.insert(0,str(Path(__file__).resolve().parent.parent))
+    sys.path[0]=str(Path(__file__).resolve().parent.parent)
     __package__='company'
 from .platform import owned_path
 from .runtime.config import VERSION

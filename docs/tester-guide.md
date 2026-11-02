@@ -1,12 +1,16 @@
 # Try SpielOS
 
-SpielOS is a portable company workspace for recurring AI work you can test and improve. This desktop tester preview supports Codex and Claude Code on macOS/Linux with Python 3.11 or newer. The plugin carries the SpielOS runtime; no separate SpielOS installation or Langfuse account is needed.
+SpielOS is a portable company workspace for recurring AI work you can test and improve. This desktop tester preview supports Codex and Claude Code on qualified desktop systems with Python 3.11 or newer available as `python3`. Windows setup must check the actual Python alias and local filesystem; do not assume a Unix shell. The plugin carries the SpielOS runtime; no separate SpielOS installation or Langfuse account is needed.
 
 ## Install
 
 Use the [official SpielOS marketplace](https://github.com/ShayanSpiel/SpielOS-Plugin).
 
+## ChatGPT and Codex
+
 **Codex:** tell it, “Install SpielOS from the ShayanSpiel/SpielOS-Plugin marketplace, then run its setup.” Choose **SpielOS → Setup** in the plugin's skills. Explicit shortcuts are `$spielos:setup`, `$spielos:director`, `$spielos:dashboard` and `$spielos:help`.
+
+## Claude Code
 
 **Claude Code:** enter these in the chat:
 
@@ -20,11 +24,13 @@ Use `/spielos:director`, `/spielos:dashboard` and `/spielos:help` afterward. Rel
 
 ## Set up your company
 
-Choose an empty folder for a test company, or explicitly select an existing SpielOS company. Setup explains local activity recording and checks the Python prerequisite. It preserves existing settings and enables no external exporter.
+Choose an empty folder for a test company, or explicitly select an existing SpielOS company. Setup explains local activity recording, checks Python and asks whether to connect Langfuse now or continue locally. Existing settings are preserved. Keys are entered in a private local form; export is enabled only after the selected project verifies.
 
 Open that company folder as the host's workspace. Review its project instructions and lifecycle hooks through the host's normal controls. Use `/hooks` to inspect them. New or changed hooks may need another review. Installation does not bypass trust or automatically make an unrelated chat a company session.
 
 Director is the role of your main chat. You do not need to spawn a second agent. Ask **“Show my company work and pending decisions”**, then **“Open my dashboard.”** The report link is private to your local computer.
+
+After the first meaningful chat, Director should open or link this company’s dashboard and explain its sections, pending evidence and unknown usage. If you deferred Langfuse, that choice should not be asked again on every message.
 
 ## A first test
 
@@ -38,11 +44,11 @@ Token totals appear only when the host exposes attributable usage. Missing usage
 
 ## What to expect
 
-The README reference image shows a company with a custom dashboard and a configured Langfuse project. A fresh company uses the generic dashboard and local recording. No company-specific designs, transcripts, credentials or production records are included.
+The product dashboard uses the same Work & learning layout as the supplied reference. A fresh company shows its own actual records and empty states, without the reference company’s gallery or history. No company-specific designs, transcripts, credentials or production records are included.
 
 Langfuse is optional for local tracking, drafts and candidate experiments. Under the current release policy, qualifying a new production workflow requires verified Langfuse evidence and independent review. Choose the exact project and evidence policy before connecting. Confirm remote records before calling them delivered. Activepieces and other effect providers are not enabled by setup. Publishing or sending still requires authorization for the exact action and destination.
 
-This preview provides inspection and versioned experiments. A full before/after improvement scorecard is not implemented. Native Windows, untrusted execution and enterprise isolation are not qualified.
+This preview provides inspection and versioned experiments. A full before/after improvement scorecard is not implemented. Native-platform qualification is recorded in release checks. Untrusted execution and enterprise isolation are not claimed.
 
 ## Updates and feedback
 

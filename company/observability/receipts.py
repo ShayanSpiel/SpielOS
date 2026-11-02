@@ -25,6 +25,13 @@ def context_payload(value,*,session_id=None,home=None):
     for item in improvements[-3:]:lines.append(item.get('name','Improvement')+' — '+{'act':'implementation in progress','observe':'being investigated','decide':'awaiting a design decision','awaiting_change_review':'awaiting independent review'}.get(item.get('stage'),'pending review'))
     telemetry=ctx.get('telemetry',{});remaining=sum(n for pop in (telemetry.get('events',{}),telemetry.get('activity_events',{})) for s,n in pop.items() if s!='verified')
     lines.append('Langfuse: '+str(remaining)+' events are not yet confirmed. Never call queued evidence synchronized.' if telemetry.get('state')=='enabled' else 'Activity stays local; Langfuse is not connected.')
+    if home:
+        from ..onboarding import status
+        first_use=status(home)
+        if first_use['ask_langfuse']:
+            lines.append('First-use onboarding: ask whether to connect Langfuse now or continue locally. Use the selected company dashboard connection form for keys, never chat. Record the explicit choice with company.onboarding.choose; installation is not consent.')
+        if not first_use['dashboard_tour_shown']:
+            lines.append('After this first meaningful chat, present the actual company dashboard link and briefly explain Home, History & examples, Quality & learning, Activity & cost, loaded context and pending evidence. Record company.onboarding.tour_shown only after actually presenting the link and guide.')
     if session_id:lines.append('Machine reference: activity_session='+session_id+'; use this session for actual operations. No direct-chat artifact is a qualified workflow Run.')
     lines.append('Machine reference: '+json.dumps({'pending':pending,'counts':ctx.get('counts',{}),'activity_session':session_id},ensure_ascii=False))
     text='\n'.join(lines);docs['runtime/operating-summary']='\n'.join(lines[-6:])

@@ -129,9 +129,9 @@ def snapshot(home):
                     a=dict(row);a['verdict']=json.loads(a.pop('verdict_json'));a['independent_acceptance']=False;result['evaluations'].append(a)
             result['evaluation_requests']=[]
             if 'host_evaluation_requests' in tables:
-                for row in c.execute('SELECT subject,status,request_json,created_at FROM host_evaluation_requests ORDER BY rowid DESC LIMIT 30'):
+                for row in c.execute('SELECT id,session_id,subject,status,request_json,created_at FROM host_evaluation_requests ORDER BY rowid DESC LIMIT 30'):
                     request=json.loads(row['request_json'])
-                    result['evaluation_requests'].append({'subject':row['subject'],'status':row['status'],
+                    result['evaluation_requests'].append({'id':row['id'],'session_id':row['session_id'],'target':request.get('target'),'subject':row['subject'],'status':row['status'],
                         'created_at':row['created_at'],'criteria':request.get('rubric',[]),
                         'artifact_digest':request.get('artifact_digest'),'independent_acceptance':False})
             cfg=_json(home/'.spielos/telemetry.json',{})
@@ -252,6 +252,9 @@ def serve(home,port=8775):
             try:
                 if route=='/api/health':self._send(200,{'standard':VERSION,'home':str(home),'pid':os.getpid(),'runtime_sha256':runtime_sha});return
                 if route=='/api/report':self._send(200,snapshot(home));return
+                if route=='/api/onboarding':
+                    from .onboarding import status
+                    self._send(200,status(home));return
                 if route=='/api/document':self._send(200,_document(home,query.get('path',[''])[0]));return
                 if route in ('/','/index.html'):
                     target='/'+config['ui_root']+'/index.html' if config['ui_root'] else '/_spielos/index.html';self.send_response(303);self.send_header('Location',target);self.end_headers();return
@@ -280,10 +283,19 @@ def serve(home,port=8775):
         def do_POST(self):
             if not self._authorized() or self.headers.get('Origin')!=f'http://{self.headers.get("Host")}' or self.headers.get('X-Spielos-Report')!='1':self._send(403,{'error':'Same-origin explicit action required'});return
             try:
-                if urlparse(self.path).path!='/api/open-file':raise PermissionError('Unknown action')
+                route=urlparse(self.path).path
+                if route not in {'/api/open-file','/api/onboarding/choice','/api/onboarding/connect','/api/onboarding/tour'}:raise PermissionError('Unknown action')
                 length=int(self.headers.get('Content-Length','0'))
-                if not 0<length<=4096:raise ValueError('Invalid request size')
-                data=json.loads(self.rfile.read(length));f=permitted_file(home,data.get('path',''))
+                if not 0<length<=16384:raise ValueError('Invalid request size')
+                data=json.loads(self.rfile.read(length))
+                if not isinstance(data,dict):raise ValueError('Expected a JSON object')
+                if route.startswith('/api/onboarding/'):
+                    from .onboarding import choose,connect_langfuse,tour_shown
+                    if route.endswith('/choice'):result=choose(home,data.get('choice'))
+                    elif route.endswith('/tour'):result=tour_shown(home,data.get('report_url'))
+                    else:result=connect_langfuse(home,**{k:data.get(k) for k in ('base_url','project_id','public_key','secret_key','approved_evidence_policy')})
+                    self._send(200,result);return
+                f=permitted_file(home,data.get('path',''))
                 if sys.platform!='darwin':self._send(200,{'path':str(f),'opened':False,'message':'Copy this path into your file manager.'});return
                 subprocess.run(['/usr/bin/open','-R',str(f)],check=True,timeout=5);self._send(200,{'opened':True,'path':str(f)})
             except (ValueError,PermissionError,FileNotFoundError) as exc:self._send(403,{'error':str(exc)})

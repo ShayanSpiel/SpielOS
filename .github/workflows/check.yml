@@ -24,7 +24,7 @@ jobs:
         run: |
           python -B tools/check_source_boundary.py
           python -B tools/sync_runtime_templates.py
-          python -B -m unittest company.tests.test_platform company.tests.test_plugin_distribution
+          python -B -m unittest company.tests.test_platform company.tests.test_plugin_distribution company.tests.test_onboarding
       - name: Build and exercise the installed Windows wheel
         env:
           PYTHONUTF8: '1'

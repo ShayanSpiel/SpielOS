@@ -13,10 +13,14 @@ import time
 WINDOWS = os.name == 'nt'
 
 
-@lru_cache(maxsize=1)
 def user_id():
     if not WINDOWS:
         return os.getuid()
+    return _windows_user_id()
+
+
+@lru_cache(maxsize=1)
+def _windows_user_id():
     rows = csv.reader(subprocess.check_output(
         ['whoami', '/user', '/fo', 'csv', '/nh'], text=True, encoding='utf-8', errors='replace').splitlines())
     sid = next((value for row in rows for value in row if re.fullmatch(r'S-1-[0-9-]+', value)), None)
@@ -58,6 +62,10 @@ def _windows_api():
     adv.ConvertSecurityDescriptorToStringSecurityDescriptorW.restype = w.BOOL
     adv.ConvertSidToStringSidW.argtypes = [ptr, c.POINTER(w.LPWSTR)]
     adv.ConvertSidToStringSidW.restype = w.BOOL
+    adv.GetAclInformation.argtypes = [ptr,ptr,w.DWORD,w.DWORD]
+    adv.GetAclInformation.restype = w.BOOL
+    adv.GetAce.argtypes = [ptr,w.DWORD,c.POINTER(ptr)]
+    adv.GetAce.restype = w.BOOL
     kernel.LocalFree.argtypes = [ptr]
     kernel.LocalFree.restype = ptr
     return c, w, adv, kernel
@@ -102,21 +110,34 @@ def is_private(path, *, allow_administrators=False):
     error = adv.GetNamedSecurityInfoW(str(path), 1, 1 | 4, c.byref(owner), None, c.byref(dacl), None, c.byref(descriptor))
     if error:
         raise c.WinError(error)
-    sid = w.LPWSTR(); text = w.LPWSTR()
+    sid = w.LPWSTR()
     try:
         if not dacl.value or not adv.ConvertSidToStringSidW(owner, c.byref(sid)):
             return False
         if sid.value != user_id():
             return False
-        if not adv.ConvertSecurityDescriptorToStringSecurityDescriptorW(descriptor, 1, 4, c.byref(text), None):
-            return False
-        entries = [entry.split(';') for entry in re.findall(r'\(([^()]+)\)', text.value or '')]
-        allowed = {str(user_id()), 'SY', 'S-1-5-18'}
-        if allow_administrators:allowed.update({'BA','S-1-5-32-544'})
-        return bool(entries) and all(len(e) == 6 and e[0] == 'A' and e[-1] in allowed for e in entries) and any(e[-1] == user_id() and e[2] in {'FA', '0x1f01ff'} for e in entries)
+        # Inspect binary ACE SIDs. SDDL may abbreviate a local administrator
+        # as LA; string aliases are not stable identity comparisons.
+        class AclSize(c.Structure):
+            _fields_=[('count',w.DWORD),('used',w.DWORD),('free',w.DWORD)]
+        info=AclSize()
+        if not adv.GetAclInformation(dacl,c.byref(info),c.sizeof(info),2):return False
+        allowed={str(user_id()),'S-1-5-18'}
+        if allow_administrators:allowed.add('S-1-5-32-544')
+        owner_access=False
+        for index in range(info.count):
+            ace=c.c_void_p();principal=w.LPWSTR()
+            if not adv.GetAce(dacl,index,c.byref(ace)):return False
+            if c.cast(ace,c.POINTER(c.c_ubyte))[0]!=0:return False
+            if not adv.ConvertSidToStringSidW(c.c_void_p(ace.value+8),c.byref(principal)):return False
+            try:
+                if principal.value not in allowed:return False
+                mask=c.cast(ace.value+4,c.POINTER(w.DWORD)).contents.value
+                if principal.value==user_id() and mask & 0x1f01ff == 0x1f01ff:owner_access=True
+            finally:kernel.LocalFree(c.cast(principal,c.c_void_p))
+        return owner_access
     finally:
         if sid: kernel.LocalFree(c.cast(sid, c.c_void_p))
-        if text: kernel.LocalFree(c.cast(text, c.c_void_p))
         kernel.LocalFree(descriptor)
 
 

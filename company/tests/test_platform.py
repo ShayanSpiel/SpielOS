@@ -29,6 +29,11 @@ class PlatformTests(unittest.TestCase):
         platform.protect_private(authority.key_path)
         self.assertEqual(authority.local_owner().subject,owner.subject)
 
+    def test_private_acl_roundtrip_checks_real_native_permissions(self):
+        folder=self.root/'Private folder';folder.mkdir();platform.protect_private(folder)
+        diagnostic=subprocess.check_output(['icacls',str(folder)],text=True,errors='replace') if platform.WINDOWS else str(folder.stat().st_mode)
+        self.assertTrue(platform.is_private(folder),diagnostic)
+
     def test_real_process_lock_excludes_another_process_and_releases(self):
         lock=self.root/'one.lock'
         code='from company.platform import locked_file; import sys\ntry:\n with locked_file(sys.argv[1],blocking=False):pass\nexcept BlockingIOError:sys.exit(7)'
