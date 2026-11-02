@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib,json,os,math
 from datetime import datetime,timezone
 from pathlib import Path
+from ..platform import owned_path
 
 SCHEMA='''CREATE TABLE IF NOT EXISTS host_usage_sources(session_id TEXT PRIMARY KEY,path TEXT NOT NULL,host_session TEXT NOT NULL,metadata_digest TEXT NOT NULL,updated_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS host_usage_turns(session_id TEXT NOT NULL,turn_key TEXT NOT NULL,record_json TEXT NOT NULL,updated_at TEXT NOT NULL,PRIMARY KEY(session_id,turn_key));'''
@@ -26,7 +27,7 @@ def estimate(usage,model,*,request_input=None):
 def read_codex(path,*,host_session,home):
     """Only explicit host/user supplied source, exact session and home. Whitelist metadata fields."""
     path=Path(path).expanduser();root=Path(os.environ.get('CODEX_HOME',str(Path.home()/'.codex'))).resolve();home=Path(home).resolve()
-    if path.is_symlink() or not path.resolve().is_relative_to(root) or path.suffix!='.jsonl' or not path.is_file() or path.stat().st_uid!=os.getuid():raise PermissionError('Usage source must be an explicitly bound local Codex log')
+    if path.is_symlink() or not path.resolve().is_relative_to(root) or path.suffix!='.jsonl' or not path.is_file() or not owned_path(path):raise PermissionError('Usage source must be an explicitly bound local Codex log')
     relative=path.resolve().relative_to(root)
     if not relative.parts or relative.parts[0] not in {'sessions','archived_sessions'}:raise PermissionError('Usage source is outside Codex session metadata')
     if any((root/Path(*relative.parts[:i])).is_symlink() for i in range(1,len(relative.parts)+1)):raise PermissionError('Usage source cannot traverse symbolic paths')

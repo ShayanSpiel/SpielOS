@@ -3,7 +3,8 @@ from __future__ import annotations
 import argparse, hashlib, json, mimetypes, os, secrets, subprocess, sys, time
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import urlparse, parse_qs, urlencode, unquote
+from urllib.parse import urlparse, parse_qs, urlencode, unquote,quote
+from .platform import protect_private,is_link
 
 VERSION='spielos-report/1'
 
@@ -18,16 +19,17 @@ def configuration(home):
     custom=data.get('ui_root')
     if custom:
         p=Path(custom)
-        if p.is_absolute() or '..' in p.parts or not p.parts or not str(p).startswith('.spielos/artifacts/'):
+        if p.is_absolute() or '..' in p.parts or p.parts[:2]!=('.spielos','artifacts'):
             raise ValueError('Custom report UI must be explicitly contained in company artifacts')
-        if not (home/p/'index.html').is_file() or any((home/Path(*p.parts[:i])).is_symlink() for i in range(1,len(p.parts)+1)):
+        if not (home/p/'index.html').is_file() or any(is_link(home/Path(*p.parts[:i])) for i in range(1,len(p.parts)+1)):
             raise ValueError('Custom report UI is missing or symbolic')
+        custom=p.as_posix()
     return {'schema':1,'ui_root':custom,'custom_name':data.get('custom_name'),'port':data.get('port',8775)}
 
 def permitted_file(home,path):
     """No state/credentials, traversal or symlink escapes, even within an allowed root."""
-    home=Path(home).resolve();name=unquote(str(path)).lstrip('/');p=Path(name)
-    if p.is_absolute() or '..' in p.parts or not p.parts:raise PermissionError('File is outside the report scope')
+    home=Path(home).resolve();name=unquote(str(path)).replace('\\','/').lstrip('/');p=Path(name)
+    if p.is_absolute() or '..' in p.parts or not p.parts or any(':' in part for part in p.parts):raise PermissionError('File is outside the report scope')
     if any(x.startswith('.') and x!='.spielos' or x.lower() in {'credentials','security','connections','private-inputs','node_modules'} for x in p.parts):
         # Only the pinned icon font CSS is a useful exception, never a general dependency server.
         if not name.startswith('company/departments/videography/remotion/node_modules/boxicons/'):
@@ -35,7 +37,7 @@ def permitted_file(home,path):
     allowed=name=='company/profile.md' or name.startswith(('company/strategy/','company/brand/','company/workflows/','company/skills/','company/agents/installed/','.spielos/artifacts/','company/departments/'))
     if not allowed:raise PermissionError('File is outside the report scope')
     for i in range(1,len(p.parts)+1):
-        if (home/Path(*p.parts[:i])).is_symlink():raise PermissionError('Symbolic files are not served')
+        if is_link(home/Path(*p.parts[:i])):raise PermissionError('Symbolic files are not served')
     f=home/p
     if not f.resolve().is_relative_to(home) or not f.is_file():raise FileNotFoundError('Report file not found')
     return f
@@ -128,9 +130,9 @@ def snapshot(home):
                     a=dict(row);a['verdict']=json.loads(a.pop('verdict_json'));a['independent_acceptance']=False;result['evaluations'].append(a)
             result['evaluation_requests']=[]
             if 'host_evaluation_requests' in tables:
-                for row in c.execute('SELECT subject,status,request_json,created_at FROM host_evaluation_requests ORDER BY rowid DESC LIMIT 30'):
+                for row in c.execute('SELECT id,session_id,subject,status,request_json,created_at FROM host_evaluation_requests ORDER BY rowid DESC LIMIT 30'):
                     request=json.loads(row['request_json'])
-                    result['evaluation_requests'].append({'subject':row['subject'],'status':row['status'],
+                    result['evaluation_requests'].append({'id':row['id'],'session_id':row['session_id'],'target':request.get('target'),'subject':row['subject'],'status':row['status'],
                         'created_at':row['created_at'],'criteria':request.get('rubric',[]),
                         'artifact_digest':request.get('artifact_digest'),'independent_acceptance':False})
             cfg=_json(home/'.spielos/telemetry.json',{})
@@ -186,12 +188,13 @@ def report_fingerprint():
     return h.hexdigest()
 
 def ensure_server(home,*,open_browser=False,port=None):
-    import urllib.request,fcntl
+    import urllib.request
+    from .platform import locked_file,detached_process
     from .runtime.paths import validate_home_destination
     from .home import write_json
     home=validate_home_destination(home);folder=home/'.spielos/state';folder.mkdir(exist_ok=True)
-    with (folder/'report-start.lock').open('a') as lock:
-        fcntl.flock(lock,fcntl.LOCK_EX);a=state(home)
+    with locked_file(folder/'report-start.lock'):
+        a=state(home)
         if a:
             try:
                 req=urllib.request.Request(a['base_url']+'/api/health',headers={'Authorization':'Bearer '+a['token']})
@@ -208,7 +211,7 @@ def ensure_server(home,*,open_browser=False,port=None):
         config=configuration(home);log=os.open(home/'.spielos/state/report-server.log',os.O_CREAT|os.O_APPEND|os.O_WRONLY,0o600)
         env={**os.environ,'PYTHONDONTWRITEBYTECODE':'1','PYTHONPATH':str(Path(__file__).resolve().parent.parent)}
         try:
-            process=subprocess.Popen([sys.executable,'-B','-m','company','report','--serve','--home',str(home),'--port',str(config['port'] if port is None else port)],cwd=home,env=env,stdout=log,stderr=log,start_new_session=True)
+            process=subprocess.Popen([sys.executable,'-B','-m','company','report','--serve','--home',str(home),'--port',str(config['port'] if port is None else port)],cwd=home,env=env,stdin=subprocess.DEVNULL,stdout=log,stderr=log,**detached_process())
         finally:os.close(log)
         deadline=time.monotonic()+15
         while time.monotonic()<deadline:
@@ -250,12 +253,15 @@ def serve(home,port=8775):
             try:
                 if route=='/api/health':self._send(200,{'standard':VERSION,'home':str(home),'pid':os.getpid(),'runtime_sha256':runtime_sha});return
                 if route=='/api/report':self._send(200,snapshot(home));return
+                if route=='/api/onboarding':
+                    from .onboarding import status
+                    self._send(200,status(home));return
                 if route=='/api/document':self._send(200,_document(home,query.get('path',[''])[0]));return
                 if route in ('/','/index.html'):
-                    target='/'+config['ui_root']+'/index.html' if config['ui_root'] else '/_spielos/index.html';self.send_response(303);self.send_header('Location',target);self.end_headers();return
+                    target='/'+config['ui_root']+'/index.html' if config['ui_root'] else '/_spielos/index.html';self.send_response(303);self.send_header('Location',quote(target,safe='/'));self.end_headers();return
                 if route.startswith('/_spielos/'):
                     f=Path(__file__).parent/'report_ui'/route.rsplit('/',1)[1]
-                    if f.name not in {'index.html','report.js','report.css'}:raise PermissionError('Unknown report asset')
+                    if f.name not in {'index.html','report.js','report.css','workspace.js','workspace.css','logo.png'}:raise PermissionError('Unknown report asset')
                 else:f=permitted_file(home,route)
                 mime=mimetypes.guess_type(f.name)[0] or 'application/octet-stream'
                 # Range playback supports actual full films without returning whole media for every seek.
@@ -269,7 +275,7 @@ def serve(home,port=8775):
                     self.send_response(206);self.send_header('Content-Type',mime);self.send_header('Content-Range',f'bytes {start}-{end}/{size}');self.send_header('Content-Length',str(end-start+1));self.send_header('Accept-Ranges','bytes');self.end_headers()
                     with f.open('rb') as stream:stream.seek(start);self.wfile.write(stream.read(end-start+1))
                 else:
-                    self.send_response(200);self.send_header('Content-Type',mime);self.send_header('Content-Length',str(size));self.send_header('Accept-Ranges','bytes');self.send_header('Referrer-Policy','no-referrer');self.send_header('X-Content-Type-Options','nosniff');self.end_headers()
+                    self.send_response(200);self.send_header('Content-Type',mime);self.send_header('Content-Length',str(size));self.send_header('Accept-Ranges','bytes');self.send_header('Referrer-Policy','no-referrer');self.send_header('X-Content-Type-Options','nosniff');self.send_header('Cache-Control','no-store');self.end_headers()
                     with f.open('rb') as stream:
                         while chunk:=stream.read(1024*1024):self.wfile.write(chunk)
             except (ValueError,PermissionError,FileNotFoundError,UnicodeError) as exc:self._send(403,{'error':str(exc)})
@@ -278,10 +284,19 @@ def serve(home,port=8775):
         def do_POST(self):
             if not self._authorized() or self.headers.get('Origin')!=f'http://{self.headers.get("Host")}' or self.headers.get('X-Spielos-Report')!='1':self._send(403,{'error':'Same-origin explicit action required'});return
             try:
-                if urlparse(self.path).path!='/api/open-file':raise PermissionError('Unknown action')
+                route=urlparse(self.path).path
+                if route not in {'/api/open-file','/api/onboarding/choice','/api/onboarding/connect','/api/onboarding/tour'}:raise PermissionError('Unknown action')
                 length=int(self.headers.get('Content-Length','0'))
-                if not 0<length<=4096:raise ValueError('Invalid request size')
-                data=json.loads(self.rfile.read(length));f=permitted_file(home,data.get('path',''))
+                if not 0<length<=16384:raise ValueError('Invalid request size')
+                data=json.loads(self.rfile.read(length))
+                if not isinstance(data,dict):raise ValueError('Expected a JSON object')
+                if route.startswith('/api/onboarding/'):
+                    from .onboarding import choose,connect_langfuse,tour_shown
+                    if route.endswith('/choice'):result=choose(home,data.get('choice'))
+                    elif route.endswith('/tour'):result=tour_shown(home,data.get('report_url'))
+                    else:result=connect_langfuse(home,**{k:data.get(k) for k in ('base_url','project_id','public_key','secret_key','approved_evidence_policy')})
+                    self._send(200,result);return
+                f=permitted_file(home,data.get('path',''))
                 if sys.platform!='darwin':self._send(200,{'path':str(f),'opened':False,'message':'Copy this path into your file manager.'});return
                 subprocess.run(['/usr/bin/open','-R',str(f)],check=True,timeout=5);self._send(200,{'opened':True,'path':str(f)})
             except (ValueError,PermissionError,FileNotFoundError) as exc:self._send(403,{'error':str(exc)})
@@ -293,7 +308,7 @@ def serve(home,port=8775):
             TCPServer.server_bind(self)
             self.server_name='localhost'
             self.server_port=self.server_address[1]
-    server=LoopbackHTTPServer(('127.0.0.1',port),Handler);base='http://127.0.0.1:'+str(server.server_port);path='/'+config['ui_root']+'/index.html' if config['ui_root'] else '/_spielos/index.html';url=base+path+'?'+urlencode({'token':token})
-    write_json(home/'.spielos/report-server.json',{'schema':1,'pid':os.getpid(),'home':str(home),'base_url':base,'url':url,'token':token,'custom_ui':bool(config['ui_root']),'started_at':_now(),'runtime_sha256':runtime_sha});os.chmod(home/'.spielos/report-server.json',0o600)
+    server=LoopbackHTTPServer(('127.0.0.1',port),Handler);base='http://127.0.0.1:'+str(server.server_port);path='/'+config['ui_root']+'/index.html' if config['ui_root'] else '/_spielos/index.html';url=base+quote(path,safe='/')+'?'+urlencode({'token':token})
+    write_json(home/'.spielos/report-server.json',{'schema':1,'pid':os.getpid(),'home':str(home),'base_url':base,'url':url,'token':token,'custom_ui':bool(config['ui_root']),'started_at':_now(),'runtime_sha256':runtime_sha});protect_private(home/'.spielos/report-server.json')
     try:server.serve_forever()
     finally:server.server_close()

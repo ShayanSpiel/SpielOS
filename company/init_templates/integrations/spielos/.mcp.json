@@ -1,12 +1,15 @@
 {
   "mcpServers": {
     "spielos": {
-      "command": "/bin/sh",
+      "command": "python3",
       "args": [
-        "${PLUGIN_ROOT}/scripts/launch.sh",
+        "-I",
+        "-X",
+        "utf8",
+        "-B",
+        "${CLAUDE_PLUGIN_ROOT}/scripts/entry.py",
         "mcp"
-      ],
-      "cwd": "${PLUGIN_ROOT}"
+      ]
     }
   }
 }

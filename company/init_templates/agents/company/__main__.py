@@ -2,6 +2,10 @@
 from __future__ import annotations
 import argparse,json,os,sqlite3,sys
 from pathlib import Path
+if not __package__:
+    sys.path[0]=str(Path(__file__).resolve().parent.parent)
+    __package__='company'
+from .platform import owned_path
 from .runtime.config import VERSION
 from .runtime.paths import find_project_root,validate_home_destination
 
@@ -136,7 +140,7 @@ def legacy_history(home,*,kind='goals',limit=50):
     if kind not in {'goals','runs','evidence','work_orders','memory','approvals'} or not 1<=limit<=500:raise ValueError('Choose a bounded legacy history population')
     home=validate_home_destination(home)
     if (home/'.spielos/layout.json').is_file():authority_for(home)
-    elif os.environ.get('SPIELOS_PRINCIPAL_TOKEN') or home.stat().st_uid!=os.getuid():
+    elif os.environ.get('SPIELOS_PRINCIPAL_TOKEN') or not owned_path(home):
         raise PermissionError('Legacy history requires its local filesystem owner until migration establishes company authority')
     path=home/'.spielos/state/company.sqlite'
     if not path.is_file():return {'records':[],'policy':'read_only; never resumed or replayed'}
@@ -177,6 +181,9 @@ def owner_text(command,output):
 
 
 def main(argv=None):
+    for stream in (sys.stdout,sys.stderr):
+        if hasattr(stream,'reconfigure'):stream.reconfigure(encoding='utf-8')
+    os.environ.setdefault('PYTHONUTF8','1')
     argv=list(sys.argv[1:] if argv is None else argv)
     if argv in (['--version'],['-V']):print('spielos '+VERSION);return 0
     # Clear retirement is preferable to accidentally initializing the old loop.

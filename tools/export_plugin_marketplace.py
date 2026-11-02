@@ -20,15 +20,21 @@ def export(destination):
         'plugins': [{'name': 'spielos', 'category': 'Business & Operations', 'source': {'source': 'local', 'path': './spielos'},
                      'policy': {'installation': 'AVAILABLE', 'authentication': 'ON_USE'}}],
     }, indent=2) + '\n')
+    claude = output / '.claude-plugin/marketplace.json'
+    claude.parent.mkdir(parents=True)
+    claude.write_text(json.dumps({'name':'spielos','owner':{'name':'Shayan Spiel'},
+        'metadata':{'description':'The official SpielOS company workspace and workflow plugin.'},
+        'plugins':[{'name':'spielos','source':'./spielos',
+                    'description':'Lasting company context, Director, dashboard and tested workflows.'}]},indent=2)+'\n')
     shutil.copyfile(ROOT / 'README.md', output / 'README.md')
     shutil.copyfile(ROOT / 'LICENSE', output / 'LICENSE')
-    for relative in ('docs/images/spielos-in-codex.png', 'docs/plugin-privacy.md', 'docs/plugin-terms.md'):
+    for relative in ('docs/images/spielos-in-codex.png', 'docs/plugin-privacy.md', 'docs/plugin-terms.md', 'docs/tester-guide.md'):
         target = output / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(ROOT / relative, target)
     # Distribution links point to the reviewed product source rather than missing files.
     readme = output / 'README.md'
-    text = readme.read_text()
+    text = readme.read_text().replace('company/init_templates/integrations/spielos/assets/logo.png', 'spielos/assets/logo.png')
     for relative in ('company/README.md', 'company/ARCHITECTURE.md', 'company/EVALUATION.md',
                      'docs/reviews/2026-11-02-technical-review.md', 'docs/reviews/2026-11-02-ci-repair.md'):
         text = text.replace('](' + relative + ')', '](https://github.com/ShayanSpiel/SpielOS/blob/main/' + relative + ')')

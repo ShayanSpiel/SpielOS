@@ -34,6 +34,7 @@ import sys
 from pathlib import Path
 
 from .config import VERSION
+from ..platform import hook_command,hook_arguments
 from .paths import package_vendored_root, validate_home_destination
 
 # Owner content that `spielos update` must never touch. Everything the
@@ -141,11 +142,11 @@ def _merge_owned_hooks(root: Path, host: str, desired: dict, destination: Path) 
                    f'python3 "{root/suffix}"')
             if host=='claude':forms=(*forms,f'python3 "$CLAUDE_PROJECT_DIR/{suffix}"')
             if command in forms:return True
-            try:parts=shlex.split(command)
+            try:parts=hook_arguments(command)
             except ValueError:continue
-            if host=='codex' and len(parts)==3 and parts[1]=='-B' and parts[2]==str(root/suffix):
+            if len(parts) in {3,5} and parts[-2]=='-B' and parts[-1]==str(root/suffix):
                 import re
-                if Path(parts[0]).is_absolute() and re.fullmatch(r'python(?:3(?:\.\d+)?)?',Path(parts[0]).name):return True
+                if Path(parts[0]).is_absolute() and re.fullmatch(r'python(?:3(?:\.\d+)?)?(?:\.exe)?',Path(parts[0]).name):return True
         return False
     merged={}
     for event,groups in hooks.items():
@@ -171,6 +172,13 @@ def _merge_claude_settings(root: Path) -> list[str]:
     fragment=root/'.claude/settings-fragment.json'
     try:desired=json.loads(fragment.read_text())
     except (OSError,ValueError):return []
+    for groups in desired.get('hooks',{}).values():
+        for group in groups:
+            for hook in group.get('hooks',[]):
+                command=hook.get('command')
+                for name in CLAUDE_HOOK_SCRIPTS:
+                    if command==f'python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/{name}"':
+                        hook['command']=hook_command(sys.executable,root/'.claude/hooks'/name)
     return _merge_owned_hooks(root,'claude',desired,root/'.claude/settings.json')
 
 
@@ -494,10 +502,11 @@ def scaffold(target: Path | None = None, *, force: bool = False,
     if codex_source.is_file():
         written += _merge_owned_hooks(root,'codex',json.loads(codex_source.read_text()),root/'.codex/hooks.json')
 
-    # Resolve owned Codex commands at installation time. A company home need
+    # Resolve owned host commands at installation time. A company home need
     # not be a Git checkout, and hook processes inherit the session cwd.
-    codex_hooks = root / ".codex/hooks.json"
-    if codex_hooks.is_file():
+    for host,relative_config in (('codex','.codex/hooks.json'),):
+        codex_hooks = root / relative_config
+        if not codex_hooks.is_file():continue
         config = json.loads(codex_hooks.read_text())
         changed = False
         owned = {
@@ -505,13 +514,14 @@ def scaffold(target: Path | None = None, *, force: bool = False,
             "python3 .codex/hooks/spielos-attention.py": "spielos-attention.py",
             "python3 .codex/hooks/spielos-observe.py": "spielos-observe.py",
         }
+        if host=='claude':
+            owned={f'python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/{name}"':name for name in CLAUDE_HOOK_SCRIPTS}
         for groups in config.get("hooks", {}).values():
             for group in groups:
                 for hook in group.get("hooks", []):
                     script = owned.get(hook.get("command"))
                     if script:
-                        hook["command"] = shlex.quote(sys.executable)+" -B " + shlex.quote(
-                            str(root / ".codex/hooks" / script))
+                        hook["command"] = hook_command(sys.executable,root / ('.'+host) / 'hooks' / script)
                         changed = True
         if changed:
             codex_hooks.write_text(json.dumps(config, indent=2) + "\n")

@@ -16,6 +16,7 @@ import inspect
 import multiprocessing
 import threading
 import subprocess
+from ..platform import user_id
 import sys
 import os
 import re
@@ -472,7 +473,7 @@ class WorkflowRuntime:
             return actor
         # Direct Python harnesses are trusted local processes, not a team API.
         import os
-        return supplied or f"os:{os.getuid()}"
+        return supplied or f"os:{user_id()}"
 
     def _audit(self, connection, action, subject, payload, *, actor=None):
         connection.execute("INSERT INTO workflow_actor_audit(actor,action,subject,payload_digest,created_at) VALUES(?,?,?,?,?)",

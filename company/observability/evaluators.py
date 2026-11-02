@@ -97,10 +97,11 @@ def desired(runtime):
 
 
 def sync(runtime,client,*,limit=None,pending_only=False):
-    import os,fcntl
-    fd=os.open(runtime.path.parent/'native-evaluators.lock',os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
+    import os
+    from ..platform import open_lock,acquire_lock
+    fd=open_lock(runtime.path.parent/'native-evaluators.lock')
     try:
-        try:fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        try:acquire_lock(fd,blocking=False)
         except BlockingIOError:return []
         return _sync(runtime,client,limit=limit,pending_only=pending_only)
     finally:os.close(fd)

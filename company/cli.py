@@ -66,6 +66,9 @@ def main(argv: list[str] | None = None) -> int:
         environment["PYTHONPATH"] = (
             agents_root + (os.pathsep + existing_path if existing_path else "")
         )
+        if os.name=='nt':
+            import subprocess
+            return subprocess.call([sys.executable,'-B','-m','company',*argv],env=environment)
         os.execve(
             sys.executable,
             [sys.executable, "-B", "-m", "company", *argv],

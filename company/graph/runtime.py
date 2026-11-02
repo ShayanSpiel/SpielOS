@@ -2,7 +2,7 @@
 from contextlib import contextmanager
 from copy import deepcopy
 from datetime import datetime
-import fcntl
+from ..platform import acquire_lock,release_lock
 import json
 import os
 from pathlib import Path
@@ -33,13 +33,13 @@ class GraphRunner:
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open('a') as stream:
             try:
-                fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                acquire_lock(stream.fileno(),blocking=False)
             except BlockingIOError as exc:
                 raise RuntimeError('Another coordinator owns this graph run') from exc
             try:
                 yield
             finally:
-                fcntl.flock(stream, fcntl.LOCK_UN)
+                release_lock(stream.fileno())
 
     def _read(self, path):
         value = json.loads(path.read_text())

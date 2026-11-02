@@ -11,6 +11,7 @@ import json
 import os
 from pathlib import Path
 import uuid
+from .platform import create_alias,is_link,protect_private
 
 OWNER_LAYERS = ('departments','skills','capabilities','connections','strategy','brand','agents/installed')
 VISIBLE_LAYERS = ('strategy','brand','workflows','agents','skills','connections','departments')
@@ -28,7 +29,7 @@ def fingerprint(value):
 def file_digest(path):
     path=Path(path)
     value=hashlib.sha256()
-    if path.is_symlink():
+    if is_link(path):
         return hashlib.sha256(os.readlink(path).encode()).hexdigest()
     with path.open('rb') as stream:
         for block in iter(lambda:stream.read(1024*1024),b''):
@@ -39,13 +40,13 @@ def file_digest(path):
 def inventory(path, *, home):
     path,home=Path(path),Path(home).resolve()
     entries={}
-    items=[path] if path.is_file() or path.is_symlink() else sorted(path.rglob('*'))
+    items=[path] if path.is_file() or is_link(path) else sorted(path.rglob('*'))
     for item in items:
-        if not item.is_file() and not item.is_symlink():continue
-        if item.is_symlink() and not item.resolve().is_relative_to(home):
+        if not item.is_file() and not is_link(item):continue
+        if is_link(item) and not item.resolve().is_relative_to(home):
             raise ValueError(f'External link must be resolved before migration: {item.relative_to(home)}')
         key='.' if item==path else item.relative_to(path).as_posix()
-        entries[key]={'sha256':file_digest(item),'kind':'link' if item.is_symlink() else 'file'}
+        entries[key]={'sha256':file_digest(item),'kind':'link' if is_link(item) else 'file'}
     return entries
 
 
@@ -59,6 +60,7 @@ def write_json(path,value):
         stream.write(json.dumps(value,indent=2)+'\n')
         stream.flush();os.fsync(stream.fileno())
     os.replace(temporary,path)
+    protect_private(path)
 
 
 def legacy_inventory(root):
@@ -139,12 +141,12 @@ class CompanyHome:
         validate_home_destination(self.root)
         for name in ('company','.spielos'):
             path=self.root/name
-            if path.is_symlink() or not path.resolve().is_relative_to(self.root):
+            if is_link(path) or not path.resolve().is_relative_to(self.root):
                 raise ValueError('Company content and private state must remain inside the selected home')
 
     def require_ready(self):
         for journal in (self.root/'.spielos/imports').glob('*/journal.json'):
-            if journal.is_symlink() or json.loads(journal.read_text()).get('status')!='complete':
+            if is_link(journal) or json.loads(journal.read_text()).get('status')!='complete':
                 raise ValueError('A package installation needs recovery before using company definitions')
 
     def owner_path(self,layer):
@@ -158,7 +160,7 @@ class CompanyHome:
         old=self.root/'.agents/company'
         if not (old/'__main__.py').is_file():
             raise ValueError('Select an installed company home before migrating')
-        if old.is_symlink():raise ValueError('Unrecognized runtime link; inspect the home before migrating')
+        if is_link(old):raise ValueError('Unrecognized runtime link; inspect the home before migrating')
         destination=self.root/'.spielos/runtime/company'
         if destination.exists():raise ValueError('Runtime destination already exists; resume the recorded migration instead')
         moves=[]
@@ -172,20 +174,20 @@ class CompanyHome:
                 shipped=set(json.loads(receipt.read_text()).get('files',{}).get('agents',[])) if receipt.is_file() else set()
                 relative=item.relative_to(self.root/'.agents').as_posix()
                 if relative in shipped:continue
-                if not receipt.is_file() and item.is_file() and not item.is_symlink():
+                if not receipt.is_file() and item.is_file() and not is_link(item):
                     from .runtime.bootstrap import template_root
                     template=template_root()/'agents'/relative
                     if template.is_file() and file_digest(template)==file_digest(item):continue
                 target=self.root/'company'/('connections/legacy-capabilities' if layer=='capabilities' else layer)/item.name
-                if target.exists() or target.is_symlink():
+                if target.exists() or is_link(target):
                     raise ValueError(f'Owner path collision: {target.relative_to(self.root)}')
-                if item.is_symlink():
+                if is_link(item):
                     raise ValueError(f'Owner package link needs an explicit rebase: {item.relative_to(self.root)}')
                 entries=inventory(item,home=self.root)
                 # Relative links that leave the moved package require an explicit
                 # rebase decision; never silently change their meaning.
-                for link in ([item] if item.is_symlink() else item.rglob('*')):
-                    if link.is_symlink() and not os.path.isabs(os.readlink(link)) and not link.resolve().is_relative_to(item.resolve() if item.is_dir() else item.parent.resolve()):
+                for link in ([item] if is_link(item) else item.rglob('*')):
+                    if is_link(link) and not os.path.isabs(os.readlink(link)) and not link.resolve().is_relative_to(item.resolve() if item.is_dir() else item.parent.resolve()):
                         raise ValueError(f'Relative link needs an explicit rebase: {link.relative_to(self.root)}')
                 moves.append({'from':item.relative_to(old).as_posix(),'to':target.relative_to(self.root).as_posix(),
                               'inventory':entries,'inventory_digest':fingerprint(entries)})
@@ -212,14 +214,14 @@ class CompanyHome:
             write_json(journal_path,journal)
         old=self.root/'.agents/company'
         runtime=self.root/'.spielos/runtime/company'
-        if old.is_symlink() and old.resolve()!=runtime.resolve():
+        if is_link(old) and old.resolve()!=runtime.resolve():
             raise ValueError('Runtime alias changed after preview')
         if not runtime.exists():
             runtime.parent.mkdir(parents=True,exist_ok=True)
             old.rename(runtime)
-        if not old.is_symlink():
+        if not is_link(old):
             if old.exists():raise ValueError('Runtime compatibility path is occupied')
-            old.symlink_to(os.path.relpath(runtime,old.parent),target_is_directory=True)
+            create_alias(old,runtime)
         for index,operation in enumerate(plan['moves']):
             relative=Path(operation['from']);target_relative=Path(operation['to'])
             expected_target=(Path('company/connections/legacy-capabilities')/Path(*relative.parts[1:]) if relative.parts and relative.parts[0]=='capabilities' else Path('company')/relative)
@@ -232,20 +234,20 @@ class CompanyHome:
                 raise ValueError('Migration source parent escaped the runtime')
             if not target.parent.resolve().is_relative_to(self.root):
                 raise ValueError('Migration destination parent escaped the company')
-            if target.exists() and source.is_symlink():
+            if target.exists() and (is_link(source) or (source.exists() and source.samefile(target))):
                 if source.resolve()!=target.resolve():raise ValueError('Compatibility link points to a different destination')
             elif target.exists() and not source.exists():
                 # Crash after rename, before recording the alias.
                 if fingerprint(inventory(target,home=self.root))!=operation['inventory_digest']:
                     raise ValueError('Moved content changed before recovery')
-                source.symlink_to(os.path.relpath(target,source.parent),target_is_directory=target.is_dir())
+                create_alias(source,target)
             else:
-                if target.exists() or source.is_symlink():raise ValueError('Migration destination changed')
+                if target.exists() or is_link(source):raise ValueError('Migration destination changed')
                 if fingerprint(inventory(source,home=self.root))!=operation['inventory_digest']:
                     raise ValueError('Owner content changed after preview')
                 target.parent.mkdir(parents=True,exist_ok=True)
                 source.rename(target)
-                source.symlink_to(os.path.relpath(target,source.parent),target_is_directory=target.is_dir())
+                create_alias(source,target)
             if index not in journal['completed']:
                 journal['completed'].append(index);write_json(journal_path,journal)
             if after_operation:after_operation(index)
@@ -279,7 +281,7 @@ class CompanyHome:
             for path in sorted(templates.rglob('*')):
                 if not path.is_file():continue
                 target=content/path.relative_to(templates)
-                if target.exists() or target.is_symlink():continue
+                if target.exists() or is_link(target):continue
                 if not target.parent.resolve().is_relative_to(content.resolve()):
                     raise ValueError('Company template path escaped owner content')
                 target.parent.mkdir(parents=True,exist_ok=True)
@@ -313,7 +315,7 @@ class CompanyProfile:
         self.home=CompanyHome(home);self.authority=CompanyAuthority(home)
         self.principal=principal;self.authority.authorize(principal,'read')
         self.path=self.home.content/'profile.md'
-        if self.path.is_symlink() or not self.path.resolve().is_relative_to(self.home.content):
+        if is_link(self.path) or not self.path.resolve().is_relative_to(self.home.content):
             raise ValueError('Company profile must remain in its selected home')
 
     def read(self):

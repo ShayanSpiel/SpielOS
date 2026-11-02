@@ -3,12 +3,16 @@
   "mcpServers": {
     "spielos": {
       "type": "stdio",
-      "command": "/bin/sh",
+      "command": "python3",
       "args": [
-        "${PLUGIN_ROOT}/scripts/launch.sh",
+        "-I",
+        "-X",
+        "utf8",
+        "-B",
+        "scripts/entry.py",
         "mcp"
       ],
-      "cwd": "${PLUGIN_ROOT}"
+      "cwd": "."
     }
   }
 }

@@ -7,10 +7,10 @@ explicit owner command, stored as hashes and scoped to one company.
 from __future__ import annotations
 from dataclasses import dataclass,field
 from contextlib import contextmanager
-import fcntl
 import hashlib,hmac,json,os,secrets,time
 from pathlib import Path
 from .home import CompanyHome,canonical,write_json
+from .platform import user_id,is_private,protect_private,is_link,locked_file
 
 ROLE_ACTIONS={
  'owner':{'configure','build','run','evaluate','review','approve','read','export','memory'},
@@ -44,39 +44,36 @@ class CompanyAuthority:
         self.home.require_destination()
         if self.root.is_symlink() or not self.root.parent.resolve().is_relative_to(self.home.root):
             raise PermissionError('Authentication directory must remain inside this company')
+        created=not self.root.exists()
         self.root.mkdir(parents=True,exist_ok=True,mode=0o700)
-        metadata=self.root.stat()
-        if metadata.st_uid!=os.getuid() or metadata.st_mode&0o077:
+        if created:protect_private(self.root)
+        if not is_private(self.root):
             raise PermissionError('Authentication directory must be private and owner controlled')
         if not self.key_path.exists():
             descriptor=os.open(self.key_path,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
             with os.fdopen(descriptor,'w') as stream:stream.write(secrets.token_hex(32))
+            protect_private(self.key_path)
         if not self.policy_path.exists():
             write_json(self.policy_path,{'schema':1,'company_id':self.company_id,
-                'owner_uid':os.getuid(),'bearer_principals':{}})
-            self.policy_path.chmod(0o600)
+                'owner_uid':user_id(),'bearer_principals':{}})
+            protect_private(self.policy_path)
 
     @contextmanager
     def _lock(self):
         self._key()
         path=self.root/'policy.lock'
-        descriptor=os.open(path,os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
-        try:
-            fcntl.flock(descriptor,fcntl.LOCK_EX)
+        with locked_file(path):
             yield
-        finally:
-            fcntl.flock(descriptor,fcntl.LOCK_UN);os.close(descriptor)
 
     def _key(self):
-        if self.root.is_symlink() or self.root.stat().st_mode&0o077 or self.root.stat().st_uid!=os.getuid():
+        if not is_private(self.root):
             raise PermissionError('Company authentication directory is not private')
-        if self.key_path.is_symlink() or self.policy_path.is_symlink():
+        if is_link(self.key_path) or is_link(self.policy_path):
             raise PermissionError('Authentication files cannot be symbolic links')
         if not self.key_path.is_file() or not self.policy_path.is_file():
             raise PermissionError('Company authentication is not configured')
         for path in (self.key_path,self.policy_path):
-            metadata=path.stat()
-            if metadata.st_uid!=os.getuid() or metadata.st_mode&0o077:
+            if not is_private(path):
                 raise PermissionError('Company authentication requires private owner-controlled files')
         return self.key_path.read_bytes()
 
@@ -93,8 +90,8 @@ class CompanyAuthority:
 
     def local_owner(self):
         policy=self._policy()
-        if policy['owner_uid']!=os.getuid():raise PermissionError('The current OS user does not own this company')
-        return self._principal(f'os:{os.getuid()}',('owner',),int(time.time())+3600)
+        if policy['owner_uid']!=user_id():raise PermissionError('The current OS user does not own this company')
+        return self._principal(f'os:{user_id()}',('owner',),int(time.time())+3600)
 
     def authorize(self,principal,action):
         if not isinstance(principal,Principal) or principal.company_id!=self.company_id:
@@ -104,7 +101,7 @@ class CompanyAuthority:
             raise PermissionError('Authentication is invalid or expired')
         policy=self._policy()
         if principal.subject.startswith('os:'):
-            if principal.subject!=f'os:{policy["owner_uid"]}' or policy['owner_uid']!=os.getuid():
+            if principal.subject!=f'os:{policy["owner_uid"]}' or policy['owner_uid']!=user_id():
                 raise PermissionError('The owner identity no longer applies')
         else:
             record=policy['bearer_principals'].get(principal.subject,{})

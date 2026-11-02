@@ -1,20 +1,20 @@
 {
   "name": "spielos",
-  "version": "10.3.6",
-  "description": "Keep your company context across chats. Build recurring workflows, test real outputs, and review the evidence before you rely on them.",
+  "version": "10.3.10",
+  "description": "Build lead research, outbound email and recurring company workflows with lasting context, a live dashboard and real evaluation evidence.",
   "skills": "./skills/",
-  "mcpServers": "./.mcp.json",
+  "mcpServers": "./mcp.json",
   "interface": {
     "displayName": "SpielOS",
-    "shortDescription": "Company work, clearly tracked.",
-    "longDescription": "Keep your company context across chats and see what happened. SpielOS brings a lasting company workspace, reusable workflows, scoped memory and a live local dashboard into Codex.\n\nUse Setup to choose a company folder, Director to operate it, Dashboard to inspect work, and Help for available skills. Setup prepares private local activity recording and bounded review; Langfuse stays disconnected until you choose a project. The desktop plugin includes the same SpielOS runtime used by the company workspace and dashboard; no separate SpielOS CLI installation is needed. Your Mac or Linux computer needs Python 3.11 or newer, and setup checks that requirement without asking you to copy Python commands.\n\nInspect workflows, runs, memory, supplied context and reported usage in the dashboard. Company hooks restore relevant context and request bounded evaluations. At the end of meaningful chats, the assistant presents a tracking receipt with actual review/delivery status, report/trace links and exposed token/cost information. These are host-rendered Markdown receipts; unavailable usage and billing remain unknown.\n\nBuild workflows with pinned implementation and evaluation criteria. Experiments run representative, held-out and negative cases. Langfuse recording requires your explicitly selected project and evidence policy; pending delivery is not remote verification. A passing test is distinct from a measured improvement, and independent release review remains separate from publication permission.\n\nCompany files stay in the folder you select. Installation alone creates no company, enables no provider and trusts no hooks automatically. The current supported target is trusted local macOS/Linux use; native Windows and enterprise isolation are not qualified.",
+    "shortDescription": "Your company, built to improve",
+    "longDescription": "Build the way your company works, then improve it with evidence. Ask Director to build an outbound email workflow for your ICP, research and score leads with sources, or turn a recurring report into a tested process. These are guided workflow builds with agreed inputs, selected sources and review before consequential actions.\n\nSpielOS keeps your company context, scoped memory, workflows and decisions in a folder you control. The desktop plugin carries the canonical Python runtime used by its dashboard. Setup checks prerequisites on supported desktop systems; you do not need a separate SpielOS CLI or Python commands.\n\nOnboarding asks whether to connect Langfuse now or continue locally. A local connection form verifies your selected project; keys stay out of chat and public files. After your first meaningful chat, Director shows your dashboard and explains Home, History & examples, Quality & learning, Activity & cost, memory and loaded context.\n\nReviewed company hooks restore context and request bounded same-host reviews. Chat receipts show real review/delivery status and host-exposed usage. Missing tokens and billed cost stay unknown. Receipts are Markdown in the chat, not arbitrary native cards.\n\nTest pinned implementations against representative, held-out and negative cases. Local tracking, drafts and candidate experiments need no Langfuse account. New production workflow qualification requires verified Langfuse evidence and independent review. Sending and publishing require separate exact-action approval. A passing test alone does not prove improvement or business impact.\n\nInstallation creates no company, trusts no hooks and enables no service. Company-specific data and designs stay outside the plugin. This is trusted local software; enterprise isolation and untrusted-code sandboxing are not claimed.",
     "developerName": "Shayan Spiel",
     "category": "Business & Operations",
     "capabilities": [],
     "defaultPrompt": [
-      "Set up a company workspace for me.",
-      "Help me turn a recurring task into a tested workflow.",
-      "Show my company work, memory and pending decisions."
+      "Director, build an outbound email workflow for [ICP]. Research fit, draft emails and require review before sending.",
+      "Director, build a lead research agent for [ICP] that cites sources and explains each fit score.",
+      "Director, turn our [recurring task] into a tested workflow. Agree quality criteria and compare actual results."
     ],
     "websiteURL": "https://github.com/ShayanSpiel/SpielOS",
     "supportURL": "https://github.com/ShayanSpiel/SpielOS/issues",
