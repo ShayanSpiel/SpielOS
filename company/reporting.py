@@ -3,8 +3,8 @@ from __future__ import annotations
 import argparse, hashlib, json, mimetypes, os, secrets, subprocess, sys, time
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import urlparse, parse_qs, urlencode, unquote
-from .platform import protect_private
+from urllib.parse import urlparse, parse_qs, urlencode, unquote,quote
+from .platform import protect_private,is_link
 
 VERSION='spielos-report/1'
 
@@ -19,16 +19,17 @@ def configuration(home):
     custom=data.get('ui_root')
     if custom:
         p=Path(custom)
-        if p.is_absolute() or '..' in p.parts or not p.parts or not str(p).startswith('.spielos/artifacts/'):
+        if p.is_absolute() or '..' in p.parts or p.parts[:2]!=('.spielos','artifacts'):
             raise ValueError('Custom report UI must be explicitly contained in company artifacts')
-        if not (home/p/'index.html').is_file() or any((home/Path(*p.parts[:i])).is_symlink() for i in range(1,len(p.parts)+1)):
+        if not (home/p/'index.html').is_file() or any(is_link(home/Path(*p.parts[:i])) for i in range(1,len(p.parts)+1)):
             raise ValueError('Custom report UI is missing or symbolic')
+        custom=p.as_posix()
     return {'schema':1,'ui_root':custom,'custom_name':data.get('custom_name'),'port':data.get('port',8775)}
 
 def permitted_file(home,path):
     """No state/credentials, traversal or symlink escapes, even within an allowed root."""
-    home=Path(home).resolve();name=unquote(str(path)).lstrip('/');p=Path(name)
-    if p.is_absolute() or '..' in p.parts or not p.parts:raise PermissionError('File is outside the report scope')
+    home=Path(home).resolve();name=unquote(str(path)).replace('\\','/').lstrip('/');p=Path(name)
+    if p.is_absolute() or '..' in p.parts or not p.parts or any(':' in part for part in p.parts):raise PermissionError('File is outside the report scope')
     if any(x.startswith('.') and x!='.spielos' or x.lower() in {'credentials','security','connections','private-inputs','node_modules'} for x in p.parts):
         # Only the pinned icon font CSS is a useful exception, never a general dependency server.
         if not name.startswith('company/departments/videography/remotion/node_modules/boxicons/'):
@@ -36,7 +37,7 @@ def permitted_file(home,path):
     allowed=name=='company/profile.md' or name.startswith(('company/strategy/','company/brand/','company/workflows/','company/skills/','company/agents/installed/','.spielos/artifacts/','company/departments/'))
     if not allowed:raise PermissionError('File is outside the report scope')
     for i in range(1,len(p.parts)+1):
-        if (home/Path(*p.parts[:i])).is_symlink():raise PermissionError('Symbolic files are not served')
+        if is_link(home/Path(*p.parts[:i])):raise PermissionError('Symbolic files are not served')
     f=home/p
     if not f.resolve().is_relative_to(home) or not f.is_file():raise FileNotFoundError('Report file not found')
     return f
@@ -210,7 +211,7 @@ def ensure_server(home,*,open_browser=False,port=None):
         config=configuration(home);log=os.open(home/'.spielos/state/report-server.log',os.O_CREAT|os.O_APPEND|os.O_WRONLY,0o600)
         env={**os.environ,'PYTHONDONTWRITEBYTECODE':'1','PYTHONPATH':str(Path(__file__).resolve().parent.parent)}
         try:
-            process=subprocess.Popen([sys.executable,'-B','-m','company','report','--serve','--home',str(home),'--port',str(config['port'] if port is None else port)],cwd=home,env=env,stdout=log,stderr=log,**detached_process())
+            process=subprocess.Popen([sys.executable,'-B','-m','company','report','--serve','--home',str(home),'--port',str(config['port'] if port is None else port)],cwd=home,env=env,stdin=subprocess.DEVNULL,stdout=log,stderr=log,**detached_process())
         finally:os.close(log)
         deadline=time.monotonic()+15
         while time.monotonic()<deadline:
@@ -257,7 +258,7 @@ def serve(home,port=8775):
                     self._send(200,status(home));return
                 if route=='/api/document':self._send(200,_document(home,query.get('path',[''])[0]));return
                 if route in ('/','/index.html'):
-                    target='/'+config['ui_root']+'/index.html' if config['ui_root'] else '/_spielos/index.html';self.send_response(303);self.send_header('Location',target);self.end_headers();return
+                    target='/'+config['ui_root']+'/index.html' if config['ui_root'] else '/_spielos/index.html';self.send_response(303);self.send_header('Location',quote(target,safe='/'));self.end_headers();return
                 if route.startswith('/_spielos/'):
                     f=Path(__file__).parent/'report_ui'/route.rsplit('/',1)[1]
                     if f.name not in {'index.html','report.js','report.css','workspace.js','workspace.css','logo.png'}:raise PermissionError('Unknown report asset')
@@ -307,7 +308,7 @@ def serve(home,port=8775):
             TCPServer.server_bind(self)
             self.server_name='localhost'
             self.server_port=self.server_address[1]
-    server=LoopbackHTTPServer(('127.0.0.1',port),Handler);base='http://127.0.0.1:'+str(server.server_port);path='/'+config['ui_root']+'/index.html' if config['ui_root'] else '/_spielos/index.html';url=base+path+'?'+urlencode({'token':token})
+    server=LoopbackHTTPServer(('127.0.0.1',port),Handler);base='http://127.0.0.1:'+str(server.server_port);path='/'+config['ui_root']+'/index.html' if config['ui_root'] else '/_spielos/index.html';url=base+quote(path,safe='/')+'?'+urlencode({'token':token})
     write_json(home/'.spielos/report-server.json',{'schema':1,'pid':os.getpid(),'home':str(home),'base_url':base,'url':url,'token':token,'custom_ui':bool(config['ui_root']),'started_at':_now(),'runtime_sha256':runtime_sha});protect_private(home/'.spielos/report-server.json')
     try:server.serve_forever()
     finally:server.server_close()

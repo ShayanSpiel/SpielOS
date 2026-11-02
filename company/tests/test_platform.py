@@ -60,3 +60,10 @@ class PlatformTests(unittest.TestCase):
         with self.assertRaises(PermissionError):authority.authorize(authority.authenticate(token),'run')
         scaffold(home,force=True,keep_stale=True)
         self.assertEqual((home/'.agents/company').resolve(),(home/'.spielos/runtime/company').resolve())
+
+    def test_report_paths_accept_native_separators_without_accepting_traversal_or_streams(self):
+        from company.reporting import _document,permitted_file
+        home=self.root/'Company';scaffold(home,keep_stale=True)
+        self.assertEqual(_document(home,'company\\profile.md')['path'],'company/profile.md')
+        for unsafe in ('company\\..\\.spielos\\security\\authority.key','company/profile.md:secret'):
+            with self.assertRaises(PermissionError):permitted_file(home,unsafe)
