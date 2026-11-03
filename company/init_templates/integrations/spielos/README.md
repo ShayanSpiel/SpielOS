@@ -1,33 +1,39 @@
 # SpielOS
 
-**Your company. Workflows you can test and improve.**
+**Give your AI a company to work for—and work it can get better at.**
 
-Ask Director to build an outbound email workflow for **[ICP]**, research and score leads with cited sources, or turn a recurring report into a tested process. Keep your company facts, strategy, brand, context and evidence together across conversations.
+SpielOS turns recurring business work into reusable workflows for Codex and Claude Code. Research leads, prepare reports or draft outbound campaigns with Director. Keep your company context, decisions and results together in a workspace you control.
 
 ## Install and start
 
-[Install in ChatGPT desktop / Codex](https://github.com/ShayanSpiel/SpielOS-Plugin#chatgpt-and-codex) · [Install in Claude Code](https://github.com/ShayanSpiel/SpielOS-Plugin#claude-code)
+Both desktop routes need Python 3.11+ available as `python3`. The plugin includes SpielOS code; you do not need to install the CLI. If Python is missing, install it from [python.org](https://www.python.org/downloads/) or your package manager and restart your host. On Windows, [check the Python alias](https://docs.python.org/3/using/windows.html#troubleshooting) if `python3` does not work.
 
-Run Setup and choose your company folder. No separate SpielOS CLI or Python commands are needed from you. The plugin includes its Python runtime code; setup checks Python 3.11+ and the `python3` command on your supported desktop, and guides missing prerequisites. It does not silently install software or trust hooks.
+**Codex:** paste this into your chat:
 
-Codex: choose **Director**, **Dashboard** or **Help**, or invoke `$spielos:director`, `$spielos:dashboard`, `$spielos:help`. Claude Code: use `/spielos:director`, `/spielos:dashboard`, `/spielos:help`. Director is the role of your main chat, not another agent you must spawn.
+> Install SpielOS from the ShayanSpiel/SpielOS-Plugin GitHub marketplace, then run its setup.
 
-Try: “Director, build an outbound email workflow for [ICP]. Research fit, draft emails and require review before sending.” Or: “Build a lead research agent for [ICP] that cites sources and explains its fit scores.” These are guided builds using sources and permissions selected for your company.
+If prompted, select **SpielOS → Setup** or enter `$spielos:setup`.
 
-## Your first conversation
+**Claude Code:** enter these commands one at a time:
 
-Setup asks whether to connect Langfuse now or continue locally. Enter project keys only in the authenticated local connection form, never chat. The exact project must verify before export is enabled. Existing connection policies are preserved.
+```text
+/plugin marketplace add ShayanSpiel/SpielOS-Plugin
+/plugin install spielos@spielos
+/spielos:setup
+```
 
-Open the selected company folder as your host workspace and review its hooks normally. After the first meaningful chat, Director presents your dashboard and explains Home, History & examples, Quality & learning, Activity & cost, Memory, Loaded context and Langfuse delivery. The same Work & learning interface is shared with the product reference, using your actual records and empty states.
+Choose a new company folder or an existing SpielOS company. Setup checks your prerequisites and asks whether to connect Langfuse or continue locally. Then open that company folder as your workspace and review its hooks through your host's normal controls.
 
-Meaningful chats end with a **Work tracked** Markdown receipt showing actual review/delivery status, report/trace links where available and exposed usage. Missing tokens, hidden reasoning and actual billing are not invented. A self-review is diagnostic, not independent acceptance.
+## Give Director a first job
 
-## Tested work and clear permission
+> Director, build a lead research workflow for [describe your ideal customer]. Find relevant companies, cite your sources, and explain why each one fits.
 
-Experiments execute pinned versions against representative, held-out and negative cases. Local tracking, drafts and candidate experiments need no Langfuse account. New production qualification requires verified Langfuse evidence and independent review. A passing test does not by itself establish better business results. A complete before/after improvement scorecard is not implemented.
+Director helps define the inputs, sources, permissions and quality criteria, then build and test the workflow. After a meaningful conversation, ask to see your dashboard: it shows actual work, pending decisions, context and available evidence. New companies start with empty records.
 
-Company files and credentials stay in the folder you choose, outside the plugin. Updating or uninstalling the plugin does not delete it. Installation alone creates no company, connects no provider and trusts no hooks. Sending and publishing require authorization for the exact action and destination. Activepieces remains inactive.
+Use `$spielos:director`, `$spielos:dashboard` and `$spielos:help` in Codex, or `/spielos:director`, `/spielos:dashboard` and `/spielos:help` in Claude Code. Director is the role of your main chat.
 
-[Tester guide and device prerequisites](https://github.com/ShayanSpiel/SpielOS/blob/main/docs/tester-guide.md) · [Source](https://github.com/ShayanSpiel/SpielOS) · [Support](https://github.com/ShayanSpiel/SpielOS/issues) · [Privacy](https://github.com/ShayanSpiel/SpielOS/blob/main/docs/plugin-privacy.md) · [Terms](https://github.com/ShayanSpiel/SpielOS/blob/main/docs/plugin-terms.md)
+Your company folder stays yours when the plugin is updated or removed. Local tracking, drafts and candidate experiments do not need Langfuse. If you connect it, enter keys in the private local form, never in chat; the selected project must verify before export. Production workflow qualification currently requires verified Langfuse evidence and independent review. Sending and publishing require separate approval for the exact action. A test pass alone does not prove improvement or business impact.
 
-This is trusted local software, not an untrusted-code sandbox or enterprise isolation service. The public GitHub marketplace and a private account save are separate from public-directory approval. Web execution is not qualified by this desktop package.
+[Full guide and CLI installation](https://github.com/ShayanSpiel/SpielOS#readme) · [Tester guide](https://github.com/ShayanSpiel/SpielOS/blob/main/docs/tester-guide.md) · [Support](https://github.com/ShayanSpiel/SpielOS/issues) · [Privacy](https://github.com/ShayanSpiel/SpielOS/blob/main/docs/plugin-privacy.md) · [Terms](https://github.com/ShayanSpiel/SpielOS/blob/main/docs/plugin-terms.md)
+
+This is trusted local software; enterprise isolation and untrusted-code sandboxing are not claimed. The manual marketplace installation supports desktop hosts with local execution, not ChatGPT web or Claude web.
