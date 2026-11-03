@@ -56,6 +56,25 @@ class ReceiptTests(unittest.TestCase):
         client=BulkMemory();drain(self.r,seconds=18,limit=40,client=client)
         self.assertTrue(any(o['metadata'].get('event_digest')==root['id'] for o in client.observations))
 
+    def test_workflow_events_are_selected_alongside_activity_backlog(self):
+        from unittest.mock import patch
+        from company.observability.automatic import drain
+        from company.tests.test_continuous_evaluation import BulkMemory
+        from company.tests.test_bounded_workflow_runs import manifest,identity
+        from company.workflows.runs import LocalAdapter
+        sessions=Sessions(self.r);sid=sessions.start(host='manual',host_session='fair-queue')['id']
+        for n in range(50):sessions.record(sid,kind='tool',request_key=str(n),payload={'tool_name':'Synthetic operation'})
+        self.r.adapters['local']=LocalAdapter(identity)
+        release=self.r.candidate(manifest());run=self.r.run(release,{'text':'one'},request_key='fair-run',candidate_case='reference')
+        config=json.loads((self.home/'.spielos/telemetry.json').read_text());config['project_id']='synthetic-project'
+        (self.home/'.spielos/telemetry.json').write_text(json.dumps(config))
+        client=BulkMemory()
+        with patch('company.observability.evaluators.sync',return_value=None):
+            result=drain(self.r,seconds=18,limit=8,client=client)
+        with self.r.connect() as c:
+            states=[r[0] for r in c.execute('SELECT status FROM workflow_export_outbox WHERE run_id=?',(run['id'],))]
+        self.assertTrue(any(state!='pending' for state in states),(states,result))
+
     def test_unresolved_native_setup_never_blocks_activity_transport(self):
         from unittest.mock import patch
         from company.observability.automatic import drain
