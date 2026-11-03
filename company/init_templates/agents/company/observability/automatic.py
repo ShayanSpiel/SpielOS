@@ -193,15 +193,19 @@ def drain(runtime,*,seconds=18,limit=80,reconcile_exhausted=False,client=None):
             except (ExportError,ValueError,RuntimeError) as exc:
                 native_issue=('Native definition setup is rate limited' if getattr(exc,'status',None)==429 else 'Native definitions pending: '+str(exc))+'; activity delivery continues separately'
             finally:client.deadline=native_deadline
-        selected=[]
+        queues=[]
         for table in ('activity_exports','workflow_export_outbox'):
             with runtime.connect() as c:
                 if reconcile_exhausted:c.execute("UPDATE "+table+" SET status='awaiting_readback',last_error='Explicitly reopened for readback; no blind resend' WHERE status='exhausted'")
                 recent=[r[0] for r in c.execute("SELECT id FROM "+table+" WHERE status IN ('pending','awaiting_readback','sending') ORDER BY rowid DESC LIMIT ?",(limit//4,))]
                 oldest=[r[0] for r in c.execute("SELECT id FROM "+table+" WHERE status IN ('pending','awaiting_readback','sending') ORDER BY rowid LIMIT ?",(limit//2-len(recent),))]
-            selected.extend((table,identity) for identity in dict.fromkeys(recent+oldest))
+            queues.append([(table,identity) for identity in dict.fromkeys(recent+oldest)])
+        # Alternate queues so a large activity backlog cannot consume the whole wake.
+        from itertools import zip_longest
+        selected=[item for pair in zip_longest(*queues) for item in pair if item is not None]
         ready=[];new=[];results=[]
         if not client._project_verified:client.verify_project()
+        experiments_synced=False
         for table,identity in selected:
             if time.monotonic()>=client.deadline-seconds/2:break
             with runtime.connect() as c:row=dict(c.execute('SELECT * FROM '+table+' WHERE id=?',(identity,)).fetchone())
@@ -213,7 +217,8 @@ def drain(runtime,*,seconds=18,limit=80,reconcile_exhausted=False,client=None):
                 if event is None:continue
             if event.get('experiment_id'):
                 from .experiments import sync_resources,enrich_event
-                sync_resources(runtime,client)
+                if not experiments_synced:
+                    sync_resources(runtime,client);experiments_synced=True
                 event=enrich_event(runtime,client,event)
                 if event is None:continue
             if row['status']=='pending':new.append((row,event))

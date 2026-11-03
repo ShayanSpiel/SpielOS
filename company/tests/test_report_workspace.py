@@ -21,6 +21,18 @@ class ReportTests(unittest.TestCase):
     def request(self,s,path,*,auth=True,method='GET',headers=None,data=None):
         h={'Authorization':'Bearer '+s['token']} if auth else {};h.update(headers or {})
         return urllib.request.urlopen(urllib.request.Request(s['base_url']+path,method=method,headers=h,data=json.dumps(data).encode() if data else None),timeout=10)
+    def test_recorded_candidate_remains_visible_without_definition(self):
+        spec=manifest();spec['id']='historical-candidate';spec['purpose']='Synthetic recorded candidate'
+        self.r.adapters['local']=LocalAdapter(identity)
+        release=self.r.candidate(spec)
+        self.r.run(release,{'text':'one'},request_key='historical',candidate_case='reference')
+        data=snapshot(self.home)
+        rows=[w for w in data['workflows'] if w['id']=='historical-candidate']
+        self.assertEqual(len(rows),1)
+        self.assertEqual(rows[0]['candidate_runs'],1)
+        self.assertEqual(rows[0]['readiness'],'recorded candidate; definition unavailable')
+        self.assertIsNone(rows[0]['path'])
+
     def test_loopback_server_starts_without_reverse_dns(self):
         from unittest.mock import patch
         from company.reporting import serve
