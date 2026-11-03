@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "spielos",
-  "version": "10.3.12",
+  "version": "10.3.13",
   "description": "Turn recurring business work into reusable AI workflows with company context, evaluation and review.",
   "license": "MIT",
   "extensions": {
