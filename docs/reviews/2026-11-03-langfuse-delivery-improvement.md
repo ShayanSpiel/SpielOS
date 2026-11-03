@@ -9,3 +9,5 @@ Acceptance: tests exercise queue fairness and slow/unavailable resource setup, p
 ## Local verification
 
 The focused delivery, evaluation and reporting tests passed (42 tests); the scenario suite passed (66 verified scenarios); an isolated installed wheel passed its 14-check local journey. Runtime template parity, source boundary and patch whitespace checks passed. These checks do not establish remote qualification or independent acceptance. Queue progress requires later host-triggered wakes; no polling daemon or scheduler is installed. Uncertain sends are read back without blind re-ingestion, and malformed historical records remain preserved and unqualified.
+
+A follow-up regression distinguishes definite pre-send failures from ambiguous remote creation: only definitely unsent evaluator or rule requests return to the retryable state; ambiguous creates remain readback-only. Focused tests cover both paths.

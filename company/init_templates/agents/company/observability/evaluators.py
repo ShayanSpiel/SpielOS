@@ -111,6 +111,7 @@ def _sync(runtime,client,*,limit=None,pending_only=False,only_key=None):
     """Journal resource creation; lost responses are resolved by exact readback."""
     from ..workflows.runs import canonical
     from .sessions import policy
+    from .langfuse import ExportError
     config=policy(runtime)
     if client.project_id!=config.get('project_id') or client.base_url!=config.get('base_url'):raise PermissionError('Native evaluation destination differs from the approved company')
     if not client._project_verified:client.verify_project()
@@ -141,7 +142,12 @@ def _sync(runtime,client,*,limit=None,pending_only=False,only_key=None):
         if not found:
             if state['status']=='creating_evaluator':raise ValueError('An evaluator creation is unresolved; inspect exact native resource readback')
             with runtime.connect() as c:c.execute("UPDATE native_evaluation_definitions SET status='creating_evaluator' WHERE key=?",(key,))
-            created=client.request('POST','/api/public/v2/evaluators',e);evaluators.append(created);found=[created]
+            try:created=client.request('POST','/api/public/v2/evaluators',e)
+            except ExportError as exc:
+                if not exc.ambiguous:
+                    with runtime.connect() as c:c.execute("UPDATE native_evaluation_definitions SET status='pending',last_error=? WHERE key=?",(str(exc),key))
+                raise
+            evaluators.append(created);found=[created]
         evaluator=client.request('GET','/api/public/v2/evaluators/'+quote(found[0]['id'],safe=''))
         if evaluator.get('sourceCode')!=SOURCE:raise ValueError('Native evaluator code differs from the approved definition')
         rule={**item['rule'],'evaluatorAssignments':[{'evaluatorId':evaluator['id'],'variableMapping':None}]}
@@ -150,7 +156,12 @@ def _sync(runtime,client,*,limit=None,pending_only=False,only_key=None):
         if not found_rules:
             if state['status']=='creating_rule':raise ValueError('A rule creation is unresolved; inspect exact native resource readback')
             with runtime.connect() as c:c.execute("UPDATE native_evaluation_definitions SET status='creating_rule',evaluator_id=? WHERE key=?",(evaluator['id'],key))
-            created=client.request('POST','/api/public/v2/evaluation-rules',rule);rules.append(created);found_rules=[created]
+            try:created=client.request('POST','/api/public/v2/evaluation-rules',rule)
+            except ExportError as exc:
+                if not exc.ambiguous:
+                    with runtime.connect() as c:c.execute("UPDATE native_evaluation_definitions SET status='pending',last_error=? WHERE key=?",(str(exc),key))
+                raise
+            rules.append(created);found_rules=[created]
         actual=client.request('GET','/api/public/v2/evaluation-rules/'+quote(found_rules[0]['id'],safe=''))
         if actual.get('enabled') is not True or actual.get('sampling')!=1 or actual.get('filter')!=rule['filter']:raise ValueError('Native rule differs from the exact company/category/sampling contract')
         with runtime.connect() as c:c.execute("UPDATE native_evaluation_definitions SET evaluator_id=?,rule_id=?,status='verified',last_error=NULL WHERE key=?",(evaluator['id'],actual['id'],key))

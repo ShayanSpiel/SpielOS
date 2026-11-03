@@ -138,6 +138,36 @@ class ReceiptTests(unittest.TestCase):
             with patch('company.observability.automatic.time.time',return_value=1016):drain(self.r,seconds=18,limit=16,client=client)
         self.assertEqual({call.kwargs['only_key'] for call in sync.call_args_list},{'synthetic-a','synthetic-b'})
 
+    def test_native_creation_retries_only_after_definitely_unsent_failure(self):
+        from company.observability.evaluators import sync
+        from company.observability.langfuse import ExportError
+        from company.tests.test_continuous_evaluation import NativeMemory
+        config=json.loads((self.home/'.spielos/telemetry.json').read_text());config['project_id']='synthetic-project'
+        (self.home/'.spielos/telemetry.json').write_text(json.dumps(config))
+        class Failed(NativeMemory):
+            def __init__(self,ambiguous):super().__init__();self.ambiguous=ambiguous
+            def request(self,method,path,payload=None):
+                if method=='POST' and path=='/api/public/v2/evaluators':raise ExportError('synthetic failure',ambiguous=self.ambiguous)
+                return super().request(method,path,payload)
+        for ambiguous,expected in [(False,'pending'),(True,'creating_evaluator')]:
+            with self.assertRaises(ExportError):sync(self.r,Failed(ambiguous),limit=1)
+            with self.r.connect() as c:state=c.execute("SELECT status FROM native_evaluation_definitions WHERE status=?",(expected,)).fetchone()
+            self.assertIsNotNone(state)
+
+    def test_definitely_unsent_native_rule_can_retry(self):
+        from company.observability.evaluators import sync
+        from company.observability.langfuse import ExportError
+        from company.tests.test_continuous_evaluation import NativeMemory
+        config=json.loads((self.home/'.spielos/telemetry.json').read_text());config['project_id']='synthetic-project'
+        (self.home/'.spielos/telemetry.json').write_text(json.dumps(config))
+        class FailedRule(NativeMemory):
+            def request(self,method,path,payload=None):
+                if method=='POST' and path=='/api/public/v2/evaluation-rules':raise ExportError('synthetic throttle',status=429)
+                return super().request(method,path,payload)
+        with self.assertRaises(ExportError):sync(self.r,FailedRule(),limit=1)
+        with self.r.connect() as c:row=c.execute("SELECT status,evaluator_id FROM native_evaluation_definitions WHERE last_error='synthetic throttle'").fetchone()
+        self.assertEqual(row['status'],'pending');self.assertIsNotNone(row['evaluator_id'])
+
     def test_resource_sync_stops_before_recording_attempt_after_deadline(self):
         import time
         from company.observability.experiments import ensure_resources
