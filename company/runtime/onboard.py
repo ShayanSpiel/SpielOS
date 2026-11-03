@@ -234,31 +234,27 @@ def _department_count(root: Path) -> int:
 
 
 def _next_steps(root: Path, hosts: dict[str, bool]) -> tuple[list[tuple[str, str]], list[str]]:
-    """Hand the fresh home to the Director instead of onboarding in the CLI."""
-    steps = [("cd " + str(root), "your SpielOS home")]
+    """Guide the owner from the new company to a first useful conversation."""
+    import shlex
+
+    steps = [("cd " + shlex.quote(str(root)), "open your company folder")]
     if hosts.get("opencode"):
-        steps.append(("opencode",
-                      "run /agents, select the Director agent, and talk to it — "
-                      "it already receives company context"))
+        steps.append(("opencode", "open your company in OpenCode"))
     if hosts.get("codex"):
-        steps.append(("codex",
-                      "use the main company chat as Director after reviewing hooks — it "
-                      "receives company context"))
+        steps.append(("codex", "open your company in Codex"))
     if hosts.get("claude"):
-        steps.append(("claude",
-                      "run `claude --agent director` (or just `claude`) and "
-                      "talk to the Director — it already sees your company "
-                      "state"))
+        steps.append(("claude", "open your company in Claude Code"))
     notes = [
-        "Choose OpenCode, Codex, or Claude Code; the Director handles "
-        "everything else in chat.",
-        "Keep credentials private; connection and external actions require explicit scope.",
-        "Review company/profile.md, strategy/ and brand/, then build or safely import a draft workflow.",
+        "Review the company hooks through your host's normal controls.",
+        "Chat activity tracking needs separate setup; CLI setup does not enable it.",
+        "Tell Director what your company does and name one recurring job.",
+        "Try: Build a lead research workflow and explain why each company fits.",
+        "Keep credentials private; sending and publishing need separate approval.",
     ]
     return steps, notes
 
 
-def _render_success(style: _Style, receipt: dict) -> None:
+def _render_success(style: _Style, receipt: dict, *, interactive: bool = False) -> None:
     from .config import VERSION
 
     root = receipt["root"]
@@ -266,9 +262,11 @@ def _render_success(style: _Style, receipt: dict) -> None:
     if not style.tty:
         print(f"SpielOS {VERSION} ready at {root} ({receipt['files_written']} files)"
               + (" · runtime verified" if receipt.get("verified") else ""))
-        steps, _ = _next_steps(Path(root), hosts)
+        steps, notes = _next_steps(Path(root), hosts)
         for command, _note in steps:
             print(f"  $ {command}")
+        for note in notes:
+            print(f"  {note}")
         return
 
     import re
@@ -306,13 +304,37 @@ def _render_success(style: _Style, receipt: dict) -> None:
     print(style.cyan("└" + "─" * (width - 2) + "┘"))
     print()
 
-    steps, notes = _next_steps(Path(root), hosts)
-    print(style.bold("Next steps"))
+    print(style.bold("Let’s get you started"))
+    selected_hosts = hosts
+    job = ""
+    if interactive:
+        print("  1. Choose where you want to work: Codex, Claude Code, or OpenCode.")
+        detected = [name for name in ("codex", "claude", "opencode") if hosts.get(name)]
+        default = detected[0] if detected else "codex"
+        while True:
+            choice = _prompt(style, "Your host (codex / claude / opencode)", default).lower()
+            aliases = {"codex": "codex", "claude": "claude", "claude code": "claude", "opencode": "opencode"}
+            if choice in aliases:
+                selected = aliases[choice]
+                selected_hosts = {name: name == selected for name in hosts}
+                break
+            print("  Choose codex, claude, or opencode.")
+        if not hosts.get(selected):
+            print(f"  {selected} was not found on your PATH. Open the company folder in that host after installing it.")
+        print("  2. Pick a first job. You can skip this and decide in chat.")
+        job = _prompt(style, "What recurring work would you like help with?")
+    steps, notes = _next_steps(Path(root), selected_hosts)
+    print(style.bold("Your next steps"))
     for command, note in steps:
         print(f"  {style.green('$')} {style.bold(command)}")
         if note:
             print(f"    {style.dim(note)}")
+    if job:
+        print("  In your company chat, try:")
+        print(f"    Help me turn this recurring work into a tested workflow: {job}")
     for note in notes:
+        if job and (note.startswith("Tell Director") or note.startswith("Try:")):
+            continue
         print(f"  {style.mark_warn()} {note}")
     print()
 
@@ -367,7 +389,7 @@ def run_init(*, dir: str = ".", force: bool = False, assume_yes: bool = False,
                          hint=f"cd {target} && PYTHONDONTWRITEBYTECODE=1 "
                               "PYTHONPATH=.agents python3 -B -m company status")
         print(f"{style.mark_ok()} Runtime verified", flush=True)
-        _render_success(style, receipt)
+        _render_success(style, receipt, interactive=interactive)
         return 0
     except KeyboardInterrupt:
         print(file=sys.stderr)
@@ -485,7 +507,7 @@ def _banner(style: _Style, target: Path, version: str) -> None:
         title = " SpielOS"
         print(style.cyan("│") + style.bold(title.ljust(width - 2))
               + style.cyan("│"))
-    tagline = f" company operating system · v{version}"
+    tagline = f" SpielOS v{version}"
     print(style.cyan("│") + style.dim(tagline.ljust(width - 2)[:width - 2])
           + style.cyan("│"))
     target_line = f" home: {target}"

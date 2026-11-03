@@ -64,7 +64,6 @@ class SpineIdentityTests(unittest.TestCase):
                      "tests/test_context_projection.py",
                      "tests/test_host_adapter_contract.py",
                      "tests/test_harness_behavior.py",
-                     "tests/test_observability_dashboard.py",
                      "tests/test_decide_boundary.py",
                      "tests/test_spine_identity.py",
                  }}

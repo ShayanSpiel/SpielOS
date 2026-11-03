@@ -2,147 +2,92 @@
 
 <img src="company/init_templates/integrations/spielos/assets/logo.png" alt="SpielOS logo" width="96" height="96">
 
-**Turn recurring company work into workflows you can test and improve.**
+**Give your AI a company to work for—and work it can get better at.**
 
-Research leads, build outbound and prepare reports with Director. Keep your company facts, strategy, brand, memory and decisions together across conversations — with a dashboard showing what actually happened.
+SpielOS turns recurring business work into reusable workflows for Codex and Claude Code. Tell Director what you need: research leads, prepare a report, or draft an outbound campaign. It helps you build and test the process while keeping your company context, decisions and results together in a workspace you control.
 
-[**Install in ChatGPT desktop / Codex →**](docs/tester-guide.md#chatgpt-and-codex) · [**Install in Claude Code →**](docs/tester-guide.md#claude-code)
+Your work carries across conversations. Your dashboard shows what ran, what needs review, and the evidence behind it.
 
 ![SpielOS in Codex with the company dashboard and work tracking](docs/images/spielos-in-codex.png)
 
-*Owner-supplied reference. Historical company counts are not product benchmarks. Fresh installs show their own records and empty states.*
-
-## Give Director a real job
-
-> Director, build an outbound email workflow for **[ICP]**. Research fit, draft personalized emails and require review before sending.
-
-> Build a lead research agent for **[ICP]** that cites its sources and explains each fit score.
-
-> Turn our **[recurring report]** into a workflow. Agree the quality criteria, test real outputs and show what improved.
-
-Director helps define the inputs, sources, permissions, examples and evaluation criteria, then builds and tests a reusable workflow. Sources and integrations are selected for your company. Nothing is sent just because a quality check passed.
+*Reference image supplied by the owner; a new company starts with its own records and empty states.*
 
 ## Get started
 
-Choose the **desktop plugin** for guided setup in chat, or install the **Python CLI** for terminal use. Both use the same SpielOS core and company folder format.
+Choose your host below. Both the plugin and CLI require **Python 3.11 or newer**. For the plugin, `python3 --version` must work; on Windows, see [Python's alias troubleshooting](https://docs.python.org/3/using/windows.html#troubleshooting). Install Python from [python.org](https://www.python.org/downloads/) or your package manager and restart your host. No separate SpielOS CLI is needed for the plugin.
 
-### 1. Install Python
+### Codex desktop
 
-**Python 3.11 or newer is required for both routes.** The plugin bundles SpielOS code, not the Python interpreter. Node.js is not required for the Python CLI or desktop plugin.
+1. Paste this into Codex:
 
-- **macOS / Windows:** install Python from [python.org](https://www.python.org/downloads/), then restart your desktop host.
-- **Linux:** install Python 3.11+ through your distribution's package manager.
-- **Plugin prerequisite:** `python3 --version` must work. On Windows, if only `py` or `python` works, follow [Python's Windows alias troubleshooting](https://docs.python.org/3/using/windows.html#troubleshooting). Having Python installed under another command alone does not satisfy the current plugin launcher.
+   > Install SpielOS from the ShayanSpiel/SpielOS-Plugin GitHub marketplace, then run its setup.
 
-### 2a. Desktop plugin
+2. If prompted, select **SpielOS → Setup** or enter `$spielos:setup`. Choose a new company folder or an existing SpielOS company. Setup checks Python and asks whether to connect Langfuse or continue locally.
+3. Open that company folder as your workspace, review its hooks when prompted, and give Director your first job (see below).
 
-[Public plugin package and installation guide](https://github.com/ShayanSpiel/SpielOS-Plugin) · [Download the ZIP](https://github.com/ShayanSpiel/SpielOS-Plugin/releases/latest)
+This is a manual marketplace install for Codex with local execution; it is not a public ChatGPT store listing or a ChatGPT web install.
 
-**Codex:** ask it to install from the **ShayanSpiel/SpielOS-Plugin** GitHub marketplace. Then choose **SpielOS → Setup** in the installed plugin's skills, or type `$spielos:setup`. This is a manual marketplace installation; the public ChatGPT store listing is not approved yet.
+### Claude Code
 
-**Claude Code:** run these in Claude Code:
+1. Enter these commands one at a time in Claude Code:
 
-```text
-/plugin marketplace add ShayanSpiel/SpielOS-Plugin
-/plugin install spielos@spielos
-/spielos:setup
-```
+   ```text
+   /plugin marketplace add ShayanSpiel/SpielOS-Plugin
+   /plugin install spielos@spielos
+   /spielos:setup
+   ```
 
-Setup helps you select or create a company folder, checks prerequisites and offers Langfuse connection. Open the selected folder as your host workspace and review its hooks. These instructions apply to Codex and Claude Code with local execution, not ChatGPT web or Claude web.
+2. Choose a new company folder or an existing SpielOS company. Setup checks Python and asks whether to connect Langfuse or continue locally.
+3. Open that company folder as your workspace, review its hooks when prompted, and give Director your first job (see below).
 
-### 2b. Python CLI alternative
+Claude Code uses separate marketplace and install commands; the setup command starts the guided conversation. This desktop plugin is not qualified for Claude web or Cowork.
 
-The CLI and its interactive onboarding remain available. On macOS/Linux, install or update from current GitHub source with one command (requires Python 3.11+ and Git):
+### Terminal / Python CLI
 
-```sh
-curl -fsSL https://raw.githubusercontent.com/ShayanSpiel/SpielOS/main/install.sh | SPIELOS_SOURCE=git+https://github.com/ShayanSpiel/SpielOS.git sh
-```
-
-The [installer](install.sh) uses an isolated pipx environment. It installs the CLI; it does not create a company until you select a folder.
-
-For a virtual environment on **macOS/Linux**:
+Install the CLI with [pipx](https://pipx.pypa.io/stable/installation/) and Python 3.11 or newer:
 
 ```sh
-python3 -m venv .venv
-.venv/bin/python -m pip install --upgrade "git+https://github.com/ShayanSpiel/SpielOS.git"
-.venv/bin/spielos init --dir ./my-company
+pipx install spielos
 ```
 
-For **Windows PowerShell**:
-
-```powershell
-py -3 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install --upgrade "git+https://github.com/ShayanSpiel/SpielOS.git"
-.\.venv\Scripts\spielos.exe init --dir .\my-company
-```
-
-Run these from a working folder outside the SpielOS source checkout. The Windows example uses the `py` launcher; if your installation exposes `python` instead, use that for the first line. Native Windows qualification is tracked in [CI](https://github.com/ShayanSpiel/SpielOS/actions).
-
-If you used the one-command installer, start interactive onboarding with:
+Create your company in a folder outside the SpielOS source checkout:
 
 ```sh
 spielos init --dir ./my-company
 ```
 
-Then open `my-company` in Codex or Claude Code and ask Director to introduce your company workspace and build your first workflow. CLI initialization creates the home and host configuration; plugin Setup additionally guides the local recording and Langfuse choices.
+Open `my-company` in Codex or Claude Code, review its hooks, and give Director your first job. The CLI creates the company and host configuration; chat activity tracking needs separate setup. Plugin setup can guide local recording and the Langfuse choice. If `spielos` is not found, run `pipx ensurepath` and restart your terminal. See the [tester guide](docs/tester-guide.md) for more help.
 
-## Commands you'll use
+## Give Director your first job
 
-| Action | Codex plugin | Claude Code plugin | Python CLI |
+Start with work you already repeat. For example:
+
+> Director, build a lead research workflow for [describe your ideal customer]. Find relevant companies, cite your sources, and explain why each one fits.
+
+Or try: “Turn our weekly [report] into a workflow. Help me define what a good result looks like, then test it with real examples.” Director helps you agree on inputs, sources, permissions and quality criteria before building and testing a reusable workflow. For outbound work, ask it to draft messages for your review.
+
+After a meaningful conversation, Director can show your local dashboard and a **Work tracked** receipt with the records and usage actually available. Your new company starts empty: no activity or results are invented.
+
+## Your company, your evidence
+
+- **Keep context together.** Company facts, strategy, brand, scoped memory and decisions live in the folder you choose. Updating or removing the plugin does not delete it.
+- **Build work you can repeat.** Save workflows and inspect their inputs, versions, outputs and evaluations.
+- **See what happened.** The dashboard shows work, pending decisions, context, quality evidence and available usage. Missing usage and billing remain unknown.
+- **Stay in control.** Local tracking, drafts and candidate experiments work without Langfuse. Setup offers a connection; credentials are entered in a private local form. Production qualification currently requires verified Langfuse evidence and independent review. Sending and publishing require separate approval for the exact action.
+
+A passing test alone does not prove improvement or business impact. A complete before/after improvement scorecard is not yet implemented; Activepieces remains inactive.
+
+## Find your way back
+
+| What you want | Codex plugin | Claude Code plugin | CLI |
 | --- | --- | --- | --- |
-| Create or select a company | `$spielos:setup` | `/spielos:setup` | `spielos init --dir ./my-company` creates one |
+| Set up a company | `$spielos:setup` | `/spielos:setup` | `spielos init --dir ./my-company` |
 | Work with Director | `$spielos:director` | `/spielos:director` | Open the company folder in your host |
 | Open the dashboard | `$spielos:dashboard` | `/spielos:dashboard` | `spielos report --home ./my-company` |
-| Check company status | Ask Director | Ask Director | `spielos status --home ./my-company` |
-| Help | `$spielos:help` | `/spielos:help` | `spielos --help` |
+| Get help | `$spielos:help` | `/spielos:help` | `spielos --help` |
 
-For a virtual-environment installation, replace `spielos` with `.venv/bin/spielos` on macOS/Linux or `.\.venv\Scripts\spielos.exe` on Windows. Codex's `$…` skill invocations and Claude Code's `/…` commands are different host interfaces.
+To update the plugin, refresh its marketplace and update it in your host. For Claude Code use `/plugin marketplace update spielos`, then `/plugin update spielos@spielos`. To update the CLI, run `pipx upgrade spielos`, then run `spielos update --dir ./my-company` to refresh an existing company. Review changed hooks through your host's normal controls.
 
-## Updates
+[Tester guide](docs/tester-guide.md) · [Operating guide](company/README.md) · [Architecture](company/ARCHITECTURE.md) · [Architecture maps](docs/architecture/README.md) · [Evaluation](company/EVALUATION.md) · [Support](https://github.com/ShayanSpiel/SpielOS/issues) · [Privacy](docs/plugin-privacy.md) · [Terms](docs/plugin-terms.md) · [MIT license](LICENSE)
 
-**Plugin:** refresh the SpielOS marketplace and update the installed plugin. In Claude Code:
-
-```text
-/plugin marketplace update spielos
-/plugin update spielos@spielos
-```
-
-**Python CLI:** rerun the one-command installer, or rerun your virtual environment's `pip install --upgrade` command above. Then explicitly refresh an existing company:
-
-```sh
-spielos update --dir ./my-company
-```
-
-Your company folder is separate from the plugin and CLI installation. Company updates preserve owner content; review changed hooks through your host's normal controls.
-
-## Your first conversation
-
-Choose or create a company folder. Setup asks whether to **connect Langfuse now or continue locally**. Project keys go into a private local connection form, never chat. The selected project must verify before export is enabled.
-
-Open that company as your workspace and review its hooks through your host's normal controls. After your first meaningful chat, Director shows your actual dashboard and explains how to read it:
-
-- **Home:** current work, counts and pending decisions.
-- **History & examples:** actual runs and outputs; examples remain separate evidence.
-- **Quality & learning:** criteria, missing reviews, judgments and the evidence required to prove later improvement.
-- **Activity & cost:** exposed token totals and measured intervals. Missing usage and actual billing stay unknown.
-- **Memory, Loaded context and Langfuse delivery:** saved facts, what was actually supplied, and queued versus remotely confirmed evidence.
-
-Meaningful chats end with a concise **Work tracked** receipt. It is Markdown in the chat, with real dashboard/trace links and review status. Installation alone trusts no hooks and creates no company.
-
-## A portable company. Workflows that improve with evidence.
-
-Your company stays in readable files in the folder you choose, with private state and outputs alongside it. Updating or removing the plugin does not delete that folder. Workflow implementations, context, criteria, inputs and actual outputs remain attributable to their versions.
-
-Experiments use representative, held-out and negative cases. Local tracking, drafts and candidate experiments need no Langfuse account. The current production release policy requires verified Langfuse evidence and independent review. Passing a test alone does not prove a workflow improved or produced business impact.
-
-The dashboard provides inspection and evidence. A complete before/after improvement scorecard is not yet implemented. Activepieces remains inactive; external sending and publishing require exact-action authorization.
-
-[Tester guide: devices, setup, first workflow and updates](docs/tester-guide.md) · [Support](https://github.com/ShayanSpiel/SpielOS/issues)
-
-## For technical reviewers
-
-CLI, host adapters and MCP use one Python workflow core: Company, Workflow, Run and Improvement. Production uses pinned releases and bounded invocations, without an autonomous Goal pursuit loop. The package contains reusable software and neutral templates, never an owner's company or credentials. Source boundary, runtime parity, behavior/scenario checks, installed-wheel journeys and native-platform acceptance remain separate evidence.
-
-This is trusted local software; enterprise isolation and untrusted-code sandboxing are not claimed. See the tester guide for prerequisites and actual platform qualification.
-
-[Operating guide](company/README.md) · [Architecture](company/ARCHITECTURE.md) · [Evaluation standard](company/EVALUATION.md) · [Technical review](docs/reviews/2026-11-02-technical-review.md) · [Privacy](docs/plugin-privacy.md) · [Terms](docs/plugin-terms.md) · [MIT license](LICENSE)
+SpielOS is trusted local software; enterprise isolation and untrusted-code sandboxing are not claimed. Platform qualification is recorded separately from local tests.

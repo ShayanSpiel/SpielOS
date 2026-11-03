@@ -60,10 +60,6 @@ The release transaction requires a candidate-linked Improvement in evaluation an
 
 See [EVALUATION.md](EVALUATION.md). New candidates require `spielos-evaluation/2`: meaningful cases, observable criterion questions, explicit anchors and exact negative-failure expectations. Recorded activity distinguishes host sessions from Director/agent roles, retains supplied context changes, feedback targets and measured artifact lineage. Approved `reviewed_evidence` telemetry exports inspectable evidence into Langfuse. Local passes remain unqualified until exact remote readback; software tests never certify model or creative quality.
 
-## Graph coordination
-
-`company.graph` adds a bounded DAG coordinator and source explorer. Workflow nodes delegate accepted releases to WorkflowRuntime; graph journals do not grant release acceptance or external permission. Inspection nodes verify source references only. They do not execute a Director, prove model quality or benchmark business outcomes. The sequential workflow adapter remains a separate, simpler composition contract. See [GRAPH.md](GRAPH.md).
-
 ## Supported deployment boundary
 
 The current implementation targets a trusted local POSIX host with Python 3.11+. File locking uses `fcntl`, company identity uses the OS user, and home layout uses symbolic links. Native Windows is not qualified. Process deadlines are operational controls for trusted code, not a security sandbox or proof that every descendant process is terminated. Team services, shared network SQLite and hostile local code are outside the current deployment claim.

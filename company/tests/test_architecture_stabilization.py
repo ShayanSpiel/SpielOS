@@ -149,17 +149,6 @@ class ArchitectureStabilizationTests(unittest.TestCase):
         self.assertEqual([len(entries) for entries in shapes.values()], [1])
         self.assertIsNone(self.controller._crystallized_workflow(self.context(), {}))
 
-    def test_dashboard_uses_pinned_steps(self):
-        order = self.order()
-        repo = self.runtime.workflows_repository
-        steps = tuple(WorkflowStep(str(i), "director", "Synthetic", "cost") for i in range(3))
-        repo.save(Workflow("synthetic", "Synthetic", steps[:2]))
-        pinned = repo.start("synthetic", goal_id=self.goal.id, run_id=self.run.id,
-            intervention_id=order.intervention_id)
-        repo.save(Workflow("synthetic", "Synthetic", steps))
-        from company.observability import Observer
-        projection = Observer(self.runtime.database).dashboard()
-        self.assertEqual(projection["goals"][0]["workflow_steps_total"], len(pinned.steps))
 
     def test_runtime_does_not_infer_strategy(self):
         evidence = self.evidence({"cost": 10})

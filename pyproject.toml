@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "spielos"
-description = "SpielOS: portable company context, bounded workflows, versioned evaluations and exact-action approvals."
+description = "Turn recurring business work into reusable AI workflows with company context, evaluation and review."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"

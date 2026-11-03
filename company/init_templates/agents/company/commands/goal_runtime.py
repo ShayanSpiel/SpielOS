@@ -20,7 +20,6 @@ from ..layout import layout_summary
 from ..memory import MemoryRepository
 from ..resolution.core import ApprovalRepository
 from ..state import Database
-from ..observability import Observer
 from ..work_orders import WorkOrderRepository
 from ..workflows import Workflow, WorkflowRepository, WorkflowStep
 from ..runtime.engine import (  # noqa: F401
@@ -1384,20 +1383,6 @@ class CleanCommandRuntime:
                  **item["payload"]} for item in self.notifications(
                      goal_id=goal_id, limit=limit)]
 
-    def observe(self, goal_id=None, health=False):
-        """Read-only observability projection (the company dashboard).
-
-        ``observe`` alone renders the full dashboard: health counters,
-        per-goal progress (stage, run, workflow position, open work
-        orders), pending attention, and memory totals. ``--goal`` renders
-        the causal trace for one Goal; ``--health`` renders only counters.
-        """
-        observer = Observer(self.database)
-        if goal_id:
-            return observer.trace(goal_id)
-        if health:
-            return observer.health()
-        return observer.dashboard()
 
     def unread_results(self, goal_id=None, **_kwargs):
         clauses, args = ["r.status='complete'"], []
