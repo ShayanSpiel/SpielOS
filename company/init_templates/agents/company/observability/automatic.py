@@ -182,14 +182,42 @@ def drain(runtime,*,seconds=18,limit=80,reconcile_exhausted=False,client=None):
         try:acquire_lock(fd,blocking=False)
         except BlockingIOError:return {'state':'another wake is delivering; evidence remains journaled'}
         client=client or LangfuseClient.from_configuration(runtime.home,config)
+        # Persist pacing across hook processes; automatic work resumes on later wakes.
+        # Do not sleep or run a background scheduler.
+        pacing_path=runtime.path.parent/'telemetry-pacing.json'
+        if getattr(client,'_rate_path',None):
+            if pacing_path.is_symlink():raise PermissionError('Telemetry pacing state cannot be a symbolic link')
+            pacing=json.loads(pacing_path.read_text()) if pacing_path.is_file() else {}
+            remaining=float(pacing.get('next_wake',0))-time.time()
+            if remaining>0:return {'state':'paced','retry_after_seconds':round(remaining,1)}
+            from ..home import write_json
+            pacing['next_wake']=time.time()+15
+            write_json(pacing_path,pacing)
+        original_request=client.request
+        request_budget=[12];rate_limited={'definitions':False,'delivery':False}
+        def bounded_request(method,path,payload=None):
+            group='definitions' if any(part in path for part in ('/v2/evaluators','/v2/evaluation-rules')) else 'delivery'
+            if rate_limited[group] or request_budget[0]<=0:
+                raise ExportError('Telemetry wake reached its request budget',status=429 if rate_limited[group] else None)
+            request_budget[0]-=1
+            try:return original_request(method,path,payload)
+            except ExportError as exc:
+                if exc.status==429:rate_limited[group]=True
+                raise
+        client.request=bounded_request
         client.timeout=min(client.timeout,4);client.deadline=time.monotonic()+seconds;client.begin_batch()
+        if not client._project_verified:client.verify_project()
         from .evaluators import prepare as prepare_native,sync as sync_native
         prepare_native(runtime)
-        with runtime.connect() as c:native_pending=c.execute("SELECT 1 FROM native_evaluation_definitions WHERE status!='verified' LIMIT 1").fetchone()
+        with runtime.connect() as c:native_pending=[row[0] for row in c.execute("SELECT key FROM native_evaluation_definitions WHERE status!='verified' ORDER BY key")]
         native_issue=None
         if native_pending and time.monotonic()<client.deadline-10:
-            native_deadline=client.deadline;client.deadline=min(native_deadline,time.monotonic()+2)
-            try:sync_native(runtime,client,limit=1,pending_only=True)
+            prior=pacing.get('last_native','') if getattr(client,'_rate_path',None) else ''
+            native_key=next((key for key in native_pending if key>prior),native_pending[0])
+            if getattr(client,'_rate_path',None):
+                pacing['last_native']=native_key;write_json(pacing_path,pacing)
+            native_deadline=client.deadline;client.deadline=min(native_deadline,time.monotonic()+4)
+            try:sync_native(runtime,client,limit=1,pending_only=True,only_key=native_key)
             except (ExportError,ValueError,RuntimeError) as exc:
                 native_issue=('Native definition setup is rate limited' if getattr(exc,'status',None)==429 else 'Native definitions pending: '+str(exc))+'; activity delivery continues separately'
             finally:client.deadline=native_deadline
@@ -197,29 +225,52 @@ def drain(runtime,*,seconds=18,limit=80,reconcile_exhausted=False,client=None):
         for table in ('activity_exports','workflow_export_outbox'):
             with runtime.connect() as c:
                 if reconcile_exhausted:c.execute("UPDATE "+table+" SET status='awaiting_readback',last_error='Explicitly reopened for readback; no blind resend' WHERE status='exhausted'")
-                recent=[r[0] for r in c.execute("SELECT id FROM "+table+" WHERE status IN ('pending','awaiting_readback','sending') ORDER BY rowid DESC LIMIT ?",(limit//4,))]
-                oldest=[r[0] for r in c.execute("SELECT id FROM "+table+" WHERE status IN ('pending','awaiting_readback','sending') ORDER BY rowid LIMIT ?",(limit//2-len(recent),))]
-            queues.append([(table,identity) for identity in dict.fromkeys(recent+oldest)])
+                quota=max(1,limit//8)
+                recent=[r[0] for r in c.execute("SELECT id FROM "+table+" WHERE status='pending' ORDER BY rowid DESC LIMIT ?",(quota,))]
+                oldest=[r[0] for r in c.execute("SELECT id FROM "+table+" WHERE status='pending' ORDER BY rowid LIMIT ?",(quota,))]
+                waiting=[r[0] for r in c.execute("SELECT id FROM "+table+" WHERE status IN ('awaiting_readback','sending') OR (status='exhausted' AND (last_error IS NULL OR last_error LIKE 'Langfuse request failed%')) ORDER BY CASE WHEN status='exhausted' THEN 0 ELSE 1 END,attempts,rowid LIMIT ?",(max(1,limit//4),))]
+            # Reserve room for fresh work and spread readback across attempts.
+            from itertools import zip_longest
+            queues.append([(table,identity) for identity in dict.fromkeys(x for pair in zip_longest(recent,oldest,waiting) for x in pair if x is not None)])
         # Alternate queues so a large activity backlog cannot consume the whole wake.
         from itertools import zip_longest
         selected=[item for pair in zip_longest(*queues) for item in pair if item is not None]
         ready=[];new=[];results=[]
-        if not client._project_verified:client.verify_project()
-        experiments_synced=False
+        # Rotate which dependent event gets resource-setup time. A permanently
+        # conflicting older suite must not block unrelated experiments forever.
+        dependencies=[]
+        with runtime.connect() as c:
+            for table,identity in selected:
+                row=c.execute("SELECT json_extract(payload_json,'$.suite_experiment'),json_extract(payload_json,'$.suite_definition'),json_extract(payload_json,'$.experiment_id') FROM "+table+" WHERE id=?",(identity,)).fetchone()
+                if row and any(value is not None for value in row):dependencies.append((table,identity))
+        dependencies=sorted(set(dependencies))
+        prior=pacing.get('last_dependency','') if getattr(client,'_rate_path',None) else ''
+        chosen=next((item for item in dependencies if ':'.join(item)>prior),dependencies[0] if dependencies else None)
+        if chosen and getattr(client,'_rate_path',None):
+            pacing['last_dependency']=':'.join(chosen);write_json(pacing_path,pacing)
         for table,identity in selected:
             if time.monotonic()>=client.deadline-seconds/2:break
             with runtime.connect() as c:row=dict(c.execute('SELECT * FROM '+table+' WHERE id=?',(identity,)).fetchone())
             row['table']=table
             event=json.loads(row['payload_json'])
-            if event.get('suite_experiment') or event.get('suite_definition'):
-                from ..evals.harness import enrich_suite_event
-                event=enrich_suite_event(runtime,client,event)
-                if event is None:continue
-            if event.get('experiment_id'):
-                from .experiments import sync_resources,enrich_event
-                if not experiments_synced:
-                    sync_resources(runtime,client);experiments_synced=True
-                event=enrich_event(runtime,client,event)
+            if event.get('suite_experiment') or event.get('suite_definition') or event.get('experiment_id'):
+                # Remote setup must not consume the budget reserved for queued spans.
+                # One dependency attempt per wake also prevents a broken suite from
+                # being retried for every event in the selected batch.
+                if (table,identity)!=chosen:continue
+                original_deadline=client.deadline
+                client.deadline=min(original_deadline,time.monotonic()+2)
+                try:
+                    if event.get('suite_experiment') or event.get('suite_definition'):
+                        from ..evals.harness import enrich_suite_event
+                        event=enrich_suite_event(runtime,client,event)
+                    elif event.get('experiment_id'):
+                        from .experiments import sync_resources,enrich_event
+                        sync_resources(runtime,client,experiment_id=event['experiment_id'])
+                        event=enrich_event(runtime,client,event)
+                except (ExportError,ValueError,RuntimeError,KeyError):
+                    event=None
+                finally:client.deadline=original_deadline
                 if event is None:continue
             if row['status']=='pending':new.append((row,event))
             else:ready.append((row,event))
@@ -261,6 +312,7 @@ def drain(runtime,*,seconds=18,limit=80,reconcile_exhausted=False,client=None):
     except Exception as exc:
         return {'state':'pending','issue':str(exc) if isinstance(exc,(ValueError,RuntimeError)) else 'Telemetry delivery could not complete within this wake'}
     finally:
+        if 'original_request' in locals():client.request=original_request
         with runtime.connect() as c:
             counts=dict(c.execute('SELECT status,COUNT(*) FROM activity_exports GROUP BY status'))
             workflow_counts=dict(c.execute('SELECT status,COUNT(*) FROM workflow_export_outbox GROUP BY status'))

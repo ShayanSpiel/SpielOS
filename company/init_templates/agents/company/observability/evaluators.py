@@ -96,28 +96,30 @@ def desired(runtime):
             for key,name,description,filters in result]
 
 
-def sync(runtime,client,*,limit=None,pending_only=False):
+def sync(runtime,client,*,limit=None,pending_only=False,only_key=None):
     import os
     from ..platform import open_lock,acquire_lock
     fd=open_lock(runtime.path.parent/'native-evaluators.lock')
     try:
         try:acquire_lock(fd,blocking=False)
         except BlockingIOError:return []
-        return _sync(runtime,client,limit=limit,pending_only=pending_only)
+        return _sync(runtime,client,limit=limit,pending_only=pending_only,only_key=only_key)
     finally:os.close(fd)
 
 
-def _sync(runtime,client,*,limit=None,pending_only=False):
+def _sync(runtime,client,*,limit=None,pending_only=False,only_key=None):
     """Journal resource creation; lost responses are resolved by exact readback."""
     from ..workflows.runs import canonical
     from .sessions import policy
     config=policy(runtime)
     if client.project_id!=config.get('project_id') or client.base_url!=config.get('base_url'):raise PermissionError('Native evaluation destination differs from the approved company')
-    client.verify_project();prepare(runtime);results=[]
+    if not client._project_verified:client.verify_project()
+    prepare(runtime);results=[]
     plans=desired(runtime)
     if pending_only:
         with runtime.connect() as c:
             plans=[p for p in plans if not (row:=c.execute('SELECT status FROM native_evaluation_definitions WHERE key=?',(p['key'],)).fetchone()) or row[0]!='verified']
+    if only_key is not None:plans=[p for p in plans if p['key']==only_key]
     if limit is not None:plans=plans[:limit]
     if not plans:return []
     def inventory(kind):

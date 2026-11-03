@@ -5,7 +5,7 @@ are journaled before transport; an unknown creation is read back, never repeated
 blindly. Langfuse v4 experiment attributes link the actual invocation spans.
 """
 from __future__ import annotations
-import hashlib,json
+import hashlib,json,time
 from urllib.parse import quote,urlencode
 
 SCHEMA='''
@@ -97,6 +97,8 @@ def ensure_resources(runtime,client,resources,*,max_attempts=20):
     if not client._project_verified:client.verify_project()
     found=[]
     for kind,expected in resources:
+        if time.monotonic()>=getattr(client,'deadline',float('inf')):
+            return None
         if kind=='item' and (not found or found[0] is None):
             found.append(None);continue
         key=digest({'project':client.project_id,'kind':kind,'expected':expected})
@@ -161,9 +163,12 @@ def definitions(runtime,manifest,release):
     return sanitize(expected_resources(manifest,release,payload_policy=mode))
 
 
-def sync_resources(runtime,client,*,max_attempts=20):
+def sync_resources(runtime,client,*,max_attempts=20,experiment_id=None):
     with runtime.connect() as connection:
-        experiments=connection.execute('SELECT * FROM workflow_experiments ORDER BY created_at LIMIT 50').fetchall()
+        if experiment_id:
+            experiments=connection.execute('SELECT * FROM workflow_experiments WHERE id=?',(experiment_id,)).fetchall()
+        else:
+            experiments=connection.execute('SELECT * FROM workflow_experiments ORDER BY created_at LIMIT 50').fetchall()
     for experiment in experiments:
         manifest=runtime.manifest(experiment['release_digest'])
         found=ensure_resources(runtime,client,definitions(runtime,manifest,experiment['release_digest']),max_attempts=max_attempts)

@@ -75,6 +75,95 @@ class ReceiptTests(unittest.TestCase):
             states=[r[0] for r in c.execute('SELECT status FROM workflow_export_outbox WHERE run_id=?',(run['id'],))]
         self.assertTrue(any(state!='pending' for state in states),(states,result))
 
+    def test_broken_suite_setup_does_not_block_unrelated_activity(self):
+        from unittest.mock import patch
+        from company.observability.automatic import drain
+        from company.observability.langfuse import ExportError
+        from company.tests.test_continuous_evaluation import BulkMemory
+        sessions=Sessions(self.r);sid=sessions.start(host='manual',host_session='broken-suite')['id']
+        ordinary=sessions.record(sid,kind='tool',request_key='ordinary',payload={'tool_name':'Synthetic operation'})
+        broken=sessions.record(sid,kind='decision',request_key='suite',payload={'suite_definition':'unavailable-suite'})
+        config=json.loads((self.home/'.spielos/telemetry.json').read_text());config['project_id']='synthetic-project'
+        (self.home/'.spielos/telemetry.json').write_text(json.dumps(config))
+        with patch('company.observability.evaluators.sync',return_value=None), patch('company.evals.harness.enrich_suite_event',side_effect=ExportError('unavailable')):
+            result=drain(self.r,seconds=18,limit=16,client=BulkMemory())
+        with self.r.connect() as c:
+            rows=dict(c.execute('SELECT id,status FROM activity_exports WHERE id IN (?,?)',(ordinary['id'],broken['id'])))
+        self.assertNotEqual(rows[ordinary['id']],'pending',result)
+        self.assertEqual(rows[broken['id']],'pending')
+
+    def test_deferred_suite_does_not_starve_another_suite(self):
+        from unittest.mock import patch
+        from company.observability.automatic import drain
+        from company.tests.test_continuous_evaluation import BulkMemory
+        sessions=Sessions(self.r);sid=sessions.start(host='manual',host_session='suite-fairness')['id']
+        first=sessions.record(sid,kind='decision',request_key='suite-one',payload={'suite_definition':'one'})
+        second=sessions.record(sid,kind='decision',request_key='suite-two',payload={'suite_definition':'two'})
+        config=json.loads((self.home/'.spielos/telemetry.json').read_text());config['project_id']='synthetic-project'
+        (self.home/'.spielos/telemetry.json').write_text(json.dumps(config))
+        client=BulkMemory();client._rate_path=self.home/'.spielos/telemetry-rate-limit.json'
+        with patch('company.observability.evaluators.sync',return_value=None), patch('company.evals.harness.enrich_suite_event',return_value=None) as enrich:
+            with patch('company.observability.automatic.time.time',return_value=1000):drain(self.r,seconds=18,limit=16,client=client)
+            with patch('company.observability.automatic.time.time',return_value=1016):drain(self.r,seconds=18,limit=16,client=client)
+        self.assertEqual({call.args[2]['id'] for call in enrich.call_args_list},{first['id'],second['id']})
+
+    def test_exhausted_unknown_delivery_is_read_back_without_resending(self):
+        from unittest.mock import patch
+        from company.observability.automatic import drain
+        from company.tests.test_continuous_evaluation import BulkMemory
+        sessions=Sessions(self.r);sid=sessions.start(host='manual',host_session='exhausted-readback')['id']
+        event=sessions.record(sid,kind='tool',request_key='uncertain',payload={'tool_name':'Synthetic operation'})
+        with self.r.connect() as c:c.execute("UPDATE activity_exports SET status='exhausted',attempts=30,last_error='Langfuse request failed; result may be unknown' WHERE id=?",(event['id'],))
+        config=json.loads((self.home/'.spielos/telemetry.json').read_text());config['project_id']='synthetic-project'
+        (self.home/'.spielos/telemetry.json').write_text(json.dumps(config))
+        client=BulkMemory()
+        with patch('company.observability.evaluators.sync',return_value=None):drain(self.r,seconds=18,limit=16,client=client)
+        with self.r.connect() as c:status=c.execute('SELECT status FROM activity_exports WHERE id=?',(event['id'],)).fetchone()[0]
+        self.assertEqual(status,'awaiting_readback')
+        self.assertFalse(any(item['metadata'].get('event_digest')==event['id'] for item in client.observations))
+
+    def test_stuck_native_definition_does_not_starve_other_definitions(self):
+        from unittest.mock import patch
+        from company.observability.automatic import drain
+        from company.observability.evaluators import prepare
+        from company.tests.test_continuous_evaluation import BulkMemory
+        prepare(self.r)
+        with self.r.connect() as c:
+            for key in ('synthetic-a','synthetic-b'):c.execute("INSERT INTO native_evaluation_definitions VALUES(?,'{}',NULL,NULL,'pending',NULL)",(key,))
+        config=json.loads((self.home/'.spielos/telemetry.json').read_text());config['project_id']='synthetic-project'
+        (self.home/'.spielos/telemetry.json').write_text(json.dumps(config))
+        client=BulkMemory();client._rate_path=self.home/'.spielos/telemetry-rate-limit.json'
+        with patch('company.observability.evaluators.sync',return_value=None) as sync:
+            with patch('company.observability.automatic.time.time',return_value=1000):drain(self.r,seconds=18,limit=16,client=client)
+            with patch('company.observability.automatic.time.time',return_value=1016):drain(self.r,seconds=18,limit=16,client=client)
+        self.assertEqual({call.kwargs['only_key'] for call in sync.call_args_list},{'synthetic-a','synthetic-b'})
+
+    def test_resource_sync_stops_before_recording_attempt_after_deadline(self):
+        import time
+        from company.observability.experiments import ensure_resources
+        from company.tests.test_continuous_evaluation import BulkMemory
+        client=BulkMemory();client._project_verified=True;client.deadline=time.monotonic()-1
+        self.assertIsNone(ensure_resources(self.r,client,[('dataset',{'name':'Synthetic'})]))
+        with self.r.connect() as c:
+            self.assertEqual(c.execute('SELECT COUNT(*) FROM workflow_remote_resources').fetchone()[0],0)
+
+    def test_live_wakes_are_paced_and_resume_on_a_later_wake(self):
+        from unittest.mock import patch
+        from company.observability.automatic import drain
+        from company.tests.test_continuous_evaluation import BulkMemory
+        sessions=Sessions(self.r);sid=sessions.start(host='manual',host_session='paced')['id']
+        sessions.record(sid,kind='tool',request_key='one',payload={'tool_name':'Synthetic operation'})
+        config=json.loads((self.home/'.spielos/telemetry.json').read_text());config['project_id']='synthetic-project'
+        (self.home/'.spielos/telemetry.json').write_text(json.dumps(config))
+        client=BulkMemory();client._rate_path=self.home/'.spielos/telemetry-rate-limit.json'
+        with patch('company.observability.evaluators.sync',return_value=None), patch('company.observability.automatic.time.time',return_value=1000):
+            first=drain(self.r,seconds=18,limit=16,client=client)
+            second=drain(self.r,seconds=18,limit=16,client=client)
+        self.assertTrue(first['records']);self.assertEqual(second['state'],'paced')
+        with patch('company.observability.evaluators.sync',return_value=None), patch('company.observability.automatic.time.time',return_value=1016):
+            third=drain(self.r,seconds=18,limit=16,client=client)
+        self.assertEqual(third['state'],'bounded wake completed')
+
     def test_unresolved_native_setup_never_blocks_activity_transport(self):
         from unittest.mock import patch
         from company.observability.automatic import drain
