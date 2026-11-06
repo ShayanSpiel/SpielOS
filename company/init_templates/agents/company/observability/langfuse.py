@@ -202,6 +202,24 @@ class LangfuseClient:
 
     def begin_batch(self):
         self._read_cache.clear()
+        self._observation_cache={}
+
+    def prefetch_observations(self,events):
+        """Fetch only named observation identities; never trust an unfiltered scan."""
+        if not self._project_verified:self.verify_project()
+        events=list(events)
+        if not events:return
+        if len(events)>100:raise ValueError('Observation readback batch is limited to 100 events')
+        ids=[identities(event)[1] for event in events]
+        query={'filter':json.dumps([{'type':'stringOptions','column':'id','operator':'any of','value':ids}]),
+               'fields':'core,basic,metadata','limit':100}
+        starts=[event.get('started_at') or event.get('at') for event in events if event.get('started_at') or event.get('at')]
+        if starts:query.update({'fromStartTime':min(starts),'toStartTime':datetime.now(timezone.utc).isoformat()})
+        response=self.request('GET','/api/public/v2/observations?'+urlencode(query))
+        cache=getattr(self,'_observation_cache',{})
+        for row in response.get('data',[]):
+            if row.get('id') in ids:cache[row['id']]=row
+        self._observation_cache=cache
 
     def read(self, path):
         if path not in self._read_cache:
@@ -273,6 +291,12 @@ class LangfuseClient:
 
     def find_observation(self, event):
         trace_id, span_id = identities(event)
+        cached=getattr(self,'_observation_cache',{}).get(span_id)
+        if cached:
+            metadata=cached.get('metadata') or {}
+            if cached.get('traceId')!=trace_id or metadata.get('event_digest')!=event['id'] or metadata.get('release_digest')!=event['release_digest']:
+                raise ExportError('Langfuse observation identity/content mismatch')
+            return cached
         query = urlencode({"traceId": trace_id, "fields": "core,basic,metadata", "limit": 100})
         cursor = None
         for _ in range(10):

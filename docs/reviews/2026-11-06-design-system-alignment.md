@@ -1,0 +1,7 @@
+# Existing design system, approved UX
+
+The supplied public reference is https://spielos.xyz/design-system/. Its live blue-dark BrandSurface and button use 6px corners, small details use 4px, and the dominant UI font is Outfit. The existing shared select rule uses a single 18px chevron, 44px end padding and 44px minimum height. Consume those values and component treatments in the report; do not modify the website design system or invent a parallel palette, corner scale or font identity.
+
+Exact files: `company/report_ui/design-system.css`, `company/report_ui/outfit-latin.woff2`, `company/report_ui/FONT-LICENSE.md`, `company/report_ui/index.html`, `company/report_ui/workspace.css`, their runtime twins, `company/tests/report_ui.test.cjs`, and this record. The public font is distributed with its OFL license. Layout changes remain in the report; website source is untouched. Verify live-reference versus installed component values, dropdown geometry, desktop/mobile behavior and package inclusion before completion.
+
+Observed installed values match the live reference: Outfit loads from the local runtime; panels and controls have 6px corners; select arrows render once at 18px, with 44px end padding and 44px minimum height. Semantic background/foreground values match the public reference. Desktop and mobile bounds and authenticated CSS/font serving are verified. No stylesheet or component in the public website repository was edited.

@@ -17,7 +17,10 @@ class ReportTests(unittest.TestCase):
         except RuntimeError as exc:
             log=self.home/'.spielos/state/report-server.log'
             self.fail(str(exc)+'\nSynthetic server log:\n'+(log.read_text()[-4000:] if log.is_file() else 'No log created'))
-        self.addCleanup(lambda:os.kill(result['pid'],signal.SIGTERM));return state(self.home)
+        def stop():
+            try:os.kill(result['pid'],signal.SIGTERM)
+            except ProcessLookupError:pass  # route selection may already restart it
+        self.addCleanup(stop);return state(self.home)
     def request(self,s,path,*,auth=True,method='GET',headers=None,data=None):
         h={'Authorization':'Bearer '+s['token']} if auth else {};h.update(headers or {})
         return urllib.request.urlopen(urllib.request.Request(s['base_url']+path,method=method,headers=h,data=json.dumps(data).encode() if data else None),timeout=10)
@@ -32,6 +35,32 @@ class ReportTests(unittest.TestCase):
         self.assertEqual(rows[0]['candidate_runs'],1)
         self.assertEqual(rows[0]['readiness'],'recorded candidate; definition unavailable')
         self.assertIsNone(rows[0]['path'])
+
+    def test_builtin_selection_preserves_custom_history_and_updates_server_route(self):
+        from company.reporting import select_ui,configuration
+        folder=self.home/'.spielos/artifacts/custom-history';folder.mkdir(parents=True)
+        page=folder/'index.html';page.write_text('Synthetic preserved custom history')
+        (self.home/'.spielos/report.json').write_text(json.dumps({'ui_root':'.spielos/artifacts/custom-history','custom_name':'Synthetic history','port':0}))
+        old=self.server();self.assertTrue(old['custom_ui'])
+        select_ui(self.home,'builtin');new=self.server()
+        self.assertFalse(new['custom_ui']);self.assertIn('/_spielos/index.html',new['url'])
+        self.assertEqual(page.read_text(),'Synthetic preserved custom history')
+        self.assertEqual(configuration(self.home)['ui_root'],'.spielos/artifacts/custom-history')
+        select_ui(self.home,'custom');self.assertEqual(configuration(self.home)['preferred_ui'],'custom')
+
+    def test_old_pending_reviews_and_more_than_twelve_context_receipts_remain_visible(self):
+        from company.observability.automatic import request_judgment
+        from company.observability.sessions import Sessions
+        first=request_judgment(self.r,'synthetic-session','old',subject='Old pending output',inputs={},output='Frozen result',rubric=[{'id':'quality','question':'Is this supported?'}])
+        for n in range(35):
+            rid=request_judgment(self.r,'synthetic-session',str(n),subject='Recent result',inputs={},output='Frozen result',rubric=[])
+            with self.r.connect() as c:c.execute("UPDATE host_evaluation_requests SET status='reviewed' WHERE id=?",(rid,))
+        sessions=Sessions(self.r);sid=sessions.start(host='manual',host_session='context-window')['id']
+        for n in range(15):sessions.context(sid,documents={'synthetic.md':str(n)},request_key=str(n),reason='Synthetic supplied document')
+        data=snapshot(self.home);review=next(r for r in data['evaluation_requests'] if r['id']==first)
+        self.assertEqual(data['evaluation_counts']['pending'],1);self.assertIn('identity',review['blocker'])
+        self.assertTrue(review['output_captured']);self.assertEqual(review['output_preview'],'Frozen result')
+        self.assertEqual(len(data['context']),15);self.assertFalse(data['context_truncated'])
 
     def test_loopback_server_starts_without_reverse_dns(self):
         from unittest.mock import patch
@@ -75,6 +104,10 @@ class ReportTests(unittest.TestCase):
         with self.request(s,'/api/report') as x:d=json.load(x)
         self.assertTrue(any(x['text']=='Synthetic revised profile' for x in d['documents']))
         self.assertEqual(ensure_server(self.home)['pid'],s['pid'])
+        with self.request(s,'/_spielos/design-system.css') as response:
+            self.assertIn('--radius-md:6px',response.read().decode())
+        with self.request(s,'/_spielos/outfit-latin.woff2') as response:
+            self.assertEqual(response.read(4),b'wOF2')
     def test_path_and_cross_origin_boundaries_and_media_range(self):
         s=self.server();folder=self.home/'.spielos/artifacts/clip';folder.mkdir(parents=True);(folder/'test.mp4').write_bytes(b'0123456789')
         for path in ['/.spielos/telemetry.json','/company/strategy/../../.spielos/security/authority.key','/api/document?path=company/connections/private.json']:

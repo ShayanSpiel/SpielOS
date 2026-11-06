@@ -65,6 +65,7 @@ def register_agent(runtime,agent):
 
 
 def desired(runtime):
+    from ..workflows.runs import digest
     prepare(runtime)
     company=runtime.authority.company_id if runtime.authority else 'synthetic'
     result=[]
@@ -89,7 +90,12 @@ def desired(runtime):
             'Agent responsibility and execution declaration: '+json.dumps(agent,ensure_ascii=False)+'. Quality is evaluated through the pinned rubric of each bound workflow and the selected host model; creating this definition does not qualify the agent.',
             [{'type':'stringObject','column':'metadata','key':'agent_id','operator':'=','value':agent['id']},
              {'type':'stringObject','column':'metadata','key':'category','operator':'=','value':'workflow_output'}]))
-    return [{'key':key,'evaluator':{'name':name,'type':'code','description':description,'sourceCode':SOURCE,'sourceCodeLanguage':'TYPESCRIPT'},
+    def bounded_description(description):
+        if len(description.encode('utf-16-le'))<=4000:return description
+        suffix=' … Full pinned definition retained locally; SHA-256: '+digest(description)
+        prefix=description.encode('utf-16-le')[:4000-len(suffix.encode('utf-16-le'))].decode('utf-16-le',errors='ignore')
+        return prefix+suffix
+    return [{'key':key,'evaluator':{'name':name,'type':'code','description':bounded_description(description),'sourceCode':SOURCE,'sourceCodeLanguage':'TYPESCRIPT'},
              'rule':{'name':name+' · every matching result','enabled':True,'sampling':1.0,
                 'filter':[{'type':'stringOptions','column':'environment','operator':'any of','value':['spielos-local']},
                           {'type':'stringObject','column':'metadata','key':'company_id','operator':'=','value':company}]+filters}}
@@ -137,6 +143,13 @@ def _sync(runtime,client,*,limit=None,pending_only=False,only_key=None):
         with runtime.connect() as c:
             c.execute("INSERT OR IGNORE INTO native_evaluation_definitions VALUES(?,?,NULL,NULL,'pending',NULL)",(key,canonical(item)))
             state=dict(c.execute('SELECT * FROM native_evaluation_definitions WHERE key=?',(key,)).fetchone())
+        # Older runtimes could leave send intent behind after a definite rejection
+        # or a deadline checked before transport. Unknown responses stay readback-only.
+        definite_failure=state['last_error'] in {'Telemetry wake reached its time budget','Telemetry wake reached its request budget'} or state['last_error'] in {
+            'Langfuse request failed (HTTP '+str(code)+')' for code in (400,401,403,404,405,413,422)}
+        if state['status'] in {'creating_evaluator','creating_rule'} and definite_failure:
+            with runtime.connect() as c:c.execute("UPDATE native_evaluation_definitions SET status='pending' WHERE key=?",(key,))
+            state['status']='pending'
         found=[v for v in evaluators if v['name']==e['name'] and v.get('sourceCode')==SOURCE]
         if len(found)>1:raise ValueError('Native evaluator identity is ambiguous')
         if not found:

@@ -240,6 +240,12 @@ def enrich_suite_event(runtime, client, event):
 
 
 def dispatch_evaluation(runtime, action, payload, *, subject=None):
+    if action=='reassign':
+        from ..observability.automatic import reassign
+        return reassign(runtime,**payload)
+    if action=='reconcile-delivery':
+        from ..observability.automatic import reconcile_delivery
+        return reconcile_delivery(runtime,**payload)
     if action=='pending':
         from ..observability.automatic import pending
         return {'requests':pending(runtime,**payload)}

@@ -696,5 +696,34 @@ class UpdatePreservationTests(unittest.TestCase):
             self.assertNotIn("plugin", config)
 
 
+class ProductAdoptionTests(unittest.TestCase):
+    def fixture(self):
+        import hashlib
+        from company.runtime.bootstrap import scaffold,VENDORED_MANIFEST,template_root
+        temp=tempfile.TemporaryDirectory();self.addCleanup(temp.cleanup)
+        home=Path(temp.name)/'home';scaffold(home,keep_stale=True)
+        name='company/observability/pricing.json';target=home/'.agents'/name
+        receipt=home/VENDORED_MANIFEST;manifest=json.loads(receipt.read_text());manifest['files']['agents'].remove(name);receipt.write_text(json.dumps(manifest))
+        target.write_text('{"synthetic_previous_version":true}')
+        owner=home/'company/profile.md';owner.write_text('Synthetic owner profile survives.');before=owner.read_bytes()
+        plan={'schema':1,'home':str(home.resolve()),'files':[{'tree':'agents','path':name,'before_sha256':hashlib.sha256(target.read_bytes()).hexdigest(),'source_sha256':hashlib.sha256((template_root()/'agents'/name).read_bytes()).hexdigest()}]}
+        return home,target,owner,before,plan
+
+    def test_exact_adoption_updates_product_and_preserves_owner(self):
+        from company.runtime.bootstrap import scaffold,template_root
+        home,target,owner,before,plan=self.fixture()
+        with self.assertRaisesRegex(FileExistsError,'collides'):scaffold(home,force=True,keep_stale=True)
+        scaffold(home,force=True,keep_stale=True,adopt_product_plan=plan)
+        self.assertEqual(target.read_bytes(),(template_root()/'agents'/plan['files'][0]['path']).read_bytes())
+        self.assertEqual(owner.read_bytes(),before)
+
+    def test_stale_or_unshipped_adoption_refuses_before_writes(self):
+        from company.runtime.bootstrap import scaffold
+        home,target,owner,before,plan=self.fixture();target.write_text('new owner edit')
+        with self.assertRaisesRegex(ValueError,'content changed'):scaffold(home,force=True,keep_stale=True,adopt_product_plan=plan)
+        self.assertEqual(target.read_text(),'new owner edit');self.assertEqual(owner.read_bytes(),before)
+        plan['files'][0]['path']='company/private-owner-record.md'
+        with self.assertRaisesRegex(ValueError,'shipped'):scaffold(home,force=True,keep_stale=True,adopt_product_plan=plan)
+
 if __name__ == "__main__":
     unittest.main()

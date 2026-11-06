@@ -24,7 +24,26 @@ def configuration(home):
         if not (home/p/'index.html').is_file() or any(is_link(home/Path(*p.parts[:i])) for i in range(1,len(p.parts)+1)):
             raise ValueError('Custom report UI is missing or symbolic')
         custom=p.as_posix()
-    return {'schema':1,'ui_root':custom,'custom_name':data.get('custom_name'),'port':data.get('port',8775)}
+    preferred=data.get('preferred_ui','custom' if custom else 'builtin')
+    if preferred not in {'custom','builtin'}:raise ValueError('Choose the built-in or declared custom dashboard')
+    return {'schema':1,'ui_root':custom,'custom_name':data.get('custom_name'),'port':data.get('port',8775),'preferred_ui':preferred}
+
+def select_ui(home,choice):
+    """Explicit preference only; preserve the custom dashboard and declaration."""
+    from .mcp import CompanySession
+    from .home import write_json
+    selected=CompanySession();selected.select(str(Path(home).resolve()))
+    runtime=selected.runtime(selected.company_id);actor=runtime._actor('configure')
+    config=configuration(runtime.home)
+    if choice not in {'builtin','custom'} or choice=='custom' and not config['ui_root']:raise ValueError('Choose an available report UI')
+    path=runtime.home/'.spielos/report.json'
+    if path.is_symlink():raise PermissionError('Report configuration cannot be symbolic')
+    data=_json(path,{});data['preferred_ui']=choice;write_json(path,data)
+    with runtime.connect() as c:runtime._audit(c,'report_ui_selection','company',{'preferred_ui':choice},actor=actor)
+    return configuration(runtime.home)
+
+def report_path(config):
+    return '/'+config['ui_root']+'/index.html' if config['ui_root'] and config['preferred_ui']=='custom' else '/_spielos/index.html'
 
 def permitted_file(home,path):
     """No state/credentials, traversal or symlink escapes, even within an allowed root."""
@@ -78,7 +97,7 @@ def snapshot(home):
     result['agents']=agents;result['skills']=skills
     for f in definition_paths:
         try:
-            doc=_document(home,f.relative_to(home));m=json.loads(doc['text']);result['workflows'].append({'id':m['id'],'purpose':m.get('purpose'),'version':m.get('version'),'path':doc['path'],'readiness':'draft','runs':0,'evaluation':m.get('evaluation'),'memory_count':0})
+            doc=_document(home,f.relative_to(home));m=json.loads(doc['text']);result['workflows'].append({'id':m['id'],'name':m.get('name') or m['id'].replace('-',' ').title(),'purpose':m.get('purpose'),'version':m.get('version'),'path':doc['path'],'readiness':'draft','runs':0,'evaluation':m.get('evaluation'),'memory_count':0})
         except (ValueError,KeyError,OSError,PermissionError):continue
     records=[];workflow_usage=[];host_usage=[];groups={};tables=set()
     if runtime is not None:
@@ -90,7 +109,7 @@ def snapshot(home):
                 for row in c.execute('SELECT workflow_id,version,manifest_json FROM workflow_releases ORDER BY created_at DESC, rowid DESC'):
                     if row['workflow_id'] in known:continue
                     manifest=json.loads(row['manifest_json']);known.add(row['workflow_id'])
-                    result['workflows'].append({'id':row['workflow_id'],'purpose':manifest.get('purpose'),'version':row['version'],'path':None,'readiness':'recorded candidate; definition unavailable','runs':0,'evaluation':manifest.get('evaluation'),'memory_count':0})
+                    result['workflows'].append({'id':row['workflow_id'],'name':manifest.get('name') or row['workflow_id'].replace('-',' ').title(),'purpose':manifest.get('purpose'),'version':row['version'],'path':None,'readiness':'recorded candidate; definition unavailable','runs':0,'evaluation':manifest.get('evaluation'),'memory_count':0})
                 result['run_counts']={r[0]:r[1] for r in c.execute('SELECT kind,COUNT(*) FROM workflow_invocations GROUP BY kind')}
                 for row in c.execute('SELECT i.id,i.kind,i.status,i.created_at,i.updated_at,i.release_digest,i.session_id,i.evaluation_json,i.memory_snapshot_json,r.workflow_id,r.version,r.manifest_json FROM workflow_invocations i JOIN workflow_releases r ON r.digest=i.release_digest ORDER BY i.created_at DESC LIMIT 300'):
                     a=dict(row);manifest=json.loads(a.pop('manifest_json'));a['agent_id']=manifest.get('resolved_agent',{}).get('id');a['pinned_context']=[{'name':n,'sha256':v.get('sha256'),'source':v.get('source')} for n,v in manifest.get('resolved_context',{}).items()];a['selected_memory']=json.loads(a.pop('memory_snapshot_json') or '[]');a['context_basis']='Pinned run context, not proof the host read it';a['evaluation']=json.loads(a.pop('evaluation_json') or 'null');a['elapsed_seconds']=max(0,(datetime.fromisoformat(a['updated_at'])-datetime.fromisoformat(a['created_at'])).total_seconds());a['time_basis']='Observed run elapsed interval; includes waiting, not active compute';result['runs'].append(a)
@@ -107,7 +126,7 @@ def snapshot(home):
             if 'workflow_memories' in tables:
                 meta={r[0]:json.loads(r[1]) for r in c.execute('SELECT memory_id,metadata_json FROM workflow_memory_classifications')} if 'workflow_memory_classifications' in tables else {}
                 result['memory']['total']=c.execute('SELECT COUNT(*) FROM workflow_memories').fetchone()[0]
-                for row in c.execute('SELECT id,scope,workflow_id,claim,evidence_json,source,created_at,status FROM workflow_memories ORDER BY created_at DESC LIMIT 2000'):
+                for row in c.execute('SELECT id,scope,workflow_id,claim,evidence_json,source,created_at,status,retired_at,retirement_reason FROM workflow_memories ORDER BY created_at DESC LIMIT 2000'):
                     a=dict(row);a['evidence']=json.loads(a.pop('evidence_json'));a['classification']=meta.get(a['id'],{'category':a['scope'],'topics':[]});records.append(a)
                 result['memory']['records']=records
                 for a in records:
@@ -134,26 +153,42 @@ def snapshot(home):
                         seen_totals.add(turn_id);totals.append(a['usage'])
                     elif turn_id not in end_turns:totals.append(a['usage'])
                 result['usage']['chat']=usage_summary(totals)
-                for row in c.execute("SELECT id,session_id,record_json,created_at FROM activity_events WHERE kind='context' ORDER BY rowid DESC LIMIT 12"):
+                result['context_total']=result['activity_counts'].get('context',0)
+                for row in c.execute("SELECT id,session_id,record_json,created_at FROM activity_events WHERE kind='context' ORDER BY rowid DESC LIMIT 500"):
                     a=dict(row);data=json.loads(a.pop('record_json'))['payload'];a['reason']=data.get('reason');a['documents']=[{'name':n,'sha256':v.get('sha256'),'preview':v.get('text','')[:1200]} for n,v in data.get('documents',{}).items()];a['changed']=data.get('added_or_changed',[]);result['context'].append(a)
             if 'host_evaluation_verdicts' in tables:
-                for row in c.execute('SELECT request_id,verdict_json,created_at FROM host_evaluation_verdicts ORDER BY rowid DESC LIMIT 20'):
+                for row in c.execute('SELECT request_id,verdict_json,created_at FROM host_evaluation_verdicts ORDER BY rowid DESC LIMIT 500'):
                     a=dict(row);a['verdict']=json.loads(a.pop('verdict_json'));a['independent_acceptance']=False;result['evaluations'].append(a)
             result['evaluation_requests']=[]
             if 'host_evaluation_requests' in tables:
-                for row in c.execute('SELECT id,session_id,subject,status,request_json,created_at FROM host_evaluation_requests ORDER BY rowid DESC LIMIT 30'):
+                result['evaluation_counts']=dict(c.execute('SELECT status,COUNT(*) FROM host_evaluation_requests GROUP BY status'))
+                review_delivery={}
+                if {'activity_exports','activity_events'}<=tables:
+                    for receipt in c.execute("SELECT e.request_key,e.record_json,x.status FROM activity_exports x JOIN activity_events e ON e.id=x.id WHERE e.kind='evaluation'"):
+                        key=receipt['request_key'];record=json.loads(receipt['record_json'])
+                        request_id=key.removeprefix('host-judgment:') if key.startswith('host-judgment:') else record['payload'].get('evaluation_request')
+                        if request_id:review_delivery.setdefault(request_id,[]).append(receipt['status'])
+                for row in c.execute("SELECT id,session_id,subject,status,request_json,created_at FROM host_evaluation_requests ORDER BY CASE WHEN status='pending' THEN 0 ELSE 1 END,rowid DESC LIMIT 500"):
                     request=json.loads(row['request_json'])
+                    delivery_rows=review_delivery.get(row['id'],[])
+                    confirmed=sum(state=='verified' for state in delivery_rows)
                     result['evaluation_requests'].append({'id':row['id'],'session_id':row['session_id'],'target':request.get('target'),'subject':row['subject'],'status':row['status'],
                         'created_at':row['created_at'],'criteria':request.get('rubric',[]),
-                        'artifact_digest':request.get('artifact_digest'),'independent_acceptance':False})
+                        'artifact_digest':request.get('artifact_digest'),'model':request.get('model'),'runtime':request.get('runtime'),
+                        'original_request_id':request.get('original_request_id'),'reassignment_reason':request.get('reassignment_reason'),
+                        'output_preview':str(request.get('output') or '')[:6000],'output_captured':request.get('output') is not None,
+                        'blocker':('Judge identity must be exposed by the host; no identity is inferred.' if not request.get('model') else 'Requires an attributable judgment from '+str(request['model'])) if row['status']=='pending' else None,
+                        'delivery':{'total':len(delivery_rows),'confirmed':confirmed,'state':'confirmed' if delivery_rows and confirmed==len(delivery_rows) else 'pending' if delivery_rows else 'not_recorded'},
+                        'independent_acceptance':False})
             cfg=_json(home/'.spielos/telemetry.json',{})
             project=cfg['base_url']+'/project/'+str(cfg['project_id']) if cfg.get('enabled') is True and cfg.get('base_url') and cfg.get('project_id') else None
             telemetry={'enabled':cfg.get('enabled',False),'project_url':project,'activity':{},'workflow':{},'recent':[]}
             for table,label in [('activity_exports','activity'),('workflow_export_outbox','workflow')]:
                 if table not in tables:continue
                 telemetry[label]={r[0]:r[1] for r in c.execute('SELECT status,COUNT(*) FROM '+table+' GROUP BY status')}
-                for row in c.execute('SELECT id,payload_json,status,last_error,remote_reference FROM '+table+' ORDER BY rowid DESC LIMIT 12'):
-                    a=dict(row);event=json.loads(a.pop('payload_json'));trace,span=identities(event);a.update({'name':event.get('trace_name',event.get('name')),'at':event.get('at'),'trace_url':project+'/traces/'+trace if project else None,'observation_id':span,'kind':label});telemetry['recent'].append(a)
+                for row in c.execute("SELECT id,payload_json,status,last_error,remote_reference,attempts FROM "+table+" ORDER BY CASE WHEN status!='verified' THEN 0 ELSE 1 END,rowid DESC LIMIT 200"):
+                    a=dict(row);event=json.loads(a.pop('payload_json'));trace,span=identities(event);a.update({'name':event.get('trace_name',event.get('name')),'at':event.get('at'),'trace_url':project+'/traces/'+trace if project else None,'observation_id':span,'kind':label,'run_id':event.get('run_id'),'session_id':event.get('session_id')});telemetry['recent'].append(a)
+            telemetry['health']=_json(home/'.spielos/telemetry-health.json',{})
             telemetry['native_definitions']=[dict(r) for r in c.execute('SELECT key,status,last_error,evaluator_id,rule_id FROM native_evaluation_definitions ORDER BY key')] if 'native_evaluation_definitions' in tables else []
             telemetry['native_pending']=sum(r['status']!='verified' for r in telemetry['native_definitions'])
             telemetry['pending']=sum(n for label in ['activity','workflow'] for state,n in telemetry[label].items() if state!='verified');telemetry['verified']=sum(telemetry[label].get('verified',0) for label in ['activity','workflow']);telemetry['synchronized']=telemetry['pending']==0 and telemetry['native_pending']==0;result['telemetry']=telemetry
@@ -181,6 +216,7 @@ def snapshot(home):
     clean=sanitize(result)
     # Classification names such as historical_authorization are categories, not credentials.
     clean['memory']['categories']=result['memory']['categories']
+    clean['context_truncated']=result.get('context_total',0)>len(result['context'])
     return clean
 
 def state(home):return _json(Path(home)/'.spielos/report-server.json',{})
@@ -211,7 +247,7 @@ def ensure_server(home,*,open_browser=False,port=None):
                 req=urllib.request.Request(a['base_url']+'/api/health',headers={'Authorization':'Bearer '+a['token']})
                 with urllib.request.urlopen(req,timeout=1) as response:health=json.load(response);healthy=health.get('home')==str(home)
                 expected=report_fingerprint()
-                if healthy and a.get('runtime_sha256')!=expected and health.get('pid')==a.get('pid'):
+                if healthy and (a.get('runtime_sha256')!=expected or urlparse(a.get('url','')).path!=report_path(configuration(home))) and health.get('pid')==a.get('pid'):
                     import signal
                     os.kill(a['pid'],signal.SIGTERM);time.sleep(.15);healthy=False
                 if healthy:
@@ -269,10 +305,10 @@ def serve(home,port=8775):
                     self._send(200,status(home));return
                 if route=='/api/document':self._send(200,_document(home,query.get('path',[''])[0]));return
                 if route in ('/','/index.html'):
-                    target='/'+config['ui_root']+'/index.html' if config['ui_root'] else '/_spielos/index.html';self.send_response(303);self.send_header('Location',quote(target,safe='/'));self.end_headers();return
+                    target=report_path(config);self.send_response(303);self.send_header('Location',quote(target,safe='/'));self.end_headers();return
                 if route.startswith('/_spielos/'):
                     f=Path(__file__).parent/'report_ui'/route.rsplit('/',1)[1]
-                    if f.name not in {'index.html','report.js','report.css','workspace.js','workspace.css','logo.png'}:raise PermissionError('Unknown report asset')
+                    if f.name not in {'index.html','report.js','report.css','workspace.js','workspace.css','logo.png','design-system.css','outfit-latin.woff2','FONT-LICENSE.md'}:raise PermissionError('Unknown report asset')
                 else:f=permitted_file(home,route)
                 mime=mimetypes.guess_type(f.name)[0] or 'application/octet-stream'
                 # Range playback supports actual full films without returning whole media for every seek.
@@ -319,7 +355,7 @@ def serve(home,port=8775):
             TCPServer.server_bind(self)
             self.server_name='localhost'
             self.server_port=self.server_address[1]
-    server=LoopbackHTTPServer(('127.0.0.1',port),Handler);base='http://127.0.0.1:'+str(server.server_port);path='/'+config['ui_root']+'/index.html' if config['ui_root'] else '/_spielos/index.html';url=base+quote(path,safe='/')+'?'+urlencode({'token':token})
-    write_json(home/'.spielos/report-server.json',{'schema':1,'pid':os.getpid(),'home':str(home),'base_url':base,'url':url,'token':token,'custom_ui':bool(config['ui_root']),'started_at':_now(),'runtime_sha256':runtime_sha});protect_private(home/'.spielos/report-server.json')
+    server=LoopbackHTTPServer(('127.0.0.1',port),Handler);base='http://127.0.0.1:'+str(server.server_port);path=report_path(config);url=base+quote(path,safe='/')+'?'+urlencode({'token':token})
+    write_json(home/'.spielos/report-server.json',{'schema':1,'pid':os.getpid(),'home':str(home),'base_url':base,'url':url,'token':token,'custom_ui':path!='/_spielos/index.html','started_at':_now(),'runtime_sha256':runtime_sha});protect_private(home/'.spielos/report-server.json')
     try:server.serve_forever()
     finally:server.server_close()

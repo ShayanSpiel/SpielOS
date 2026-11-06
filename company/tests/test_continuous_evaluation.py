@@ -57,6 +57,41 @@ class ContinuousEvaluationTests(unittest.TestCase):
         self.assertTrue(all('Order' in e['trace_name'] for e in events))
         self.assertTrue(all(e['evaluation']['state']=='missing' for e in events))
 
+    def test_absent_answer_records_capture_gap_without_unjudgeable_request(self):
+        self.event('UserPromptSubmit','capture-gap',prompt='Synthetic question')
+        self.event('Stop','capture-gap')
+        self.assertEqual(pending(self.runtime),[])
+        with self.runtime.connect() as c:
+            records=[json.loads(r[0]) for r in c.execute("SELECT record_json FROM activity_events WHERE kind='evaluation'")]
+        self.assertTrue(any(r['payload']['output']['quality_review']=='Capture incomplete; no final answer exposed' for r in records))
+
+    def test_reassignment_preserves_frozen_artifact_and_prevents_old_submission(self):
+        from company.observability.automatic import reassign
+        self.event('UserPromptSubmit','reassign',prompt='Review this synthetic result')
+        self.event('Stop','reassign',last_assistant_message='Frozen synthetic result')
+        old=pending(self.runtime)[0]
+        replacement=reassign(self.runtime,old['id'],model='synthetic-new-model',reason='Original judge unavailable',model_source='Explicit synthetic host metadata')
+        with self.runtime.connect() as c:
+            new=json.loads(c.execute('SELECT request_json FROM host_evaluation_requests WHERE id=?',(replacement['id'],)).fetchone()[0])
+            original=json.loads(c.execute('SELECT request_json FROM host_evaluation_requests WHERE id=?',(old['id'],)).fetchone()[0])
+        self.assertEqual(new['output'],original['output']);self.assertEqual(new['artifact_digest'],original['artifact_digest'])
+        self.assertEqual(new['rubric'],original['rubric']);self.assertEqual(original['model'],'synthetic-model')
+        self.assertEqual(reassign(self.runtime,old['id'],model='synthetic-new-model',reason='Same request',model_source='Synthetic metadata')['id'],replacement['id'])
+        verdicts={c['id']:{'state':'missing','reason':'Synthetic missing evidence','evidence':['Frozen artifact']} for c in original['rubric']}
+        with self.assertRaisesRegex(ValueError,'reassigned'):submit(self.runtime,old['id'],verdicts=verdicts,model='synthetic-model')
+        result=submit(self.runtime,replacement['id'],verdicts=verdicts,model='synthetic-new-model')
+        self.assertFalse(result['independent_acceptance']);self.assertEqual(pending(self.runtime),[])
+
+    def test_bulk_reconciliation_confirms_scoreless_events_without_remote_writes(self):
+        from company.observability.automatic import reconcile_delivery
+        sessions=Sessions(self.runtime);sid=sessions.start(host='manual',host_session='bulk-readback')['id']
+        for n in range(120):sessions.record(sid,kind='tool',request_key=str(n),payload={'tool_name':'Synthetic operation'})
+        client=BulkMemory();drain(self.runtime,client=client,limit=100)
+        posts=len(client.posts)
+        result=reconcile_delivery(self.runtime,limit=1000,client=client)
+        self.assertGreater(result['verified'],0);self.assertEqual(len(client.posts),posts)
+        self.assertLessEqual(result['checked'],1000)
+
     def test_host_judgment_has_reasons_evidence_and_numeric_rating_and_preserves_frozen_output(self):
         self.event('UserPromptSubmit','review',prompt='Explain the result')
         info=self.event('Stop','review',last_assistant_message='The actual frozen answer.')
@@ -107,6 +142,32 @@ class ContinuousEvaluationTests(unittest.TestCase):
         self.assertTrue(all(r['sampling']==1 and r['enabled'] for r in client.rules))
         self.assertTrue(all(any(f.get('key')=='company_id' and f['value']==self.company_id for f in r['filter']) for r in client.rules))
         self.assertTrue(any('Codex / host model' in e['name'] for e in client.evaluators))
+
+    def test_long_definition_fits_remote_limit_without_discarding_local_contract(self):
+        from company.observability.evaluators import register_agent
+        agent={'id':'synthetic-long-contract','description':'Detailed synthetic responsibility 🧪 '*250}
+        register_agent(self.runtime,agent)
+        client=NativeMemory();sync(self.runtime,client)
+        wire=next(e for e in client.evaluators if 'Synthetic Long Contract' in e['name'])
+        self.assertLessEqual(len(wire['description'].encode('utf-16-le'))//2,2000)
+        self.assertIn('SHA-256:',wire['description'])
+        with self.runtime.connect() as c:
+            saved=json.loads(c.execute('SELECT definition_json FROM agent_evaluation_definitions WHERE agent_id=?',(agent['id'],)).fetchone()[0])
+        self.assertEqual(saved['description'],agent['description'])
+
+    def test_legacy_definite_creation_failure_recovers_but_unknown_does_not(self):
+        from company.observability.evaluators import prepare
+        from company.workflows.runs import canonical
+        prepare(self.runtime);plan=desired(self.runtime)[0]
+        with self.runtime.connect() as c:
+            c.execute("INSERT INTO native_evaluation_definitions VALUES(?,?,NULL,NULL,'creating_evaluator',?)",(plan['key'],canonical(plan),'Langfuse request failed (HTTP 400)'))
+        client=NativeMemory();sync(self.runtime,client,only_key=plan['key'])
+        self.assertEqual(len(client.evaluators),1)
+        with self.runtime.connect() as c:
+            c.execute("UPDATE native_evaluation_definitions SET status='creating_evaluator',last_error='Langfuse request failed; result may be unknown' WHERE key=?",(plan['key'],))
+        unseen=NativeMemory()
+        with self.assertRaisesRegex(ValueError,'unresolved'):sync(self.runtime,unseen,only_key=plan['key'])
+        self.assertEqual(unseen.evaluators,[])
 
     def test_new_agent_always_registers_its_own_native_definition(self):
         from company.agents.loader import AgentCatalog

@@ -168,6 +168,23 @@ class ReceiptTests(unittest.TestCase):
         with self.r.connect() as c:row=c.execute("SELECT status,evaluator_id FROM native_evaluation_definitions WHERE last_error='synthetic throttle'").fetchone()
         self.assertEqual(row['status'],'pending');self.assertIsNotNone(row['evaluator_id'])
 
+    def test_exhausted_resource_can_confirm_late_result_without_resending(self):
+        from company.observability.experiments import ensure_resources
+        from company.tests.test_continuous_evaluation import BulkMemory
+        from company.workflows.runs import digest,canonical
+        expected={'name':'Synthetic late dataset','metadata':{'evaluation_digest':'synthetic-digest'}}
+        class Late(BulkMemory):
+            def request(self,method,path,payload=None):
+                if method=='GET' and path.startswith('/api/public/v2/datasets/'):
+                    return {**expected,'id':'synthetic-late-dataset'}
+                return super().request(method,path,payload)
+        client=Late();client._project_verified=True
+        key=digest({'project':client.project_id,'kind':'dataset','expected':expected})
+        with self.r.connect() as c:c.execute("INSERT INTO workflow_remote_resources VALUES(?,?,?,?,'exhausted',20,NULL,NULL)",(key,client.project_id,'dataset',canonical(expected)))
+        found=ensure_resources(self.r,client,[('dataset',expected)])
+        self.assertEqual(found[0]['id'],'synthetic-late-dataset');self.assertEqual(client.posts,[])
+        with self.r.connect() as c:self.assertEqual(c.execute('SELECT status FROM workflow_remote_resources WHERE key=?',(key,)).fetchone()[0],'verified')
+
     def test_resource_sync_stops_before_recording_attempt_after_deadline(self):
         import time
         from company.observability.experiments import ensure_resources
@@ -205,6 +222,30 @@ class ReceiptTests(unittest.TestCase):
         with patch('company.observability.evaluators.sync',side_effect=ValueError('An evaluator creation is unresolved')):
             result=drain(self.r,seconds=18,limit=40,client=BulkMemory())
         self.assertIn('unresolved',result['native_definition_issue']);self.assertTrue(result['records'])
+
+    def test_dependency_failure_is_visible_and_successful_retry_clears_it(self):
+        from unittest.mock import patch
+        from company.observability.automatic import drain
+        from company.tests.test_continuous_evaluation import BulkMemory
+        sessions=Sessions(self.r);sid=sessions.start(host='manual',host_session='dependency-error')['id']
+        record=sessions.record(sid,kind='tool',request_key='dependent',payload={'tool_name':'Synthetic dependency','suite_definition':'synthetic-suite'})
+        event_id=record['id']
+        client=BulkMemory()
+        with patch('company.evals.harness.enrich_suite_event',side_effect=ValueError('Synthetic dataset conflict')):
+            drain(self.r,client=client)
+        with self.r.connect() as c:
+            saved=c.execute('SELECT status,last_error FROM activity_exports WHERE id=?',(event_id,)).fetchone()
+        self.assertEqual(saved[0],'pending');self.assertIn('Synthetic dataset conflict',saved[1])
+        with patch('company.evals.harness.enrich_suite_event',return_value=None):
+            drain(self.r,client=client)
+        with self.r.connect() as c:
+            saved=c.execute('SELECT status,last_error FROM activity_exports WHERE id=?',(event_id,)).fetchone()
+        self.assertEqual(saved[0],'pending');self.assertIn('resources await confirmation',saved[1])
+        with patch('company.evals.harness.enrich_suite_event',side_effect=lambda r,c,e:e):
+            drain(self.r,client=client)
+        with self.r.connect() as c:
+            saved=c.execute('SELECT status,last_error FROM activity_exports WHERE id=?',(event_id,)).fetchone()
+        self.assertEqual(saved[0],'awaiting_readback');self.assertIsNone(saved[1])
 
     def test_session_close_cannot_extend_a_completed_turn_or_hide_its_usage(self):
         from unittest.mock import patch

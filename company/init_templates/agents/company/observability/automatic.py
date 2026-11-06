@@ -94,7 +94,8 @@ def evaluate_turn(sessions,session_id,turn_key,*,model=None):
             'tools':tools,'tool_evidence_window':'Last 100 captured calls; response excerpts are limited to 1500 characters. Full individual events remain in the activity journal.',
             'evidence_event_ids':[r['id'] for r in rows],'captured_events':len(rows),'coverage_complete':len(rows)<=500}
     output=answers[0] if answers else None
-    rid=request_judgment(runtime,session_id,turn_key,subject='Director turn',inputs=inputs,output=output,rubric=RUBRIC,model=model)
+    # A missing answer is a capture gap, not an indefinitely pending assignment.
+    rid=request_judgment(runtime,session_id,turn_key,subject='Director turn',inputs=inputs,output=output,rubric=RUBRIC,model=model) if output else None
     # These checks describe evidence coverage, not answer quality.
     checks={
         'Owner request captured':('pass' if prompts else 'missing','The owner request is available.' if prompts else 'No owner request was exposed for this turn.'),
@@ -102,13 +103,13 @@ def evaluate_turn(sessions,session_id,turn_key,*,model=None):
         'Final answer captured':('pass' if output else 'missing','The frozen host answer is available.' if output else 'The host did not expose a final answer.'),
         'Reported tool failures':('fail' if any(t['error'] for t in tools) else 'missing' if tools else 'not_applicable','Explicitly reported tool errors: '+str(sum(bool(t['error']) for t in tools))+'; unreported success is not assumed.'),
         'Capture coverage':('pass' if len(rows)<=500 else 'missing','Captured '+str(len(rows))+' events; the bounded inspection limit is 500.'),
-        'Codex quality review':('missing','A frozen review request is assigned to the selected host model; no semantic pass is inferred from logging.'),
+        'Codex quality review':('missing','A frozen review request is assigned to the selected host model; no semantic pass is inferred from logging.' if rid else 'No final answer was exposed; semantic review cannot run on missing output.'),
     }
     report={'state':'missing','case_id':None,'rubric_version':'Director continuous review v1','release_digest':'director-continuous-v1',
             'artifact_digest':digest(output),'coverage_complete':False,'quality_domain':'director_behavior','business_outcome':'unmeasured',
             'criteria':{name:{'state':state,'reason':reason,'score':None,'evaluator_version':'Lifecycle evidence checks v1','dimension':'operational'} for name,(state,reason) in checks.items()}}
     sessions.record(session_id,kind='evaluation',request_key='turn-evidence:'+turn_key,payload={
-        'input':inputs,'output':{'answer':output,'governance':report['criteria'],'quality_review':'Pending host-model review','review_request':rid},
+        'input':inputs,'output':{'answer':output,'governance':report['criteria'],'quality_review':'Pending host-model review' if rid else 'Capture incomplete; no final answer exposed','review_request':rid},
         'report':report,'category':'director_turn','evaluation_request':rid,'model':model})
     return rid
 
@@ -120,6 +121,29 @@ def pending(runtime,*,session_id=None,limit=3):
     return [{**dict(row),'request':json.loads(row['request_json'])} for row in rows]
 
 
+def reassign(runtime,request_id,*,model,reason,model_source):
+    """Create a separately attributed review of the same frozen artifact."""
+    from ..workflows.runs import canonical,digest,stamp
+    actor=runtime._actor('evaluate');prepare(runtime)
+    if any(not isinstance(x,str) or not x.strip() for x in (model,reason,model_source)):
+        raise ValueError('Reassignment needs an exposed host model, its source and a reason')
+    with runtime.connect() as c:
+        c.execute('BEGIN IMMEDIATE')
+        row=c.execute('SELECT * FROM host_evaluation_requests WHERE id=?',(request_id,)).fetchone()
+        if not row:raise ValueError('Unknown frozen review')
+        previous=c.execute("SELECT id FROM host_evaluation_requests WHERE json_extract(request_json,'$.original_request_id')=?",(request_id,)).fetchone()
+        if previous:return {'id':previous[0],'status':'reassigned','original_request_id':request_id}
+        if row['status']!='pending':raise ValueError('Only an unjudged request may be reassigned')
+        frozen=json.loads(row['request_json'])
+        identity=digest({'original_request_id':request_id,'model':model})
+        replacement={**frozen,'model':model,'original_request_id':request_id,'original_model':frozen.get('model'),
+                     'reassignment_reason':reason,'model_source':model_source}
+        c.execute("INSERT INTO host_evaluation_requests VALUES(?,?,?,?,?,'pending',?)",(identity,row['session_id'],row['turn_key']+':reassigned:'+identity[:12],row['subject'],canonical(replacement),stamp()))
+        c.execute("UPDATE host_evaluation_requests SET status='reassigned' WHERE id=?",(request_id,))
+        runtime._audit(c,'evaluation_reassign',request_id,{'replacement':identity,'model':model,'reason':reason,'model_source':model_source,'artifact_digest':frozen['artifact_digest']},actor=actor)
+    return {'id':identity,'status':'reassigned','original_request_id':request_id,'independent_acceptance':False}
+
+
 def submit(runtime,request_id,*,verdicts,model,source='Selected host model runtime'):
     from ..workflows.runs import canonical,digest,stamp
     from .sessions import Sessions
@@ -127,6 +151,7 @@ def submit(runtime,request_id,*,verdicts,model,source='Selected host model runti
     with runtime.connect() as c:row=c.execute('SELECT * FROM host_evaluation_requests WHERE id=?',(request_id,)).fetchone()
     if not row:raise ValueError('Unknown frozen host evaluation request')
     req=json.loads(row['request_json']);criteria=req['rubric']
+    if row['status']=='reassigned':raise ValueError('This request was reassigned; judge its replacement without rewriting the original')
     if not model or not isinstance(verdicts,dict) or set(verdicts)!={c['id'] for c in criteria}:
         raise ValueError('The host model must identify itself and judge every pinned criterion')
     if req.get('model') and req['model']!=model:raise ValueError('Judge model differs from the model exposed by the host')
@@ -164,6 +189,52 @@ def workflow_output(runtime,run_id):
         rubric=[{'id':c['id'],'question':c['question'],**c['anchors']} for c in manifest['evaluation']['criteria'] if c['evaluator'] in {'human','model'}]
         if rubric:request_judgment(runtime,run['session_id'],'workflow:'+run_id,subject='Workflow · '+manifest['purpose'],inputs=run['inputs'],output=run['output'],rubric=rubric,target={'kind':'run','id':run_id})
     return run
+
+
+def reconcile_delivery(runtime,*,limit=1000,seconds=50,client=None):
+    """One explicit read-only remote reconciliation, never a resend or daemon.
+
+    Score-bearing and experiment events retain their stronger qualification
+    paths. Bulk readback only closes scoreless observation delivery receipts.
+    """
+    from .sessions import policy
+    from .langfuse import LangfuseClient,ExportError,identities
+    from ..platform import open_lock,acquire_lock
+    runtime._actor('run')
+    if not 1<=limit<=1000 or not 1<=seconds<=50:raise ValueError('Choose a bounded readback limit and duration')
+    config=policy(runtime)
+    if not config.get('enabled'):return {'state':'disabled','verified':0}
+    client=client or LangfuseClient.from_configuration(runtime.home,config)
+    if (client.project_id,client.base_url)!=(config['project_id'],config['base_url']):raise PermissionError('Readback destination differs from the selected company')
+    fd=open_lock(runtime.path.parent/'activity-export.lock');verified=checked=0;issue=None
+    try:
+        try:acquire_lock(fd,blocking=False)
+        except BlockingIOError:return {'state':'another wake is delivering','verified':0}
+        client.timeout=min(client.timeout,5);client.deadline=time.monotonic()+seconds;client.begin_batch();client.verify_project()
+        eligible="status IN ('awaiting_readback','sending') AND json_extract(payload_json,'$.evaluation') IS NULL AND json_extract(payload_json,'$.rating') IS NULL AND json_extract(payload_json,'$.experiment_id') IS NULL AND json_extract(payload_json,'$.suite_experiment') IS NULL AND json_extract(payload_json,'$.suite_definition') IS NULL"
+        rows=[]
+        for table in ('activity_exports','workflow_export_outbox'):
+            with runtime.connect() as c:
+                rows.extend((table,dict(row)) for row in c.execute('SELECT * FROM '+table+' WHERE '+eligible+' ORDER BY attempts,rowid LIMIT ?',(limit,)))
+        rows=rows[:limit]
+        for start in range(0,len(rows),100):
+            if time.monotonic()>=client.deadline-1:break
+            batch=rows[start:start+100];events=[json.loads(row['payload_json']) for _,row in batch]
+            client.prefetch_observations(events)
+            for (table,row),event in zip(batch,events):
+                checked+=1;trace,span=identities(event)
+                if span not in getattr(client,'_observation_cache',{}):
+                    with runtime.connect() as c:c.execute("UPDATE "+table+" SET attempts=attempts+1,last_error='Exact readback did not expose this observation; send outcome remains uncertain; no resend' WHERE id=? AND status IN ('awaiting_readback','sending')",(row['id'],))
+                    continue
+                client.find_observation(event)  # verifies trace, event digest and release
+                reference=client.base_url+'/project/'+client.project_id+'/traces/'+trace+'?observation='+span
+                with runtime.connect() as c:
+                    updated=c.execute("UPDATE "+table+" SET status='verified',last_error=NULL,remote_reference=?,attempts=attempts+1 WHERE id=? AND status IN ('awaiting_readback','sending')",(reference,row['id'])).rowcount
+                verified+=updated
+    except ExportError as exc:issue=str(exc)
+    finally:os.close(fd)
+    return {'state':'bounded readback completed','checked':checked,'verified':verified,'issue':issue,
+            'scope':'Exact scoreless observation receipts only; evaluations and experiments retain their own confirmation gates.'}
 
 
 def drain(runtime,*,seconds=18,limit=80,reconcile_exhausted=False,client=None):
@@ -260,6 +331,7 @@ def drain(runtime,*,seconds=18,limit=80,reconcile_exhausted=False,client=None):
                 if (table,identity)!=chosen:continue
                 original_deadline=client.deadline
                 client.deadline=min(original_deadline,time.monotonic()+2)
+                dependency_issue=None
                 try:
                     if event.get('suite_experiment') or event.get('suite_definition'):
                         from ..evals.harness import enrich_suite_event
@@ -268,10 +340,13 @@ def drain(runtime,*,seconds=18,limit=80,reconcile_exhausted=False,client=None):
                         from .experiments import sync_resources,enrich_event
                         sync_resources(runtime,client,experiment_id=event['experiment_id'])
                         event=enrich_event(runtime,client,event)
-                except (ExportError,ValueError,RuntimeError,KeyError):
+                except (ExportError,ValueError,RuntimeError,KeyError) as exc:
+                    dependency_issue='Evaluation dependency pending: '+str(exc)
                     event=None
                 finally:client.deadline=original_deadline
-                if event is None:continue
+                if event is None:
+                    with runtime.connect() as c:c.execute('UPDATE '+table+' SET last_error=? WHERE id=?',(dependency_issue or 'Evaluation resources await confirmation; inspect the remote resource journal',identity))
+                    continue
             if row['status']=='pending':new.append((row,event))
             else:ready.append((row,event))
         # Include a pending trace root with its recent children. Otherwise the

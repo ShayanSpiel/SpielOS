@@ -143,7 +143,7 @@ class Improvements:
             for name in evidence_files:
                 try:value=json.loads(Path(name).read_text())
                 except (ValueError,UnicodeError):continue
-                if value.get('standard')=='spielos-evaluation/2' and value.get('subject')=='system_improvement':reports.append(value)
+                if isinstance(value,dict) and value.get('standard')=='spielos-evaluation/2' and value.get('subject')=='system_improvement':reports.append(value)
             if not reports or any(not report.get('checks') or any(not all(check.get(key) for key in ('question','expected','actual','evidence')) or check.get('passed') is not True for check in report['checks']) for report in reports):
                 raise ValueError('System acceptance needs actual behavioral questions, expected/observed results and passing evidence; file hashes alone are provenance')
             session_id=getattr(self.runtime,'activity_session_id',None)

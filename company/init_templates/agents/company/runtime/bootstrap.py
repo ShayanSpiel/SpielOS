@@ -395,7 +395,7 @@ def _prune_stale(src: Path, dst: Path, skip=None, tracked=None) -> list[str]:
 
 
 def scaffold(target: Path | None = None, *, force: bool = False,
-             on_phase=None, keep_stale: bool = False) -> dict:
+             on_phase=None, keep_stale: bool = False, adopt_product_plan=None) -> dict:
     """Materialize a complete harness home. Returns a receipt dict.
 
     ``on_phase(label)`` is called before each materialization chunk so an
@@ -422,6 +422,29 @@ def scaffold(target: Path | None = None, *, force: bool = False,
     lean = home.lean
     if lean and (root / ".agents/company").resolve() != home.runtime.resolve():
         raise ValueError("Runtime compatibility alias changed; inspect the home before updating")
+
+    if adopt_product_plan is not None:
+        import hashlib
+        plan=adopt_product_plan
+        if not existing_home or not force or not isinstance(plan,dict) or plan.get('schema')!=1 or plan.get('home')!=str(root):
+            raise ValueError('Product adoption requires an explicit update plan for this exact home')
+        entries=plan.get('files')
+        if not isinstance(entries,list) or not entries or len(entries)>1000:raise ValueError('Product adoption needs a bounded exact file list')
+        checked=[];seen=set()
+        for item in entries:
+            tree=item.get('tree');name=item.get('path');relative=Path(name or '')
+            if tree not in {'agents','codex','claude','opencode'} or not name or relative.is_absolute() or '..' in relative.parts or relative.as_posix()!=name:
+                raise ValueError('Product adoption path is outside shipped product files')
+            source=(templates/'agents' if tree=='agents' else templates/'hosts'/tree)
+            destination=root/('.'+tree)/relative
+            if (tree,name) in seen or name not in _template_files(source) or not destination.resolve().is_relative_to(root) or destination.is_symlink() or not destination.is_file():
+                raise ValueError('Product adoption must name distinct existing shipped files')
+            seen.add((tree,name))
+            if hashlib.sha256(destination.read_bytes()).hexdigest()!=item.get('before_sha256') or hashlib.sha256((source/relative).read_bytes()).hexdigest()!=item.get('source_sha256'):
+                raise ValueError('Product adoption content changed; inspect a fresh plan')
+            checked.append((tree,name))
+        manifest=manifest or {}
+        for tree,name in checked:manifest[tree]=sorted(set(manifest.get(tree,()))|{name})
 
     def vendored_entries() -> dict[str, list[str]]:
         entries = {"agents": _template_files(templates / "agents")}

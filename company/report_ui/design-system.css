@@ -1,0 +1,62 @@
+/* Pinned public semantic values from https://spielos.xyz/design-system/ and its shared CSS.
+ * This is a consumer snapshot; the website design system is not modified. */
+@font-face{font-family:Outfit;font-style:normal;font-weight:100 900;font-display:swap;src:url("/_spielos/outfit-latin.woff2") format("woff2")}
+:root{
+  --background:#0b0f1a;
+  --background-deep:#0b0f1a;
+  --panel:#111827;
+  --panel-raised:#1a2332;
+  --panel-strong:#1e293b;
+  --panel-deep:#0b0f1a;
+  --input:color-mix(in oklab, #1e293b 62%, #111827);
+  --hover:color-mix(in oklab, #e2e8f0 7%, #111827);
+  --selected:color-mix(in oklab, #3b82f6 17%, #1a2332);
+  --border:color-mix(in oklab, #334155 62%, #111827);
+  --border-strong:#334155;
+  --ring:#3b82f6;
+  --foreground:#e2e8f0;
+  --foreground-strong:#f1f5f9;
+  --foreground-muted:#94a3b8;
+  --muted-foreground:#64748b;
+  --primary:#3b82f6;
+  --primary-foreground:#111827;
+  --primary-soft:color-mix(in oklab, #3b82f6 20%, transparent);
+  --success:#22c55e;
+  --success-soft:color-mix(in oklab, #22c55e 20%, transparent);
+  --warning:#eab308;
+  --warning-soft:color-mix(in oklab, #eab308 20%, transparent);
+  --destructive:#ef4444;
+  --destructive-soft:color-mix(in oklab, #ef4444 20%, transparent);
+  --info:#3b82f6;
+  --info-soft:color-mix(in oklab, #3b82f6 20%, transparent);
+  --accent:#a855f7;
+  --accent-soft:color-mix(in oklab, #a855f7 20%, transparent);
+  --code-block:#0b0f1a;
+  --shadow-panel:inset 0 1px 0 color-mix(in oklab,#3b82f6 20%,transparent),inset 0 -1px 0 color-mix(in oklab,color-mix(in oklab,#0b0f1a 78%,black) 80%,transparent),0 5px 10px color-mix(in oklab,color-mix(in oklab,#0b0f1a 78%,black) 60%,transparent),0 20px 38px color-mix(in oklab,color-mix(in oklab,#0b0f1a 78%,black) 44%,transparent);
+  --shadow-popover:0 8px 24px color-mix(in oklab, #0b0f1a 60%, transparent);
+  --radius-sm:4px;
+  --radius-md:6px;
+  --radius-lg:6px;
+  --duration:160ms;
+  --ease:cubic-bezier(0.2, 0.8, 0.2, 1);
+  --focus-border:color-mix(in oklab, #3b82f6 42%, #334155);
+  --focus-ring:color-mix(in oklab, #3b82f6 18%, transparent);
+  --disabled-surface:color-mix(in oklab, color-mix(in oklab, #1e293b 62%, #111827) 58%, #111827 42%);
+  --disabled-border:color-mix(in oklab, color-mix(in oklab, #334155 62%, #111827) 68%, transparent);
+  --disabled-foreground:color-mix(in oklab, #64748b 72%, transparent);
+  --overlay-bg:color-mix(in oklab, #0b0f1a 70%, transparent);
+  --brand-canvas-ink:color-mix(in oklab,#0b0f1a 78%,black);
+  --brand-surface:color-mix(in oklab,#111827 44%,color-mix(in oklab,#0b0f1a 78%,black));
+  --brand-surface-fill:radial-gradient(ellipse at 18% 0%,color-mix(in oklab,#3b82f6 11%,transparent),transparent 64%),linear-gradient(153deg,color-mix(in oklab,color-mix(in oklab,#111827 44%,color-mix(in oklab,#0b0f1a 78%,black)) 89%,#f1f5f9),color-mix(in oklab,#111827 44%,color-mix(in oklab,#0b0f1a 78%,black)) 32%,color-mix(in oklab,#0b0f1a 78%,black));
+  --brand-edge:color-mix(in oklab,#3b82f6 42%,#334155);
+  --brand-depth:inset 0 1px 0 color-mix(in oklab,#3b82f6 20%,transparent),inset 0 -1px 0 color-mix(in oklab,color-mix(in oklab,#0b0f1a 78%,black) 80%,transparent),0 5px 10px color-mix(in oklab,color-mix(in oklab,#0b0f1a 78%,black) 60%,transparent),0 20px 38px color-mix(in oklab,color-mix(in oklab,#0b0f1a 78%,black) 44%,transparent);
+  --brand-tone:#3b82f6;
+  --font-sans:Outfit,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+  --blue:var(--primary);--amber:var(--warning);--green:var(--success);
+}
+/* Existing BrandSurface and secondary control treatment. */
+.brand-surface{background:var(--brand-surface-fill);border:1px solid var(--brand-edge);border-radius:var(--radius-md);box-shadow:var(--brand-depth)}
+:root{--control-chevron:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%2394a3b8' d='m12 15.414-5.707-5.707 1.414-1.414L12 12.586l4.293-4.293 1.414 1.414z'/%3E%3C/svg%3E");}
+html select:not([multiple]):not([size]){appearance:none;-webkit-appearance:none;padding-inline-end:44px!important;background-image:var(--control-chevron)!important;background-repeat:no-repeat!important;background-size:18px 18px!important;background-position:right 13px center!important;min-height:44px;line-height:1.5;cursor:pointer}
+html select:not([multiple]):not([size]):dir(rtl){background-position:left 13px center!important}
+@media(forced-colors:active){html select:not([multiple]):not([size]){appearance:auto;-webkit-appearance:auto;background-image:none!important}}

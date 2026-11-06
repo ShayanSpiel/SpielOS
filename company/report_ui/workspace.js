@@ -3,9 +3,10 @@
   const $ = id => document.getElementById(id);
   const esc = text => String(text ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const icons={overview:'M3 3h6v6H3z M15 3h6v6h-6z M3 15h6v6H3z M15 15h6v6h-6z',history:'M3 11a9 9 0 1 1 2 7 M3 4v7h7 M12 7v6l4 2',checks:'M4 20h16 M6 17V9h3v8 M11 17V4h3v13 M16 17v-6h3v6',activity:'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18 M12 7v5l4 2',memory:'M9 4a3 3 0 0 0-5 3v3a3 3 0 0 0 0 5v2a3 3 0 0 0 5 3 M15 4a3 3 0 0 1 5 3v3a3 3 0 0 1 0 5v2a3 3 0 0 1-5 3 M12 3v18',runtime:'m3 7 9-5 9 5-9 5z M3 12l9 5 9-5 M3 17l9 5 9-5',telemetry:'M6 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6 M18 15a3 3 0 1 0 0 6 3 3 0 0 0 0-6 M6 9v12 M18 3v8c0 4-12 0-12 5',company:'M4 21V3h16v18 M8 7h2 M14 7h2 M8 11h2 M14 11h2 M10 21v-5h4v5'};
-  const main={overview:'Home',history:'History & examples',checks:'Quality & learning',activity:'Activity & cost'};
-  const records={memory:'Memory',runtime:'Loaded context',telemetry:'Langfuse delivery',company:'Company & strategy'};
-  const routes={overview:'home',history:'runs',checks:'evaluations',activity:'activity',memory:'memory',runtime:'runtime',telemetry:'telemetry',company:'company'};
+  icons.workflows=icons.runtime;
+  const main={overview:'Overview',workflows:'Workflows',history:'Runs',checks:'Evaluations'};
+  const records={memory:'Memory & context',runtime:'Supplied context',telemetry:'Delivery',activity:'Activity & cost',company:'Profile & strategy'};
+  const routes={workflows:'workflows',overview:'home',history:'runs',checks:'evaluations',activity:'activity',memory:'memory',runtime:'runtime',telemetry:'telemetry',company:'company'};
   let sequence=0;
   const nav=items=>Object.entries(items).map(([key,label])=>`<button data-tab="${key}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${icons[key]}"></path></svg><span>${label}</span></button>`).join('');
   $('workspace-nav').innerHTML=nav(main);$('company-nav').innerHTML=nav(records);
@@ -17,7 +18,7 @@
     $('connect-langfuse').textContent=state.langfuse_configured?'Langfuse settings':'Connect Langfuse';
     if(!state.ask_langfuse&&state.dashboard_tour_shown){$('onboarding-intro').innerHTML='';return;}
     const guide=state.dashboard_tour_shown?'':`<div class="tour-guide"><p><b>Home</b>Your current work, counts and pending decisions.</p><p><b>History & examples</b>Actual runs and outputs; examples remain separate.</p><p><b>Quality & learning</b>Questions, anchored criteria and pending reviews. A judgment is not independent acceptance.</p><p><b>Activity & cost</b>Exposed usage and observed intervals. Missing tokens or billed cost remain unknown.</p><p><b>Memory & loaded context</b>What was saved versus what was actually supplied.</p><p><b>Langfuse delivery</b>Queued records versus exact remote confirmation.</p></div>`;
-    $('onboarding-intro').innerHTML=`<section class="onboarding-card"><h2>${state.ask_langfuse?'Connect Langfuse, or start locally?':'Your workspace, at a glance.'}</h2><p>${state.ask_langfuse?'Connect your project for traces, experiments and evaluation evidence. You can keep tracking and testing drafts locally while you decide.':'This dashboard reads your selected company’s actual records. Empty states show where evidence is still missing.'}</p>${guide}<div class="onboarding-actions">${state.ask_langfuse?'<button id="onboarding-connect">Connect now</button><button id="onboarding-local">Keep local for now</button>':''}${state.dashboard_tour_shown?'':'<button id="onboarding-understood">Got it</button>'}</div></section>`;
+    $('onboarding-intro').innerHTML=`<section class="onboarding-card compact-tour"><details><summary>${state.ask_langfuse?'Connect Langfuse, or start locally':'Quick tour of your workspace'}</summary><p>${state.ask_langfuse?'Choose a project before sending recorded evidence. You can keep working locally.':'Current work, evidence and context stay in one lasting workspace.'}</p>${guide}<div class="onboarding-actions">${state.ask_langfuse?'<button id="onboarding-connect">Connect now</button><button id="onboarding-local">Keep local for now</button>':''}${state.dashboard_tour_shown?'':'<button id="onboarding-understood">Got it</button>'}</div></details></section>`;
     if($('onboarding-connect'))$('onboarding-connect').onclick=()=>openConnection().catch(showError);
     if($('onboarding-local'))$('onboarding-local').onclick=async()=>{try{await post('/api/onboarding/choice',{choice:'local'});await render();}catch(error){showError(error);}};
     if($('onboarding-understood'))$('onboarding-understood').onclick=async()=>{try{await post('/api/onboarding/tour',{report_url:location.href});await render();}catch(error){showError(error);}};
@@ -36,19 +37,24 @@
   async function render(){const current=++sequence;try{
     const data=await window.SpielosReport.load();if(current!==sequence)return;
     const params=new URLSearchParams(location.search);let subject=params.get('subject')||'company';const requested=params.get('tab')||'overview';const tab=routes[requested]?requested:'overview';
-    const workflow=data.workflows.find(w=>w.id===subject);if(!workflow&&!['company','director'].includes(subject))subject='company';
-    const name=workflow?(workflow.purpose||workflow.id):subject==='director'?'Director':'Company overview';
-    $('subject').innerHTML='<option value="company">Company overview</option><option value="director">Director</option>'+ (data.workflows.length?'<optgroup label="Workflows">'+data.workflows.map(w=>`<option value="${esc(w.id)}">${esc(w.purpose||w.id)}</option>`).join('')+'</optgroup>':'');$('subject').value=subject;
+    const workflow=data.workflows.find(w=>w.id===subject);const unavailable=!workflow&&!['company','director'].includes(subject);
+    const name=workflow?(workflow.name||workflow.purpose||workflow.id):unavailable?'Workflow unavailable':subject==='director'?'Director':'Company overview';
+    $('subject').innerHTML='<option value="company">Company overview</option><option value="director">Director</option>'+ (data.workflows.length?'<optgroup label="Workflows">'+data.workflows.map(w=>`<option value="${esc(w.id)}">${esc(w.name||w.purpose||w.id)}</option>`).join('')+'</optgroup>':'');if(unavailable)$('subject').insertAdjacentHTML('beforeend',`<option value="${esc(subject)}">Unavailable workflow</option>`);$('subject').value=subject;
     $('crumb').textContent='Work & learning / '+name;$('subject-kind').textContent=workflow?'SELECTED WORKFLOW · LIVE':subject==='director'?'DIRECTOR · COMPANY-WIDE VIEW':'SELECTED COMPANY · LIVE';
-    $('subject-title').innerHTML=subject==='company'?'Company <em>overview.</em>':esc(name)+' <em>workspace.</em>';
-    $('subject-description').textContent=workflow?'Versioned runs, pinned context and actual evaluation evidence for this workflow.':'Workflows, runs, memory and reported usage in one lasting workspace.';
-    $('record-status').textContent='Live company records · refreshed '+new Date(data.generated_at).toLocaleTimeString()+'. Missing evidence stays missing.';
+    const titles={overview:'Your work, at a glance',workflows:'Workflow library',history:'Recorded runs',checks:'Evaluation, with evidence',memory:'Memory & context',runtime:'Context supplied to the host',telemetry:'Delivery, with confirmation',activity:'Activity & cost',company:'Profile & strategy'};
+    $('subject-title').textContent=workflow?name:titles[tab];
+    $('subject-description').textContent=workflow?'Versioned runs, pinned context and actual evaluation evidence for this workflow.':({overview:'See what needs attention and what finished.',checks:'Separate quality judgment, owner review and cloud delivery.',memory:'Know what is saved, what was supplied, and why.',runtime:'Inspect source documents and recorded selections.',telemetry:'See confirmed records, waiting records, and the reason.',activity:'Measured usage and reference estimates; the actual bill remains separate.'}[tab]||'Inspect this company’s actual records.');
+    $('record-status').textContent='Live records · refreshed '+new Date(data.generated_at).toLocaleTimeString();
+    $('custom-history').innerHTML=data.extension.ui_root?`<a href="/${esc(data.extension.ui_root)}/index.html">Preserved media & history ↗</a>`:'';
+    $('crumb').textContent=workflow?'Workflows / '+name:titles[tab];
     document.querySelectorAll('[data-tab]').forEach(b=>{if(b.dataset.tab===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});
     await onboardingIntro();if(current!==sequence)return;
-    $('workspace-content').innerHTML='<div id="live-section"></div>';await window.SpielosReport.mount($('live-section'),routes[tab],workflow?.id);
-    if(tab==='checks')$('workspace-content').insertAdjacentHTML('beforeend',learning());
+    if(unavailable){$('workspace-content').innerHTML='<section class="report-panel"><h2>This workflow is not in the current inventory.</h2><p>Select another workflow or refresh. No history has been deleted.</p></section>';return;}
+    $('workspace-content').innerHTML='<div id="live-section"></div>';await window.SpielosReport.mount($('live-section'),routes[tab],workflow?.id,data);
     if(tab==='history'&&!data.runs.length)$('workspace-content').insertAdjacentHTML('afterbegin','<section class="workspace-empty"><h2>Your history starts with real work.</h2><p>No registered runs are recorded yet. Ask Director to build a workflow or test a candidate. Company-specific example galleries stay separate from run evidence.</p></section>');
   }catch(error){$('record-status').textContent='Cannot read company records.';$('workspace-content').innerHTML='<p class="report-alert">'+esc(error.message)+'</p>';}}
   function navigate(tab,subject){const params=new URLSearchParams(location.search);if(tab)params.set('tab',tab);if(subject)params.set('subject',subject);history.pushState({},'',location.pathname+'?'+params);render();}
-  document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>navigate(b.dataset.tab));$('subject').onchange=e=>navigate(null,e.target.value);$('refresh').onclick=render;window.onpopstate=render;render();
+  document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>navigate(b.dataset.tab));$('subject').onchange=e=>navigate(null,e.target.value);$('refresh').onclick=render;window.onpopstate=render;
+  $('search-form').onsubmit=e=>{e.preventDefault();const p=new URLSearchParams(location.search);p.set('q',$('global-search').value);p.set('tab','workflows');history.pushState({},'',location.pathname+'?'+p);location.reload();};
+  window.addEventListener('focus',()=>render());render();
 })();

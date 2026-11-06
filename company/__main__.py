@@ -21,12 +21,13 @@ def build_parser():
     commands.add_parser('mcp',help='local MCP server; select a company through its tools')
     report=commands.add_parser('report',help='open the live company dashboard on an authenticated loopback server')
     report.add_argument('--home',required=True);report.add_argument('--json',action='store_true');report.add_argument('--serve',action='store_true');report.add_argument('--snapshot',action='store_true');report.add_argument('--no-open',action='store_true');report.add_argument('--port',type=int)
+    report.add_argument('--ui',choices=('builtin','custom'),help='select the shipped dashboard or declared custom UI')
     activity=commands.add_parser('activity',help='inspect and record host/Director activity, context, feedback and artifacts')
     activity.add_argument('activity_command',choices=('start','show','record','context','artifact','export','import-ratings','import-usage'))
     activity.add_argument('--payload',help='JSON evidence object');activity.add_argument('--session')
     activity.add_argument('--home',required=True);activity.add_argument('--json',action='store_true')
     evaluation=commands.add_parser('evaluation',help='standard suites and comparable evaluation experiments')
-    evaluation.add_argument('evaluation_command',choices=('template','register','show','evaluate-event','compare','pending','judge'))
+    evaluation.add_argument('evaluation_command',choices=('template','register','show','evaluate-event','compare','pending','judge','reassign','reconcile-delivery'))
     evaluation.add_argument('--session')
     evaluation.add_argument('--subject',choices=('director','build','system_improvement','workflow','agent'))
     evaluation.add_argument('--payload');evaluation.add_argument('--home',required=True);evaluation.add_argument('--json',action='store_true')
@@ -35,6 +36,7 @@ def build_parser():
     init.add_argument('-y','--yes',action='store_true');init.add_argument('--json',action='store_true')
     update=commands.add_parser('update',help='refresh product files while preserving company content')
     update.add_argument('--dir',default='.');update.add_argument('--keep-stale',action='store_true');update.add_argument('--json',action='store_true')
+    update.add_argument('--adopt-product-plan',help='exact selected-home plan with existing and shipped content hashes')
     migrate=commands.add_parser('migrate',help='preview or apply an exact lean migration')
     migrate.add_argument('--dir',required=True);migrate.add_argument('--plan');migrate.add_argument('--digest');migrate.add_argument('--json',action='store_true')
     for name in ('status','overview','context','catalog','departments','layout'):
@@ -195,7 +197,8 @@ def main(argv=None):
     args=build_parser().parse_args(argv)
     try:
         if args.command=='report':
-            from .reporting import ensure_server,serve,snapshot
+            from .reporting import ensure_server,serve,snapshot,select_ui
+            if args.ui:select_ui(args.home,args.ui)
             if args.serve:return serve(args.home,args.port if args.port is not None else 8775)
             output=snapshot(args.home) if args.snapshot else ensure_server(args.home,open_browser=not args.no_open,port=args.port)
             print(json.dumps(output,indent=2,ensure_ascii=False) if args.json else ('Company dashboard: '+output['url'] if not args.snapshot else json.dumps(output,ensure_ascii=False)))
@@ -220,7 +223,7 @@ def main(argv=None):
             return run_init(dir=args.dir,force=args.force,assume_yes=args.yes,as_json=args.json)
         if args.command=='update':
             from .runtime.onboard import run_update
-            return run_update(dir=args.dir,as_json=args.json,keep_stale=args.keep_stale)
+            return run_update(dir=args.dir,as_json=args.json,keep_stale=args.keep_stale,adopt_product_plan=read_json(args.adopt_product_plan) if args.adopt_product_plan else None)
         if args.command=='migrate':
             from .home import CompanyHome,fingerprint
             home=CompanyHome(args.dir)

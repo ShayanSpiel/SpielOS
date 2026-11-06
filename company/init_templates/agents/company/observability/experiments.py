@@ -108,9 +108,10 @@ def ensure_resources(runtime,client,resources,*,max_attempts=20):
             row=connection.execute('SELECT * FROM workflow_remote_resources WHERE key=?',(key,)).fetchone()
             if row['status']=='verified':
                 found.append(json.loads(row['reference_json']));continue
-            if row['attempts']>=max_attempts:return None
             connection.execute("UPDATE workflow_remote_resources SET status='sending',attempts=attempts+1 WHERE key=?",(key,))
-        reference=None;error=None;allow=row['status']=='pending'
+        # An exhausted send budget still permits exact readback. A late remote
+        # result must not be stranded forever, and readback never authorizes resend.
+        reference=None;error=None;allow=row['status']=='pending' and row['attempts']<max_attempts
         try:
             actual=lookup(client,kind,expected)
             if actual:
