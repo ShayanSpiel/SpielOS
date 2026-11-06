@@ -44,6 +44,23 @@ class ContinuousEvaluationTests(unittest.TestCase):
     def event(self,event,turn,**values):
         return capture_hook(self.home,{'session_id':'synthetic-host','hook_event_name':event,'turn_id':turn,'model':'synthetic-model',**values},host='codex',context='The actual supplied test brief.' if event=='UserPromptSubmit' else None)
 
+    def test_interrupted_judgment_receipt_remains_pending_and_retries_once(self):
+        from unittest.mock import patch
+        self.event('UserPromptSubmit','interrupted',prompt='Synthetic request')
+        self.event('Stop','interrupted',last_assistant_message='Synthetic frozen output')
+        request=pending(self.runtime)[0]
+        verdicts={c['id']:{'state':'missing','reason':'Synthetic evidence missing','evidence':'Frozen synthetic output'} for c in request['request']['rubric']}
+        with patch.object(Sessions,'record',side_effect=RuntimeError('Synthetic receipt interruption')):
+            with self.assertRaisesRegex(RuntimeError,'receipt interruption'):submit(self.runtime,request['id'],verdicts=verdicts,model='synthetic-model')
+        self.assertEqual(len(pending(self.runtime)),1)
+        first=submit(self.runtime,request['id'],verdicts=verdicts,model='synthetic-model')
+        second=submit(self.runtime,request['id'],verdicts=verdicts,model='synthetic-model')
+        self.assertEqual(first['event_id'],second['event_id']);self.assertEqual(pending(self.runtime),[])
+        with self.runtime.connect() as c:
+            self.assertEqual(c.execute('SELECT COUNT(*) FROM host_evaluation_verdicts WHERE request_id=?',(request['id'],)).fetchone()[0],1)
+        changed=deepcopy(verdicts);next(iter(changed.values()))['reason']='A different judgment'
+        with self.assertRaisesRegex(ValueError,'Frozen verdict'):submit(self.runtime,request['id'],verdicts=changed,model='synthetic-model')
+
     def test_every_turn_freezes_a_distinct_review_without_manual_experiment(self):
         for n in range(2):
             self.event('UserPromptSubmit','turn-'+str(n),prompt='Order '+str(n)+': explain the captured result')

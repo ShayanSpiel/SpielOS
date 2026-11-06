@@ -166,9 +166,8 @@ def submit(runtime,request_id,*,verdicts,model,source='Selected host model runti
         old=c.execute('SELECT id FROM host_evaluation_verdicts WHERE request_id=?',(request_id,)).fetchone()
         if old:
             if old[0]!=identity:raise ValueError('Frozen verdict already exists; use an explicit reviewed revision')
-            return {'id':identity,'status':'recorded'}
-        c.execute('INSERT INTO host_evaluation_verdicts VALUES(?,?,?,?,?)',(identity,request_id,canonical(record),actor,stamp()))
-        c.execute("UPDATE host_evaluation_requests SET status='reviewed' WHERE id=?",(request_id,))
+        else:
+            c.execute('INSERT INTO host_evaluation_verdicts VALUES(?,?,?,?,?)',(identity,request_id,canonical(record),actor,stamp()))
     report={'state':'fail' if any(v['state']=='fail' for v in verdicts.values()) else 'missing' if any(v['state']=='missing' for v in verdicts.values()) else 'pass',
             'case_id':None,'rubric_version':digest(criteria),'release_digest':'host-review-v1','artifact_digest':req['artifact_digest'],
             'coverage_complete':all(v['state'] in {'pass','fail'} for v in verdicts.values()),'self_judged':True,'quality_domain':'host_model_review',
@@ -177,6 +176,9 @@ def submit(runtime,request_id,*,verdicts,model,source='Selected host model runti
     event=sessions.record(row['session_id'],kind='evaluation',request_key='host-judgment:'+request_id,payload={
         'input':{'request':req['input'],'rubric':criteria},'output':{'evaluated_output':req['output'],'verdicts':verdicts,'model':model,'review_scope':record['review_scope']},
         'report':report,'category':'host_judgment','model':model})
+    # Keep the request actionable until its idempotent durable event exists.
+    # An interrupted receipt can be repaired by the same frozen verdict retry.
+    with runtime.connect() as c:c.execute("UPDATE host_evaluation_requests SET status='reviewed' WHERE id=?",(request_id,))
     return {'id':identity,'status':'recorded','event_id':event['id'],'independent_acceptance':False}
 
 

@@ -1,0 +1,13 @@
+# Existing dashboard restoration
+
+The replacement dashboard was not an acceptable interpretation of the requested polish. The company-owned dashboard is selected again. Bookmarks to the shipped shell respect an explicitly selected custom dashboard. Existing media, reference cases, file previews and company-owned layout are retained.
+
+Restore the shared renderer's full numeric metrics: company/workflow totals, input/cached/output/reasoning tokens, reference credits, API-equivalent estimate, per-turn elapsed time and completion receipts. These estimates remain distinct from actual billing. Workflow inspection opens its purpose, definition, contained supporting files and recorded runs in the existing dialog rather than navigating to an empty run list. Individual run inspection opens that exact output, evaluation evidence and remaining review questions. Rendered HTML previews are sandboxed with scripts disabled. Company-wide memory is not hidden by a previously selected workflow. Shared paging actions stop propagation before reaching a custom dashboard's unrelated history handler.
+
+Workflow definitions and historical pinned candidates remain separate sources. Missing working files are not fabricated. Expected rejection on a negative case is distinguished from an unexpected failure. Deterministic checks, visual judgments, independent acceptance and transport confirmation remain separate; this change does not promote historical candidates or bypass release gates.
+
+A separate bounded reliability fix keeps a frozen host-evaluation request pending until its durable activity event is recorded. A same-verdict retry repairs an interrupted receipt idempotently; conflicting verdicts are refused. No judgment is synthesized. An audit of the selected home found no saved verdicts lacking their corresponding activity event at the time of repair.
+
+Source scope: `company/report_ui/report.js`, `company/reporting.py`, their runtime twins, `company/tests/report_ui.test.cjs`, `company/tests/test_report_workspace.py`, and this record. The receipt fix separately scopes `company/observability/automatic.py`, its runtime twin and `company/tests/test_continuous_evaluation.py`. Company-specific adapter changes remain in the installed home and are not shipped as generic source or copied into public documentation.
+
+Local verification includes the 508-test source suite, 66 acceptance scenarios, focused report and receipt tests, UI contracts, source-boundary/parity checks and an isolated installed-wheel journey. Actual browser inspection exercises the original dashboard, workflow/file/run dialogs, full token metrics, memory visibility, history paging and preserved media. Local checks do not constitute independent acceptance or remote qualification.

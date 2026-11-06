@@ -97,7 +97,7 @@ def snapshot(home):
     result['agents']=agents;result['skills']=skills
     for f in definition_paths:
         try:
-            doc=_document(home,f.relative_to(home));m=json.loads(doc['text']);result['workflows'].append({'id':m['id'],'name':m.get('name') or m['id'].replace('-',' ').title(),'purpose':m.get('purpose'),'version':m.get('version'),'path':doc['path'],'readiness':'draft','runs':0,'evaluation':m.get('evaluation'),'memory_count':0})
+            doc=_document(home,f.relative_to(home));m=json.loads(doc['text']);result['workflows'].append({'id':m['id'],'name':m.get('name') or m['id'].replace('-',' ').title(),'purpose':m.get('purpose'),'version':m.get('version'),'path':doc['path'],'readiness':'draft','runs':0,'evaluation':m.get('evaluation'),'memory_count':0,'definition':m,'files':[p.relative_to(home).as_posix() for p in sorted(f.parent.rglob('*')) if p.is_file() and not p.is_symlink() and p.suffix in {'.json','.md','.txt','.py','.toml'} and not any(part.startswith('.') or part in {'node_modules','__pycache__','private-inputs','credentials','security'} for part in p.relative_to(f.parent).parts)][:100]})
         except (ValueError,KeyError,OSError,PermissionError):continue
     records=[];workflow_usage=[];host_usage=[];groups={};tables=set()
     if runtime is not None:
@@ -109,11 +109,11 @@ def snapshot(home):
                 for row in c.execute('SELECT workflow_id,version,manifest_json FROM workflow_releases ORDER BY created_at DESC, rowid DESC'):
                     if row['workflow_id'] in known:continue
                     manifest=json.loads(row['manifest_json']);known.add(row['workflow_id'])
-                    result['workflows'].append({'id':row['workflow_id'],'name':manifest.get('name') or row['workflow_id'].replace('-',' ').title(),'purpose':manifest.get('purpose'),'version':row['version'],'path':None,'readiness':'recorded candidate; definition unavailable','runs':0,'evaluation':manifest.get('evaluation'),'memory_count':0})
+                    result['workflows'].append({'id':row['workflow_id'],'name':manifest.get('name') or row['workflow_id'].replace('-',' ').title(),'purpose':manifest.get('purpose'),'version':row['version'],'path':None,'readiness':'recorded candidate; definition unavailable','runs':0,'evaluation':manifest.get('evaluation'),'memory_count':0,'definition':manifest,'files':[]})
                 result['run_counts']={r[0]:r[1] for r in c.execute('SELECT kind,COUNT(*) FROM workflow_invocations GROUP BY kind')}
                 result['run_status_counts']=dict(c.execute('SELECT status,COUNT(*) FROM workflow_invocations GROUP BY status'))
-                for row in c.execute('SELECT i.id,i.kind,i.status,i.created_at,i.updated_at,i.release_digest,i.session_id,i.evaluation_json,i.memory_snapshot_json,r.workflow_id,r.version,r.manifest_json FROM workflow_invocations i JOIN workflow_releases r ON r.digest=i.release_digest ORDER BY i.created_at DESC LIMIT 300'):
-                    a=dict(row);manifest=json.loads(a.pop('manifest_json'));a['agent_id']=manifest.get('resolved_agent',{}).get('id');a['pinned_context']=[{'name':n,'sha256':v.get('sha256'),'source':v.get('source')} for n,v in manifest.get('resolved_context',{}).items()];a['selected_memory']=json.loads(a.pop('memory_snapshot_json') or '[]');a['context_basis']='Pinned run context, not proof the host read it';a['evaluation']=json.loads(a.pop('evaluation_json') or 'null');a['elapsed_seconds']=max(0,(datetime.fromisoformat(a['updated_at'])-datetime.fromisoformat(a['created_at'])).total_seconds());a['time_basis']='Observed run elapsed interval; includes waiting, not active compute';result['runs'].append(a)
+                for row in c.execute('SELECT i.id,i.kind,i.status,i.created_at,i.updated_at,i.release_digest,i.session_id,i.evaluation_json,i.memory_snapshot_json,i.output_json,i.review_json,i.error,i.case_id,r.workflow_id,r.version,r.manifest_json FROM workflow_invocations i JOIN workflow_releases r ON r.digest=i.release_digest ORDER BY i.created_at DESC LIMIT 300'):
+                    a=dict(row);manifest=json.loads(a.pop('manifest_json'));a['expected_outcome']=next((x.get('expected') for x in manifest.get('evaluation',{}).get('cases',[]) if x.get('id')==a.get('case_id')),None);a['output']=json.loads(a.pop('output_json') or 'null');a['review']=json.loads(a.pop('review_json') or 'null');a['agent_id']=manifest.get('resolved_agent',{}).get('id');a['pinned_context']=[{'name':n,'sha256':v.get('sha256'),'source':v.get('source')} for n,v in manifest.get('resolved_context',{}).items()];a['selected_memory']=json.loads(a.pop('memory_snapshot_json') or '[]');a['context_basis']='Pinned run context, not proof the host read it';a['evaluation']=json.loads(a.pop('evaluation_json') or 'null');a['elapsed_seconds']=max(0,(datetime.fromisoformat(a['updated_at'])-datetime.fromisoformat(a['created_at'])).total_seconds());a['time_basis']='Observed run elapsed interval; includes waiting, not active compute';result['runs'].append(a)
                 for w in result['workflows']:
                     w['runs']=c.execute("SELECT COUNT(*) FROM workflow_invocations i JOIN workflow_releases r ON r.digest=i.release_digest WHERE r.workflow_id=? AND i.kind='production'",(w['id'],)).fetchone()[0]
                     w['candidate_runs']=c.execute("SELECT COUNT(*) FROM workflow_invocations i JOIN workflow_releases r ON r.digest=i.release_digest WHERE r.workflow_id=? AND i.kind='candidate'",(w['id'],)).fetchone()[0]
@@ -319,6 +319,8 @@ def serve(home,port=8775):
                 if route=='/api/document':self._send(200,_document(home,query.get('path',[''])[0]));return
                 if config['ui_root'] and config['preferred_ui']=='builtin' and route=='/'+config['ui_root']+'/index.html' and query.get('preserved')!=['1']:
                     self.send_response(303);self.send_header('Location','/_spielos/index.html');self.end_headers();return
+                if route=='/_spielos/index.html' and config['preferred_ui']=='custom':
+                    self.send_response(303);self.send_header('Location',quote(report_path(config),safe='/'));self.end_headers();return
                 if route in ('/','/index.html'):
                     target=report_path(config);self.send_response(303);self.send_header('Location',quote(target,safe='/'));self.end_headers();return
                 if route.startswith('/_spielos/'):

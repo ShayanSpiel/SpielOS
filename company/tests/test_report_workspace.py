@@ -40,6 +40,8 @@ class ReportTests(unittest.TestCase):
         self.assertEqual(rows[0]['candidate_runs'],1)
         self.assertEqual(rows[0]['readiness'],'recorded candidate; definition unavailable')
         self.assertIsNone(rows[0]['path'])
+        self.assertEqual(rows[0]['definition']['purpose'],'Synthetic recorded candidate')
+        self.assertEqual(rows[0]['files'],[])
 
     def test_builtin_selection_preserves_custom_history_and_updates_server_route(self):
         from company.reporting import select_ui,configuration
@@ -54,6 +56,8 @@ class ReportTests(unittest.TestCase):
         with self.request(new,'/.spielos/artifacts/custom-history/index.html') as response:self.assertIn('/_spielos/index.html',response.url)
         with self.request(new,'/.spielos/artifacts/custom-history/index.html?preserved=1') as response:self.assertEqual(response.read().decode(),'Synthetic preserved custom history')
         select_ui(self.home,'custom');self.assertEqual(configuration(self.home)['preferred_ui'],'custom')
+        restored=self.server()
+        with self.request(restored,'/_spielos/index.html') as response:self.assertEqual(response.read().decode(),'Synthetic preserved custom history')
 
     def test_authorized_browser_capability_survives_normal_report_restart(self):
         from unittest.mock import patch
