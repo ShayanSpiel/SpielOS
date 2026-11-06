@@ -12,6 +12,11 @@ class ReportTests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup);self.home=Path(self.temp.name)/'home';scaffold(self.home,keep_stale=True)
         s=CompanySession();v=s.select(str(self.home));self.r=s.runtime(v['company_id'])
+    def test_browser_view_contracts(self):
+        import subprocess
+        root=Path(__file__).resolve().parents[2]
+        result=subprocess.run(['node','--test',str(root/'company/tests/report_ui.test.cjs')],capture_output=True,text=True,timeout=30)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
     def server(self):
         try:result=ensure_server(self.home,port=0)
         except RuntimeError as exc:
