@@ -22,7 +22,8 @@ def status(home):
     confirmed=0;database=home/'.spielos/state/workflows.sqlite'
     if configured and database.is_file() and not is_link(database):
         import sqlite3
-        with sqlite3.connect(database.as_uri()+'?mode=ro',uri=True) as connection:
+        from contextlib import closing
+        with closing(sqlite3.connect(database.as_uri()+'?mode=ro',uri=True)) as connection:
             if connection.execute("SELECT 1 FROM sqlite_master WHERE name='activity_exports'").fetchone():
                 confirmed=connection.execute("SELECT COUNT(*) FROM activity_exports WHERE status='verified' AND remote_reference LIKE ?",(project+'/traces/%',)).fetchone()[0]
     return {'langfuse_choice':state.get('langfuse_choice'),'ask_langfuse':not configured and not state.get('langfuse_choice'),

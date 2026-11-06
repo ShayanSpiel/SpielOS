@@ -50,7 +50,13 @@ class OnboardingTests(unittest.TestCase):
         selected=CompanySession();selected.select(str(self.home));runtime=selected.runtime(selected.company_id)
         sid=Sessions(runtime).start(host='manual',host_session='existing-connection')['id']
         with runtime.connect() as c:c.execute("UPDATE activity_exports SET status='verified',remote_reference='https://langfuse.invalid/project/synthetic-project/traces/synthetic' WHERE id IN (SELECT id FROM activity_events WHERE session_id=?)",(sid,))
-        result=onboarding.status(self.home)
+        import sqlite3
+        connections=[];connect=sqlite3.connect
+        def capture(*args,**kwargs):
+            connection=connect(*args,**kwargs);connections.append(connection);return connection
+        with patch('sqlite3.connect',side_effect=capture):result=onboarding.status(self.home)
+        self.assertEqual(len(connections),1)
+        with self.assertRaises(sqlite3.ProgrammingError):connections[0].execute('SELECT 1')
         self.assertTrue(result['langfuse_configured']);self.assertFalse(result['ask_langfuse']);self.assertEqual(result['connection_status'],'connected');self.assertGreater(result['confirmed_records'],0)
 
     def test_tour_cannot_be_completed_with_an_invented_dashboard(self):
