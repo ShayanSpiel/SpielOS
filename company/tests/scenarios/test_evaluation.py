@@ -149,12 +149,14 @@ class EvaluationJourneys(WorkspaceJourney):
                     # Chrome's launcher may exit while its helpers still own the
                     # profile. Stop the entire isolated session before cleanup.
                     try:os.killpg(process.pid,signal.SIGTERM)
-                    except ProcessLookupError:pass
+                    except (ProcessLookupError,PermissionError):pass
                     try:process.wait(timeout=5)
                     except subprocess.TimeoutExpired:
-                        os.killpg(process.pid,signal.SIGKILL);process.wait()
+                        try:os.killpg(process.pid,signal.SIGKILL)
+                        except (ProcessLookupError,PermissionError):process.kill()
+                        process.wait(timeout=5)
                     try:os.killpg(process.pid,signal.SIGKILL)
-                    except ProcessLookupError:pass
+                    except (ProcessLookupError,PermissionError):pass
                     for _ in range(100):
                         try:os.killpg(process.pid,0)
                         # macOS may leave unsignalable sandbox helper/zombie
