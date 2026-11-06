@@ -18,11 +18,20 @@ def status(home):
     state=_read(home/'.spielos/onboarding.json')
     policy=_read(home/'.spielos/telemetry.json')
     configured=policy.get('enabled') is True and bool(policy.get('project_id')) and bool(policy.get('base_url'))
+    project=policy['base_url'].rstrip('/')+'/project/'+str(policy['project_id']) if configured else None
+    confirmed=0;database=home/'.spielos/state/workflows.sqlite'
+    if configured and database.is_file() and not is_link(database):
+        import sqlite3
+        with sqlite3.connect(database.as_uri()+'?mode=ro',uri=True) as connection:
+            if connection.execute("SELECT 1 FROM sqlite_master WHERE name='activity_exports'").fetchone():
+                confirmed=connection.execute("SELECT COUNT(*) FROM activity_exports WHERE status='verified' AND remote_reference LIKE ?",(project+'/traces/%',)).fetchone()[0]
     return {'langfuse_choice':state.get('langfuse_choice'),'ask_langfuse':not configured and not state.get('langfuse_choice'),
         'langfuse_configured':configured,'connection_verified_at':state.get('connection_verified_at'),
+        'connection_status':'connected' if configured and (confirmed or state.get('connection_verified_at') and state.get('verified_project_id')==policy.get('project_id') and state.get('verified_base_url')==policy.get('base_url')) else 'configured' if configured else 'not_connected',
+        'confirmed_records':confirmed,'payload_policy':policy.get('payload_policy'),
         'dashboard_tour_shown':state.get('dashboard_tour_shown') is True,
         'local_capture':policy.get('payload_policy')=='reviewed_evidence',
-        'project_url':policy['base_url'].rstrip('/')+'/project/'+str(policy['project_id']) if configured else None}
+        'project_url':project}
 
 
 def _runtime(home):
@@ -82,4 +91,4 @@ def connect_langfuse(home,*,base_url,project_id,public_key,secret_key,approved_e
         'payload_policy':'reviewed_evidence','require_verified_release':True,'credential_ref':reference,
         'automatic':{'enabled':True,'judge_runtime':'selected_host'}})
     from .workflows.runs import stamp
-    return _save(runtime.home,{'langfuse_choice':'connect','connection_verified_at':stamp()})
+    return _save(runtime.home,{'langfuse_choice':'connect','connection_verified_at':stamp(),'verified_project_id':project_id,'verified_base_url':client.base_url})

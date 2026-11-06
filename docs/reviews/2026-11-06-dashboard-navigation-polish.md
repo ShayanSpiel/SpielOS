@@ -1,0 +1,11 @@
+# Dashboard navigation and connection polish
+
+The previous shell fetched the entire company report on every page change. A slow report could leave the old content visible while the URL changed. Navigation now renders the current snapshot immediately; initial load, explicit refresh and a stale-window focus refresh fetch records. Search, workflow scope, internal links and browser history use the same router.
+
+The shell retains the published website's Outfit font, semantic colors, component radii and select-arrow treatment. Sidebar items have no border or shadow. Canonical Boxicons provide consistent navigation and settings symbols, chips stay on one line, and the mobile drawer keeps hidden navigation from intercepting clicks. The connection button opens Settings, where an existing configured project and confirmed delivery are distinguished from a backlog. Changing project credentials is an explicit action. A private same-home browser capability survives normal report-server updates.
+
+The workflow library explains the release path from candidate execution through evidence and independent review to a production invocation. Candidate runs are never relabeled as production. Memory keeps provenance, category and historical exclusions visible; supplied context does not claim reading or learning.
+
+Exact boundary: `company/report_ui/{index.html,workspace.js,workspace.css,report.js,ICON-LICENSE.md}`, `company/reporting.py`, `company/onboarding.py`, their runtime twins, `company/tests/{test_report_workspace.py,test_onboarding.py,report_ui.test.cjs}`, and this record.
+
+Local verification: 507 behavior tests, 11 UI contracts, 66 acceptance scenarios and the 14-check isolated installed-wheel journey passed. Real browser checks cover all ten sidebar destinations, cached navigation, workflow scope, search clearing, browser history, explicit connection editing, desktop/mobile bounds and an already authorized browser surviving an installed-runtime restart. Source boundary and runtime parity are checked separately. These are implementation checks, not independent acceptance or remote qualification. Uncertain remote writes, independently gated output/release reviews and historical owner-file transition findings remain visible rather than being silently cleared.

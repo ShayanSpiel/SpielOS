@@ -40,6 +40,18 @@ class OnboardingTests(unittest.TestCase):
         policy=json.loads((self.home/'.spielos/telemetry.json').read_text())
         self.assertNotIn('synthetic-secret-key',json.dumps(policy));self.assertTrue(policy['require_verified_release'])
         self.assertTrue(is_private(self.home/policy['credential_ref']))
+        self.assertEqual(result['connection_status'],'connected')
+
+    def test_existing_verified_project_is_recognized_without_reconnection(self):
+        from company.mcp import CompanySession
+        from company.observability.sessions import Sessions
+        with patch('company.observability.langfuse.LangfuseClient.request',return_value={'data':[{'id':'synthetic-project'}]}):self.connect()
+        (self.home/'.spielos/onboarding.json').write_text('{}')
+        selected=CompanySession();selected.select(str(self.home));runtime=selected.runtime(selected.company_id)
+        sid=Sessions(runtime).start(host='manual',host_session='existing-connection')['id']
+        with runtime.connect() as c:c.execute("UPDATE activity_exports SET status='verified',remote_reference='https://langfuse.invalid/project/synthetic-project/traces/synthetic' WHERE id IN (SELECT id FROM activity_events WHERE session_id=?)",(sid,))
+        result=onboarding.status(self.home)
+        self.assertTrue(result['langfuse_configured']);self.assertFalse(result['ask_langfuse']);self.assertEqual(result['connection_status'],'connected');self.assertGreater(result['confirmed_records'],0)
 
     def test_tour_cannot_be_completed_with_an_invented_dashboard(self):
         with self.assertRaises(ValueError):onboarding.tour_shown(self.home,'http://127.0.0.1:1/invented')

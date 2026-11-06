@@ -51,7 +51,16 @@ class ReportTests(unittest.TestCase):
         self.assertFalse(new['custom_ui']);self.assertIn('/_spielos/index.html',new['url'])
         self.assertEqual(page.read_text(),'Synthetic preserved custom history')
         self.assertEqual(configuration(self.home)['ui_root'],'.spielos/artifacts/custom-history')
+        with self.request(new,'/.spielos/artifacts/custom-history/index.html') as response:self.assertIn('/_spielos/index.html',response.url)
+        with self.request(new,'/.spielos/artifacts/custom-history/index.html?preserved=1') as response:self.assertEqual(response.read().decode(),'Synthetic preserved custom history')
         select_ui(self.home,'custom');self.assertEqual(configuration(self.home)['preferred_ui'],'custom')
+
+    def test_authorized_browser_capability_survives_normal_report_restart(self):
+        from unittest.mock import patch
+        old=self.server()
+        with patch('company.reporting.report_fingerprint',return_value='synthetic-new-product-version'):new=self.server()
+        self.assertNotEqual(old['pid'],new['pid']);self.assertEqual(old['token'],new['token'])
+        with self.request(new,'/api/report',headers={'Authorization':'Bearer '+old['token']}) as response:self.assertEqual(response.status,200)
 
     def test_old_pending_reviews_and_more_than_twelve_context_receipts_remain_visible(self):
         from company.observability.automatic import request_judgment

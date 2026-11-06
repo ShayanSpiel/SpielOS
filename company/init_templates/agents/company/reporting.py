@@ -4,7 +4,7 @@ import argparse, hashlib, json, mimetypes, os, secrets, subprocess, sys, time
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs, urlencode, unquote,quote
-from .platform import protect_private,is_link
+from .platform import protect_private,is_link,is_private
 
 VERSION='spielos-report/1'
 
@@ -137,11 +137,14 @@ def snapshot(home):
             if 'activity_events' in tables:
                 result['activity_counts']={r[0]:r[1] for r in c.execute('SELECT kind,COUNT(*) FROM activity_events GROUP BY kind')}
                 result['unique_completions']=c.execute("SELECT COUNT(*) FROM (SELECT session_id,COALESCE(json_extract(record_json,'$.turn_key'),id) FROM activity_events WHERE kind='end' GROUP BY session_id,COALESCE(json_extract(record_json,'$.turn_key'),id))").fetchone()[0]
+                completion_payloads={}
+                for item in c.execute("SELECT session_id,record_json FROM activity_events WHERE kind='end' ORDER BY rowid"):
+                    record=json.loads(item['record_json']);payload=record['payload'];key=(item['session_id'],record.get('turn_key'))
+                    if key not in completion_payloads or payload.get('event')=='Stop' and completion_payloads[key].get('event')!='Stop':completion_payloads[key]=payload
                 for row in c.execute("SELECT id,session_id,record_json,created_at FROM activity_events WHERE kind IN ('end','generation') ORDER BY rowid DESC LIMIT 2000"):
                     a=dict(row);payload=json.loads(a.pop('record_json'));data=payload['payload'];turn=payload.get('turn_key');u=data.get('usage',{'status':'unknown'});a.update({'turn_key':turn,'usage':u,'elapsed_seconds':data.get('elapsed_seconds'),'time_basis':data.get('time_basis'),'target':payload.get('target')})
                     if payload.get('kind')=='end' and turn:
-                        from .observability.sessions import completion_end
-                        completed=completion_end(c,a['session_id'],turn) or data
+                        completed=completion_payloads.get((a['session_id'],turn)) or data
                         a['elapsed_seconds']=completed.get('elapsed_seconds');a['usage']=completed.get('usage',u)
                     host_usage.append(a['usage']);a['event_kind']=payload.get('kind');result['activity'].append(a)
                 # Aggregates use completion totals when present; a generation is not added again to its turn total.
@@ -218,6 +221,8 @@ def snapshot(home):
     # Classification names such as historical_authorization are categories, not credentials.
     clean['memory']['categories']=result['memory']['categories']
     clean['context_truncated']=result.get('context_total',0)>len(result['context'])
+    from .onboarding import status as connection_status
+    clean['connection']=connection_status(home)
     return clean
 
 def state(home):return _json(Path(home)/'.spielos/report-server.json',{})
@@ -279,7 +284,14 @@ def ensure_server(home,*,open_browser=False,port=None):
 def serve(home,port=8775):
     from http.server import ThreadingHTTPServer,BaseHTTPRequestHandler
     from .home import write_json
-    home=Path(home).resolve();snapshot(home);config=configuration(home);token=secrets.token_urlsafe(32);cookie_name='spielos_report_'+hashlib.sha256(str(home).encode()).hexdigest()[:10];runtime_sha=report_fingerprint()
+    home=Path(home).resolve();snapshot(home);config=configuration(home)
+    previous=state(home);capability=previous.get('token','');capability_file=home/'.spielos/report-server.json'
+    import re
+    # A normal product update must not invalidate an already authorized browser.
+    # Reuse only a private, same-home capability, never an insecure or foreign one.
+    reuse=previous.get('home')==str(home) and isinstance(capability,str) and re.fullmatch(r'[A-Za-z0-9_-]{32,128}',capability) and not is_link(capability_file) and is_private(capability_file)
+    token=capability if reuse else secrets.token_urlsafe(32)
+    cookie_name='spielos_report_'+hashlib.sha256(str(home).encode()).hexdigest()[:10];runtime_sha=report_fingerprint()
     class Handler(BaseHTTPRequestHandler):
         def log_message(self,*args):pass
         def _authorized(self):
@@ -305,6 +317,8 @@ def serve(home,port=8775):
                     from .onboarding import status
                     self._send(200,status(home));return
                 if route=='/api/document':self._send(200,_document(home,query.get('path',[''])[0]));return
+                if config['ui_root'] and config['preferred_ui']=='builtin' and route=='/'+config['ui_root']+'/index.html' and query.get('preserved')!=['1']:
+                    self.send_response(303);self.send_header('Location','/_spielos/index.html');self.end_headers();return
                 if route in ('/','/index.html'):
                     target=report_path(config);self.send_response(303);self.send_header('Location',quote(target,safe='/'));self.end_headers();return
                 if route.startswith('/_spielos/'):
